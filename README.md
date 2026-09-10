@@ -10,9 +10,9 @@
 ./dev.sh          # backend :8765 + frontend :5173
 ```
 
-`http://localhost:5173` 접속. 주제를 비워 두면 최근 10회에 안 나온 주제를 자동으로 고른다.
+`http://localhost:5173` 접속. 주제를 비워 두면 기술 · 문학 · 세계사 풀(`backend/app/topics.py`)에서 최근 10회에 안 나온 주제를 자동으로 고른다. 표현 5개는 주제와 무관한 B2~C1+ 범용 표현이다.
 
-생성은 로컬 `claude` CLI(`claude -p --json-schema`)를 서브프로세스로 호출한다. API 키 불필요, Claude 구독으로 처리. 1회 생성 약 1~2분(opus 기준). CLI에는 `Skill`, `Read` 도구만 열려 있고 MCP는 끈다.
+생성은 로컬 `claude` CLI(`claude -p --json-schema`)를 서브프로세스로 호출한다. API 키 불필요, Claude 구독으로 처리. 1회 생성 약 1~2분(opus 기준). CLI에는 `Skill`, `Read`와 firecrawl MCP(`firecrawl_search`, `firecrawl_scrape`)만 열려 있다. 아티클은 최대 3회 웹 검색으로 사실을 확인하고 최근 이슈를 각도로 잡는다. firecrawl은 호스트에서 `claude mcp add --transport http firecrawl https://mcp.firecrawl.dev/v2/mcp-oauth` 후 한 번 OAuth 로그인해 두면 된다.
 
 | 환경변수 | 기본값 | 용도 |
 |---|---|---|
@@ -23,10 +23,11 @@
 ## Docker
 
 ```sh
-claude setup-token                 # 장기 OAuth 토큰 발급 (구독 과금)
-cp .env.example .env               # 토큰, 모델, 스킬, 포트 기입
+cp .env.example .env               # 모델, 스킬, 포트 기입. 토큰은 비워도 된다
 docker compose up -d --build
 ```
+
+인증은 호스트의 `~/.claude/.credentials.json`(claude.ai 로그인 + firecrawl OAuth)을 컨테이너 시작 시 복사한다. 호스트에서 로그인이 바뀌면 `docker compose restart backend`. 호스트 로그인과 분리하려면 `claude setup-token` 값을 `.env`의 `CLAUDE_CODE_OAUTH_TOKEN`에 넣는다.
 
 `http://localhost:5173` 접속. 포트가 겹치면 `.env`의 `FRONTEND_PORT`를 바꾼다.
 
@@ -35,7 +36,7 @@ docker compose up -d --build
 | backend | python 3.13 + uv + Claude Code 바이너리. `backend/data`를 `/data`로 마운트해 SQLite 유지 |
 | frontend | Vite 빌드를 nginx로 서빙. `/api`를 backend:8765로 프록시, 타임아웃 600초 |
 
-스킬은 호스트의 `~/.claude/skills`와 `~/.claude/plugins`를 읽기 전용으로 같은 경로에 마운트한다(플러그인 매니페스트가 절대경로를 쓰므로 컨테이너 HOME을 호스트와 맞춘다). 호스트 `settings.json`에서는 `enabledPlugins`만 가져오므로 훅과 권한 설정은 컨테이너 안에서 돌지 않는다. stdio MCP 서버는 컨테이너에 없으므로 쓰지 않는다.
+스킬은 호스트의 `~/.claude/skills`와 `~/.claude/plugins`를 읽기 전용으로 같은 경로에 마운트한다(플러그인 매니페스트가 절대경로를 쓰므로 컨테이너 HOME을 호스트와 맞춘다). 호스트 `settings.json`에서는 `enabledPlugins`만 가져오므로 훅과 권한 설정은 컨테이너 안에서 돌지 않는다. MCP는 `--strict-mcp-config`로 firecrawl(HTTP)만 붙인다.
 
 ## 세션 진행 (30분)
 

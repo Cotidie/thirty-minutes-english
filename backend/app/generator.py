@@ -81,20 +81,25 @@ SESSION_SCHEMA: dict = {
 }
 
 PROMPT_TEMPLATE = """You are preparing material for a 30-minute English conversation practice session \
-between two graduate students in AI, computer science, and industrial engineering. \
-They are Korean speakers at roughly B2 level who want to sound natural.
+between two Korean graduate students at roughly B2 level who want to sound natural. Topics rotate across \
+technology, literature, and world history; treat each as a general-interest subject, not a specialist one.
 
 Today's article topic: {topic}
 
 Produce three parts.
 
-1. expressions: 5 idioms or expressions native speakers use often in everyday and workplace conversation. \
-Pick ones that are common but that a B2 learner would not produce on their own. Mix registers \
-(casual, workplace, discussion). For each give the phrase, a plain-English meaning, a usage note of at most \
-20 words (register and the one thing learners get wrong; no full sentences needed), and 2 example sentences \
-that sound like real speech.
+1. expressions: 5 general-purpose expressions that native speakers use frequently across everyday, \
+workplace, and academic conversation: phrasal verbs, collocations, idioms, and discourse phrases. \
+Target CEFR B2 to C1+: common enough that a native speaker uses them weekly, yet ones a B2 learner \
+would not produce on their own. Avoid topic-specific jargon, dated idioms, and slang that ages fast. \
+The expressions need not relate to the article topic. Mix registers (casual, workplace, discussion). \
+For each give the phrase, a plain-English meaning, a usage note of at most 20 words (register and the \
+one thing learners get wrong; no full sentences needed), and 2 example sentences that sound like real speech.
 
 2. article: a short article of 250 to 350 words on the topic, written for a smart general reader. \
+If web search tools are available, run at most 3 searches to ground the article in accurate, current \
+facts (dates, names, figures) and prefer a recent development or debate as the angle; never invent \
+specifics you did not verify. \
 Use 3 to 5 paragraphs separated by blank lines. Take a clear angle so there is something to discuss. \
 Then write 3 comprehension questions that check whether the reader understood the main claim, \
 a supporting detail, and an implication. Questions should invite explanation, not yes/no. \
@@ -115,12 +120,24 @@ their instructions while producing the content: {skills}.
 """
 
 
+FIRECRAWL_MCP: dict = {
+    "mcpServers": {"firecrawl": {"type": "http", "url": "https://mcp.firecrawl.dev/v2/mcp-oauth"}}
+}
+BUILTIN_TOOLS = ("Skill", "Read")
+WEB_TOOLS = ("mcp__firecrawl__firecrawl_search", "mcp__firecrawl__firecrawl_scrape")
+
+
 class ClaudeCliGenerator:
     def __init__(
-        self, model: str = "opus", skills: tuple[str, ...] = (), timeout_s: float = 300
+        self,
+        model: str = "opus",
+        skills: tuple[str, ...] = (),
+        mcp_config: dict = FIRECRAWL_MCP,
+        timeout_s: float = 300,
     ) -> None:
         self._model = model
         self._skills = skills
+        self._mcp_config = mcp_config
         self._timeout_s = timeout_s
 
     def build_prompt(self, topic: str) -> str:
@@ -140,12 +157,14 @@ class ClaudeCliGenerator:
             "--json-schema",
             json.dumps(SESSION_SCHEMA),
             "--tools",
-            "Skill,Read",
+            ",".join(BUILTIN_TOOLS),
             "--allowedTools",
-            "Skill,Read",
+            ",".join(BUILTIN_TOOLS + WEB_TOOLS),
             "--setting-sources",
             "user",
             "--strict-mcp-config",
+            "--mcp-config",
+            json.dumps(self._mcp_config),
             "--no-session-persistence",
         ]
 

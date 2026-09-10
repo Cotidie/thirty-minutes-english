@@ -35,13 +35,16 @@ def test_build_command_includes_model_and_schema():
     assert set(schema["required"]) == {"topic", "expressions", "article", "vocabulary"}
 
 
-def test_build_command_exposes_only_skill_and_read_tools():
+def test_build_command_exposes_skill_read_and_firecrawl_only():
     cmd = ClaudeCliGenerator(model="sonnet").build_command()
     assert cmd[cmd.index("--tools") + 1] == "Skill,Read"
-    assert cmd[cmd.index("--allowedTools") + 1] == "Skill,Read"
+    allowed = cmd[cmd.index("--allowedTools") + 1].split(",")
+    assert allowed == ["Skill", "Read", "mcp__firecrawl__firecrawl_search", "mcp__firecrawl__firecrawl_scrape"]
     assert cmd[cmd.index("--setting-sources") + 1] == "user"
     assert "--restricted" not in cmd
     assert "--strict-mcp-config" in cmd
+    mcp = json.loads(cmd[cmd.index("--mcp-config") + 1])
+    assert list(mcp["mcpServers"]) == ["firecrawl"]
 
 
 def test_prompt_mentions_topic():
