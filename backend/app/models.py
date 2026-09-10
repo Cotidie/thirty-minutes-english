@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from pydantic import BaseModel
+from pydantic import BaseModel, field_validator
 
 
 class Expression(BaseModel):
@@ -10,10 +10,22 @@ class Expression(BaseModel):
     examples: list[str]
 
 
+class Question(BaseModel):
+    text: str
+    evidence: list[str] = []
+
+
 class Article(BaseModel):
     title: str
     body: str
-    questions: list[str]
+    questions: list[Question]
+
+    @field_validator("questions", mode="before")
+    @classmethod
+    def coerce_legacy_strings(cls, value: object) -> object:
+        if isinstance(value, list):
+            return [{"text": q, "evidence": []} if isinstance(q, str) else q for q in value]
+        return value
 
 
 class VocabularyItem(BaseModel):

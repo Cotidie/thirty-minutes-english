@@ -517,6 +517,37 @@ a {
   margin-bottom: 0.75rem;
 }
 
+.question {
+  display: block;
+  width: 100%;
+  border: 0;
+  background: transparent;
+  padding: 0.15rem 0.35rem;
+  margin-left: -0.35rem;
+  text-align: left;
+  font: inherit;
+  line-height: inherit;
+}
+
+button.question {
+  cursor: pointer;
+  border-left: 3px solid transparent;
+}
+
+button.question:hover {
+  border-left-color: var(--line);
+}
+
+button.question.is-active {
+  border-left-color: var(--marker);
+  background: var(--marker-soft);
+}
+
+.article mark {
+  background: linear-gradient(transparent 6%, var(--marker) 6%, var(--marker) 94%, transparent 94%);
+  color: inherit;
+}
+
 /* Vocabulary */
 
 .vocab-grid {

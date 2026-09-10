@@ -45,7 +45,20 @@ SESSION_SCHEMA: dict = {
             "properties": {
                 "title": {"type": "string"},
                 "body": {"type": "string"},
-                "questions": {"type": "array", "minItems": 3, "maxItems": 3, "items": {"type": "string"}},
+                "questions": {
+                    "type": "array",
+                    "minItems": 3,
+                    "maxItems": 3,
+                    "items": {
+                        "type": "object",
+                        "additionalProperties": False,
+                        "required": ["text", "evidence"],
+                        "properties": {
+                            "text": {"type": "string"},
+                            "evidence": {"type": "array", "minItems": 1, "maxItems": 2, "items": {"type": "string"}},
+                        },
+                    },
+                },
             },
         },
         "vocabulary": {
@@ -84,7 +97,9 @@ that sound like real speech.
 2. article: a short article of 250 to 350 words on the topic, written for a smart general reader. \
 Use 3 to 5 paragraphs separated by blank lines. Take a clear angle so there is something to discuss. \
 Then write 3 comprehension questions that check whether the reader understood the main claim, \
-a supporting detail, and an implication. Questions should invite explanation, not yes/no.
+a supporting detail, and an implication. Questions should invite explanation, not yes/no. \
+For each question give evidence: 1 or 2 passages copied word for word from the article body (exact \
+substrings, 5 to 30 words each, same capitalization and punctuation) that the answer rests on.
 
 3. vocabulary: 8 words at B2 to C1 level or above that appear verbatim in the article body. \
 Prefer words useful across academic and professional English over topic-specific jargon. \

@@ -5,10 +5,15 @@ export interface Expression {
   examples: string[]
 }
 
+export interface Question {
+  text: string
+  evidence: string[]
+}
+
 export interface Article {
   title: string
   body: string
-  questions: string[]
+  questions: Question[]
 }
 
 export interface VocabularyItem {
