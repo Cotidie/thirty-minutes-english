@@ -434,8 +434,24 @@ a {
 }
 
 .expression-note {
+  display: block;
+  width: 100%;
+  border: 0;
+  background: transparent;
+  padding: 0;
+  text-align: left;
   color: var(--muted);
+  font-size: 0.95rem;
+  line-height: 1.45;
   margin: 0 0 0.9rem;
+  cursor: pointer;
+}
+
+.expression-note.is-clamped {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow: hidden;
 }
 
 .expression-examples {

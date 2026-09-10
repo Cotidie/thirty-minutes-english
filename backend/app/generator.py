@@ -77,8 +77,9 @@ Produce three parts.
 
 1. expressions: 5 idioms or expressions native speakers use often in everyday and workplace conversation. \
 Pick ones that are common but that a B2 learner would not produce on their own. Mix registers \
-(casual, workplace, discussion). For each give the phrase, a plain-English meaning, a short usage note \
-(register, typical situation, common mistake), and 2 example sentences that sound like real speech.
+(casual, workplace, discussion). For each give the phrase, a plain-English meaning, a usage note of at most \
+20 words (register and the one thing learners get wrong; no full sentences needed), and 2 example sentences \
+that sound like real speech.
 
 2. article: a short article of 250 to 350 words on the topic, written for a smart general reader. \
 Use 3 to 5 paragraphs separated by blank lines. Take a clear angle so there is something to discuss. \
