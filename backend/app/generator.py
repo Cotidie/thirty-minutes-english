@@ -109,13 +109,25 @@ sentence different from the article.
 Set topic to the article topic. Use American English. Return only the structured output."""
 
 
+SKILLS_PREAMBLE = """Before writing, invoke each of these skills with the Skill tool and follow \
+their instructions while producing the content: {skills}.
+
+"""
+
+
 class ClaudeCliGenerator:
-    def __init__(self, model: str = "opus", timeout_s: float = 300) -> None:
+    def __init__(
+        self, model: str = "opus", skills: tuple[str, ...] = (), timeout_s: float = 300
+    ) -> None:
         self._model = model
+        self._skills = skills
         self._timeout_s = timeout_s
 
     def build_prompt(self, topic: str) -> str:
-        return PROMPT_TEMPLATE.format(topic=topic)
+        prompt = PROMPT_TEMPLATE.format(topic=topic)
+        if self._skills:
+            prompt = SKILLS_PREAMBLE.format(skills=", ".join(self._skills)) + prompt
+        return prompt
 
     def build_command(self) -> list[str]:
         return [
@@ -127,9 +139,12 @@ class ClaudeCliGenerator:
             "json",
             "--json-schema",
             json.dumps(SESSION_SCHEMA),
-            "--restricted",
             "--tools",
-            "",
+            "Skill,Read",
+            "--allowedTools",
+            "Skill,Read",
+            "--setting-sources",
+            "user",
             "--strict-mcp-config",
             "--no-session-persistence",
         ]

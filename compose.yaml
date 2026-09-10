@@ -1,0 +1,23 @@
+services:
+  backend:
+    build:
+      context: ./backend
+      args:
+        UID: ${UID:-1000}
+        HOME_DIR: ${HOME}
+    environment:
+      CLAUDE_CODE_OAUTH_TOKEN: ${CLAUDE_CODE_OAUTH_TOKEN:?run `claude setup-token` and put it in .env}
+      CLAUDE_MODEL: ${CLAUDE_MODEL:-opus}
+      CLAUDE_SKILLS: ${CLAUDE_SKILLS:-}
+    volumes:
+      - ./backend/data:/data
+      - ${HOME}/.claude/skills:${HOME}/.claude/skills:ro
+      - ${HOME}/.claude/plugins:${HOME}/.claude/plugins:ro
+      - ${HOME}/.claude/settings.json:/host-settings.json:ro
+
+  frontend:
+    build: ./frontend
+    ports:
+      - "${FRONTEND_PORT:-5173}:80"
+    depends_on:
+      - backend

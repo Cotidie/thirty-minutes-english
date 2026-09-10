@@ -35,6 +35,27 @@ def test_build_command_includes_model_and_schema():
     assert set(schema["required"]) == {"topic", "expressions", "article", "vocabulary"}
 
 
+def test_build_command_exposes_only_skill_and_read_tools():
+    cmd = ClaudeCliGenerator(model="sonnet").build_command()
+    assert cmd[cmd.index("--tools") + 1] == "Skill,Read"
+    assert cmd[cmd.index("--allowedTools") + 1] == "Skill,Read"
+    assert cmd[cmd.index("--setting-sources") + 1] == "user"
+    assert "--restricted" not in cmd
+    assert "--strict-mcp-config" in cmd
+
+
 def test_prompt_mentions_topic():
     gen = ClaudeCliGenerator(model="sonnet")
     assert "Digital twins" in gen.build_prompt("Digital twins")
+
+
+def test_prompt_lists_skills_when_configured():
+    gen = ClaudeCliGenerator(model="sonnet", skills=("stop-slop", "cotidie:write-like-me"))
+    prompt = gen.build_prompt("Digital twins")
+    assert prompt.startswith("Before writing, invoke each of these skills")
+    assert "stop-slop, cotidie:write-like-me" in prompt
+    assert "Digital twins" in prompt
+
+
+def test_prompt_has_no_skill_preamble_by_default():
+    assert not ClaudeCliGenerator(model="sonnet").build_prompt("x").startswith("Before writing")
