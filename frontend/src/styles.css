@@ -192,11 +192,6 @@ a {
   border-color: var(--ink);
 }
 
-.topic-hint {
-  color: var(--muted);
-  margin: 1rem 0 0;
-}
-
 .history-title {
   font-family: var(--serif);
   font-weight: 500;
@@ -645,4 +640,74 @@ button.question.is-active {
   .timer-fill {
     transition: none;
   }
+}
+
+/* Generation progress */
+
+.gen {
+  margin-top: 1.25rem;
+  display: grid;
+  gap: 0.5rem;
+}
+
+.gen-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 1rem;
+  font-size: 0.95rem;
+}
+
+.gen-label {
+  font-weight: 500;
+}
+
+.gen-time {
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.gen-bar {
+  height: 0.5rem;
+  background: var(--marker-soft);
+  overflow: hidden;
+}
+
+.gen-fill {
+  height: 100%;
+  background: var(--marker);
+  transition: width 900ms ease-out;
+}
+
+.gen-topic {
+  margin: 0;
+  color: var(--muted);
+  font-family: var(--serif);
+  font-style: italic;
+}
+
+/* Sources */
+
+.sources {
+  margin-top: 1rem;
+  font-size: 0.92rem;
+}
+
+.sources summary {
+  cursor: pointer;
+  color: var(--muted);
+}
+
+.sources ul {
+  margin: 0.5rem 0 0;
+  padding-left: 1.2rem;
+}
+
+.sources li {
+  margin-bottom: 0.3rem;
+}
+
+.source-host {
+  margin-left: 0.5rem;
+  color: var(--muted);
 }

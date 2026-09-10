@@ -46,7 +46,6 @@ export function TopicPicker({ suggestions, busy, onGenerate }: Props) {
           ))}
         </ul>
       )}
-      {busy && <p className="topic-hint">Claude is writing five expressions, an article, and eight words. Usually one to two minutes.</p>}
     </form>
   )
 }

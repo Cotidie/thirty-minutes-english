@@ -24,6 +24,19 @@ describe('ArticleTab', () => {
     expect(document.querySelector('mark')).toBeNull()
   })
 
+  it('lists sources as links when present and hides the block when absent', () => {
+    const { unmount } = render(
+      <ArticleTab article={{ ...article, sources: [{ title: 'Kafka - Britannica', url: 'https://www.britannica.com/kafka' }] }} />,
+    )
+    const link = screen.getByRole('link', { name: 'Kafka - Britannica' })
+    expect(link).toHaveAttribute('href', 'https://www.britannica.com/kafka')
+    expect(screen.getByText('britannica.com')).toBeInTheDocument()
+    unmount()
+
+    render(<ArticleTab article={article} />)
+    expect(screen.queryByText('Sources')).toBeNull()
+  })
+
   it('renders a question without evidence as plain text', () => {
     render(<ArticleTab article={article} />)
     expect(screen.queryByRole('button', { name: 'Legacy question' })).toBeNull()

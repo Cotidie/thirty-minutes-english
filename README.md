@@ -12,7 +12,7 @@
 
 `http://localhost:5173` 접속. 주제를 비워 두면 기술 · 문학 · 세계사 풀(`backend/app/topics.py`)에서 최근 10회에 안 나온 주제를 자동으로 고른다. 표현 6개는 주제와 무관한 B2~C1+ 범용 표현이고, 어휘 12개는 주제 연관 단어로 아티클 밖에서도 고른다.
 
-생성은 로컬 `claude` CLI(`claude -p --json-schema`)를 서브프로세스로 호출한다. API 키 불필요, Claude 구독으로 처리. 1회 생성 약 1~2분(opus 기준). CLI에는 `Skill`, `Read`와 firecrawl MCP(`firecrawl_search`, `firecrawl_scrape`)만 열려 있다. 아티클은 최대 3회 웹 검색으로 사실을 확인하고 최근 이슈를 각도로 잡는다. firecrawl은 호스트에서 `claude mcp add --transport http firecrawl https://mcp.firecrawl.dev/v2/mcp-oauth` 후 한 번 OAuth 로그인해 두면 된다.
+생성은 로컬 `claude` CLI(`claude -p --json-schema --output-format stream-json`)를 서브프로세스로 호출한다. `POST /api/sessions`는 202로 작업 ID를 돌려주고, 프론트가 `GET /api/jobs/{id}`를 1초마다 폴링해 단계(스킬 로드 → 웹 검색 n회 → 작성 → 구조 확인)와 진행 바를 보여준다. 퍼센트는 단계 하한 + 경과 시간(최근 5회 중앙값 기준) 추정이다. API 키 불필요, Claude 구독으로 처리. 1회 생성 약 1~2분(opus 기준). CLI에는 `Skill`, `Read`와 firecrawl MCP(`firecrawl_search`, `firecrawl_scrape`)만 열려 있다. 아티클은 최대 3회 웹 검색으로 사실을 확인하고 최근 이슈를 각도로 잡는다. firecrawl은 호스트에서 `claude mcp add --transport http firecrawl https://mcp.firecrawl.dev/v2/mcp-oauth` 후 한 번 OAuth 로그인해 두면 된다.
 
 | 환경변수 | 기본값 | 용도 |
 |---|---|---|

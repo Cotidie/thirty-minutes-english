@@ -1,3 +1,4 @@
+import type { JobStatus } from './lib/progress'
 import type { Session, SessionSummary } from './types'
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
@@ -15,7 +16,8 @@ export const api = {
   topics: () => request<string[]>('/api/topics'),
   listSessions: () => request<SessionSummary[]>('/api/sessions'),
   getSession: (id: number) => request<Session>(`/api/sessions/${id}`),
-  createSession: (topic: string | null) =>
-    request<Session>('/api/sessions', { method: 'POST', body: JSON.stringify({ topic }) }),
+  startGeneration: (topic: string | null) =>
+    request<JobStatus>('/api/sessions', { method: 'POST', body: JSON.stringify({ topic }) }),
+  getJob: (id: string) => request<JobStatus>(`/api/jobs/${id}`),
   deleteSession: (id: number) => request<void>(`/api/sessions/${id}`, { method: 'DELETE' }),
 }

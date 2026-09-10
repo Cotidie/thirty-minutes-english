@@ -38,6 +38,21 @@ export function ArticleTab({ article }: { article: Article }) {
           ))}
         </ol>
       </details>
+      {article.sources && article.sources.length > 0 && (
+        <details className="sources">
+          <summary>Sources</summary>
+          <ul>
+            {article.sources.map((src) => (
+              <li key={src.url}>
+                <a href={src.url} target="_blank" rel="noreferrer">
+                  {src.title}
+                </a>
+                <span className="source-host">{hostOf(src.url)}</span>
+              </li>
+            ))}
+          </ul>
+        </details>
+      )}
     </section>
   )
 }
@@ -49,4 +64,12 @@ function QuestionItem({ question, active, onToggle }: { question: Question; acti
       {question.text}
     </button>
   )
+}
+
+function hostOf(url: string): string {
+  try {
+    return new URL(url).hostname.replace(/^www\./, '')
+  } catch {
+    return ''
+  }
 }

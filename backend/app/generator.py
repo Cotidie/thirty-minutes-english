@@ -1,11 +1,16 @@
 import json
 import os
 import subprocess
+import threading
+from collections.abc import Callable
 from typing import Protocol
 
 from pydantic import ValidationError
 
 from app.models import SessionContent
+from app.progress import Progress, StreamTracker
+
+OnProgress = Callable[[Progress], None]
 
 
 class GenerationError(Exception):
@@ -13,7 +18,7 @@ class GenerationError(Exception):
 
 
 class Generator(Protocol):
-    def generate(self, topic: str) -> SessionContent: ...
+    def generate(self, topic: str, on_progress: OnProgress | None = None) -> SessionContent: ...
 
 
 EXPRESSION_COUNT = 6
@@ -44,10 +49,21 @@ SESSION_SCHEMA: dict = {
         "article": {
             "type": "object",
             "additionalProperties": False,
-            "required": ["title", "body", "questions"],
+            "required": ["title", "body", "questions", "sources"],
             "properties": {
                 "title": {"type": "string"},
                 "body": {"type": "string"},
+                "sources": {
+                    "type": "array",
+                    "minItems": 0,
+                    "maxItems": 5,
+                    "items": {
+                        "type": "object",
+                        "additionalProperties": False,
+                        "required": ["title", "url"],
+                        "properties": {"title": {"type": "string"}, "url": {"type": "string"}},
+                    },
+                },
                 "questions": {
                     "type": "array",
                     "minItems": 3,
@@ -102,7 +118,8 @@ one thing learners get wrong; no full sentences needed), and 2 example sentences
 2. article: a short article of 250 to 350 words on the topic, written for a smart general reader. \
 If web search tools are available, run at most 3 searches to ground the article in accurate, current \
 facts (dates, names, figures) and prefer a recent development or debate as the angle; never invent \
-specifics you did not verify. \
+specifics you did not verify. In sources, list only the web pages you actually drew on (page title \
+and exact URL from the search results); leave it empty if you used none. \
 Use 3 to 5 paragraphs separated by blank lines. Take a clear angle so there is something to discuss. \
 Then write 3 discussion questions that check the main claim, a supporting detail, and an implication. \
 Each question is one short sentence of at most 14 words, in plain conversational wording a friend \
@@ -167,7 +184,8 @@ class ClaudeCliGenerator:
             "--effort",
             self._effort,
             "--output-format",
-            "json",
+            "stream-json",
+            "--verbose",
             "--json-schema",
             json.dumps(SESSION_SCHEMA),
             "--tools",
@@ -182,31 +200,59 @@ class ClaudeCliGenerator:
             "--no-session-persistence",
         ]
 
-    def generate(self, topic: str) -> SessionContent:
+    def generate(self, topic: str, on_progress: OnProgress | None = None) -> SessionContent:
         env = {k: v for k, v in os.environ.items() if k != "CLAUDECODE"}
+        tracker = StreamTracker(on_progress or (lambda _: None))
         try:
-            proc = subprocess.run(
+            proc = subprocess.Popen(
                 self.build_command(),
-                input=self.build_prompt(topic),
-                capture_output=True,
+                stdin=subprocess.PIPE,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
                 text=True,
-                timeout=self._timeout_s,
                 env=env,
             )
         except FileNotFoundError as e:
             raise GenerationError("claude CLI not found on PATH") from e
-        except subprocess.TimeoutExpired as e:
-            raise GenerationError(f"claude timed out after {self._timeout_s:.0f}s") from e
+        assert proc.stdin and proc.stdout and proc.stderr
+        proc.stdin.write(self.build_prompt(topic))
+        proc.stdin.close()
+        killer = threading.Timer(self._timeout_s, proc.kill)
+        killer.start()
+        result: dict | None = None
+        try:
+            for line in proc.stdout:
+                event = self._parse_event(line)
+                if event is None:
+                    continue
+                if event.get("type") == "result":
+                    result = event
+                tracker.feed(event)
+            stderr = proc.stderr.read()
+            proc.wait()
+        finally:
+            timed_out = not killer.is_alive()
+            killer.cancel()
+        if timed_out:
+            raise GenerationError(f"claude timed out after {self._timeout_s:.0f}s")
         if proc.returncode != 0:
-            raise GenerationError(f"claude exited {proc.returncode}: {proc.stderr.strip()[-500:]}")
-        return self.parse_output(proc.stdout)
+            raise GenerationError(f"claude exited {proc.returncode}: {stderr.strip()[-500:]}")
+        if result is None:
+            raise GenerationError("claude produced no result event")
+        return self.parse_result(result)
 
     @staticmethod
-    def parse_output(stdout: str) -> SessionContent:
+    def _parse_event(line: str) -> dict | None:
+        line = line.strip()
+        if not line:
+            return None
         try:
-            envelope = json.loads(stdout)
-        except json.JSONDecodeError as e:
-            raise GenerationError(f"claude returned non-JSON output: {stdout[:200]}") from e
+            return json.loads(line)
+        except json.JSONDecodeError:
+            return None
+
+    @staticmethod
+    def parse_result(envelope: dict) -> SessionContent:
         if envelope.get("is_error"):
             raise GenerationError(str(envelope.get("result", "unknown error")))
         payload = envelope.get("structured_output")

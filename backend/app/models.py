@@ -1,4 +1,5 @@
 from datetime import datetime
+from typing import Literal
 
 from pydantic import BaseModel, field_validator
 
@@ -15,10 +16,16 @@ class Question(BaseModel):
     evidence: list[str] = []
 
 
+class Source(BaseModel):
+    title: str
+    url: str
+
+
 class Article(BaseModel):
     title: str
     body: str
     questions: list[Question]
+    sources: list[Source] = []
 
     @field_validator("questions", mode="before")
     @classmethod
@@ -58,3 +65,16 @@ class Session(BaseModel):
 
 class CreateSessionRequest(BaseModel):
     topic: str | None = None
+
+
+class JobStatus(BaseModel):
+    id: str
+    topic: str
+    status: Literal["running", "done", "failed"]
+    stage: Literal["starting", "skills", "searching", "writing", "finalizing"]
+    searches: int
+    elapsed_seconds: float
+    stage_elapsed_seconds: float
+    expected_seconds: float
+    session_id: int | None = None
+    error: str | None = None

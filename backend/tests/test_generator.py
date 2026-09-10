@@ -6,24 +6,21 @@ from app.generator import ClaudeCliGenerator, GenerationError
 from tests.conftest import sample_content
 
 
-def test_parse_cli_output_returns_content():
+def test_parse_result_returns_content():
     payload = sample_content().model_dump()
-    stdout = json.dumps({"is_error": False, "structured_output": payload})
-    parsed = ClaudeCliGenerator.parse_output(stdout)
+    parsed = ClaudeCliGenerator.parse_result({"is_error": False, "structured_output": payload})
     assert parsed.article.title == "Twins at Work"
     assert len(parsed.vocabulary) == 12
 
 
-def test_parse_cli_output_raises_on_error_envelope():
-    stdout = json.dumps({"is_error": True, "result": "rate limited"})
+def test_parse_result_raises_on_error_envelope():
     with pytest.raises(GenerationError, match="rate limited"):
-        ClaudeCliGenerator.parse_output(stdout)
+        ClaudeCliGenerator.parse_result({"is_error": True, "result": "rate limited"})
 
 
-def test_parse_cli_output_raises_on_missing_structured_output():
-    stdout = json.dumps({"is_error": False, "result": "plain text"})
+def test_parse_result_raises_on_missing_structured_output():
     with pytest.raises(GenerationError):
-        ClaudeCliGenerator.parse_output(stdout)
+        ClaudeCliGenerator.parse_result({"is_error": False, "result": "plain text"})
 
 
 def test_build_command_includes_model_effort_and_schema():
@@ -32,6 +29,8 @@ def test_build_command_includes_model_effort_and_schema():
     assert cmd[0] == "claude"
     assert cmd[cmd.index("--model") + 1] == "sonnet"
     assert cmd[cmd.index("--effort") + 1] == "high"
+    assert cmd[cmd.index("--output-format") + 1] == "stream-json"
+    assert "--verbose" in cmd
     schema = json.loads(cmd[cmd.index("--json-schema") + 1])
     assert set(schema["required"]) == {"topic", "expressions", "article", "vocabulary"}
     assert schema["properties"]["expressions"]["minItems"] == 6
@@ -82,3 +81,10 @@ def test_prompt_has_no_skill_preamble_by_default():
 def test_prompt_asks_for_short_discussion_questions():
     prompt = ClaudeCliGenerator(model="sonnet").build_prompt("x")
     assert "at most 14 words" in prompt
+
+
+def test_schema_and_prompt_ask_for_sources():
+    gen = ClaudeCliGenerator(model="sonnet")
+    schema = json.loads(gen.build_command()[gen.build_command().index("--json-schema") + 1])
+    assert "sources" in schema["properties"]["article"]["required"]
+    assert "list only the web pages you actually drew on" in gen.build_prompt("x")

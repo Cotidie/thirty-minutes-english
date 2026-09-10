@@ -10,10 +10,16 @@ export interface Question {
   evidence: string[]
 }
 
+export interface Source {
+  title: string
+  url: string
+}
+
 export interface Article {
   title: string
   body: string
   questions: Question[]
+  sources?: Source[]
 }
 
 export interface VocabularyItem {

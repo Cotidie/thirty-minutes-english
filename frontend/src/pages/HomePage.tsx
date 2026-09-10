@@ -1,7 +1,9 @@
 import { useEffect, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { api } from '../api'
+import { GenerationProgress } from '../components/GenerationProgress'
 import { TopicPicker } from '../components/TopicPicker'
+import type { JobStatus } from '../lib/progress'
 import type { SessionSummary } from '../types'
 
 function shuffle<T>(items: T[]): T[] {
@@ -17,23 +19,40 @@ export function HomePage() {
   const navigate = useNavigate()
   const [topics, setTopics] = useState<string[]>([])
   const [sessions, setSessions] = useState<SessionSummary[]>([])
-  const [busy, setBusy] = useState(false)
+  const [job, setJob] = useState<JobStatus | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const busy = job !== null && job.status === 'running'
 
   useEffect(() => {
     api.topics().then((t) => setTopics(shuffle(t))).catch(() => setTopics([]))
     api.listSessions().then(setSessions).catch((e: Error) => setError(e.message))
   }, [])
 
+  useEffect(() => {
+    if (!busy || !job) return
+    const timer = setInterval(() => {
+      api
+        .getJob(job.id)
+        .then((next) => {
+          setJob(next)
+          if (next.status === 'done' && next.session_id !== null) navigate(`/s/${next.session_id}`)
+          if (next.status === 'failed') setError(next.error ?? 'generation failed')
+        })
+        .catch((e: Error) => {
+          setError(e.message)
+          setJob(null)
+        })
+    }, 1000)
+    return () => clearInterval(timer)
+  }, [busy, job, navigate])
+
   async function generate(topic: string | null) {
-    setBusy(true)
     setError(null)
     try {
-      const session = await api.createSession(topic)
-      navigate(`/s/${session.id}`)
+      setJob(await api.startGeneration(topic))
     } catch (e) {
       setError((e as Error).message)
-      setBusy(false)
+      setJob(null)
     }
   }
 
@@ -52,6 +71,7 @@ export function HomePage() {
       </header>
 
       <TopicPicker suggestions={topics} busy={busy} onGenerate={generate} />
+      {job && job.status !== 'failed' && <GenerationProgress job={job} />}
       {error && <p className="error">Could not create the session: {error}</p>}
 
       <section className="history">
