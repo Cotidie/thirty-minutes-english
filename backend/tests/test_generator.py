@@ -2,6 +2,7 @@ import json
 
 import pytest
 
+from app.exclusions import Exclusions
 from app.generator import ClaudeCliGenerator, GenerationError
 from tests.conftest import sample_content
 
@@ -88,3 +89,12 @@ def test_schema_and_prompt_ask_for_sources():
     schema = json.loads(gen.build_command()[gen.build_command().index("--json-schema") + 1])
     assert "sources" in schema["properties"]["article"]["required"]
     assert "list only the web pages you actually drew on" in gen.build_prompt("x")
+
+
+def test_prompt_lists_exclusions_only_when_given():
+    gen = ClaudeCliGenerator(model="sonnet")
+    assert "Already covered" not in gen.build_prompt("x")
+    assert "Already covered" not in gen.build_prompt("x", Exclusions())
+    prompt = gen.build_prompt("x", Exclusions(("on the fence", "push back"), ("scrutiny",)))
+    assert "Expressions: on the fence; push back" in prompt
+    assert "Words: scrutiny" in prompt

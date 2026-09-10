@@ -7,6 +7,7 @@ from typing import Protocol
 
 from pydantic import ValidationError
 
+from app.exclusions import Exclusions
 from app.models import SessionContent
 from app.progress import Progress, StreamTracker
 
@@ -18,7 +19,12 @@ class GenerationError(Exception):
 
 
 class Generator(Protocol):
-    def generate(self, topic: str, on_progress: OnProgress | None = None) -> SessionContent: ...
+    def generate(
+        self,
+        topic: str,
+        on_progress: OnProgress | None = None,
+        exclude: Exclusions | None = None,
+    ) -> SessionContent: ...
 
 
 EXPRESSION_COUNT = 6
@@ -139,6 +145,12 @@ sentence different from the article.
 Set topic to the article topic. Use American English. Return only the structured output."""
 
 
+EXCLUSIONS_TEMPLATE = """
+
+Already covered in earlier sessions. Do not reuse any of these.
+Expressions: {expressions}
+Words: {words}"""
+
 SKILLS_PREAMBLE = """Before writing, invoke each of these skills with the Skill tool and follow \
 their instructions while producing the content: {skills}.
 
@@ -167,12 +179,17 @@ class ClaudeCliGenerator:
         self._mcp_config = mcp_config
         self._timeout_s = timeout_s
 
-    def build_prompt(self, topic: str) -> str:
+    def build_prompt(self, topic: str, exclude: Exclusions | None = None) -> str:
         prompt = PROMPT_TEMPLATE.format(
             topic=topic, expression_count=EXPRESSION_COUNT, vocabulary_count=VOCABULARY_COUNT
         )
         if self._skills:
             prompt = SKILLS_PREAMBLE.format(skills=", ".join(self._skills)) + prompt
+        if exclude:
+            prompt += EXCLUSIONS_TEMPLATE.format(
+                expressions="; ".join(exclude.expressions) or "none",
+                words=", ".join(exclude.words) or "none",
+            )
         return prompt
 
     def build_command(self) -> list[str]:
@@ -200,7 +217,12 @@ class ClaudeCliGenerator:
             "--no-session-persistence",
         ]
 
-    def generate(self, topic: str, on_progress: OnProgress | None = None) -> SessionContent:
+    def generate(
+        self,
+        topic: str,
+        on_progress: OnProgress | None = None,
+        exclude: Exclusions | None = None,
+    ) -> SessionContent:
         env = {k: v for k, v in os.environ.items() if k != "CLAUDECODE"}
         tracker = StreamTracker(on_progress or (lambda _: None))
         try:
@@ -215,7 +237,7 @@ class ClaudeCliGenerator:
         except FileNotFoundError as e:
             raise GenerationError("claude CLI not found on PATH") from e
         assert proc.stdin and proc.stdout and proc.stderr
-        proc.stdin.write(self.build_prompt(topic))
+        proc.stdin.write(self.build_prompt(topic, exclude))
         proc.stdin.close()
         killer = threading.Timer(self._timeout_s, proc.kill)
         killer.start()

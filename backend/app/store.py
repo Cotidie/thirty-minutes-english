@@ -2,6 +2,7 @@ import sqlite3
 from datetime import UTC, datetime
 from pathlib import Path
 
+from app.exclusions import Exclusions
 from app.models import Session, SessionContent, SessionSummary
 
 
@@ -71,3 +72,17 @@ class SessionStore:
                 (limit,),
             ).fetchall()
         return [row["topic"] for row in rows]
+
+    def used_items(self, limit_sessions: int = 40) -> Exclusions:
+        """Distinct expressions and words from the most recent sessions, newest first."""
+        with self._connect() as conn:
+            rows = conn.execute(
+                "SELECT content_json FROM sessions ORDER BY id DESC LIMIT ?", (limit_sessions,)
+            ).fetchall()
+        expressions: dict[str, None] = {}
+        words: dict[str, None] = {}
+        for row in rows:
+            content = SessionContent.model_validate_json(row["content_json"])
+            expressions.update((e.phrase, None) for e in content.expressions)
+            words.update((v.word, None) for v in content.vocabulary)
+        return Exclusions(tuple(expressions), tuple(words))

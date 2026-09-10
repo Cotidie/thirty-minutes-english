@@ -1,5 +1,6 @@
 """Background generation jobs with observable progress, kept in memory."""
 
+import random
 import time
 import uuid
 from collections import deque
@@ -49,6 +50,7 @@ class Executor(Protocol):
 
 class JobRunner:
     DEFAULT_EXPECTED_SECONDS = 150.0
+    REPEAT_ALLOWANCE = 0.1  # each past item escapes the exclusion list with this probability
 
     def __init__(
         self, generator: Generator, store: SessionStore, executor: Executor | None = None
@@ -77,7 +79,8 @@ class JobRunner:
 
     def _run(self, job: Job) -> None:
         try:
-            content = self._generator.generate(job.topic, on_progress=job.apply)
+            exclude = self._store.used_items().thin(1 - self.REPEAT_ALLOWANCE, random.Random())
+            content = self._generator.generate(job.topic, on_progress=job.apply, exclude=exclude)
         except GenerationError as e:
             job.error = str(e)
             job.status = "failed"

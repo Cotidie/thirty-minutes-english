@@ -41,3 +41,16 @@ def test_recent_topics_returns_latest_distinct(tmp_path):
         store.create(sample_content(topic=topic))
     assert store.recent_topics(limit=2) == ["C", "A"]
     assert store.recent_topics(limit=10) == ["C", "A", "B"]
+
+
+def test_used_items_collects_distinct_phrases_and_words_newest_first(tmp_path):
+    store = SessionStore(tmp_path / "s.db")
+    store.create(sample_content(topic="A"))
+    store.create(sample_content(topic="B"))
+    used = store.used_items()
+    assert used.expressions == tuple(f"phrase {i}" for i in range(6))
+    assert used.words == tuple(f"word{i}" for i in range(12))
+
+
+def test_used_items_is_empty_on_fresh_store(tmp_path):
+    assert not SessionStore(tmp_path / "s.db").used_items()

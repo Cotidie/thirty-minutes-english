@@ -19,16 +19,18 @@ class InlineExecutor:
 class FakeGenerator:
     def __init__(self):
         self.topics: list[str] = []
+        self.excluded: list = []
 
-    def generate(self, topic: str, on_progress=None):
+    def generate(self, topic: str, on_progress=None, exclude=None):
         self.topics.append(topic)
+        self.excluded.append(exclude)
         if on_progress:
             on_progress(Progress(Stage.SEARCHING, 2))
         return sample_content(topic=topic, title=f"About {topic}")
 
 
 class FailingGenerator:
-    def generate(self, topic: str, on_progress=None):
+    def generate(self, topic: str, on_progress=None, exclude=None):
         raise GenerationError("claude exited 1")
 
 
@@ -104,3 +106,12 @@ def test_job_reports_failure_when_generator_fails(tmp_path):
     assert job["status"] == "failed"
     assert "claude exited 1" in job["error"]
     assert job["session_id"] is None
+
+
+def test_second_generation_receives_items_from_the_first(client):
+    create(client, "A")
+    create(client, "B")
+    first, second = client.generator.excluded
+    assert not first
+    assert set(second.expressions) <= {f"phrase {i}" for i in range(6)}
+    assert set(second.words) <= {f"word{i}" for i in range(12)}
