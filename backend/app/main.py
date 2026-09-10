@@ -1,3 +1,4 @@
+import logging
 import os
 from pathlib import Path
 
@@ -74,6 +75,7 @@ def create_app(store: SessionStore, generator: Generator, executor: Executor | N
 
 
 def default_app() -> FastAPI:
+    logging.basicConfig(level=logging.INFO, format="%(levelname)s %(name)s: %(message)s")
     return create_app(
         SessionStore(os.environ.get("DB_PATH", ROOT / "data" / "sessions.db")),
         ClaudeCliGenerator(
