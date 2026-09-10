@@ -93,8 +93,8 @@ def test_schema_and_prompt_ask_for_sources():
 
 def test_prompt_lists_exclusions_only_when_given():
     gen = ClaudeCliGenerator(model="sonnet")
-    assert "Already covered" not in gen.build_prompt("x")
-    assert "Already covered" not in gen.build_prompt("x", Exclusions())
+    assert "HARD CONSTRAINT" not in gen.build_prompt("x")
+    assert "HARD CONSTRAINT" not in gen.build_prompt("x", Exclusions())
     prompt = gen.build_prompt("x", Exclusions(("on the fence", "push back"), ("scrutiny",)))
-    assert "Expressions: on the fence; push back" in prompt
-    assert "Words: scrutiny" in prompt
+    assert "Banned expressions: on the fence; push back" in prompt
+    assert "Banned words: scrutiny" in prompt

@@ -147,9 +147,11 @@ Set topic to the article topic. Use American English. Return only the structured
 
 EXCLUSIONS_TEMPLATE = """
 
-Already covered in earlier sessions. Do not reuse any of these.
-Expressions: {expressions}
-Words: {words}"""
+HARD CONSTRAINT. The items below were already taught in earlier sessions. Do not include any of them, \
+nor close variants (same phrase with a different pronoun, particle, or tense). Before you finalize, \
+check every expression and every vocabulary word against these lists and replace any match.
+Banned expressions: {expressions}
+Banned words: {words}"""
 
 SKILLS_PREAMBLE = """Before writing, invoke each of these skills with the Skill tool and follow \
 their instructions while producing the content: {skills}.

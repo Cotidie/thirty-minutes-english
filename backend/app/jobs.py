@@ -1,5 +1,6 @@
 """Background generation jobs with observable progress, kept in memory."""
 
+import logging
 import random
 import time
 import uuid
@@ -15,6 +16,7 @@ from app.progress import Progress, Stage
 from app.store import SessionStore
 
 Status = Literal["running", "done", "failed"]
+log = logging.getLogger(__name__)
 
 
 @dataclass
@@ -79,12 +81,21 @@ class JobRunner:
 
     def _run(self, job: Job) -> None:
         try:
-            exclude = self._store.used_items().thin(1 - self.REPEAT_ALLOWANCE, random.Random())
+            used = self._store.used_items()
+            exclude = used.thin(1 - self.REPEAT_ALLOWANCE, random.Random())
+            log.info("job %s: banning %d/%d expressions, %d/%d words", job.id,
+                     len(exclude.expressions), len(used.expressions), len(exclude.words), len(used.words))
             content = self._generator.generate(job.topic, on_progress=job.apply, exclude=exclude)
         except GenerationError as e:
             job.error = str(e)
             job.status = "failed"
             return
+        leaked = sorted(
+            {e.phrase for e in content.expressions} & set(exclude.expressions)
+            | {v.word for v in content.vocabulary} & set(exclude.words)
+        )
+        if leaked:
+            log.warning("job %s: %d banned items came back anyway: %s", job.id, len(leaked), leaked)
         session = self._store.create(content)
         with self._lock:
             self._durations.append(job.elapsed_seconds)
