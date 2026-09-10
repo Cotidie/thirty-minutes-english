@@ -47,7 +47,7 @@ export function HomePage() {
       <header className="home-header">
         <h1 className="brand">Thirty minutes of English</h1>
         <p className="lede">
-          Five expressions, one short article, eight words. Everything you two need to talk for half an hour.
+          Six expressions, one short article, twelve words. Everything you two need to talk for half an hour.
         </p>
       </header>
 

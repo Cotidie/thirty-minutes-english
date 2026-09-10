@@ -58,6 +58,7 @@ def default_app() -> FastAPI:
         SessionStore(os.environ.get("DB_PATH", ROOT / "data" / "sessions.db")),
         ClaudeCliGenerator(
             model=os.environ.get("CLAUDE_MODEL", "opus"),
+            effort=os.environ.get("CLAUDE_EFFORT", "xhigh"),
             skills=tuple(s for s in os.environ.get("CLAUDE_SKILLS", "").split(",") if s.strip()),
         ),
     )

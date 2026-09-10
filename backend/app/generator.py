@@ -16,6 +16,9 @@ class Generator(Protocol):
     def generate(self, topic: str) -> SessionContent: ...
 
 
+EXPRESSION_COUNT = 6
+VOCABULARY_COUNT = 12
+
 SESSION_SCHEMA: dict = {
     "type": "object",
     "additionalProperties": False,
@@ -24,8 +27,8 @@ SESSION_SCHEMA: dict = {
         "topic": {"type": "string"},
         "expressions": {
             "type": "array",
-            "minItems": 5,
-            "maxItems": 5,
+            "minItems": EXPRESSION_COUNT,
+            "maxItems": EXPRESSION_COUNT,
             "items": {
                 "type": "object",
                 "additionalProperties": False,
@@ -63,8 +66,8 @@ SESSION_SCHEMA: dict = {
         },
         "vocabulary": {
             "type": "array",
-            "minItems": 8,
-            "maxItems": 8,
+            "minItems": VOCABULARY_COUNT,
+            "maxItems": VOCABULARY_COUNT,
             "items": {
                 "type": "object",
                 "additionalProperties": False,
@@ -88,7 +91,7 @@ Today's article topic: {topic}
 
 Produce three parts.
 
-1. expressions: 5 general-purpose expressions that native speakers use frequently across everyday, \
+1. expressions: {expression_count} general-purpose expressions that native speakers use frequently across everyday, \
 workplace, and academic conversation: phrasal verbs, collocations, idioms, and discourse phrases. \
 Target CEFR B2 to C1+: common enough that a native speaker uses them weekly, yet ones a B2 learner \
 would not produce on their own. Avoid topic-specific jargon, dated idioms, and slang that ages fast. \
@@ -101,13 +104,18 @@ If web search tools are available, run at most 3 searches to ground the article 
 facts (dates, names, figures) and prefer a recent development or debate as the angle; never invent \
 specifics you did not verify. \
 Use 3 to 5 paragraphs separated by blank lines. Take a clear angle so there is something to discuss. \
-Then write 3 comprehension questions that check whether the reader understood the main claim, \
-a supporting detail, and an implication. Questions should invite explanation, not yes/no. \
+Then write 3 discussion questions that check the main claim, a supporting detail, and an implication. \
+Each question is one short sentence of at most 14 words, in plain conversational wording a friend \
+would ask across a table. No compound questions, no "explain the writer's reasoning", no quoting. \
+Example of the right length: "Why does the writer call the space race a bad label?" \
+Questions should invite explanation, not yes/no. \
 For each question give evidence: 1 or 2 passages copied word for word from the article body (exact \
 substrings, 5 to 30 words each, same capitalization and punctuation) that the answer rests on.
 
-3. vocabulary: 8 words at B2 to C1 level or above that appear verbatim in the article body. \
-Prefer words useful across academic and professional English over topic-specific jargon. \
+3. vocabulary: {vocabulary_count} words at B2 to C1+ level connected to the topic. Draw from the \
+article body where it offers strong candidates, and fill the rest with words a well-read speaker would \
+use when discussing this subject even if they do not appear in the article. Prefer words useful across \
+academic and professional English over topic-specific jargon; no proper nouns. \
 For each give the word, part of speech, a concise learner-dictionary definition, and one example \
 sentence different from the article.
 
@@ -131,17 +139,21 @@ class ClaudeCliGenerator:
     def __init__(
         self,
         model: str = "opus",
+        effort: str = "xhigh",
         skills: tuple[str, ...] = (),
         mcp_config: dict = FIRECRAWL_MCP,
         timeout_s: float = 300,
     ) -> None:
         self._model = model
+        self._effort = effort
         self._skills = skills
         self._mcp_config = mcp_config
         self._timeout_s = timeout_s
 
     def build_prompt(self, topic: str) -> str:
-        prompt = PROMPT_TEMPLATE.format(topic=topic)
+        prompt = PROMPT_TEMPLATE.format(
+            topic=topic, expression_count=EXPRESSION_COUNT, vocabulary_count=VOCABULARY_COUNT
+        )
         if self._skills:
             prompt = SKILLS_PREAMBLE.format(skills=", ".join(self._skills)) + prompt
         return prompt
@@ -152,6 +164,8 @@ class ClaudeCliGenerator:
             "-p",
             "--model",
             self._model,
+            "--effort",
+            self._effort,
             "--output-format",
             "json",
             "--json-schema",

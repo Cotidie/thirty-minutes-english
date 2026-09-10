@@ -11,7 +11,7 @@ def test_parse_cli_output_returns_content():
     stdout = json.dumps({"is_error": False, "structured_output": payload})
     parsed = ClaudeCliGenerator.parse_output(stdout)
     assert parsed.article.title == "Twins at Work"
-    assert len(parsed.vocabulary) == 8
+    assert len(parsed.vocabulary) == 12
 
 
 def test_parse_cli_output_raises_on_error_envelope():
@@ -26,13 +26,28 @@ def test_parse_cli_output_raises_on_missing_structured_output():
         ClaudeCliGenerator.parse_output(stdout)
 
 
-def test_build_command_includes_model_and_schema():
-    gen = ClaudeCliGenerator(model="sonnet")
+def test_build_command_includes_model_effort_and_schema():
+    gen = ClaudeCliGenerator(model="sonnet", effort="high")
     cmd = gen.build_command()
     assert cmd[0] == "claude"
-    assert "--model" in cmd and cmd[cmd.index("--model") + 1] == "sonnet"
+    assert cmd[cmd.index("--model") + 1] == "sonnet"
+    assert cmd[cmd.index("--effort") + 1] == "high"
     schema = json.loads(cmd[cmd.index("--json-schema") + 1])
     assert set(schema["required"]) == {"topic", "expressions", "article", "vocabulary"}
+    assert schema["properties"]["expressions"]["minItems"] == 6
+    assert schema["properties"]["vocabulary"]["maxItems"] == 12
+
+
+def test_default_effort_is_xhigh():
+    cmd = ClaudeCliGenerator(model="sonnet").build_command()
+    assert cmd[cmd.index("--effort") + 1] == "xhigh"
+
+
+def test_prompt_states_counts_and_relaxed_vocabulary_rule():
+    prompt = ClaudeCliGenerator(model="sonnet").build_prompt("x")
+    assert "6 general-purpose expressions" in prompt
+    assert "12 words at B2 to C1+" in prompt
+    assert "even if they do not appear in the article" in prompt
 
 
 def test_build_command_exposes_skill_read_and_firecrawl_only():
@@ -62,3 +77,8 @@ def test_prompt_lists_skills_when_configured():
 
 def test_prompt_has_no_skill_preamble_by_default():
     assert not ClaudeCliGenerator(model="sonnet").build_prompt("x").startswith("Before writing")
+
+
+def test_prompt_asks_for_short_discussion_questions():
+    prompt = ClaudeCliGenerator(model="sonnet").build_prompt("x")
+    assert "at most 14 words" in prompt

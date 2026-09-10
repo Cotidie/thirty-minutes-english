@@ -8,6 +8,7 @@ services:
     environment:
       CLAUDE_CODE_OAUTH_TOKEN: ${CLAUDE_CODE_OAUTH_TOKEN:-}
       CLAUDE_MODEL: ${CLAUDE_MODEL:-opus}
+      CLAUDE_EFFORT: ${CLAUDE_EFFORT:-xhigh}
       CLAUDE_SKILLS: ${CLAUDE_SKILLS:-}
     volumes:
       - ./backend/data:/data

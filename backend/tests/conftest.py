@@ -13,7 +13,7 @@ def sample_content(topic: str = "Digital twins", title: str = "Twins at Work") -
                 usage_note=f"note {i}",
                 examples=[f"ex {i}a", f"ex {i}b"],
             )
-            for i in range(5)
+            for i in range(6)
         ],
         article=Article(
             title=title,
@@ -22,7 +22,7 @@ def sample_content(topic: str = "Digital twins", title: str = "Twins at Work") -
         ),
         vocabulary=[
             VocabularyItem(word=f"word{i}", pos="noun", definition=f"def {i}", example=f"ex {i}")
-            for i in range(8)
+            for i in range(12)
         ],
     )
 
