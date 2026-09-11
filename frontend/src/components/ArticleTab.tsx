@@ -19,7 +19,7 @@ export function ArticleTab({ article }: { article: Article }) {
       <p className="tab-brief">
         Read silently for three minutes. Then each of you summarizes the article in your own words before opening the
         questions. Click a question to see the passage it comes from. Press Read aloud under a paragraph to have a
-        native-speaker coach listen and correct you as you read it.
+        native-speaker coach listen and correct your pronunciation as you read it.
       </p>
       <article className="article" ref={bodyRef}>
         <h2 className="article-title">{article.title}</h2>
