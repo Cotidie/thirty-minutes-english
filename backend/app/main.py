@@ -6,18 +6,26 @@ from fastapi import FastAPI, HTTPException, Request, Response
 
 from app.generator import ClaudeCliGenerator, Generator
 from app.jobs import Executor, Job, JobRunner
-from app.models import CreateSessionRequest, JobStatus, Session, SessionSummary
+from app.models import CreateSessionRequest, JobStatus, ReadAloudRequest, ReadAloudSession, Session, SessionSummary
+from app.read_aloud import AgentDefinition, LiveSessionError, OpenAILiveSessions, ReadAloudCoach
 from app.store import SessionStore
 from app.topics import TOPICS, pick_topic
 
 ROOT = Path(__file__).resolve().parent.parent
+READ_ALOUD_AGENT_DIR = ROOT.parent.parent / "read-aloud-coach"
 RECENT_TOPIC_WINDOW = 10
 
 
-def create_app(store: SessionStore, generator: Generator, executor: Executor | None = None) -> FastAPI:
+def create_app(
+    store: SessionStore,
+    generator: Generator,
+    executor: Executor | None = None,
+    coach: ReadAloudCoach | None = None,
+) -> FastAPI:
     app = FastAPI(title="english-speaking-claude")
     app.state.store = store
     app.state.jobs = JobRunner(generator, store, executor)
+    app.state.coach = coach
 
     def status_of(job: Job, runner: JobRunner) -> JobStatus:
         return JobStatus(
@@ -71,7 +79,25 @@ def create_app(store: SessionStore, generator: Generator, executor: Executor | N
             raise HTTPException(status_code=404, detail="session not found")
         return Response(status_code=204)
 
+    @app.post("/api/read-aloud/sessions", response_model=ReadAloudSession, status_code=201)
+    def start_read_aloud(body: ReadAloudRequest, request: Request) -> dict:
+        coach: ReadAloudCoach | None = request.app.state.coach
+        if coach is None:
+            raise HTTPException(status_code=503, detail="read-aloud is off: set OPENAI_API_KEY on the backend")
+        try:
+            return coach.start(body.paragraph, body.sdp)
+        except LiveSessionError as e:
+            raise HTTPException(status_code=502, detail=f"GPT-Live session failed: {e.message}") from e
+
     return app
+
+
+def read_aloud_coach() -> ReadAloudCoach | None:
+    api_key = os.environ.get("OPENAI_API_KEY", "").strip()
+    if not api_key:
+        return None
+    agent_dir = Path(os.environ.get("READ_ALOUD_AGENT_DIR", READ_ALOUD_AGENT_DIR))
+    return ReadAloudCoach(AgentDefinition(agent_dir), OpenAILiveSessions(api_key))
 
 
 def default_app() -> FastAPI:
@@ -83,6 +109,7 @@ def default_app() -> FastAPI:
             effort=os.environ.get("CLAUDE_EFFORT", "xhigh"),
             skills=tuple(s for s in os.environ.get("CLAUDE_SKILLS", "").split(",") if s.strip()),
         ),
+        coach=read_aloud_coach(),
     )
 
 

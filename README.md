@@ -20,6 +20,14 @@
 | `CLAUDE_EFFORT` | `xhigh` | reasoning effort. `low`, `medium`, `high`, `xhigh`, `max` |
 | `CLAUDE_SKILLS` | 비움 | 생성 전에 호출할 스킬. 쉼표 구분. 예: `stop-slop,cotidie:write-like-me` |
 | `DB_PATH` | `backend/data/sessions.db` | SQLite 파일 |
+| `OPENAI_API_KEY` | 비움 | Read aloud 코치용. 비우면 버튼이 503을 돌려준다 |
+| `READ_ALOUD_AGENT_DIR` | `../read-aloud-coach` | 코치 에이전트 정의 폴더(프롬프트, 세션 설정) |
+
+## Read aloud (GPT-Live)
+
+Article 탭의 문단마다 `Read aloud` 버튼이 있다. 누르면 브라우저 마이크가 GPT-Live(`gpt-live-1`)에 WebRTC로 붙고, 읽는 동안 원어민 코치가 듣다가 어색한 발음·끊어 읽기·억양이 나오면 그 자리에서 짧게 고쳐 준다. 문단을 대신 읽어 주지는 않는다. `Finish`를 누르면 마무리 한마디, `Stop`은 세션 종료. 분당 $0.05, 문단 하나에 약 $0.10.
+
+에이전트 정의(프롬프트, 세션 설정, 검증 시나리오)는 `../read-aloud-coach/`에 있고 backend는 그 폴더를 읽기만 한다. backend `POST /api/read-aloud/sessions`가 브라우저의 SDP offer를 `POST https://api.openai.com/v1/live/sessions`에 중계한다. API 키는 backend 환경변수에만 둔다.
 
 ## Docker
 
@@ -52,8 +60,8 @@ docker compose up -d --build
 ## 구조
 
 ```
-backend/   FastAPI. app/{main,generator,store,topics,models}.py, tests/
-frontend/  React 19 + Vite + TS. src/{pages,components,lib}
+backend/   FastAPI. app/{main,generator,read_aloud,store,topics,models}.py, tests/
+frontend/  React 19 + Vite + TS. src/{pages,components,lib}. lib/readAloudClient.ts가 WebRTC
 dev.sh     둘 다 띄우는 스크립트
 ```
 

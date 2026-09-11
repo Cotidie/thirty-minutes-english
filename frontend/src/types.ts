@@ -49,3 +49,8 @@ export interface Session {
   topic: string
   content: SessionContent
 }
+
+export interface ReadAloudSession {
+  session: { id: string }
+  transport: { type: 'webrtc'; sdp: string }
+}

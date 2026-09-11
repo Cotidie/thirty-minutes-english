@@ -78,3 +78,22 @@ class JobStatus(BaseModel):
     expected_seconds: float
     session_id: int | None = None
     error: str | None = None
+
+
+class ReadAloudRequest(BaseModel):
+    paragraph: str
+    sdp: str
+
+    @field_validator("paragraph", "sdp")
+    @classmethod
+    def not_blank(cls, value: str) -> str:
+        if not value.strip():
+            raise ValueError("must not be blank")
+        return value
+
+
+class ReadAloudSession(BaseModel):
+    """Passthrough of OpenAI's session-creation answer: {session: {id}, transport: {type, sdp}}."""
+
+    session: dict
+    transport: dict

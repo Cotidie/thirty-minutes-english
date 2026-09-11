@@ -1,9 +1,11 @@
 import { useEffect, useRef, useState } from 'react'
 import { highlightSegments } from '../lib/highlight'
 import type { Article, Question } from '../types'
+import { ReadAloud } from './ReadAloud'
 
 export function ArticleTab({ article }: { article: Article }) {
   const [active, setActive] = useState<number | null>(null)
+  const [reading, setReading] = useState<number | null>(null)
   const bodyRef = useRef<HTMLElement>(null)
   const paragraphs = article.body.split(/\n\s*\n/).map((p) => p.trim()).filter(Boolean)
   const evidence = active === null ? [] : article.questions[active].evidence
@@ -16,16 +18,25 @@ export function ArticleTab({ article }: { article: Article }) {
     <section className="tab-panel">
       <p className="tab-brief">
         Read silently for three minutes. Then each of you summarizes the article in your own words before opening the
-        questions. Click a question to see the passage it comes from.
+        questions. Click a question to see the passage it comes from. Press Read aloud under a paragraph to have a
+        native-speaker coach listen and correct you as you read it.
       </p>
       <article className="article" ref={bodyRef}>
         <h2 className="article-title">{article.title}</h2>
         {paragraphs.map((p, i) => (
-          <p key={i}>
-            {highlightSegments(p, evidence).map((seg, j) =>
-              seg.marked ? <mark key={j}>{seg.text}</mark> : <span key={j}>{seg.text}</span>,
-            )}
-          </p>
+          <div key={i} className="paragraph">
+            <p>
+              {highlightSegments(p, evidence).map((seg, j) =>
+                seg.marked ? <mark key={j}>{seg.text}</mark> : <span key={j}>{seg.text}</span>,
+              )}
+            </p>
+            <ReadAloud
+              paragraph={p}
+              active={reading !== null && reading !== i}
+              onStart={() => setReading(i)}
+              onEnd={() => setReading(null)}
+            />
+          </div>
         ))}
       </article>
       <details className="questions" open={active !== null || undefined}>

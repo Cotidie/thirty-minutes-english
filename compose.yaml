@@ -10,8 +10,11 @@ services:
       CLAUDE_MODEL: ${CLAUDE_MODEL:-opus}
       CLAUDE_EFFORT: ${CLAUDE_EFFORT:-xhigh}
       CLAUDE_SKILLS: ${CLAUDE_SKILLS:-}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      READ_ALOUD_AGENT_DIR: /agents/read-aloud-coach
     volumes:
       - ./backend/data:/data
+      - ../read-aloud-coach:/agents/read-aloud-coach:ro
       - ${HOME}/.claude/skills:${HOME}/.claude/skills:ro
       - ${HOME}/.claude/plugins:${HOME}/.claude/plugins:ro
       - ${HOME}/.claude/settings.json:/host-settings.json:ro

@@ -538,6 +538,90 @@ button.question.is-active {
   background: var(--marker-soft);
 }
 
+.paragraph {
+  margin: 0 0 1.1em;
+}
+
+.paragraph > p {
+  margin: 0;
+}
+
+.read-aloud {
+  font-family: var(--sans);
+  font-size: 0.86rem;
+  line-height: 1.45;
+  margin-top: 0.35rem;
+}
+
+.read-aloud audio {
+  display: none;
+}
+
+.read-aloud-start {
+  border: 1px solid var(--line);
+  background: transparent;
+  border-radius: 999px;
+  padding: 0.15rem 0.7rem;
+  cursor: pointer;
+  color: var(--muted);
+}
+
+.read-aloud-start:hover:not(:disabled) {
+  border-color: var(--ink);
+  color: var(--ink);
+}
+
+.read-aloud-start:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+.read-aloud.is-live {
+  border-left: 3px solid var(--marker);
+  padding-left: 0.75rem;
+}
+
+.read-aloud-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.6rem;
+}
+
+.read-aloud-bar button {
+  border: 1px solid var(--line);
+  background: var(--paper);
+  border-radius: 999px;
+  padding: 0.1rem 0.65rem;
+  cursor: pointer;
+}
+
+.read-aloud-seconds {
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.read-aloud-error {
+  color: #a13a2f;
+  margin: 0.3rem 0 0;
+}
+
+.read-aloud-captions {
+  display: grid;
+  grid-template-columns: 3.5rem 1fr;
+  gap: 0.2rem 0.6rem;
+  margin: 0.5rem 0 0;
+}
+
+.read-aloud-captions dt {
+  color: var(--muted);
+}
+
+.read-aloud-captions dd {
+  margin: 0;
+  white-space: pre-wrap;
+}
+
 .article mark {
   background: linear-gradient(transparent 6%, var(--marker) 6%, var(--marker) 94%, transparent 94%);
   color: inherit;
