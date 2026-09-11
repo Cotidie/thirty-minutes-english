@@ -28,8 +28,10 @@ export async function connectReadAloud(opts: ReadAloudOptions): Promise<ReadAlou
   const peer = new RTCPeerConnection()
   let microphone: MediaStream | undefined
   let finalized = false
+  let disposed = false
 
   const dispose = () => {
+    disposed = true
     microphone?.getTracks().forEach((t) => t.stop())
     events.close()
     peer.close()
@@ -50,10 +52,10 @@ export async function connectReadAloud(opts: ReadAloudOptions): Promise<ReadAlou
     if (event.type === 'session.closed') dispose()
   })
   events.addEventListener('close', () => {
-    if (!finalized) {
-      dispose()
-      opts.onDisconnect()
-    }
+    // A close we caused (dispose after an error or session.closed) is not a drop.
+    if (finalized || disposed) return
+    dispose()
+    opts.onDisconnect()
   })
 
   try {
