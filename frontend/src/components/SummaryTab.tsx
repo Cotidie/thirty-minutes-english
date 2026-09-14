@@ -31,11 +31,6 @@ export function SummaryTab({ sessionId }: { sessionId: number }) {
 
   return (
     <section className="tab-panel">
-      <p className="tab-brief">
-        What this session left behind. Expressions you asked for, and the words the coach stopped you on while reading.
-        Both are written up the first time you open this tab.
-      </p>
-
       {error && <p className="error">Could not read the session back: {error}</p>}
       {loading && <p className="empty">Reading it back…</p>}
 
