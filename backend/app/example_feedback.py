@@ -1,4 +1,4 @@
-"""A sentence the reader made with a target, said back the native way with one line of feedback.
+"""A sentence the reader made with a target, said back the native way with a line per change.
 
 GPT-Live only hears the sentence and reads the answer aloud; the judgment is a
 text run of the claude CLI with the prompt in the example-coach folder.

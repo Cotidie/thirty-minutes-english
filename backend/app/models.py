@@ -168,7 +168,7 @@ class ExampleFeedbackRequest(BaseModel):
 
 
 class ExampleFeedback(BaseModel):
-    """The sentence the native way, and one line on the change that matters most."""
+    """The sentence the native way, and a short line on each change made."""
 
     paraphrase: str
     feedback: str

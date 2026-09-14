@@ -26,8 +26,8 @@ interface Props {
 
 /**
  * A button under an expression or word. One press is one sentence: the live
- * coach hears it, a text model writes it back the native way with a line of
- * feedback, the live coach reads that aloud; Keep stacks it under the target.
+ * coach hears it, a text model writes it back the native way with a line per
+ * change, the live coach reads that aloud; Keep stacks it under the target.
  */
 export function Practice({
   target,

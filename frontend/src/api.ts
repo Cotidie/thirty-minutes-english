@@ -71,7 +71,7 @@ export const api = {
         usage_note: target.note,
       }),
     }),
-  /** The written half of a practice round: the sentence the native way, plus one line of feedback. */
+  /** The written half of a practice round: the sentence the native way, plus a short line per change. */
   exampleFeedback: (target: PracticeTarget, userText: string) =>
     request<ExampleFeedback>("/api/example/feedback", {
       method: "POST",
