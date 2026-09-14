@@ -1017,6 +1017,24 @@ button.question.is-active {
   }
 }
 
+.question.is-open {
+  display: inline-flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.question-tag {
+  font-family: var(--sans);
+  font-size: 0.7rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--muted);
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  padding: 0 0.45rem;
+}
+
 /* --- Summary: what the session left behind ------------------------------ */
 
 .tab.is-summary .tab-minutes {

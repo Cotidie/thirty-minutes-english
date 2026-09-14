@@ -18,8 +18,9 @@ export function ArticleTab({ article, sessionId }: { article: Article; sessionId
     <section className="tab-panel">
       <p className="tab-brief">
         Read silently for three minutes. Then each of you summarizes the article in your own words before opening the
-        questions. Click a question to see the passage it comes from. Press Read aloud under a paragraph to have a
-        native-speaker coach listen and correct your pronunciation as you read it.
+        questions. The first two are answered in the text, so click one to see the passage it comes from; the last one
+        is yours to argue about. Press Read aloud under a paragraph to have a native-speaker coach listen and correct
+        your pronunciation as you read it.
       </p>
       <article className="article" ref={bodyRef}>
         <h2 className="article-title">{article.title}</h2>
@@ -70,7 +71,15 @@ export function ArticleTab({ article, sessionId }: { article: Article; sessionId
 }
 
 function QuestionItem({ question, active, onToggle }: { question: Question; active: boolean; onToggle: () => void }) {
-  if (question.evidence.length === 0) return <span className="question">{question.text}</span>
+  // Nothing in the article answers it, so there is no passage to point at.
+  if (question.evidence.length === 0) {
+    return (
+      <span className="question is-open">
+        {question.text}
+        <span className="question-tag">your take</span>
+      </span>
+    )
+  }
   return (
     <button type="button" className={`question${active ? ' is-active' : ''}`} aria-pressed={active} onClick={onToggle}>
       {question.text}

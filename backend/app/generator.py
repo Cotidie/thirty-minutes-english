@@ -80,7 +80,7 @@ SESSION_SCHEMA: dict = {
                         "required": ["text", "evidence"],
                         "properties": {
                             "text": {"type": "string"},
-                            "evidence": {"type": "array", "minItems": 1, "maxItems": 2, "items": {"type": "string"}},
+                            "evidence": {"type": "array", "minItems": 0, "maxItems": 2, "items": {"type": "string"}},
                         },
                     },
                 },
@@ -127,13 +127,16 @@ facts (dates, names, figures) and prefer a recent development or debate as the a
 specifics you did not verify. In sources, list only the web pages you actually drew on (page title \
 and exact URL from the search results); leave it empty if you used none. \
 Use 3 to 5 paragraphs separated by blank lines. Take a clear angle so there is something to discuss. \
-Then write 3 discussion questions that check the main claim, a supporting detail, and an implication. \
-Each question is one short sentence of at most 14 words, in plain conversational wording a friend \
-would ask across a table. No compound questions, no "explain the writer's reasoning", no quoting. \
+Then write 3 discussion questions. Each is one short sentence of at most 14 words, in plain \
+conversational wording a friend would ask across a table. No compound questions, no "explain the \
+writer's reasoning", no quoting. Questions invite explanation, not yes/no. \
 Example of the right length: "Why does the writer call the space race a bad label?" \
-Questions should invite explanation, not yes/no. \
-For each question give evidence: 1 or 2 passages copied word for word from the article body (exact \
-substrings, 5 to 30 words each, same capitalization and punctuation) that the answer rests on.
+The first two are answered by the article: one on the main claim, one on a supporting detail. \
+For each of those two give evidence: 1 or 2 passages copied word for word from the article body \
+(exact substrings, 5 to 30 words each, same capitalization and punctuation) that the answer rests on. \
+The third is an open question the article does not settle. It asks the two speakers what they think, \
+about something two reasonable people would disagree on, and it grows out of the article's angle \
+rather than asking about life in general. Its evidence is an empty list.
 
 3. vocabulary: {vocabulary_count} words at B2 to C1+ level connected to the topic. Draw from the \
 article body where it offers strong candidates, and fill the rest with words a well-read speaker would \

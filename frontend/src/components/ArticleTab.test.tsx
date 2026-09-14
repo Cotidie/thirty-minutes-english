@@ -60,3 +60,23 @@ describe('ArticleTab', () => {
     expect(screen.getByRole('button', { name: 'Read aloud' })).toBeDisabled()
   })
 })
+
+describe('ArticleTab open question', () => {
+  it('marks the question the article does not answer and leaves it unclickable', async () => {
+    render(
+      <ArticleTab
+        article={{
+          ...article,
+          questions: [
+            { text: 'What pays?', evidence: ['Upkeep is what actually pays.'] },
+            { text: 'Would you fund a twin you could not maintain?', evidence: [] },
+          ],
+        }}
+        sessionId={3}
+      />,
+    )
+    expect(screen.getByRole('button', { name: 'What pays?' })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /Would you fund/ })).not.toBeInTheDocument()
+    expect(screen.getByText('your take')).toBeInTheDocument()
+  })
+})
