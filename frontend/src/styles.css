@@ -192,7 +192,24 @@ a {
   border-color: var(--ink);
 }
 
+.history-aside {
+  font-family: var(--sans);
+  font-size: 0.86rem;
+  font-weight: 400;
+  color: var(--muted);
+  text-decoration: none;
+  border-bottom: 1px solid var(--line);
+}
+
+.history-aside:hover {
+  color: var(--ink);
+}
+
 .history-title {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 1rem;
   font-family: var(--serif);
   font-weight: 500;
   font-size: 1.5rem;
@@ -255,7 +272,7 @@ a {
   top: 0;
   align-self: start;
   height: 100vh;
-  padding: 1.5rem 1.25rem;
+  padding: 1.5rem 1.25rem 6.5rem;
   border-right: 1px solid var(--line);
   display: flex;
   flex-direction: column;
@@ -271,6 +288,26 @@ a {
 .rail-back:hover {
   color: var(--ink);
   text-decoration: underline;
+}
+
+.rail-links {
+  margin-top: auto;
+  padding-top: 1.1rem;
+  border-top: 1px solid var(--line);
+  display: grid;
+  gap: 0.3rem;
+}
+
+.rail-link {
+  font-size: 0.92rem;
+  color: var(--muted);
+  text-decoration: none;
+}
+
+.rail-link:hover {
+  color: var(--ink);
+  text-decoration: underline;
+  text-underline-offset: 3px;
 }
 
 .rail-topic {
@@ -796,74 +833,81 @@ button.question.is-active {
   color: var(--muted);
 }
 
-/* --- Ask: a ruled line at the foot of the page, a slip when it opens ----- */
+/* --- Ask: a round button at the foot of the rail, a slip when it opens -- */
 
 .ask {
   position: fixed;
-  inset: auto 0 0 0;
+  left: 1.25rem;
+  bottom: 1.25rem;
   z-index: 20;
   font-family: var(--sans);
   font-size: 0.86rem;
   line-height: 1.45;
-  pointer-events: none;
-}
-
-.ask > * {
-  pointer-events: auto;
 }
 
 .ask audio {
   display: none;
 }
 
-.ask-rule {
+.ask-start {
   display: flex;
-  align-items: baseline;
-  gap: 0.9rem;
-  border-top: 1px solid var(--line);
-  background: var(--ground);
-  padding: 0.45rem max(1.25rem, calc((100vw - 76rem) / 2)) 0.5rem;
+  align-items: center;
+  gap: 0.55rem;
+  height: 3rem;
+  padding: 0 1rem 0 0.85rem;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--paper);
+  color: var(--ink);
+  cursor: pointer;
+  box-shadow: 0 1px 3px rgb(27 36 49 / 10%), 0 10px 24px rgb(27 36 49 / 8%);
+  transition: border-color 120ms ease, box-shadow 120ms ease;
 }
 
-.ask-start {
-  border: 0;
-  background: none;
-  padding: 0;
-  cursor: pointer;
-  color: var(--ink);
+.ask-start:hover,
+.ask-start:focus-visible {
+  border-color: var(--ink);
+  box-shadow: 0 1px 3px rgb(27 36 49 / 14%), 0 12px 28px rgb(27 36 49 / 12%);
+}
+
+/* three bars: the same mark the live meter uses, at rest */
+.ask-start-glyph {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  height: 1.05rem;
+}
+
+.ask-start-glyph i {
+  width: 3px;
+  border-radius: 1px;
+  background: var(--ink);
+}
+
+.ask-start-glyph i:nth-child(1) { height: 45%; }
+.ask-start-glyph i:nth-child(2) { height: 100%; }
+.ask-start-glyph i:nth-child(3) { height: 65%; }
+
+.ask-start-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
   font-weight: 500;
 }
 
-.ask-start:hover {
-  text-decoration: underline;
-  text-underline-offset: 3px;
-}
-
-.ask-rule kbd,
+.ask-start kbd,
 .ask-actions kbd {
   font-family: inherit;
   font-size: 0.72rem;
+  font-weight: 400;
   color: var(--muted);
   border: 1px solid var(--line);
   border-radius: 4px;
   padding: 0 0.25rem;
-  margin-left: 0.3rem;
-}
-
-.ask-review {
-  margin-left: auto;
-  color: var(--muted);
-  text-decoration: none;
-  border-bottom: 1px solid var(--line);
-}
-
-.ask-review:hover {
-  color: var(--ink);
 }
 
 .ask-slip {
   width: min(30rem, calc(100vw - 2.5rem));
-  margin: 0 auto 1.1rem;
   background: var(--paper);
   border: 1px solid var(--line);
   border-top: 3px solid var(--marker);
@@ -926,6 +970,9 @@ button.question.is-active {
 }
 
 .ask-actions button {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
   border: 1px solid var(--line);
   background: var(--paper);
   border-radius: 999px;

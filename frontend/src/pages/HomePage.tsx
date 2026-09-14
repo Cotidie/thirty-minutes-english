@@ -75,7 +75,12 @@ export function HomePage() {
       {error && <p className="error">Could not create the session: {error}</p>}
 
       <section className="history">
-        <h2 className="history-title">Past sessions</h2>
+        <h2 className="history-title">
+          Past sessions
+          <Link to="/asks" className="history-aside">
+            Asks
+          </Link>
+        </h2>
         {sessions.length === 0 ? (
           <p className="empty">Nothing yet. Generate the first session above.</p>
         ) : (

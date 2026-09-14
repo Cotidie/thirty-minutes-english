@@ -55,6 +55,11 @@ export function SessionPage() {
             </button>
           ))}
         </nav>
+        <nav className="rail-links" aria-label="Saved work">
+          <Link to={`/asks?session_id=${session.id}`} className="rail-link">
+            Asks
+          </Link>
+        </nav>
       </aside>
       <div className="content">
         {tab === 0 && <ExpressionsTab items={content.expressions} />}

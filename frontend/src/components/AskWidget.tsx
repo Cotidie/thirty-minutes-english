@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { Link, useMatch } from 'react-router-dom'
+import { useMatch } from 'react-router-dom'
 import { api } from '../api'
 import { connectAsk, type LiveConnection } from '../lib/liveClient'
 import { applyLiveEvent, initialLiveState, liveFailed, type LiveState } from '../lib/liveSession'
@@ -138,14 +138,14 @@ export function AskWidget() {
     <div className={`ask${open ? ' is-open' : ''}`}>
       <audio ref={audioRef} autoPlay />
       {state === null ? (
-        <div className="ask-rule">
-          <button type="button" className="ask-start" onClick={() => void start()}>
-            Ask <kbd>a</kbd>
-          </button>
-          <Link className="ask-review" to={sessionId === null ? '/asks' : `/asks?session_id=${sessionId}`}>
-            Asks
-          </Link>
-        </div>
+        <button type="button" className="ask-start" onClick={() => void start()} aria-keyshortcuts="a">
+          <span className="ask-start-glyph" aria-hidden="true">
+            <i />
+            <i />
+            <i />
+          </span>
+          <span className="ask-start-label">Ask<kbd>a</kbd></span>
+        </button>
       ) : (
         <div className="ask-slip" role="dialog" aria-label="Ask the coach">
           <div className="ask-bar">
