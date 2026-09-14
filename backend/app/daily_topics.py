@@ -23,7 +23,7 @@ TOPICS_SCHEMA: dict = {
     "properties": {
         "topics": {
             "type": "array",
-            "minItems": FRESH_COUNT,
+            "minItems": 0,  # an empty list is how a run with no web access reports failure
             "maxItems": FRESH_COUNT,
             "items": {"type": "string"},
         }
@@ -33,6 +33,13 @@ TOPICS_SCHEMA: dict = {
 PROMPT = """Search the news from the last seven days and give me {count} topics for a short English \
 article a pair of adult learners will argue about over coffee today.
 
+Take only stories that ran big. A story qualifies if it led the front page or the top of the home page \
+at major international outlets (Reuters, AP, BBC, the Financial Times, The New York Times, The Guardian, \
+The Economist, Nikkei, Al Jazeera), or if it broke in the last day or two and is climbing fast. \
+Two independent major outlets covering it prominently is the bar. If you cannot tell that a story \
+cleared it, drop it and take the next one. Leave out trade-press items, single-company product news, \
+and local stories with no wider consequence.
+
 Each topic is one line: a noun phrase of at most 10 words, in plain English, naming the dispute rather \
 than reporting the headline. "Who pays when the grid runs short" rather than "Country X raises power \
 prices 12%". No dates, no figures, and no story that only makes sense to people who followed it all week.
@@ -41,7 +48,10 @@ Spread them out: no two on the same story, and between them cover more than one 
 field. At least one should sit near technology, industry or science. Skip anything whose only angle is \
 party politics or a running war's daily movements, and skip celebrity news.
 
-Run at most 3 searches. Return only the structured output."""
+Run at most 4 searches, and spend one of them on what the major outlets are leading with right now. \
+If you have no web search tool in this session, or the searches return nothing usable, return an empty \
+list. Never invent a story, and never return placeholder text or a note about the tools you were given. \
+Return only the structured output."""
 
 
 class TopicSource(Protocol):
@@ -49,7 +59,7 @@ class TopicSource(Protocol):
 
 
 class ClaudeTopicSource:
-    def __init__(self, model: str = "sonnet", effort: str = "medium", timeout_s: float = 180):
+    def __init__(self, model: str = "sonnet", effort: str = "medium", timeout_s: float = 240):
         self._cli = ClaudeCli(model=model, effort=effort, timeout_s=timeout_s)
 
     def fetch(self, count: int) -> list[str]:
@@ -98,6 +108,11 @@ class DailyTopics:
             log.warning("could not fetch today's topics, staying on the pool: %s", e)
             self._running = None
             return
-        if topics:
-            self.store.set_daily_topics(day, topics)
+        if not topics:
+            # No web access, or nothing cleared the bar. Leave the day unset so a
+            # later request tries again rather than caching an empty news half.
+            log.warning("no news topics came back for %s, staying on the pool", day)
+            self._running = None
+            return
+        self.store.set_daily_topics(day, topics)
         log.info("topics for %s: %d from the news", day, len(topics))

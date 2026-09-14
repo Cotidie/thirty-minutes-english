@@ -75,6 +75,21 @@ def test_a_day_is_fetched_once(store):
     assert source.calls == 1
 
 
+def test_an_empty_fetch_is_not_cached_and_is_tried_again(store):
+    source = FakeSource()
+    source.fetch = lambda count: []  # type: ignore[method-assign]
+    daily = DailyTopics(store, source)
+    daily.ensure_fetched()
+
+    topics, pending = daily.listing()
+    assert set(topics) <= set(TOPICS)
+    assert pending is True
+
+    source.fetch = FakeSource().fetch  # type: ignore[method-assign]
+    daily.ensure_fetched()
+    assert texts(daily.listing()[0][:FRESH_COUNT]) == NEWS
+
+
 def test_a_failed_fetch_leaves_a_full_list_of_pool_topics(store):
     source = FakeSource(GenerationError("claude timed out after 180s"))
     daily = DailyTopics(store, source)
