@@ -18,7 +18,7 @@ const article = {
 
 describe('ArticleTab', () => {
   it('marks the evidence in the body when a question is clicked, and clears it on a second click', async () => {
-    render(<ArticleTab article={article} />)
+    render(<ArticleTab article={article} sessionId={3} />)
     expect(document.querySelector('mark')).toBeNull()
 
     await userEvent.click(screen.getByRole('button', { name: 'What pays?' }))
@@ -30,25 +30,28 @@ describe('ArticleTab', () => {
 
   it('lists sources as links when present and hides the block when absent', () => {
     const { unmount } = render(
-      <ArticleTab article={{ ...article, sources: [{ title: 'Kafka - Britannica', url: 'https://www.britannica.com/kafka' }] }} />,
+      <ArticleTab
+        article={{ ...article, sources: [{ title: 'Kafka - Britannica', url: 'https://www.britannica.com/kafka' }] }}
+        sessionId={3}
+      />,
     )
     const link = screen.getByRole('link', { name: 'Kafka - Britannica' })
     expect(link).toHaveAttribute('href', 'https://www.britannica.com/kafka')
     expect(screen.getByText('britannica.com')).toBeInTheDocument()
     unmount()
 
-    render(<ArticleTab article={article} />)
+    render(<ArticleTab article={article} sessionId={3} />)
     expect(screen.queryByText('Sources')).toBeNull()
   })
 
   it('renders a question without evidence as plain text', () => {
-    render(<ArticleTab article={article} />)
+    render(<ArticleTab article={article} sessionId={3} />)
     expect(screen.queryByRole('button', { name: 'Legacy question' })).toBeNull()
     expect(screen.getByText('Legacy question')).toBeInTheDocument()
   })
 
   it('offers Read aloud under each paragraph and lets only one paragraph hold the microphone', async () => {
-    render(<ArticleTab article={article} />)
+    render(<ArticleTab article={article} sessionId={3} />)
     const buttons = screen.getAllByRole('button', { name: 'Read aloud' })
     expect(buttons).toHaveLength(2)
 

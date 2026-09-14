@@ -118,6 +118,36 @@ class PhraseCard(BaseModel):
     note: str = ""
 
 
+class ReadingRequest(BaseModel):
+    session_id: int | None = None
+    paragraph: str
+    user_text: str
+    coach_text: str
+    seconds: float = 0
+
+    _check = field_validator("paragraph", "coach_text")(_not_blank)
+
+
+class Correction(BaseModel):
+    """One word the coach stopped the reader on."""
+
+    word: str
+    heard: str
+    fix: str
+    repeated_ok: bool = False
+
+
+class Reading(BaseModel):
+    id: int
+    created_at: datetime
+    session_id: int | None
+    paragraph: str
+    user_text: str
+    coach_text: str
+    seconds: float
+    corrections: list[Correction] | None = None
+
+
 class Ask(BaseModel):
     id: int
     created_at: datetime

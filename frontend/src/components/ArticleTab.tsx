@@ -3,7 +3,7 @@ import { highlightSegments } from '../lib/highlight'
 import type { Article, Question } from '../types'
 import { ReadAloud } from './ReadAloud'
 
-export function ArticleTab({ article }: { article: Article }) {
+export function ArticleTab({ article, sessionId }: { article: Article; sessionId: number | null }) {
   const [active, setActive] = useState<number | null>(null)
   const [reading, setReading] = useState<number | null>(null)
   const bodyRef = useRef<HTMLElement>(null)
@@ -32,6 +32,7 @@ export function ArticleTab({ article }: { article: Article }) {
             </p>
             <ReadAloud
               paragraph={p}
+              sessionId={sessionId}
               active={reading !== null && reading !== i}
               onStart={() => setReading(i)}
               onEnd={() => setReading(null)}

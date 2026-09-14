@@ -3,7 +3,10 @@ import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { LiveEvent } from '../lib/liveSession'
 import type { LiveConnection, LiveOptions } from '../lib/liveClient'
+import { api } from '../api'
 import { ReadAloud } from './ReadAloud'
+
+vi.mock('../api', () => ({ api: { addReading: vi.fn(async () => ({})) } }))
 
 const connection = { microphone: {} as MediaStream, finish: vi.fn(), close: vi.fn(), dispose: vi.fn() }
 let emit: (e: LiveEvent) => void = () => undefined
@@ -22,11 +25,12 @@ vi.mock('../lib/liveClient', () => ({
 function renderIdle(active = false) {
   const onStart = vi.fn()
   const onEnd = vi.fn()
-  render(<ReadAloud paragraph="Researchers verified it." active={active} onStart={onStart} onEnd={onEnd} />)
+  render(<ReadAloud paragraph="Researchers verified it." sessionId={3} active={active} onStart={onStart} onEnd={onEnd} />)
   return { onStart, onEnd }
 }
 
 beforeEach(() => {
+  vi.mocked(api.addReading).mockClear()
   connect.mockClear()
   connection.finish.mockClear()
   connection.close.mockClear()
@@ -89,5 +93,32 @@ describe('ReadAloud', () => {
   it('is disabled while another paragraph holds the microphone', () => {
     renderIdle(true)
     expect(screen.getByRole('button', { name: 'Read aloud' })).toBeDisabled()
+  })
+})
+
+describe('ReadAloud records', () => {
+  it('files a round the coach spoke in, and skips a silent one', async () => {
+    renderIdle()
+    await userEvent.click(screen.getByRole('button', { name: 'Read aloud' }))
+    act(() => emit({ type: 'session.started', session: { id: 'live_1' } }))
+    act(() => emit({ type: 'session.input_transcript.delta', delta: 'researchers berified it' }))
+    act(() => emit({ type: 'session.output_transcript.delta', delta: 'Quick one: that was berified.' }))
+    act(() => emit({ type: 'session.closed', usage: { seconds: 31 } }))
+
+    expect(vi.mocked(api.addReading)).toHaveBeenCalledWith({
+      session_id: 3,
+      paragraph: 'Researchers verified it.',
+      user_text: 'researchers berified it',
+      coach_text: 'Quick one: that was berified.',
+      seconds: 31,
+    })
+
+    vi.mocked(api.addReading).mockClear()
+    await userEvent.click(screen.getByRole('button', { name: 'Done' }))
+    await userEvent.click(screen.getByRole('button', { name: 'Read aloud' }))
+    act(() => emit({ type: 'session.started', session: { id: 'live_2' } }))
+    act(() => emit({ type: 'session.input_transcript.delta', delta: 'researchers verified it' }))
+    act(() => emit({ type: 'session.closed', usage: { seconds: 28 } }))
+    expect(vi.mocked(api.addReading)).not.toHaveBeenCalled()
   })
 })

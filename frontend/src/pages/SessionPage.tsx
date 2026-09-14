@@ -4,9 +4,13 @@ import { api } from '../api'
 import { ArticleTab } from '../components/ArticleTab'
 import { ExpressionsTab } from '../components/ExpressionsTab'
 import { SessionTimer } from '../components/SessionTimer'
+import { SummaryTab } from '../components/SummaryTab'
 import { VocabularyTab } from '../components/VocabularyTab'
 import { PHASES } from '../lib/phases'
 import type { Session } from '../types'
+
+/** Sits after the timed phases; the timer never sends you here. */
+const SUMMARY_TAB = PHASES.length
 
 export function SessionPage() {
   const { id } = useParams()
@@ -54,17 +58,25 @@ export function SessionPage() {
               <span className="tab-minutes">{p.minutes} min</span>
             </button>
           ))}
-        </nav>
-        <nav className="rail-links" aria-label="Saved work">
-          <Link to={`/asks?session_id=${session.id}`} className="rail-link">
-            Asks
-          </Link>
+          <button
+            type="button"
+            className={`tab is-summary${tab === SUMMARY_TAB ? ' is-active' : ''}`}
+            aria-current={tab === SUMMARY_TAB ? 'page' : undefined}
+            onClick={() => showTab(SUMMARY_TAB)}
+          >
+            <span className="tab-index" aria-hidden="true">
+              ·
+            </span>
+            <span className="tab-label">Summary</span>
+            <span className="tab-minutes">after</span>
+          </button>
         </nav>
       </aside>
       <div className="content">
         {tab === 0 && <ExpressionsTab items={content.expressions} />}
-        {tab === 1 && <ArticleTab article={content.article} />}
+        {tab === 1 && <ArticleTab article={content.article} sessionId={session.id} />}
         {tab === 2 && <VocabularyTab items={content.vocabulary} />}
+        {tab === SUMMARY_TAB && <SummaryTab sessionId={session.id} />}
       </div>
     </main>
   )

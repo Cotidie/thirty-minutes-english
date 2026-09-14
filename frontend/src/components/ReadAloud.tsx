@@ -1,9 +1,12 @@
 import { useEffect, useRef, useState } from 'react'
-import { applyLiveEvent, initialLiveState, liveFailed, type LiveState } from '../lib/liveSession'
+import { api } from '../api'
 import { connectReadAloud, type LiveConnection } from '../lib/liveClient'
+import { applyLiveEvent, initialLiveState, liveFailed, type LiveState } from '../lib/liveSession'
 
 interface Props {
   paragraph: string
+  /** Where a finished round is filed, when the reading happens inside a session. */
+  sessionId: number | null
   /** Only one paragraph may hold the microphone at a time. */
   active: boolean
   onStart: () => void
@@ -18,7 +21,7 @@ const STATUS_LABEL: Record<LiveState['status'], string> = {
   failed: 'Could not start.',
 }
 
-export function ReadAloud({ paragraph, active, onStart, onEnd }: Props) {
+export function ReadAloud({ paragraph, sessionId, active, onStart, onEnd }: Props) {
   const [state, setState] = useState<LiveState | null>(null)
   const audioRef = useRef<HTMLAudioElement>(null)
   const connRef = useRef<LiveConnection | null>(null)
@@ -31,12 +34,32 @@ export function ReadAloud({ paragraph, active, onStart, onEnd }: Props) {
     try {
       connRef.current = await connectReadAloud(paragraph, {
         audio: audioRef.current!,
-        onEvent: (event) => setState((s) => applyLiveEvent(s ?? initialLiveState, event)),
+        onEvent: (event) => {
+          setState((s) => {
+            const next = applyLiveEvent(s ?? initialLiveState, event)
+            if (event.type === 'session.closed') void keep(next)
+            return next
+          })
+        },
         onDisconnect: () => setState((s) => liveFailed(s ?? initialLiveState, 'Connection dropped before the round ended.')),
       })
     } catch (e) {
       setState((s) => liveFailed(s ?? initialLiveState, e instanceof Error ? e.message : String(e)))
     }
+  }
+
+  /** A round the coach spoke in is worth keeping; a silent one has no findings. */
+  const keep = async (round: LiveState) => {
+    if (!round.coach.trim()) return
+    await api
+      .addReading({
+        session_id: sessionId,
+        paragraph,
+        user_text: round.user.trim(),
+        coach_text: round.coach.trim(),
+        seconds: round.seconds,
+      })
+      .catch(() => undefined)
   }
 
   const finish = () => connRef.current?.finish()

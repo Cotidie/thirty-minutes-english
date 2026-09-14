@@ -4,13 +4,15 @@ from pathlib import Path
 
 from fastapi import FastAPI, HTTPException, Request, Response
 
-from app.cards import AskReview, CardExtractor, OpenAICardExtractor
+from app.cards import AskReview, CorrectionExtractor, Extractor, PhraseCardExtractor, ReadingReview
 from app.generator import ClaudeCliGenerator, Generator
 from app.jobs import Executor, Job, JobRunner
 from app.live import AgentDefinition, LiveAgent, LiveSessionError, OpenAILiveSessions
 from app.models import (
     Ask,
     AskRequest,
+    Reading,
+    ReadingRequest,
     CreateSessionRequest,
     JobStatus,
     LiveSession,
@@ -35,13 +37,15 @@ def create_app(
     generator: Generator,
     executor: Executor | None = None,
     agents: dict[str, LiveAgent] | None = None,
-    extractor: CardExtractor | None = None,
+    extractor: Extractor | None = None,
+    corrections: Extractor | None = None,
 ) -> FastAPI:
     app = FastAPI(title="english-speaking-claude")
     app.state.store = store
     app.state.jobs = JobRunner(generator, store, executor)
     app.state.agents = agents or {}
-    app.state.review = AskReview(store, extractor)
+    app.state.asks = AskReview(store, extractor)
+    app.state.readings = ReadingReview(store, corrections)
 
     def live_agent(request: Request, name: str) -> LiveAgent:
         agent = request.app.state.agents.get(name)
@@ -128,17 +132,29 @@ def create_app(
 
     @app.post("/api/asks/cards", response_model=list[Ask])
     def ask_cards(request: Request, session_id: int | None = None) -> list[Ask]:
-        return request.app.state.review.cards_for(session_id)
+        return request.app.state.asks.cards_for(session_id)
+
+    @app.post("/api/readings", response_model=Reading, status_code=201)
+    def add_reading(body: ReadingRequest, request: Request) -> Reading:
+        store: SessionStore = request.app.state.store
+        if body.session_id is not None and store.get(body.session_id) is None:
+            raise HTTPException(status_code=404, detail="session not found")
+        return store.add_reading(body.session_id, body.paragraph, body.user_text, body.coach_text, body.seconds)
+
+    @app.post("/api/readings/corrections", response_model=list[Reading])
+    def reading_corrections(request: Request, session_id: int | None = None) -> list[Reading]:
+        return request.app.state.readings.corrections_for(session_id)
 
     return app
 
 
-def card_extractor() -> CardExtractor | None:
+def _extractor(agent: str, schema: str, build) -> Extractor | None:
+    """An extractor per agent folder, once a key and that folder's schema exist."""
     api_key = os.environ.get("OPENAI_API_KEY", "").strip()
-    agent_dir = Path(os.environ.get(*AGENT_DIRS["phrase"]))
-    if not api_key or not (agent_dir / "cards.schema.json").is_file():
+    agent_dir = Path(os.environ.get(*AGENT_DIRS[agent]))
+    if not api_key or not (agent_dir / schema).is_file():
         return None
-    return OpenAICardExtractor(api_key, agent_dir, os.environ.get("PHRASE_CARD_MODEL", "gpt-5.6-luna"))
+    return build(api_key, agent_dir, os.environ.get("SUMMARY_MODEL", "gpt-5.6-luna"))
 
 
 def live_agents() -> dict[str, LiveAgent]:
@@ -167,7 +183,8 @@ def default_app() -> FastAPI:
             skills=tuple(s for s in os.environ.get("CLAUDE_SKILLS", "").split(",") if s.strip()),
         ),
         agents=live_agents(),
-        extractor=card_extractor(),
+        extractor=_extractor("phrase", "cards.schema.json", PhraseCardExtractor),
+        corrections=_extractor("read-aloud", "feedback.schema.json", CorrectionExtractor),
     )
 
 

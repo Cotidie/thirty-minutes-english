@@ -290,26 +290,6 @@ a {
   text-decoration: underline;
 }
 
-.rail-links {
-  margin-top: auto;
-  padding-top: 1.1rem;
-  border-top: 1px solid var(--line);
-  display: grid;
-  gap: 0.3rem;
-}
-
-.rail-link {
-  font-size: 0.92rem;
-  color: var(--muted);
-  text-decoration: none;
-}
-
-.rail-link:hover {
-  color: var(--ink);
-  text-decoration: underline;
-  text-underline-offset: 3px;
-}
-
 .rail-topic {
   font-family: var(--serif);
   font-size: 1.15rem;
@@ -1035,6 +1015,49 @@ button.question.is-active {
   .ask-level.is-quiet i {
     animation: none;
   }
+}
+
+/* --- Summary: what the session left behind ------------------------------ */
+
+.tab.is-summary .tab-index {
+  color: var(--line);
+}
+
+.tab.is-summary .tab-minutes {
+  font-style: italic;
+}
+
+.summary-section {
+  margin-bottom: 3rem;
+}
+
+.summary-title {
+  display: flex;
+  align-items: baseline;
+  gap: 0.6rem;
+  font-family: var(--sans);
+  font-size: 0.78rem;
+  font-weight: 500;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--muted);
+  margin: 0 0 0.9rem;
+}
+
+.summary-count {
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0;
+  color: var(--ink);
+  background: var(--marker-soft);
+  border-radius: 999px;
+  padding: 0 0.45rem;
+}
+
+.summary-ok {
+  margin-left: 0.5rem;
+  font-size: 0.8rem;
+  color: var(--ink);
+  background: linear-gradient(transparent 66%, var(--marker-soft) 66%);
 }
 
 /* --- Asks: the ledger. Question in the margin, expression in the column -- */

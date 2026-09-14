@@ -1,9 +1,10 @@
+import json
 import sqlite3
 from datetime import UTC, datetime
 from pathlib import Path
 
 from app.exclusions import Exclusions
-from app.models import Ask, PhraseCard, Session, SessionContent, SessionSummary
+from app.models import Ask, Correction, PhraseCard, Reading, Session, SessionContent, SessionSummary
 
 
 class SessionStore:
@@ -32,6 +33,20 @@ class SessionStore:
                     coach_text TEXT NOT NULL,
                     seconds REAL NOT NULL DEFAULT 0,
                     card_json TEXT
+                )
+                """
+            )
+            conn.execute(
+                """
+                CREATE TABLE IF NOT EXISTS readings (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    created_at TEXT NOT NULL,
+                    session_id INTEGER,
+                    paragraph TEXT NOT NULL,
+                    user_text TEXT NOT NULL,
+                    coach_text TEXT NOT NULL,
+                    seconds REAL NOT NULL DEFAULT 0,
+                    corrections_json TEXT
                 )
                 """
             )
@@ -77,6 +92,7 @@ class SessionStore:
         with self._connect() as conn:
             cur = conn.execute("DELETE FROM sessions WHERE id = ?", (session_id,))
             conn.execute("DELETE FROM asks WHERE session_id = ?", (session_id,))
+            conn.execute("DELETE FROM readings WHERE session_id = ?", (session_id,))
         return cur.rowcount > 0
 
     def recent_topics(self, limit: int) -> list[str]:
@@ -136,6 +152,61 @@ class SessionStore:
     def set_ask_card(self, ask_id: int, card: PhraseCard) -> None:
         with self._connect() as conn:
             conn.execute("UPDATE asks SET card_json = ? WHERE id = ?", (card.model_dump_json(), ask_id))
+
+
+    # --- readings: one paragraph read aloud, and what the coach stopped on --
+
+    def add_reading(
+        self, session_id: int | None, paragraph: str, user_text: str, coach_text: str, seconds: float
+    ) -> Reading:
+        created_at = datetime.now(UTC)
+        with self._connect() as conn:
+            cur = conn.execute(
+                "INSERT INTO readings (created_at, session_id, paragraph, user_text, coach_text, seconds)"
+                " VALUES (?, ?, ?, ?, ?, ?)",
+                (created_at.isoformat(), session_id, paragraph, user_text, coach_text, seconds),
+            )
+            reading_id = cur.lastrowid
+        assert reading_id is not None
+        return Reading(
+            id=reading_id,
+            created_at=created_at,
+            session_id=session_id,
+            paragraph=paragraph,
+            user_text=user_text,
+            coach_text=coach_text,
+            seconds=seconds,
+        )
+
+    def list_readings(self, session_id: int | None = None) -> list[Reading]:
+        """Newest first. A session_id narrows to that session; None lists every reading."""
+        sql = "SELECT * FROM readings"
+        params: tuple = ()
+        if session_id is not None:
+            sql += " WHERE session_id = ?"
+            params = (session_id,)
+        with self._connect() as conn:
+            rows = conn.execute(sql + " ORDER BY id DESC", params).fetchall()
+        return [_reading(row) for row in rows]
+
+    def set_reading_corrections(self, reading_id: int, corrections: list[Correction]) -> None:
+        payload = json.dumps([c.model_dump() for c in corrections])
+        with self._connect() as conn:
+            conn.execute("UPDATE readings SET corrections_json = ? WHERE id = ?", (payload, reading_id))
+
+
+def _reading(row: sqlite3.Row) -> Reading:
+    saved = row["corrections_json"]
+    return Reading(
+        id=row["id"],
+        created_at=row["created_at"],
+        session_id=row["session_id"],
+        paragraph=row["paragraph"],
+        user_text=row["user_text"],
+        coach_text=row["coach_text"],
+        seconds=row["seconds"],
+        corrections=[Correction.model_validate(c) for c in json.loads(saved)] if saved else None,
+    )
 
 
 def _ask(row: sqlite3.Row) -> Ask:

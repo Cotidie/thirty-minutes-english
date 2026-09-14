@@ -13,7 +13,7 @@ services:
       OPENAI_API_KEY: ${OPENAI_API_KEY:-}
       READ_ALOUD_AGENT_DIR: /agents/read-aloud-coach
       PHRASE_AGENT_DIR: /agents/phrase-coach
-      PHRASE_CARD_MODEL: ${PHRASE_CARD_MODEL:-gpt-5.6-luna}
+      SUMMARY_MODEL: ${SUMMARY_MODEL:-gpt-5.6-luna}
     volumes:
       - ./backend/data:/data
       - ../read-aloud-coach:/agents/read-aloud-coach:ro

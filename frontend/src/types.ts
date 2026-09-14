@@ -62,6 +62,24 @@ export interface PhraseCard {
   note: string
 }
 
+export interface Correction {
+  word: string
+  heard: string
+  fix: string
+  repeated_ok: boolean
+}
+
+export interface Reading {
+  id: number
+  created_at: string
+  session_id: number | null
+  paragraph: string
+  user_text: string
+  coach_text: string
+  seconds: number
+  corrections: Correction[] | null
+}
+
 export interface Ask {
   id: number
   created_at: string

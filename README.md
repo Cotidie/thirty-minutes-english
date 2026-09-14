@@ -23,7 +23,7 @@
 | `OPENAI_API_KEY` | 비움 | Read aloud 코치와 Ask 위젯용. 비우면 두 버튼이 503을 돌려준다 |
 | `READ_ALOUD_AGENT_DIR` | `../read-aloud-coach` | 발음 코치 정의 폴더(프롬프트, 세션 설정) |
 | `PHRASE_AGENT_DIR` | `../phrase-coach` | 표현 코치 정의 폴더 |
-| `PHRASE_CARD_MODEL` | `gpt-5.6-luna` | Ask 기록을 복습 카드로 정리하는 텍스트 모델 |
+| `SUMMARY_MODEL` | `gpt-5.6-luna` | Summary 탭에서 transcript를 정리하는 텍스트 모델 |
 
 ## Read aloud (GPT-Live)
 
@@ -37,9 +37,24 @@ Article 탭의 문단마다 `Read aloud` 버튼이 있다. 누르면 브라우�
 
 말할 타이밍을 놓쳤거나 엉뚱하게 들어갔으면 `Retry`(`R`)로 그 자리에서 다시 시작한다. 앞 라운드는 버려지고 새 세션이 열리므로 15초 최소 과금이 다시 붙는다.
 
-라운드가 끝나면 자막 두 줄이 쪽지에 남고, `Save`(`Enter`)를 눌러야 `asks` 테이블에 들어간다. 쓸모없는 답은 `Discard`(`Esc`)로 버린다. 세션 안에서 물었으면 그 세션에 묶이고, 홈에서 물었으면 세션 없이 남는다. `Asks` 링크를 열면 그때 텍스트 모델이 한 번 돌아 카드(물은 말 / 추천 표현 / 대안 / 노트)로 정리하고, 만든 카드는 다시 만들지 않는다.
+라운드가 끝나면 자막 두 줄이 쪽지에 남고, `Save`(`Enter`)를 눌러야 `asks` 테이블에 들어간다. 쓸모없는 답은 `Discard`(`Esc`)로 버린다. 세션 안에서 물었으면 그 세션에 묶이고, 홈에서 물었으면 세션 없이 남는다.
 
 에이전트 정의는 `../phrase-coach/`에 있다. `../read-aloud-coach/`와 같은 규약이고, backend의 같은 `LiveAgent`가 둘 다 읽는다.
+
+## Summary 탭
+
+레일의 네 번째 항목. 세션이 남긴 것을 두 섹션으로 보여준다.
+
+| 섹션 | 내용 | 원본 |
+|---|---|---|
+| Expressions you asked for | 물은 말 / 추천 표현 / 대안 / 노트 | `asks` 테이블 |
+| Words to watch | 들린 대로 / 원래 단어 / 고칠 점 | `readings` 테이블 |
+
+Read aloud 라운드는 코치가 한마디라도 했으면 끝날 때 자동으로 `readings`에 저장된다(조용히 넘어간 라운드는 남길 게 없어 저장하지 않는다). Ask와 달리 저장 버튼이 없다.
+
+탭을 처음 열 때 텍스트 모델이 두 번 돌아(카드용, 교정용) transcript를 정리하고 결과를 각 행에 캐시한다. 두 번째부터는 호출하지 않는다. 프롬프트와 스키마는 각 에이전트 폴더에 있다(`phrase-coach/cards.schema.json`, `read-aloud-coach/feedback.schema.json`).
+
+홈의 `Asks` 링크는 세션과 무관하게 지금까지 물어본 표현 전체를 보여준다.
 
 ## Docker
 
@@ -66,6 +81,7 @@ docker compose up -d --build
 | Expressions | 10분 | 표현 6개. 예문 읽고 용례 합의, 각자 문장 하나씩 |
 | Article | 10분 | 3분 묵독 후 각자 요약, 질문 3개로 토론 |
 | Vocabulary | 10분 | 단어 + 예문만 보고 뜻을 영어로 설명, 카드 클릭해 확인 |
+| Summary | 끝나고 | 물어본 표현과 지적받은 발음을 한 화면에서 확인 |
 
 타이머 `Start 30 min`을 누르면 10분마다 탭이 자동으로 넘어간다.
 
