@@ -1,6 +1,6 @@
 import random
 
-from app.topics import HISTORY_TOPICS, LITERATURE_TOPICS, TECH_TOPICS, TOPICS, pick_topic
+from app.topics import HISTORY_TOPICS, LITERATURE_TOPICS, TECH_TOPICS, TOPICS, WORLD_TOPICS, pick_topic
 
 
 def test_pick_topic_avoids_recent():
@@ -17,7 +17,8 @@ def test_pick_topic_is_random_among_unused():
     assert len(picks) > 1
 
 
-def test_topics_span_three_domains():
-    assert set(TOPICS) == set(TECH_TOPICS) | set(LITERATURE_TOPICS) | set(HISTORY_TOPICS)
-    assert min(len(TECH_TOPICS), len(LITERATURE_TOPICS), len(HISTORY_TOPICS)) >= 10
+def test_topics_span_four_domains():
+    pools = (TECH_TOPICS, LITERATURE_TOPICS, HISTORY_TOPICS, WORLD_TOPICS)
+    assert set(TOPICS) == set().union(*(set(p) for p in pools))
+    assert min(len(p) for p in pools) >= 10
     assert len(set(TOPICS)) == len(TOPICS)

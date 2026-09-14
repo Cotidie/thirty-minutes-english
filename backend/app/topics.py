@@ -70,7 +70,32 @@ HISTORY_TOPICS: tuple[str, ...] = (
     "The invention of the nation-state",
 )
 
-TOPICS: tuple[str, ...] = TECH_TOPICS + LITERATURE_TOPICS + HISTORY_TOPICS
+# Standing arguments rather than this week's headline: the generator searches for
+# the latest turn in each, so the pool does not go stale between sessions.
+WORLD_TOPICS: tuple[str, ...] = (
+    "The global race to regulate AI",
+    "Semiconductor export controls and technological sovereignty",
+    "Critical minerals and the battery supply chain",
+    "Falling birth rates and shrinking workforces",
+    "Aging societies and the arithmetic of pensions",
+    "Housing costs in the world's big cities",
+    "Migration and border politics in Europe",
+    "The electricity bill of the AI boom",
+    "Who pays for the energy transition",
+    "Insurance retreating from places extreme weather keeps hitting",
+    "Water scarcity and the future of farming",
+    "Undersea cables and the security of the internet",
+    "Space debris and the crowding of low orbit",
+    "Weight-loss drugs and the budgets of health systems",
+    "Antibiotic resistance as a slow-moving emergency",
+    "Deep-sea mining and the rules nobody agreed on",
+    "Elections in an age of synthetic media",
+    "Remote work, five years on",
+    "Food export bans and global prices",
+    "Carbon border taxes and the trade fights they start",
+)
+
+TOPICS: tuple[str, ...] = TECH_TOPICS + LITERATURE_TOPICS + HISTORY_TOPICS + WORLD_TOPICS
 
 
 def pick_topic(recent: list[str], rng: random.Random | None = None) -> str:
