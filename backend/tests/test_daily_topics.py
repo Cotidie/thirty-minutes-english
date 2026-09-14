@@ -6,6 +6,7 @@ from fastapi.testclient import TestClient
 from app.claude_cli import GenerationError
 from app.daily_topics import FRESH_COUNT, POOL_COUNT, DailyTopics
 from app.main import create_app
+from app.models import Category
 from app.store import SessionStore
 from app.topics import TOPICS, pool_for_day
 from tests.test_api import FakeGenerator, InlineExecutor
@@ -30,6 +31,10 @@ def store(tmp_path) -> SessionStore:
     return SessionStore(tmp_path / "s.db")
 
 
+def texts(topics) -> list[str]:
+    return [t.text for t in topics]
+
+
 def test_pool_slice_holds_all_day_and_turns_over_at_midnight():
     today = pool_for_day(date(2026, 9, 14), 6)
     assert today == pool_for_day(date(2026, 9, 14), 6)
@@ -39,8 +44,8 @@ def test_pool_slice_holds_all_day_and_turns_over_at_midnight():
 
 
 def test_pool_slice_leaves_out_what_the_news_already_covers():
-    taken = list(TOPICS[:3])
-    assert not set(pool_for_day(date(2026, 9, 14), 6, exclude=taken)) & set(taken)
+    taken = texts(TOPICS[:3])
+    assert not set(texts(pool_for_day(date(2026, 9, 14), 6, exclude=taken))) & set(taken)
 
 
 def test_the_day_starts_on_the_pool_then_keeps_what_the_news_gave(store):
@@ -50,12 +55,14 @@ def test_the_day_starts_on_the_pool_then_keeps_what_the_news_gave(store):
     topics, pending = daily.listing()
     assert pending is True
     assert len(topics) == FRESH_COUNT + POOL_COUNT
-    assert not set(topics) & set(NEWS)
+    assert not set(texts(topics)) & set(NEWS)
 
     daily.ensure_fetched()
     topics, pending = daily.listing()
     assert pending is False
-    assert topics[:FRESH_COUNT] == NEWS
+    assert texts(topics[:FRESH_COUNT]) == NEWS
+    assert {t.category for t in topics[:FRESH_COUNT]} == {Category.NEWS}
+    assert Category.NEWS not in {t.category for t in topics[FRESH_COUNT:]}
     assert len(topics) == FRESH_COUNT + POOL_COUNT
 
 
@@ -93,8 +100,10 @@ def test_endpoint_serves_the_news_half_once_it_lands(tmp_path):
     with TestClient(app) as c:
         first = c.get("/api/topics").json()
         # InlineExecutor runs the fetch during that first request
-        assert first["topics"][:FRESH_COUNT] == NEWS or first["pending"] is True
+        assert [t["text"] for t in first["topics"][:FRESH_COUNT]] == NEWS or first["pending"] is True
 
         second = c.get("/api/topics").json()
         assert second["pending"] is False
-        assert second["topics"][:FRESH_COUNT] == NEWS
+        assert [t["text"] for t in second["topics"][:FRESH_COUNT]] == NEWS
+        assert {t["category"] for t in second["topics"][:FRESH_COUNT]} == {"news"}
+        assert all(t["category"] for t in second["topics"])

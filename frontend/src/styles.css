@@ -180,16 +180,74 @@ a {
 }
 
 .chip {
-  border: 1px solid var(--line);
+  border: 1px solid var(--cat-line, var(--line));
   border-radius: 999px;
-  background: var(--paper);
+  background: var(--cat-fill, var(--paper));
+  color: var(--cat-ink, inherit);
   padding: 0.3rem 0.8rem;
   font-size: 0.92rem;
   cursor: pointer;
 }
 
 .chip:not(:disabled):hover {
-  border-color: var(--ink);
+  border-color: var(--cat-ink, var(--ink));
+}
+
+/* One hue per topic category; the key below the chips names them. */
+[data-category='news'] {
+  --cat-line: #d9a29a;
+  --cat-fill: #fbeeea;
+  --cat-ink: #8f3a2a;
+}
+
+[data-category='tech'] {
+  --cat-line: #a8bdd8;
+  --cat-fill: #eaf1f9;
+  --cat-ink: #2f5580;
+}
+
+[data-category='literature'] {
+  --cat-line: #c3aed2;
+  --cat-fill: #f3eef8;
+  --cat-ink: #5f3f7a;
+}
+
+[data-category='history'] {
+  --cat-line: #d6be8d;
+  --cat-fill: #f8f1e1;
+  --cat-ink: #7a561a;
+}
+
+[data-category='world'] {
+  --cat-line: #a4c5a7;
+  --cat-fill: #ebf4ec;
+  --cat-ink: #35633c;
+}
+
+.chip-key {
+  list-style: none;
+  padding: 0;
+  margin: 0.7rem 0 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.2rem 1rem;
+  font-size: 0.78rem;
+  color: var(--muted);
+}
+
+.chip-key li {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.chip-key li::before {
+  content: '';
+  width: 0.55rem;
+  height: 0.55rem;
+  border-radius: 50%;
+  background: var(--cat-fill);
+  border: 1px solid var(--cat-line);
 }
 
 .history-aside {

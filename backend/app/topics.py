@@ -1,7 +1,9 @@
 import random
 from datetime import date
 
-TECH_TOPICS: tuple[str, ...] = (
+from app.models import Category, Topic
+
+_TECH: tuple[str, ...] = (
     "Digital twins in manufacturing",
     "Reinforcement learning for vehicle dispatching",
     "Automated material handling in semiconductor fabs",
@@ -34,7 +36,7 @@ TECH_TOPICS: tuple[str, ...] = (
     "Optimization solvers versus learned heuristics",
 )
 
-LITERATURE_TOPICS: tuple[str, ...] = (
+_LITERATURE: tuple[str, ...] = (
     "Why Orwell's 1984 keeps returning to bestseller lists",
     "Kafka and the modern bureaucratic nightmare",
     "Han Kang and the international rise of Korean fiction",
@@ -52,7 +54,7 @@ LITERATURE_TOPICS: tuple[str, ...] = (
     "Memoir and the ethics of writing about real people",
 )
 
-HISTORY_TOPICS: tuple[str, ...] = (
+_HISTORY: tuple[str, ...] = (
     "The Silk Road and the first global trade network",
     "How the printing press changed who could think in public",
     "The Black Death and the end of medieval Europe",
@@ -73,7 +75,7 @@ HISTORY_TOPICS: tuple[str, ...] = (
 
 # Standing arguments rather than this week's headline: the generator searches for
 # the latest turn in each, so the pool does not go stale between sessions.
-WORLD_TOPICS: tuple[str, ...] = (
+_WORLD: tuple[str, ...] = (
     "The global race to regulate AI",
     "Semiconductor export controls and technological sovereignty",
     "Critical minerals and the battery supply chain",
@@ -96,13 +98,23 @@ WORLD_TOPICS: tuple[str, ...] = (
     "Carbon border taxes and the trade fights they start",
 )
 
-TOPICS: tuple[str, ...] = TECH_TOPICS + LITERATURE_TOPICS + HISTORY_TOPICS + WORLD_TOPICS
+
+def _pool(texts: tuple[str, ...], category: Category) -> tuple[Topic, ...]:
+    return tuple(Topic(text=t, category=category) for t in texts)
 
 
-def pool_for_day(day: date, count: int, exclude: list[str] | None = None) -> list[str]:
+TECH_TOPICS = _pool(_TECH, Category.TECH)
+LITERATURE_TOPICS = _pool(_LITERATURE, Category.LITERATURE)
+HISTORY_TOPICS = _pool(_HISTORY, Category.HISTORY)
+WORLD_TOPICS = _pool(_WORLD, Category.WORLD)
+
+TOPICS: tuple[Topic, ...] = TECH_TOPICS + LITERATURE_TOPICS + HISTORY_TOPICS + WORLD_TOPICS
+
+
+def pool_for_day(day: date, count: int, exclude: list[str] | None = None) -> list[Topic]:
     """The same slice all day, a different one tomorrow. Seeded by the date alone."""
     taken = set(exclude or ())
-    available = [t for t in TOPICS if t not in taken]
+    available = [t for t in TOPICS if t.text not in taken]
     rng = random.Random(day.toordinal())
     rng.shuffle(available)
     return available[: max(0, count)]
@@ -110,5 +122,5 @@ def pool_for_day(day: date, count: int, exclude: list[str] | None = None) -> lis
 
 def pick_topic(recent: list[str], rng: random.Random | None = None) -> str:
     rng = rng or random.Random()
-    unused = [t for t in TOPICS if t not in set(recent)]
-    return rng.choice(unused or list(TOPICS))
+    unused = [t.text for t in TOPICS if t.text not in set(recent)]
+    return rng.choice(unused or [t.text for t in TOPICS])

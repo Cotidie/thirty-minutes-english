@@ -7,6 +7,7 @@ from datetime import UTC, date, datetime
 from typing import Protocol
 
 from app.claude_cli import ClaudeCli, GenerationError, structured_output
+from app.models import Category, Topic
 from app.store import SessionStore
 from app.topics import pool_for_day
 
@@ -69,13 +70,14 @@ class DailyTopics:
     def today(self) -> date:
         return datetime.now(UTC).date()
 
-    def listing(self) -> tuple[list[str], bool]:
+    def listing(self) -> tuple[list[Topic], bool]:
         """The day's topics, and whether a fetch is still on its way."""
         day = self.today()
         fresh = self.store.get_daily_topics(day.isoformat()) or []
         pool = pool_for_day(day, POOL_COUNT + FRESH_COUNT - len(fresh), exclude=fresh)
         pending = not fresh and self.source is not None
-        return fresh + pool, pending
+        news = [Topic(text=t, category=Category.NEWS) for t in fresh]
+        return news + pool, pending
 
     def ensure_fetched(self) -> None:
         """Starts the day's fetch if it has not run yet. Safe to call on every request."""

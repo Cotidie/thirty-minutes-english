@@ -14,6 +14,8 @@
 
 홈 화면 추천 주제 12개는 하루 단위로 바뀐다. 절반은 그날 뉴스에서 새로 뽑고, 절반은 고정 풀(기술 · 문학 · 세계사 · 세계 이슈)에서 날짜를 씨앗으로 고른다. 같은 날에는 몇 번을 새로고침해도 같은 12개가 나오고, 자정을 넘기면 바뀐다.
 
+주제마다 카테고리(`news` · `tech` · `literature` · `history` · `world`)가 붙어 `/api/topics`에 `{text, category}`로 내려간다. 칩 색은 카테고리별로 다르고, 칩 아래 범례가 그날 나온 카테고리만 이름으로 보여준다. 색 정의는 `frontend/src/styles.css`의 `[data-category=...]` 규칙에 모여 있다.
+
 뉴스 절반은 그날 처음 `/api/topics`를 호출할 때 백그라운드로 `claude` CLI를 한 번 돌려 받아 `topic_days` 테이블에 저장한다(하루 1회). 도착 전이나 실패했을 때는 12개 전부 고정 풀에서 채우므로 화면이 비지 않는다. 프론트는 `pending`이 참인 동안 15초 간격으로 최대 3분간 다시 물어본다. 표현 6개는 주제와 무관한 B2~C1+ 범용 표현이고, 어휘 12개는 주제 연관 단어로 아티클 밖에서도 고른다. 최근 40세션에서 이미 나온 표현·단어는 프롬프트에 제외 목록으로 넘긴다. 각 항목은 10% 확률로 목록에서 빠져 가끔 다시 나올 수 있다(`JobRunner.REPEAT_ALLOWANCE`).
 
 생성은 로컬 `claude` CLI(`claude -p --json-schema --output-format stream-json`)를 서브프로세스로 호출한다. `POST /api/sessions`는 202로 작업 ID를 돌려주고, 프론트가 `GET /api/jobs/{id}`를 1초마다 폴링해 단계(스킬 로드 → 웹 검색 n회 → 작성 → 구조 확인)와 진행 바를 보여준다. 퍼센트는 단계 하한 + 경과 시간(최근 5회 중앙값 기준) 추정이다. API 키 불필요, Claude 구독으로 처리. 1회 생성 약 1~2분(opus 기준). CLI에는 `Skill`, `Read`와 firecrawl MCP(`firecrawl_search`, `firecrawl_scrape`)만 열려 있다. 아티클은 최대 3회 웹 검색으로 사실을 확인하고 최근 이슈를 각도로 잡는다. firecrawl은 호스트에서 `claude mcp add --transport http firecrawl https://mcp.firecrawl.dev/v2/mcp-oauth` 후 한 번 OAuth 로그인해 두면 된다.

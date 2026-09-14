@@ -36,8 +36,15 @@ export interface SessionContent {
   vocabulary: VocabularyItem[]
 }
 
+export type Category = 'tech' | 'literature' | 'history' | 'world' | 'news'
+
+export interface Topic {
+  text: string
+  category: Category
+}
+
 export interface TopicListing {
-  topics: string[]
+  topics: Topic[]
   /** Today's news half has not landed yet; the list is pool topics for now. */
   pending: boolean
 }

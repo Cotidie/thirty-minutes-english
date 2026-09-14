@@ -4,7 +4,7 @@ import { api } from '../api'
 import { GenerationProgress } from '../components/GenerationProgress'
 import { TopicPicker } from '../components/TopicPicker'
 import type { JobStatus } from '../lib/progress'
-import type { SessionSummary } from '../types'
+import type { SessionSummary, Topic } from '../types'
 
 /** How often to look back for the day's news topics while they are still coming. */
 const TOPIC_POLL_MS = 15_000
@@ -12,7 +12,7 @@ const TOPIC_POLL_LIMIT = 12
 
 export function HomePage() {
   const navigate = useNavigate()
-  const [topics, setTopics] = useState<string[]>([])
+  const [topics, setTopics] = useState<Topic[]>([])
   const [sessions, setSessions] = useState<SessionSummary[]>([])
   const [job, setJob] = useState<JobStatus | null>(null)
   const [error, setError] = useState<string | null>(null)

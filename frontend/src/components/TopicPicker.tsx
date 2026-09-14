@@ -1,15 +1,28 @@
 import { useState } from 'react'
+import type { Category, Topic } from '../types'
 
 interface Props {
-  suggestions: string[]
+  suggestions: Topic[]
   busy: boolean
   onGenerate: (topic: string | null) => void
 }
+
+/** Colour carries the category, so the key names what each colour means. */
+const CATEGORY_LABELS: Record<Category, string> = {
+  news: 'In the news',
+  tech: 'Technology',
+  literature: 'Literature',
+  history: 'History',
+  world: 'World',
+}
+
+const CATEGORY_ORDER: Category[] = ['news', 'tech', 'literature', 'history', 'world']
 
 export function TopicPicker({ suggestions, busy, onGenerate }: Props) {
   const [topic, setTopic] = useState('')
   // The server decides how many the day offers, and in what order.
   const shown = suggestions
+  const legend = CATEGORY_ORDER.filter((c) => shown.some((s) => s.category === c))
 
   return (
     <form
@@ -37,15 +50,30 @@ export function TopicPicker({ suggestions, busy, onGenerate }: Props) {
         </button>
       </div>
       {shown.length > 0 && (
-        <ul className="chips" aria-label="Suggested topics">
-          {shown.map((s) => (
-            <li key={s}>
-              <button type="button" className="chip" disabled={busy} onClick={() => setTopic(s)}>
-                {s}
-              </button>
-            </li>
-          ))}
-        </ul>
+        <>
+          <ul className="chips" aria-label="Suggested topics">
+            {shown.map((s) => (
+              <li key={s.text}>
+                <button
+                  type="button"
+                  className="chip"
+                  data-category={s.category}
+                  disabled={busy}
+                  onClick={() => setTopic(s.text)}
+                >
+                  {s.text}
+                </button>
+              </li>
+            ))}
+          </ul>
+          <ul className="chip-key" aria-label="Topic categories">
+            {legend.map((c) => (
+              <li key={c} data-category={c}>
+                {CATEGORY_LABELS[c]}
+              </li>
+            ))}
+          </ul>
+        </>
       )}
     </form>
   )

@@ -6,6 +6,8 @@ from app.main import create_app
 from app.progress import Progress, Stage
 from app.store import SessionStore
 from app.topics import TOPICS
+
+TOPIC_TEXTS = {t.text for t in TOPICS}
 from tests.conftest import sample_content
 
 
@@ -68,7 +70,7 @@ def test_job_endpoint_returns_same_job(client):
 
 
 def test_create_session_picks_topic_when_missing(client):
-    assert create(client)["topic"] in TOPICS
+    assert create(client)["topic"] in TOPIC_TEXTS
 
 
 def test_create_session_avoids_recent_auto_topics(client):
@@ -98,7 +100,7 @@ def test_delete_session(client):
 def test_topics_endpoint_offers_a_stable_daily_slice(client):
     body = client.get("/api/topics").json()
     assert len(body["topics"]) == 12
-    assert set(body["topics"]) <= set(TOPICS)
+    assert {t["text"] for t in body["topics"]} <= TOPIC_TEXTS
     assert body["pending"] is False  # no news source configured in tests
     assert client.get("/api/topics").json()["topics"] == body["topics"]
 

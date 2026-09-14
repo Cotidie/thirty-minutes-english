@@ -1,7 +1,25 @@
 from datetime import datetime
+from enum import StrEnum
 from typing import Literal
 
-from pydantic import BaseModel, field_validator
+from pydantic import BaseModel, ConfigDict, field_validator
+
+
+class Category(StrEnum):
+    """Where a suggested topic comes from. Drives the chip colour on the home page."""
+
+    TECH = "tech"
+    LITERATURE = "literature"
+    HISTORY = "history"
+    WORLD = "world"
+    NEWS = "news"
+
+
+class Topic(BaseModel):
+    model_config = ConfigDict(frozen=True)
+
+    text: str
+    category: Category
 
 
 class Expression(BaseModel):
@@ -66,7 +84,7 @@ class Session(BaseModel):
 class TopicListing(BaseModel):
     """The day's suggestions, and whether the news half is still on its way."""
 
-    topics: list[str]
+    topics: list[Topic]
     pending: bool
 
 
