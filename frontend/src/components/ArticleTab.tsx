@@ -1,13 +1,19 @@
 import { useEffect, useRef, useState } from 'react'
-import { highlightSegments } from '../lib/highlight'
+import { markedSpans, segmentsIn } from '../lib/highlight'
+import { pairSentences } from '../lib/sentences'
 import type { Article, Question } from '../types'
 import { ReadAloud } from './ReadAloud'
+import { Run, Sentence } from './Sentence'
 
 export function ArticleTab({ article, sessionId }: { article: Article; sessionId: number | null }) {
   const [active, setActive] = useState<number | null>(null)
   const [reading, setReading] = useState<number | null>(null)
   const bodyRef = useRef<HTMLElement>(null)
-  const paragraphs = article.body.split(/\n\s*\n/).map((p) => p.trim()).filter(Boolean)
+  const paragraphs = article.body
+    .split(/\n\s*\n/)
+    .map((p) => p.trim())
+    .filter(Boolean)
+  const sentences = pairSentences(paragraphs, article.translation ?? [])
   const evidence = active === null ? [] : article.questions[active].evidence
 
   useEffect(() => {
@@ -19,27 +25,35 @@ export function ArticleTab({ article, sessionId }: { article: Article; sessionId
       <p className="tab-brief">
         Read silently for three minutes. Then each of you summarizes the article in your own words before opening the
         questions. The first two are answered in the text, so click one to see the passage it comes from; the last one
-        is yours to argue about. Press Read aloud under a paragraph to have a native-speaker coach stop you on a
-        mispronounced word or a pause that breaks a phrase.
+        is yours to argue about. Click a sentence to see it in Korean, and again for the English. Press Read aloud under
+        a paragraph to have a native-speaker coach stop you on a mispronounced word or a pause that breaks a phrase.
       </p>
       <article className="article" ref={bodyRef}>
         <h2 className="article-title">{article.title}</h2>
-        {paragraphs.map((p, i) => (
-          <div key={i} className="paragraph">
-            <p>
-              {highlightSegments(p, evidence).map((seg, j) =>
-                seg.marked ? <mark key={j}>{seg.text}</mark> : <span key={j}>{seg.text}</span>,
-              )}
-            </p>
-            <ReadAloud
-              paragraph={p}
-              sessionId={sessionId}
-              active={reading !== null && reading !== i}
-              onStart={() => setReading(i)}
-              onEnd={() => setReading(null)}
-            />
-          </div>
-        ))}
+        {paragraphs.map((p, i) => {
+          const spans = markedSpans(p, evidence)
+          return (
+            <div key={i} className="paragraph">
+              <p>
+                {sentences[i].map((piece, j) => {
+                  const segments = segmentsIn(piece.text, spans, piece.start)
+                  return piece.ko === null ? (
+                    <Run key={j} segments={segments} />
+                  ) : (
+                    <Sentence key={j} segments={segments} ko={piece.ko} />
+                  )
+                })}
+              </p>
+              <ReadAloud
+                paragraph={p}
+                sessionId={sessionId}
+                active={reading !== null && reading !== i}
+                onStart={() => setReading(i)}
+                onEnd={() => setReading(null)}
+              />
+            </div>
+          )
+        })}
       </article>
       <details className="questions" open={active !== null || undefined}>
         <summary>Discussion questions</summary>

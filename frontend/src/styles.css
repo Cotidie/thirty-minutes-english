@@ -805,6 +805,59 @@ button.question.is-active {
   white-space: pre-wrap;
 }
 
+/* A sentence that flips between the English and its Korean */
+.swap {
+  position: relative;
+  top: 0;
+  cursor: pointer;
+  border-radius: 2px;
+  transition: background-color 120ms ease;
+}
+
+.swap:hover,
+.swap:focus-visible {
+  background: rgb(27 36 49 / 6%);
+  outline: none;
+}
+
+.swap.is-ko {
+  font-size: 0.95em;
+  color: #2c3b4f;
+}
+
+.swap.is-sinking {
+  animation: swap-sink 240ms ease-in forwards;
+}
+
+.swap.is-rising {
+  animation: swap-rise 320ms ease-out;
+}
+
+@keyframes swap-sink {
+  to {
+    top: 0.55em;
+    opacity: 0;
+  }
+}
+
+@keyframes swap-rise {
+  from {
+    top: 0.55em;
+    opacity: 0;
+  }
+  to {
+    top: 0;
+    opacity: 1;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .swap.is-sinking,
+  .swap.is-rising {
+    animation-duration: 1ms;
+  }
+}
+
 .article mark {
   background: linear-gradient(transparent 6%, var(--marker) 6%, var(--marker) 94%, transparent 94%);
   color: inherit;

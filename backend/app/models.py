@@ -2,7 +2,7 @@ from datetime import datetime
 from enum import StrEnum
 from typing import Literal
 
-from pydantic import BaseModel, ConfigDict, field_validator
+from pydantic import BaseModel, ConfigDict, field_validator, model_validator
 
 
 class Category(StrEnum):
@@ -39,11 +39,19 @@ class Source(BaseModel):
     url: str
 
 
+class SentencePair(BaseModel):
+    """One sentence of the body, copied exactly, and its Korean."""
+
+    en: str
+    ko: str
+
+
 class Article(BaseModel):
     title: str
     body: str
     questions: list[Question]
     sources: list[Source] = []
+    translation: list[SentencePair] = []
 
     @field_validator("questions", mode="before")
     @classmethod
@@ -51,6 +59,12 @@ class Article(BaseModel):
         if isinstance(value, list):
             return [{"text": q, "evidence": []} if isinstance(q, str) else q for q in value]
         return value
+
+    @model_validator(mode="after")
+    def keep_only_sentences_found_in_the_body(self) -> "Article":
+        """A pair the reader cannot click on is no use; the sentence stays English."""
+        self.translation = [pair for pair in self.translation if pair.en.strip() and pair.en.strip() in self.body]
+        return self
 
 
 class VocabularyItem(BaseModel):

@@ -50,10 +50,20 @@ SESSION_SCHEMA: dict = {
         "article": {
             "type": "object",
             "additionalProperties": False,
-            "required": ["title", "body", "questions", "sources"],
+            "required": ["title", "body", "questions", "sources", "translation"],
             "properties": {
                 "title": {"type": "string"},
                 "body": {"type": "string"},
+                "translation": {
+                    "type": "array",
+                    "minItems": 1,
+                    "items": {
+                        "type": "object",
+                        "additionalProperties": False,
+                        "required": ["en", "ko"],
+                        "properties": {"en": {"type": "string"}, "ko": {"type": "string"}},
+                    },
+                },
                 "sources": {
                     "type": "array",
                     "minItems": 0,
@@ -131,7 +141,11 @@ For each of those two give evidence: 1 or 2 passages copied word for word from t
 (exact substrings, 5 to 30 words each, same capitalization and punctuation) that the answer rests on. \
 The third is an open question the article does not settle. It asks the two speakers what they think, \
 about something two reasonable people would disagree on, and it grows out of the article's angle \
-rather than asking about life in general. Its evidence is an empty list.
+rather than asking about life in general. Its evidence is an empty list. \
+Then give translation: every sentence of the article body, in reading order, as pairs. en is the sentence \
+copied character for character from the body, final punctuation included, one sentence per pair; never \
+merge or split sentences. ko is that sentence in natural written Korean (해라체, "~다"로 끝맺기), translated \
+with its neighbors in mind so the Korean reads well in sequence; keep names, figures, and dates as they are.
 
 3. vocabulary: {vocabulary_count} words at B2 to C1+ level connected to the topic. Draw from the \
 article body where it offers strong candidates, and fill the rest with words a well-read speaker would \

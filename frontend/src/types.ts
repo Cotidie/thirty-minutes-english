@@ -15,11 +15,18 @@ export interface Source {
   url: string
 }
 
+/** One sentence of the body, copied exactly, and its Korean. */
+export interface SentencePair {
+  en: string
+  ko: string
+}
+
 export interface Article {
   title: string
   body: string
   questions: Question[]
   sources?: Source[]
+  translation?: SentencePair[]
 }
 
 export interface VocabularyItem {
