@@ -6,6 +6,8 @@ import { api } from '../api'
 import type { LiveEvent } from './liveSession'
 
 export interface LiveConnection {
+  /** The live microphone track, so the UI can show that sound is going in. */
+  microphone: MediaStream
   /** Tells the agent the round is over, so it signs off. */
   finish(): void
   /** Ends the round. `session.closed` arrives through onEvent afterwards. */
@@ -80,6 +82,7 @@ export async function connectLive(opts: LiveOptions): Promise<LiveConnection> {
   }
 
   return {
+    microphone,
     finish: () =>
       send({
         type: 'session.instructions.append',

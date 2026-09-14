@@ -5,7 +5,7 @@ import type { LiveEvent } from '../lib/liveSession'
 import type { LiveConnection, LiveOptions } from '../lib/liveClient'
 import { ReadAloud } from './ReadAloud'
 
-const connection = { finish: vi.fn(), close: vi.fn(), dispose: vi.fn() }
+const connection = { microphone: {} as MediaStream, finish: vi.fn(), close: vi.fn(), dispose: vi.fn() }
 let emit: (e: LiveEvent) => void = () => undefined
 let drop: () => void = () => undefined
 type RoundOptions = Omit<LiveOptions, 'start'>

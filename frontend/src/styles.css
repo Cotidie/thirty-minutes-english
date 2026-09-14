@@ -965,22 +965,63 @@ button.question.is-active {
   color: var(--muted);
 }
 
-.ask-card-raw {
-  margin-top: 0.7rem;
-  color: var(--muted);
+
+.ask-save {
+  font-weight: 500;
 }
 
-.ask-card-raw summary {
-  cursor: pointer;
+.ask-save:disabled {
+  opacity: 0.45;
+  cursor: default;
 }
 
-.ask-card-raw dl {
-  display: grid;
-  grid-template-columns: 3.2rem 1fr;
-  gap: 0.15rem 0.6rem;
-  margin: 0.5rem 0 0;
+.ask-bar .ask-save {
+  margin-left: auto;
 }
 
-.ask-card-raw dd {
-  margin: 0;
+.ask-bar .ask-save + button {
+  margin-left: 0;
+}
+
+.ask-level {
+  display: inline-flex;
+  align-items: flex-end;
+  gap: 2px;
+  height: 0.85rem;
+}
+
+.ask-level i {
+  width: 3px;
+  background: var(--line);
+  border-radius: 1px;
+}
+
+.ask-level i:nth-child(1) { height: 30%; }
+.ask-level i:nth-child(2) { height: 50%; }
+.ask-level i:nth-child(3) { height: 70%; }
+.ask-level i:nth-child(4) { height: 85%; }
+.ask-level i:nth-child(5) { height: 100%; }
+
+.ask-level i.is-on {
+  background: var(--ink);
+}
+
+.ask-level.is-quiet i {
+  animation: ask-waiting 1.6s ease-in-out infinite;
+}
+
+.ask-level.is-quiet i:nth-child(2) { animation-delay: 0.1s; }
+.ask-level.is-quiet i:nth-child(3) { animation-delay: 0.2s; }
+.ask-level.is-quiet i:nth-child(4) { animation-delay: 0.3s; }
+.ask-level.is-quiet i:nth-child(5) { animation-delay: 0.4s; }
+
+@keyframes ask-waiting {
+  0%, 100% { opacity: 0.35; }
+  50% { opacity: 1; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ask-level.is-quiet i {
+    animation: none;
+  }
 }

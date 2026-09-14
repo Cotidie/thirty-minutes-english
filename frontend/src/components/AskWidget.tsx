@@ -3,6 +3,7 @@ import { Link, useMatch } from 'react-router-dom'
 import { api } from '../api'
 import { connectAsk, type LiveConnection } from '../lib/liveClient'
 import { applyLiveEvent, initialLiveState, liveFailed, type LiveState } from '../lib/liveSession'
+import { LEVEL_STEPS, useMicLevel } from '../lib/micLevel'
 
 /** How long the coach stays quiet before we take the round as finished. */
 const SILENCE_MS = 5000
@@ -10,8 +11,8 @@ const SILENCE_MS = 5000
 const STATUS_LABEL: Record<LiveState['status'], string> = {
   connecting: 'Connecting…',
   listening: 'Ask away. "How do you say…"',
-  closing: 'Saving…',
-  closed: 'Saved.',
+  closing: 'Wrapping up…',
+  closed: 'Round over. Save it if it was any good.',
   failed: 'Could not start.',
 }
 
@@ -19,6 +20,9 @@ export function AskWidget() {
   const match = useMatch('/s/:id')
   const sessionId = match?.params.id ? Number(match.params.id) : null
   const [state, setState] = useState<LiveState | null>(null)
+  const [saved, setSaved] = useState(false)
+  const [microphone, setMicrophone] = useState<MediaStream | null>(null)
+  const level = useMicLevel(microphone)
   const audioRef = useRef<HTMLAudioElement>(null)
   const connRef = useRef<LiveConnection | null>(null)
   const latest = useRef<LiveState | null>(null)
@@ -41,31 +45,37 @@ export function AskWidget() {
     connRef.current?.dispose()
   }, [])
 
-  const save = useCallback(
-    async (round: LiveState) => {
-      const user_text = round.user.trim()
-      const coach_text = round.coach.trim()
-      if (!user_text || !coach_text) return
-      await api
-        .addAsk({ session_id: sessionId, user_text, coach_text, seconds: round.seconds })
-        .catch(() => undefined)
-    },
-    [sessionId],
-  )
+  /** Only what the user chose to keep: a misheard or useless round is thrown away. */
+  const save = useCallback(async () => {
+    const round = latest.current
+    if (!round) return
+    setSaved(true)
+    try {
+      await api.addAsk({
+        session_id: sessionId,
+        user_text: round.user.trim(),
+        coach_text: round.coach.trim(),
+        seconds: round.seconds,
+      })
+    } catch (e) {
+      setSaved(false)
+      setState((s) => (s ? { ...s, error: e instanceof Error ? e.message : String(e) } : s))
+    }
+  }, [sessionId])
 
   const close = useCallback(() => {
     clearSilence()
+    setMicrophone(null)
     setState((s) => (s ? { ...s, status: 'closing' } : s))
     connRef.current?.close()
-    const round = latest.current
-    if (round) void save(round)
-  }, [save])
+  }, [])
 
   const start = useCallback(async () => {
     setState(initialLiveState)
+    setSaved(false)
     try {
       const topic = sessionId === null ? null : await api.getSession(sessionId).then((s) => s.content.topic, () => null)
-      connRef.current = await connectAsk(topic, {
+      const conn = await connectAsk(topic, {
         audio: audioRef.current!,
         onEvent: (event) => {
           setState((s) => applyLiveEvent(s ?? initialLiveState, event))
@@ -74,8 +84,13 @@ export function AskWidget() {
             silence.current = setTimeout(close, SILENCE_MS)
           }
         },
-        onDisconnect: () => setState((s) => liveFailed(s ?? initialLiveState, 'Connection dropped.')),
+        onDisconnect: () => {
+          setMicrophone(null)
+          setState((s) => liveFailed(s ?? initialLiveState, 'Connection dropped.'))
+        },
       })
+      connRef.current = conn
+      setMicrophone(conn.microphone)
     } catch (e) {
       setState((s) => liveFailed(s ?? initialLiveState, e instanceof Error ? e.message : String(e)))
     }
@@ -85,6 +100,7 @@ export function AskWidget() {
     clearSilence()
     connRef.current?.dispose()
     connRef.current = null
+    setMicrophone(null)
     setState(null)
   }, [])
 
@@ -118,13 +134,19 @@ export function AskWidget() {
       ) : (
         <div className="ask-panel" role="dialog" aria-label="Ask the coach">
           <div className="ask-bar">
+            {state.status === 'listening' && <MicMeter level={level} />}
             <span className="ask-status" role="status">
-              {STATUS_LABEL[state.status]}
+              {saved ? 'Saved.' : STATUS_LABEL[state.status]}
             </span>
             {state.seconds > 0 && <span className="ask-seconds">{state.seconds}s</span>}
             {state.status === 'listening' && (
               <button type="button" onClick={close}>
                 Done
+              </button>
+            )}
+            {state.status === 'closed' && !saved && (
+              <button type="button" className="ask-save" onClick={() => void save()} disabled={!worthSaving(state)}>
+                Save
               </button>
             )}
             {(state.status === 'closed' || state.status === 'failed') && (
@@ -146,6 +168,22 @@ export function AskWidget() {
       )}
     </div>
   )
+}
+
+/** Five bars that fill with how loud the microphone is, so silence is visible. */
+function MicMeter({ level }: { level: number }) {
+  return (
+    <span className={`ask-level${level === 0 ? ' is-quiet' : ''}`} aria-hidden="true">
+      {Array.from({ length: LEVEL_STEPS }, (_, i) => (
+        <i key={i} className={i < level ? 'is-on' : ''} />
+      ))}
+    </span>
+  )
+}
+
+/** A round with nothing on one of the two lines has nothing to review later. */
+function worthSaving(state: LiveState): boolean {
+  return state.user.trim() !== '' && state.coach.trim() !== ''
 }
 
 function isTyping(target: EventTarget | null): boolean {

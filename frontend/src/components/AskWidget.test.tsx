@@ -7,7 +7,7 @@ import type { LiveConnection, LiveOptions } from '../lib/liveClient'
 import type { LiveEvent } from '../lib/liveSession'
 import { AskWidget } from './AskWidget'
 
-const connection = { finish: vi.fn(), close: vi.fn(), dispose: vi.fn() }
+const connection = { microphone: {} as MediaStream, finish: vi.fn(), close: vi.fn(), dispose: vi.fn() }
 let emit: (e: LiveEvent) => void = () => undefined
 type RoundOptions = Omit<LiveOptions, 'start'>
 const connect = vi.fn(async (_topic: string | null, opts: RoundOptions): Promise<LiveConnection> => {
@@ -49,20 +49,31 @@ beforeEach(() => {
   connection.dispose.mockClear()
 })
 
+/** Ends the live round: the panel stays up with the transcript and a Save button. */
+async function endRound() {
+  await userEvent.click(screen.getByRole('button', { name: 'Done' }))
+  act(() => emit({ type: 'session.closed', usage: { seconds: 12 } }))
+}
+
 describe('AskWidget', () => {
-  it('asks with the session topic and saves the round against that session', async () => {
+  it('asks with the session topic and keeps the round against that session once saved', async () => {
     renderAt('/s/3')
     await askAndAnswer()
     expect(connect.mock.calls[0][0]).toBe('Digital twins')
 
-    await userEvent.click(screen.getByRole('button', { name: 'Done' }))
+    await endRound()
     expect(connection.close).toHaveBeenCalled()
+    expect(vi.mocked(api.addAsk)).not.toHaveBeenCalled()
+
+    await userEvent.click(screen.getByRole('button', { name: 'Save' }))
     expect(vi.mocked(api.addAsk)).toHaveBeenCalledWith({
       session_id: 3,
       user_text: '눈치 좀 챙겨',
       coach_text: 'Read the room.',
       seconds: 12,
     })
+    expect(screen.getByRole('status')).toHaveTextContent('Saved.')
+    expect(screen.queryByRole('button', { name: 'Save' })).not.toBeInTheDocument()
   })
 
   it('works off a session, with no topic and no session id', async () => {
@@ -71,11 +82,22 @@ describe('AskWidget', () => {
     expect(connect.mock.calls[0][0]).toBeNull()
     expect(vi.mocked(api.getSession)).not.toHaveBeenCalled()
 
-    await userEvent.click(screen.getByRole('button', { name: 'Done' }))
+    await endRound()
+    await userEvent.click(screen.getByRole('button', { name: 'Save' }))
     expect(vi.mocked(api.addAsk).mock.calls[0][0].session_id).toBeNull()
   })
 
-  it('closes itself once the coach has been quiet, and saves once', async () => {
+  it('throws the round away when the user closes without saving', async () => {
+    renderAt('/')
+    await askAndAnswer()
+    await endRound()
+
+    await userEvent.click(screen.getByRole('button', { name: 'Close' }))
+    expect(vi.mocked(api.addAsk)).not.toHaveBeenCalled()
+    expect(screen.getByRole('button', { name: /Ask/ })).toBeInTheDocument()
+  })
+
+  it('closes the round itself once the coach has been quiet, and still waits to be told to save', async () => {
     vi.useFakeTimers({ shouldAdvanceTime: true })
     try {
       renderAt('/')
@@ -86,7 +108,7 @@ describe('AskWidget', () => {
         vi.advanceTimersByTime(5000)
       })
       expect(connection.close).toHaveBeenCalledTimes(1)
-      expect(vi.mocked(api.addAsk)).toHaveBeenCalledTimes(1)
+      expect(vi.mocked(api.addAsk)).not.toHaveBeenCalled()
     } finally {
       vi.useRealTimers()
     }
@@ -106,14 +128,25 @@ describe('AskWidget', () => {
     expect(connect).toHaveBeenCalled()
   })
 
-  it('saves nothing when the round produced no answer', async () => {
+  it('will not let a round with no answer be saved', async () => {
     renderAt('/')
     await userEvent.click(screen.getByRole('button', { name: /Ask/ }))
     act(() => emit({ type: 'session.started', session: { id: 'live_1' } }))
     act(() => emit({ type: 'session.input_transcript.delta', delta: 'hello?' }))
 
-    await userEvent.click(screen.getByRole('button', { name: 'Done' }))
-    expect(vi.mocked(api.addAsk)).not.toHaveBeenCalled()
+    await endRound()
+    expect(screen.getByRole('button', { name: 'Save' })).toBeDisabled()
+  })
+
+  it('keeps the Save button when the write fails', async () => {
+    vi.mocked(api.addAsk).mockRejectedValueOnce(new Error('database is locked'))
+    renderAt('/')
+    await askAndAnswer()
+    await endRound()
+
+    await userEvent.click(screen.getByRole('button', { name: 'Save' }))
+    expect(await screen.findByText(/database is locked/)).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Save' })).toBeInTheDocument()
   })
 
   it('shows why it could not start', async () => {

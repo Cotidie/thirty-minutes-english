@@ -47,15 +47,6 @@ export function AsksPage() {
               </p>
             ))}
             {ask.card?.note && <p className="ask-card-note">{ask.card.note}</p>}
-            <details className="ask-card-raw">
-              <summary>Transcript</summary>
-              <dl>
-                <dt>You</dt>
-                <dd>{ask.user_text}</dd>
-                <dt>Coach</dt>
-                <dd>{ask.coach_text}</dd>
-              </dl>
-            </details>
           </li>
         ))}
       </ol>

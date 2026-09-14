@@ -1,5 +1,4 @@
 import { render, screen } from '@testing-library/react'
-import userEvent from '@testing-library/user-event'
 import { MemoryRouter } from 'react-router-dom'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { api } from '../api'
@@ -53,8 +52,8 @@ describe('AsksPage', () => {
     expect(screen.getByText('Take a hint (blunter)')).toBeInTheDocument()
     expect(screen.getByText(/never to a manager/)).toBeInTheDocument()
 
-    await userEvent.click(screen.getByText('Transcript'))
-    expect(screen.getByText(/Friends or coworkers\./)).toBeInTheDocument()
+    expect(screen.queryByText('Transcript')).not.toBeInTheDocument()
+    expect(screen.queryByText(/Read the room\. Read the room\./)).not.toBeInTheDocument()
     expect(screen.getByRole('link', { name: 'Back to the session' })).toHaveAttribute('href', '/s/3')
   })
 
@@ -72,7 +71,7 @@ describe('AsksPage', () => {
     vi.mocked(api.askCards).mockResolvedValue([withoutCard])
     renderAt('/asks')
     expect(await screen.findByText(/No answer landed/)).toBeInTheDocument()
-    expect(screen.getAllByText('uh, how do you say')).toHaveLength(2)
+    expect(screen.getByText('uh, how do you say')).toBeInTheDocument()
   })
 
   it('reports a failure instead of an empty list', async () => {
