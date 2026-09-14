@@ -28,6 +28,7 @@
 | `DB_PATH` | `backend/data/sessions.db` | SQLite 파일 |
 | `OPENAI_API_KEY` | 비움 | Read aloud 코치와 Ask 위젯용. 비우면 두 버튼이 503을 돌려준다 |
 | `READ_ALOUD_AGENT_DIR` | `../read-aloud-coach` | 발음·끊어 읽기 코치 정의 폴더(프롬프트, 세션 설정) |
+| `EXAMPLE_AGENT_DIR` | `../example-coach` | Your turn / Practice 코치 정의 폴더 |
 | `PHRASE_AGENT_DIR` | `../phrase-coach` | 표현 코치 정의 폴더 |
 | `SUMMARY_MODEL` | `gpt-5.6-luna` | Summary 탭에서 transcript를 정리하는 텍스트 모델 |
 | `TOPICS_MODEL` | `sonnet` | 하루 한 번 뉴스에서 추천 주제를 뽑는 모델 |
@@ -49,13 +50,22 @@ Article 탭의 문단마다 `Read aloud` 버튼이 있다. 누르면 브라우�
 
 에이전트 정의는 `../phrase-coach/`에 있다. `../read-aloud-coach/`와 같은 규약이고, backend의 같은 `LiveAgent`가 둘 다 읽는다.
 
+## Your turn / Practice (GPT-Live)
+
+Expressions 탭의 표현마다 노란 `Your turn: one sentence each.` 라벨이, Vocabulary 탭의 카드마다 `Practice` 버튼이 있다. 누르면 마이크가 붙고 참가자가 그 표현이나 단어로 문장 하나를 말한다. 코치는 그 문장을 원어민이 말하는 대로 되풀이한 뒤 피드백 한 문장을 붙인다(뜻과 표현은 그대로, 전치사·관사·어색한 단어만 고침. 이미 자연스러우면 그렇다고만). 코치가 5초간 조용하면 라운드가 끝나고 `Keep`으로 그 표현 아래에 쌓인다. 쪽지 위의 `↻`는 처음부터 다시, `✕`는 듣는 중이든 끝난 뒤든 버린다. 한 문장에 약 $0.015.
+
+쌓인 문장은 `examples` 테이블에 세션·표현별로 남고, 새로고침해도 그 자리에 다시 나온다. 별도 추출 없이 자막 두 줄(참가자 문장, 코치 답)을 그대로 쓴다.
+
+에이전트 정의는 `../example-coach/`에 있다. 다른 두 코치와 같은 규약이고, backend `POST /api/example/sessions`가 표현·뜻·노트를 채워 중계한다.
+
 ## Summary 탭
 
-레일의 네 번째 항목. 세션이 남긴 것을 세 섹션으로 보여준다.
+레일의 네 번째 항목. 세션이 남긴 것을 네 섹션으로 보여준다.
 
 | 섹션 | 내용 | 원본 |
 |---|---|---|
 | Starred | 표현: 구문 / 뜻, 단어: 단어 · 품사 / 정의 (예문과 노트는 뺀 축약형) | `stars` 테이블 |
+| Sentences you made | 표현·단어 / 참가자 문장 / 코치의 되풀이와 피드백 | `examples` 테이블 |
 | Expressions you asked for | 물은 말 / 추천 표현 / 대안 / 노트 | `asks` 테이블 |
 | Reading to fix | 들린 대로 / 원래 단어나 구 / 고칠 점. 끊어 읽기 교정은 `phrasing` 표시 | `readings` 테이블 |
 
@@ -90,7 +100,7 @@ docker compose up -d --build
 | Expressions | 10분 | 표현 6개. 예문 읽고 용례 합의, 각자 문장 하나씩 |
 | Article | 10분 | 3분 묵독 후 각자 요약, 질문 3개로 토론. 앞 2개는 본문 확인용, 마지막 1개는 의견 교환용 |
 | Vocabulary | 10분 | 단어 + 예문만 보고 뜻을 영어로 설명, 카드 클릭해 확인 |
-| Summary | 끝나고 | 별표한 표현·단어, 물어본 표현, 지적받은 발음을 한 화면에서 확인 |
+| Summary | 끝나고 | 별표한 표현·단어, 만든 문장, 물어본 표현, 지적받은 발음을 한 화면에서 확인 |
 
 타이머 `Start 30 min`을 누르면 10분마다 탭이 자동으로 넘어간다.
 

@@ -132,6 +132,25 @@ class PhraseRequest(BaseModel):
     _check = field_validator("sdp")(_not_blank)
 
 
+class ExampleSessionRequest(BaseModel):
+    sdp: str
+    expression: str
+    meaning: str
+    usage_note: str = ""
+
+    _check = field_validator("sdp", "expression", "meaning")(_not_blank)
+
+
+class ExampleRequest(BaseModel):
+    session_id: int
+    expression: str
+    user_text: str
+    coach_text: str
+    seconds: float = 0
+
+    _check = field_validator("expression", "user_text", "coach_text")(_not_blank)
+
+
 class AskRequest(BaseModel):
     session_id: int | None = None
     user_text: str
@@ -179,6 +198,18 @@ class Reading(BaseModel):
     coach_text: str
     seconds: float
     corrections: list[Correction] | None = None
+
+
+class Example(BaseModel):
+    """One sentence a reader made with an expression, and the coach's echo of it."""
+
+    id: int
+    created_at: datetime
+    session_id: int
+    expression: str
+    user_text: str
+    coach_text: str
+    seconds: float
 
 
 class Ask(BaseModel):

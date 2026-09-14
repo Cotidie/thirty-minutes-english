@@ -4,6 +4,7 @@
 
 import { api } from '../api'
 import type { LiveEvent } from './liveSession'
+import type { PracticeTarget } from '../types'
 
 export interface LiveConnection {
   /** The live microphone track, so the UI can show that sound is going in. */
@@ -105,6 +106,11 @@ export function connectReadAloud(paragraph: string, opts: RoundOptions): Promise
 /** One "how do I say this in English" question, with the session topic for context. */
 export function connectAsk(topic: string | null, opts: RoundOptions): Promise<LiveConnection> {
   return connectLive({ ...opts, start: (sdp) => api.startPhrase(topic, sdp) })
+}
+
+/** One sentence made with an expression or word, said back the native way with a line of feedback. */
+export function connectExample(target: PracticeTarget, opts: RoundOptions): Promise<LiveConnection> {
+  return connectLive({ ...opts, start: (sdp) => api.startExample(target, sdp) })
 }
 
 function waitForIce(peer: RTCPeerConnection): Promise<void> {

@@ -164,3 +164,24 @@ def test_stars_endpoint_round_trips_and_404s_on_unknown_session(client):
 
     assert client.get("/api/sessions/999/stars").status_code == 404
     assert client.put("/api/sessions/999/stars", json=body).status_code == 404
+
+
+def test_examples_stack_under_a_session_in_the_order_made(client):
+    sid = create(client, "X")["session_id"]
+    assert client.get("/api/examples", params={"session_id": sid}).json() == []
+
+    body = {"session_id": sid, "expression": "phrase 0", "user_text": "I said it.", "coach_text": "I said it. Natural.", "seconds": 9}
+    first = client.post("/api/examples", json=body)
+    assert first.status_code == 201
+    assert first.json()["expression"] == "phrase 0"
+    client.post("/api/examples", json={**body, "user_text": "Again."})
+
+    listed = client.get("/api/examples", params={"session_id": sid}).json()
+    assert [e["user_text"] for e in listed] == ["I said it.", "Again."]
+    assert client.get("/api/examples", params={"session_id": sid + 1}).json() == []
+
+    assert client.post("/api/examples", json={**body, "session_id": 999}).status_code == 404
+    assert client.post("/api/examples", json={**body, "coach_text": " "}).status_code == 422
+
+    client.delete(f"/api/sessions/{sid}")
+    assert client.get("/api/examples", params={"session_id": sid}).json() == []

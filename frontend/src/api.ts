@@ -1,5 +1,5 @@
 import type { JobStatus } from './lib/progress'
-import type { Ask, LiveSession, Reading, Session, SessionSummary, Stars, TopicListing } from './types'
+import type { Ask, Example, LiveSession, PracticeTarget, Reading, Session, SessionSummary, Stars, TopicListing } from './types'
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const res = await fetch(path, { headers: { 'Content-Type': 'application/json' }, ...init })
@@ -27,6 +27,14 @@ export const api = {
     request<LiveSession>('/api/read-aloud/sessions', { method: 'POST', body: JSON.stringify({ paragraph, sdp }) }),
   startPhrase: (topic: string | null, sdp: string) =>
     request<LiveSession>('/api/phrase/sessions', { method: 'POST', body: JSON.stringify({ topic, sdp }) }),
+  startExample: (target: PracticeTarget, sdp: string) =>
+    request<LiveSession>('/api/example/sessions', {
+      method: 'POST',
+      body: JSON.stringify({ sdp, expression: target.text, meaning: target.meaning, usage_note: target.note }),
+    }),
+  addExample: (example: { session_id: number; expression: string; user_text: string; coach_text: string; seconds: number }) =>
+    request<Example>('/api/examples', { method: 'POST', body: JSON.stringify(example) }),
+  listExamples: (sessionId: number) => request<Example[]>(`/api/examples?session_id=${sessionId}`),
   addAsk: (ask: { session_id: number | null; user_text: string; coach_text: string; seconds: number }) =>
     request<Ask>('/api/asks', { method: 'POST', body: JSON.stringify(ask) }),
   listAsks: (sessionId?: number) => request<Ask[]>(asksPath('/api/asks', sessionId)),

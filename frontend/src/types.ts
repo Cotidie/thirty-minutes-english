@@ -100,6 +100,32 @@ export interface Reading {
   corrections: Correction[] | null
 }
 
+/** What a Practice round is about: an expression or a word, with what the coach needs to judge a sentence. */
+export interface PracticeTarget {
+  text: string
+  meaning: string
+  note: string
+}
+
+export function practiceExpression(e: Expression): PracticeTarget {
+  return { text: e.phrase, meaning: e.meaning, note: e.usage_note }
+}
+
+export function practiceWord(v: VocabularyItem): PracticeTarget {
+  return { text: v.word, meaning: v.definition, note: `part of speech: ${v.pos}` }
+}
+
+/** One sentence made with an expression or word, and the coach's echo of it. */
+export interface Example {
+  id: number
+  created_at: string
+  session_id: number
+  expression: string
+  user_text: string
+  coach_text: string
+  seconds: number
+}
+
 export interface Ask {
   id: number
   created_at: string

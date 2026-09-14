@@ -4,7 +4,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 
 from app.exclusions import Exclusions
-from app.models import Ask, Correction, PhraseCard, Reading, Session, SessionContent, SessionSummary, Stars
+from app.models import Ask, Correction, Example, PhraseCard, Reading, Session, SessionContent, SessionSummary, Stars
 
 
 class SessionStore:
@@ -47,6 +47,19 @@ class SessionStore:
                     coach_text TEXT NOT NULL,
                     seconds REAL NOT NULL DEFAULT 0,
                     corrections_json TEXT
+                )
+                """
+            )
+            conn.execute(
+                """
+                CREATE TABLE IF NOT EXISTS examples (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    created_at TEXT NOT NULL,
+                    session_id INTEGER NOT NULL,
+                    expression TEXT NOT NULL,
+                    user_text TEXT NOT NULL,
+                    coach_text TEXT NOT NULL,
+                    seconds REAL NOT NULL DEFAULT 0
                 )
                 """
             )
@@ -112,6 +125,7 @@ class SessionStore:
             conn.execute("DELETE FROM asks WHERE session_id = ?", (session_id,))
             conn.execute("DELETE FROM readings WHERE session_id = ?", (session_id,))
             conn.execute("DELETE FROM stars WHERE session_id = ?", (session_id,))
+            conn.execute("DELETE FROM examples WHERE session_id = ?", (session_id,))
         return cur.rowcount > 0
 
     def get_stars(self, session_id: int) -> Stars:
@@ -190,6 +204,38 @@ class SessionStore:
         with self._connect() as conn:
             conn.execute("UPDATE asks SET card_json = ? WHERE id = ?", (card.model_dump_json(), ask_id))
 
+
+    # --- examples: a sentence made with an expression, and the coach's echo --
+
+    def add_example(
+        self, session_id: int, expression: str, user_text: str, coach_text: str, seconds: float
+    ) -> Example:
+        created_at = datetime.now(UTC)
+        with self._connect() as conn:
+            cur = conn.execute(
+                "INSERT INTO examples (created_at, session_id, expression, user_text, coach_text, seconds)"
+                " VALUES (?, ?, ?, ?, ?, ?)",
+                (created_at.isoformat(), session_id, expression, user_text, coach_text, seconds),
+            )
+            example_id = cur.lastrowid
+        assert example_id is not None
+        return Example(
+            id=example_id,
+            created_at=created_at,
+            session_id=session_id,
+            expression=expression,
+            user_text=user_text,
+            coach_text=coach_text,
+            seconds=seconds,
+        )
+
+    def list_examples(self, session_id: int) -> list[Example]:
+        """In the order they were made, so they stack under each expression."""
+        with self._connect() as conn:
+            rows = conn.execute(
+                "SELECT * FROM examples WHERE session_id = ? ORDER BY id", (session_id,)
+            ).fetchall()
+        return [Example(**dict(row)) for row in rows]
 
     # --- readings: one paragraph read aloud, and what the coach stopped on --
 

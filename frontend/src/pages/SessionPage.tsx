@@ -7,6 +7,7 @@ import { SessionTimer } from '../components/SessionTimer'
 import { SummaryTab } from '../components/SummaryTab'
 import { VocabularyTab } from '../components/VocabularyTab'
 import { PHASES } from '../lib/phases'
+import { useExamples } from '../lib/useExamples'
 import { useStars } from '../lib/useStars'
 import type { Session } from '../types'
 
@@ -16,6 +17,7 @@ const SUMMARY_TAB = PHASES.length
 export function SessionPage() {
   const { id } = useParams()
   const { stars, toggle } = useStars(Number(id))
+  const { examples, add: addExample } = useExamples(Number(id))
   const [session, setSession] = useState<Session | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [tab, setTab] = useState(0)
@@ -76,16 +78,22 @@ export function SessionPage() {
         {tab === 0 && (
           <ExpressionsTab
             items={content.expressions}
+            sessionId={session.id}
             starred={stars.expressions}
             onToggleStar={(phrase) => toggle('expressions', phrase)}
+            examples={examples}
+            onExample={addExample}
           />
         )}
         {tab === 1 && <ArticleTab article={content.article} sessionId={session.id} />}
         {tab === 2 && (
           <VocabularyTab
             items={content.vocabulary}
+            sessionId={session.id}
             starred={stars.words}
             onToggleStar={(word) => toggle('words', word)}
+            examples={examples}
+            onExample={addExample}
           />
         )}
         {tab === SUMMARY_TAB && <SummaryTab sessionId={session.id} content={content} stars={stars} />}

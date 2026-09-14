@@ -13,6 +13,7 @@ services:
       OPENAI_API_KEY: ${OPENAI_API_KEY:-}
       READ_ALOUD_AGENT_DIR: /agents/read-aloud-coach
       PHRASE_AGENT_DIR: /agents/phrase-coach
+      EXAMPLE_AGENT_DIR: /agents/example-coach
       SUMMARY_MODEL: ${SUMMARY_MODEL:-gpt-5.6-luna}
       TOPICS_MODEL: ${TOPICS_MODEL:-sonnet}
       TOPICS_EFFORT: ${TOPICS_EFFORT:-medium}
@@ -20,6 +21,7 @@ services:
       - ./backend/data:/data
       - ../read-aloud-coach:/agents/read-aloud-coach:ro
       - ../phrase-coach:/agents/phrase-coach:ro
+      - ../example-coach:/agents/example-coach:ro
       - ${HOME}/.claude/skills:${HOME}/.claude/skills:ro
       - ${HOME}/.claude/plugins:${HOME}/.claude/plugins:ro
       - ${HOME}/.claude/settings.json:/host-settings.json:ro

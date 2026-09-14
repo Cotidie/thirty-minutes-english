@@ -16,6 +16,9 @@ from app.models import (
     Reading,
     ReadingRequest,
     CreateSessionRequest,
+    Example,
+    ExampleRequest,
+    ExampleSessionRequest,
     JobStatus,
     LiveSession,
     PhraseRequest,
@@ -31,6 +34,7 @@ ROOT = Path(__file__).resolve().parent.parent
 AGENT_DIRS = {
     "read-aloud": ("READ_ALOUD_AGENT_DIR", ROOT.parent.parent / "read-aloud-coach"),
     "phrase": ("PHRASE_AGENT_DIR", ROOT.parent.parent / "phrase-coach"),
+    "example": ("EXAMPLE_AGENT_DIR", ROOT.parent.parent / "example-coach"),
 }
 RECENT_TOPIC_WINDOW = 10
 
@@ -140,6 +144,27 @@ def create_app(
     @app.post("/api/phrase/sessions", response_model=LiveSession, status_code=201)
     def start_phrase(body: PhraseRequest, request: Request) -> dict:
         return start_live(live_agent(request, "phrase"), body.sdp, topic=body.topic or "an English conversation")
+
+    @app.post("/api/example/sessions", response_model=LiveSession, status_code=201)
+    def start_example(body: ExampleSessionRequest, request: Request) -> dict:
+        return start_live(
+            live_agent(request, "example"),
+            body.sdp,
+            expression=body.expression,
+            meaning=body.meaning,
+            usage_note=body.usage_note or "none",
+        )
+
+    @app.post("/api/examples", response_model=Example, status_code=201)
+    def add_example(body: ExampleRequest, request: Request) -> Example:
+        store: SessionStore = request.app.state.store
+        if store.get(body.session_id) is None:
+            raise HTTPException(status_code=404, detail="session not found")
+        return store.add_example(body.session_id, body.expression, body.user_text, body.coach_text, body.seconds)
+
+    @app.get("/api/examples", response_model=list[Example])
+    def list_examples(session_id: int, request: Request) -> list[Example]:
+        return request.app.state.store.list_examples(session_id)
 
     @app.post("/api/asks", response_model=Ask, status_code=201)
     def add_ask(body: AskRequest, request: Request) -> Ask:

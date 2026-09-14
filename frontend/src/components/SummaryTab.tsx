@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { api } from '../api'
-import type { Ask, Correction, Reading, SessionContent, Stars } from '../types'
+import type { Ask, Correction, Example, Reading, SessionContent, Stars } from '../types'
 
 interface Props {
   sessionId: number
@@ -9,21 +9,24 @@ interface Props {
 }
 
 /**
- * What the session left behind: what the pair starred, the expressions the
- * coach handed over, and the words it stopped the reader on. The last two are
- * extracted from transcripts the first time this tab is opened, then kept.
+ * What the session left behind: what the pair starred, the sentences they
+ * made, the expressions the coach handed over, and the words it stopped the
+ * reader on. The last two are extracted from transcripts the first time this
+ * tab is opened, then kept.
  */
 export function SummaryTab({ sessionId, content, stars }: Props) {
   const [asks, setAsks] = useState<Ask[] | null>(null)
+  const [examples, setExamples] = useState<Example[] | null>(null)
   const [readings, setReadings] = useState<Reading[] | null>(null)
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
     let live = true
-    Promise.all([api.askCards(sessionId), api.readingCorrections(sessionId)])
-      .then(([a, r]) => {
+    Promise.all([api.askCards(sessionId), api.listExamples(sessionId), api.readingCorrections(sessionId)])
+      .then(([a, e, r]) => {
         if (!live) return
         setAsks(a)
+        setExamples(e)
         setReadings(r)
       })
       .catch((e: Error) => live && setError(e.message))
@@ -68,6 +71,25 @@ export function SummaryTab({ sessionId, content, stars }: Props) {
             ))}
           </ul>
         )}
+      </section>
+
+      <section className="summary-section">
+        <h2 className="summary-title">
+          Sentences you made
+          {examples !== null && <span className="summary-count">{examples.length}</span>}
+        </h2>
+        {examples?.length === 0 && <p className="empty">No sentences yet. Each expression has a Your turn button.</p>}
+        <ol className="ask-cards">
+          {examples?.map((ex) => (
+            <li key={ex.id} className="ask-card">
+              <p className="ask-card-asked">{ex.expression}</p>
+              <div className="ask-card-body">
+                <p className="ask-card-english">{ex.user_text}</p>
+                <p className="ask-card-note">{ex.coach_text}</p>
+              </div>
+            </li>
+          ))}
+        </ol>
       </section>
 
       <section className="summary-section">

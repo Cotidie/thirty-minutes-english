@@ -1,5 +1,6 @@
 import { useState } from 'react'
-import type { VocabularyItem } from '../types'
+import { practiceWord, type Example, type VocabularyItem } from '../types'
+import { Practice } from './Practice'
 import { StarButton } from './StarButton'
 
 function VocabCard({ item }: { item: VocabularyItem }) {
@@ -24,11 +25,15 @@ function VocabCard({ item }: { item: VocabularyItem }) {
 
 interface Props {
   items: VocabularyItem[]
+  sessionId: number
   starred: string[]
   onToggleStar: (word: string) => void
+  /** Every sentence made in this session; each word shows its own. */
+  examples: Example[]
+  onExample: (example: Example) => void
 }
 
-export function VocabularyTab({ items, starred, onToggleStar }: Props) {
+export function VocabularyTab({ items, sessionId, starred, onToggleStar, examples, onExample }: Props) {
   return (
     <section className="tab-panel">
       <p className="tab-brief">
@@ -40,6 +45,13 @@ export function VocabularyTab({ items, starred, onToggleStar }: Props) {
           <div key={item.word} className="vocab-cell">
             <VocabCard item={item} />
             <StarButton label={item.word} on={starred.includes(item.word)} onToggle={() => onToggleStar(item.word)} />
+            <Practice
+              target={practiceWord(item)}
+              label="Practice"
+              sessionId={sessionId}
+              examples={examples.filter((e) => e.expression === item.word)}
+              onKept={onExample}
+            />
           </div>
         ))}
       </div>

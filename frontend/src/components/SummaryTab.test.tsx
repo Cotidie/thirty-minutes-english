@@ -1,10 +1,10 @@
 import { render, screen } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { api } from '../api'
-import type { Ask, Reading, SessionContent, Stars } from '../types'
+import type { Ask, Example, Reading, SessionContent, Stars } from '../types'
 import { SummaryTab } from './SummaryTab'
 
-vi.mock('../api', () => ({ api: { askCards: vi.fn(), readingCorrections: vi.fn() } }))
+vi.mock('../api', () => ({ api: { askCards: vi.fn(), listExamples: vi.fn(), readingCorrections: vi.fn() } }))
 
 const ask: Ask = {
   id: 2,
@@ -50,8 +50,19 @@ const content: SessionContent = {
 
 const none: Stars = { expressions: [], words: [] }
 
+const example: Example = {
+  id: 9,
+  created_at: '',
+  session_id: 3,
+  expression: 'on the fence',
+  user_text: "I'm on the fence about the offer.",
+  coach_text: "I'm on the fence about the offer. That's how a native speaker would say it.",
+  seconds: 11,
+}
+
 beforeEach(() => {
   vi.mocked(api.askCards).mockResolvedValue([ask])
+  vi.mocked(api.listExamples).mockResolvedValue([example])
   vi.mocked(api.readingCorrections).mockResolvedValue([reading])
 })
 
@@ -61,6 +72,9 @@ describe('SummaryTab', () => {
 
     expect(await screen.findByText('Read the room.')).toBeInTheDocument()
     expect(screen.getByText('Take a hint (blunter)')).toBeInTheDocument()
+    expect(screen.getByText("I'm on the fence about the offer.")).toBeInTheDocument()
+    expect(screen.getByText(/That's how a native speaker would say it/)).toBeInTheDocument()
+    expect(vi.mocked(api.listExamples)).toHaveBeenCalledWith(3)
     expect(screen.getByText('verified')).toBeInTheDocument()
     expect(screen.getByText('twice as long')).toBeInTheDocument()
     expect(screen.getByText('phrasing')).toBeInTheDocument()
@@ -74,7 +88,7 @@ describe('SummaryTab', () => {
     render(<SummaryTab sessionId={3} content={content} stars={none} />)
     await screen.findByText('Read the room.')
     const counts = document.querySelectorAll('.summary-count')
-    expect([...counts].map((c) => c.textContent)).toEqual(['0', '1', '2'])
+    expect([...counts].map((c) => c.textContent)).toEqual(['0', '1', '1', '2'])
   })
 
   it('tells a clean read apart from never having read aloud', async () => {

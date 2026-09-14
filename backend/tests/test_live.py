@@ -86,7 +86,11 @@ def test_start_returns_upstream_answer(tmp_path, agent_dir):
 
 @pytest.mark.parametrize(
     "path,body",
-    [("/api/read-aloud/sessions", {"paragraph": PARAGRAPH, "sdp": "v=0"}), ("/api/phrase/sessions", {"sdp": "v=0"})],
+    [
+        ("/api/read-aloud/sessions", {"paragraph": PARAGRAPH, "sdp": "v=0"}),
+        ("/api/phrase/sessions", {"sdp": "v=0"}),
+        ("/api/example/sessions", {"sdp": "v=0", "expression": "x", "meaning": "y"}),
+    ],
 )
 def test_503_when_agent_not_configured(tmp_path, path, body):
     with make_client(tmp_path, {}) as c:
@@ -159,3 +163,41 @@ def test_agents_are_independent(tmp_path, agent_dir, phrase_agent_dir):
     with make_client(tmp_path, agents) as c:
         assert c.post("/api/read-aloud/sessions", json={"paragraph": PARAGRAPH, "sdp": "v=0"}).status_code == 201
         assert c.post("/api/phrase/sessions", json={"sdp": "v=0"}).status_code == 201
+
+
+@pytest.fixture
+def example_agent_dir(tmp_path):
+    directory = tmp_path / "example"
+    (directory / "prompts").mkdir(parents=True)
+    (directory / "prompts" / "live.md").write_text("You are Echo.\n")
+    (directory / "session.json").write_text(
+        json.dumps(
+            {
+                "model": "gpt-live-1",
+                "instructions": "<contents of prompts/live.md>",
+                "input": [
+                    {
+                        "type": "message",
+                        "role": "developer",
+                        "content": [{"type": "input_text", "text": "{{expression}} / {{meaning}} / {{usage_note}}"}],
+                    }
+                ],
+            }
+        )
+    )
+    return directory
+
+
+def test_example_session_carries_the_expression(tmp_path, example_agent_dir):
+    sessions = FakeLiveSessions()
+    agents = {"example": LiveAgent("example", AgentDefinition(example_agent_dir), sessions)}
+    with make_client(tmp_path, agents) as c:
+        res = c.post(
+            "/api/example/sessions",
+            json={"sdp": "v=0 offer", "expression": "read too much into", "meaning": "find a meaning that is not there"},
+        )
+    assert res.status_code == 201
+    session, sdp = sessions.calls[0]
+    assert sdp == "v=0 offer"
+    assert session["input"][0]["content"][0]["text"] == "read too much into / find a meaning that is not there / none"
+    assert session["instructions"] == "You are Echo.\n"
