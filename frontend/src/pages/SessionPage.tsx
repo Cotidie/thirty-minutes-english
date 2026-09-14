@@ -64,9 +64,7 @@ export function SessionPage() {
             aria-current={tab === SUMMARY_TAB ? 'page' : undefined}
             onClick={() => showTab(SUMMARY_TAB)}
           >
-            <span className="tab-index" aria-hidden="true">
-              ·
-            </span>
+            <span className="tab-index">{SUMMARY_TAB + 1}</span>
             <span className="tab-label">Summary</span>
             <span className="tab-minutes">after</span>
           </button>

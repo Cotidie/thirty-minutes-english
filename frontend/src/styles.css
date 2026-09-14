@@ -1019,10 +1019,6 @@ button.question.is-active {
 
 /* --- Summary: what the session left behind ------------------------------ */
 
-.tab.is-summary .tab-index {
-  color: var(--line);
-}
-
 .tab.is-summary .tab-minutes {
   font-style: italic;
 }
