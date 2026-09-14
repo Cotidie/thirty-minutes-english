@@ -36,17 +36,19 @@ export function AsksPage() {
         {asks?.map((ask) => (
           <li key={ask.id} className="ask-card">
             <p className="ask-card-asked">{ask.card?.asked || ask.user_text}</p>
-            {ask.card?.english ? (
-              <p className="ask-card-english">{ask.card.english}</p>
-            ) : (
-              <p className="ask-card-english is-missing">No answer landed in this round.</p>
-            )}
-            {ask.card?.alternatives.map((alt) => (
-              <p key={alt} className="ask-card-alt">
-                {alt}
-              </p>
-            ))}
-            {ask.card?.note && <p className="ask-card-note">{ask.card.note}</p>}
+            <div className="ask-card-body">
+              {ask.card?.english ? (
+                <p className="ask-card-english">{ask.card.english}</p>
+              ) : (
+                <p className="ask-card-english is-missing">No answer landed in this round.</p>
+              )}
+              {ask.card?.alternatives.map((alt) => (
+                <p key={alt} className="ask-card-alt">
+                  {alt}
+                </p>
+              ))}
+              {ask.card?.note && <p className="ask-card-note">{ask.card.note}</p>}
+            </div>
           </li>
         ))}
       </ol>

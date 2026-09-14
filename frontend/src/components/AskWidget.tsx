@@ -10,10 +10,10 @@ const SILENCE_MS = 5000
 
 const STATUS_LABEL: Record<LiveState['status'], string> = {
   connecting: 'Connecting…',
-  listening: 'Ask away. "How do you say…"',
+  listening: 'Listening',
   closing: 'Wrapping up…',
-  closed: 'Round over. Save it if it was any good.',
-  failed: 'Could not start.',
+  closed: 'Round over',
+  failed: 'Could not start',
 }
 
 export function AskWidget() {
@@ -70,7 +70,12 @@ export function AskWidget() {
     connRef.current?.close()
   }, [])
 
+  /** Also the retry: drops whatever was said and opens a fresh round. */
   const start = useCallback(async () => {
+    clearSilence()
+    connRef.current?.dispose()
+    connRef.current = null
+    setMicrophone(null)
     setState(initialLiveState)
     setSaved(false)
     try {
@@ -106,56 +111,53 @@ export function AskWidget() {
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape' && open) {
-        if (latest.current?.status === 'listening') close()
-        else dismiss()
+      if (isTyping(e.target) || e.metaKey || e.ctrlKey || e.altKey) return
+      const round = latest.current
+      if (!open) {
+        if (e.key !== 'a') return
+        e.preventDefault()
+        void start()
         return
       }
-      if (e.key !== 'a' || open || e.metaKey || e.ctrlKey || e.altKey || isTyping(e.target)) return
-      e.preventDefault()
-      void start()
+      if (e.key === 'Escape') {
+        if (round?.status === 'listening') close()
+        else dismiss()
+      } else if (e.key === 'r') {
+        e.preventDefault()
+        void start()
+      } else if (e.key === 'Enter' && round?.status === 'closed' && !saved && worthSaving(round)) {
+        e.preventDefault()
+        void save()
+      }
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [close, dismiss, open, start])
+  }, [close, dismiss, open, save, saved, start])
 
   return (
     <div className={`ask${open ? ' is-open' : ''}`}>
       <audio ref={audioRef} autoPlay />
       {state === null ? (
-        <div className="ask-idle">
+        <div className="ask-rule">
           <button type="button" className="ask-start" onClick={() => void start()}>
-            🎤 Ask <kbd>a</kbd>
+            Ask <kbd>a</kbd>
           </button>
           <Link className="ask-review" to={sessionId === null ? '/asks' : `/asks?session_id=${sessionId}`}>
             Asks
           </Link>
         </div>
       ) : (
-        <div className="ask-panel" role="dialog" aria-label="Ask the coach">
+        <div className="ask-slip" role="dialog" aria-label="Ask the coach">
           <div className="ask-bar">
             {state.status === 'listening' && <MicMeter level={level} />}
             <span className="ask-status" role="status">
-              {saved ? 'Saved.' : STATUS_LABEL[state.status]}
+              {saved ? 'Saved' : STATUS_LABEL[state.status]}
             </span>
             {state.seconds > 0 && <span className="ask-seconds">{state.seconds}s</span>}
-            {state.status === 'listening' && (
-              <button type="button" onClick={close}>
-                Done
-              </button>
-            )}
-            {state.status === 'closed' && !saved && (
-              <button type="button" className="ask-save" onClick={() => void save()} disabled={!worthSaving(state)}>
-                Save
-              </button>
-            )}
-            {(state.status === 'closed' || state.status === 'failed') && (
-              <button type="button" onClick={dismiss}>
-                Close
-              </button>
-            )}
           </div>
+
           {state.error && <p className="ask-error">{state.error}</p>}
+
           {(state.user || state.coach) && (
             <dl className="ask-captions">
               <dt>You</dt>
@@ -164,6 +166,27 @@ export function AskWidget() {
               <dd>{state.coach}</dd>
             </dl>
           )}
+
+          <div className="ask-actions">
+            <span className="ask-hint">{hintFor(state, saved)}</span>
+            <button type="button" onClick={() => void start()}>
+              Retry <kbd>r</kbd>
+            </button>
+            {state.status === 'listening' ? (
+              <button type="button" onClick={close}>
+                Done
+              </button>
+            ) : (
+              <button type="button" onClick={dismiss}>
+                {saved ? 'Close' : 'Discard'}
+              </button>
+            )}
+            {state.status === 'closed' && !saved && (
+              <button type="button" className="ask-save" onClick={() => void save()} disabled={!worthSaving(state)}>
+                Save
+              </button>
+            )}
+          </div>
         </div>
       )}
     </div>
@@ -179,6 +202,13 @@ function MicMeter({ level }: { level: number }) {
       ))}
     </span>
   )
+}
+
+function hintFor(state: LiveState, saved: boolean): string {
+  if (saved) return 'Kept for review'
+  if (state.status === 'listening') return 'Missed your moment? Retry'
+  if (state.status === 'closed') return worthSaving(state) ? 'Enter to save, Esc to discard' : 'Nothing came through'
+  return ''
 }
 
 /** A round with nothing on one of the two lines has nothing to review later. */

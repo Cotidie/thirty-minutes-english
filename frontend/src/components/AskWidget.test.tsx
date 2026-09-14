@@ -28,6 +28,14 @@ function renderAt(path: string) {
   )
 }
 
+/** Fills in the round that a retry just reopened: no button to click. */
+async function askAndAnswerAgain() {
+  act(() => emit({ type: 'session.started', session: { id: 'live_2' } }))
+  act(() => emit({ type: 'session.input_transcript.delta', delta: '눈치 좀 챙겨' }))
+  act(() => emit({ type: 'session.output_transcript.delta', delta: 'Read the room.' }))
+  act(() => emit({ type: 'session.usage.updated', usage: { seconds: 12 } }))
+}
+
 async function askAndAnswer() {
   await userEvent.click(screen.getByRole('button', { name: /Ask/ }))
   act(() => emit({ type: 'session.started', session: { id: 'live_1' } }))
@@ -72,7 +80,7 @@ describe('AskWidget', () => {
       coach_text: 'Read the room.',
       seconds: 12,
     })
-    expect(screen.getByRole('status')).toHaveTextContent('Saved.')
+    expect(screen.getByRole('status')).toHaveTextContent('Saved')
     expect(screen.queryByRole('button', { name: 'Save' })).not.toBeInTheDocument()
   })
 
@@ -87,14 +95,37 @@ describe('AskWidget', () => {
     expect(vi.mocked(api.addAsk).mock.calls[0][0].session_id).toBeNull()
   })
 
-  it('throws the round away when the user closes without saving', async () => {
+  it('throws the round away when the user discards it', async () => {
     renderAt('/')
     await askAndAnswer()
     await endRound()
 
-    await userEvent.click(screen.getByRole('button', { name: 'Close' }))
+    await userEvent.click(screen.getByRole('button', { name: 'Discard' }))
     expect(vi.mocked(api.addAsk)).not.toHaveBeenCalled()
     expect(screen.getByRole('button', { name: /Ask/ })).toBeInTheDocument()
+  })
+
+  it('retries a round the user talked over, dropping what was said', async () => {
+    renderAt('/')
+    await askAndAnswer()
+
+    await userEvent.click(screen.getByRole('button', { name: /Retry/ }))
+    expect(connection.dispose).toHaveBeenCalled()
+    expect(connect).toHaveBeenCalledTimes(2)
+    expect(screen.queryByText('눈치 좀 챙겨')).not.toBeInTheDocument()
+    expect(vi.mocked(api.addAsk)).not.toHaveBeenCalled()
+  })
+
+  it('retries on R and saves on Enter once the round is over', async () => {
+    renderAt('/')
+    await askAndAnswer()
+    await userEvent.keyboard('r')
+    expect(connect).toHaveBeenCalledTimes(2)
+
+    await askAndAnswerAgain()
+    await endRound()
+    await userEvent.keyboard('{Enter}')
+    expect(vi.mocked(api.addAsk)).toHaveBeenCalledTimes(1)
   })
 
   it('closes the round itself once the coach has been quiet, and still waits to be told to save', async () => {
@@ -155,7 +186,7 @@ describe('AskWidget', () => {
     await userEvent.click(screen.getByRole('button', { name: /Ask/ }))
     expect(await screen.findByText(/set OPENAI_API_KEY/)).toBeInTheDocument()
 
-    await userEvent.click(screen.getByRole('button', { name: 'Close' }))
+    await userEvent.click(screen.getByRole('button', { name: 'Discard' }))
     expect(screen.getByRole('button', { name: /Ask/ })).toBeInTheDocument()
   })
 })
