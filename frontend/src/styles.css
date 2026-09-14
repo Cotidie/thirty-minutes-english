@@ -407,6 +407,11 @@ a {
   max-width: var(--measure);
 }
 
+/* Two word cards side by side, each wide enough for a practice slip. */
+.tab-panel.is-wide {
+  max-width: calc(var(--measure) * 1.3);
+}
+
 .tab-brief {
   color: var(--muted);
   margin: 0 0 2rem;
@@ -646,8 +651,14 @@ a {
   gap: 0.15rem;
 }
 
-.practice-answer span + span {
+.practice-notes {
+  margin: 0;
+  padding-left: 1.1rem;
   color: var(--muted);
+}
+
+.practice-notes li + li {
+  margin-top: 0.15rem;
 }
 
 /* ↻ and ✕ in the slip's top bar */
@@ -922,7 +933,7 @@ button.question.is-active {
 
 .vocab-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(17rem, 1fr));
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 1px;
   background: var(--line);
   border: 1px solid var(--line);
@@ -1017,6 +1028,10 @@ button.question.is-active {
 /* Small screens */
 
 @media (max-width: 720px) {
+  .vocab-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
   .session {
     grid-template-columns: 1fr;
   }

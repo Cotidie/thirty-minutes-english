@@ -39,13 +39,14 @@ def test_prompt_names_the_target_and_the_sentence(agent_dir):
 
 
 def test_feedback_is_the_two_lines_the_model_returns(agent_dir):
-    cli = FakeCli({"paraphrase": "I can't say off the top of my head.", "feedback": "You dropped 'my'; the expression needs it."})
+    cli = FakeCli({"paraphrase": "I can't say off the top of my head.", "feedback": ["You dropped 'my'; the expression needs it."]})
     coach = ExampleCoach(cli, agent_dir)
     result = coach.feedback("off the top of my head", "without checking", "", "I can't say off the top of head.")
     assert result == ExampleFeedback(
-        paraphrase="I can't say off the top of my head.", feedback="You dropped 'my'; the expression needs it."
+        paraphrase="I can't say off the top of my head.", feedback=["You dropped 'my'; the expression needs it."]
     )
     assert cli.schemas[0]["required"] == ["paraphrase", "feedback"]
+    assert cli.schemas[0]["properties"]["feedback"]["type"] == "array"  # one entry per change, shown as bullets
 
 
 def test_the_feedback_run_has_no_tools_and_no_mcp():
@@ -65,7 +66,7 @@ class FakeCoach:
         self.calls.append((expression, meaning, usage_note, sentence))
         if self.error:
             raise self.error
-        return ExampleFeedback(paraphrase=f"{sentence} (native)", feedback="Good.")
+        return ExampleFeedback(paraphrase=f"{sentence} (native)", feedback=["Good."])
 
 
 def client_with(tmp_path, coach) -> TestClient:
@@ -81,7 +82,7 @@ def test_feedback_endpoint_returns_paraphrase_and_feedback(tmp_path):
             json={"expression": "rivalry", "meaning": "competition", "usage_note": "noun", "user_text": "The rivalry make them faster."},
         )
         assert res.status_code == 200
-        assert res.json() == {"paraphrase": "The rivalry make them faster. (native)", "feedback": "Good."}
+        assert res.json() == {"paraphrase": "The rivalry make them faster. (native)", "feedback": ["Good."]}
         assert coach.calls == [("rivalry", "competition", "noun", "The rivalry make them faster.")]
 
 

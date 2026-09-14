@@ -58,9 +58,9 @@ Article 탭의 문단마다 `Read aloud` 버튼이 있다. 누르면 브라우�
 
 ## Your turn / Practice (GPT-Live + claude CLI)
 
-Expressions 탭의 표현마다 노란 `Your turn: one sentence each.` 라벨이, Vocabulary 탭의 카드마다 `Practice` 버튼이 있다. 둘 다 같은 `Practice` 컴포넌트다. 누르면 마이크가 붙고 참가자가 그 표현이나 단어로 문장 하나를 말한다. GPT-Live는 듣기와 읽어 주기만 맡는다: 문장이 끝나면 "Got it." 한마디, 그 첫 발화를 신호로 프론트가 사용자 transcript를 `POST /api/example/feedback`에 보낸다. backend는 `claude` CLI(`EXAMPLE_MODEL`, 기본 opus, `EXAMPLE_EFFORT` 기본 low, 도구 없음)에 `../example-coach/prompts/feedback.md`를 넣어 `paraphrase`(원어민이 말하는 대로 바꿔 말한 문장, 고칠 곳은 모두 고침)와 `feedback`(고친 곳마다 짧은 문장 하나) 두 필드를 받는다. 답이 오는 동안 쪽지에 `Writing the native version…`이 뜨고 라운드는 닫히지 않는다(약 10초). 답이 오면 화면에 두 줄로 보이고, 같은 문장을 `session.instructions.append`로 넘겨 코치가 그대로 소리 내어 읽는다. 코치가 5초간 조용하면 라운드가 끝나고 `Keep`으로 그 표현 아래에 쌓인다. 쪽지 위의 `↻`는 처음부터 다시, `✕`는 듣는 중이든 끝난 뒤든 버린다. 텍스트 모델이 실패하면 오류가 쪽지에 그대로 뜨고 Keep은 잠긴다.
+Expressions 탭의 표현마다 노란 `Your turn: one sentence each.` 라벨이, Vocabulary 탭의 카드마다 `Practice` 버튼이 있다. 둘 다 같은 `Practice` 컴포넌트다. 누르면 마이크가 붙고 참가자가 그 표현이나 단어로 문장 하나를 말한다. GPT-Live는 듣기와 읽어 주기만 맡는다: 문장이 끝나면 "Got it." 한마디, 그 첫 발화를 신호로 프론트가 사용자 transcript를 `POST /api/example/feedback`에 보낸다. backend는 `claude` CLI(`EXAMPLE_MODEL`, 기본 opus, `EXAMPLE_EFFORT` 기본 low, 도구 없음)에 `../example-coach/prompts/feedback.md`를 넣어 `paraphrase`(원어민이 말하는 대로 바꿔 말한 문장, 고칠 곳은 모두 고침)와 `feedback`(고친 곳마다 짧은 문장 하나씩의 목록) 두 필드를 받는다. 쪽지에서는 목록을 불릿으로 보여 준다. 답이 오는 동안 쪽지에 `Writing the native version…`이 뜨고 라운드는 닫히지 않는다(약 10초). 답이 오면 화면에 두 줄로 보이고, 같은 문장을 `session.instructions.append`로 넘겨 코치가 그대로 소리 내어 읽는다. 코치가 5초간 조용하면 라운드가 끝나고 `Keep`으로 그 표현 아래에 쌓인다. 쪽지 위의 `↻`는 처음부터 다시, `✕`는 듣는 중이든 끝난 뒤든 버린다. 텍스트 모델이 실패하면 오류가 쪽지에 그대로 뜨고 Keep은 잠긴다.
 
-쌓인 문장은 `examples` 테이블에 세션·표현별로 남고, 새로고침해도 그 자리에 다시 나온다. 코치 줄은 Live transcript가 아니라 텍스트 모델의 두 필드를 `paraphrase + " " + feedback`으로 이어 저장한다. 첫 문장이 예문, 나머지가 피드백이라는 형식은 그대로다.
+쌓인 문장은 `examples` 테이블에 세션·표현별로 남고, 새로고침해도 그 자리에 다시 나온다. 코치 줄은 Live transcript가 아니라 텍스트 모델의 두 필드를 `paraphrase`와 `feedback` 항목들을 공백으로 이은 한 줄로 저장한다. 첫 문장이 예문, 나머지가 피드백이라는 형식은 그대로다.
 
 에이전트 정의는 `../example-coach/`에 있다. 다른 두 코치와 같은 규약이고, backend `POST /api/example/sessions`가 표현·뜻·노트를 채워 중계한다.
 

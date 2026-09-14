@@ -14,7 +14,10 @@ FEEDBACK_SCHEMA: dict = {
     "type": "object",
     "additionalProperties": False,
     "required": ["paraphrase", "feedback"],
-    "properties": {"paraphrase": {"type": "string"}, "feedback": {"type": "string"}},
+    "properties": {
+        "paraphrase": {"type": "string"},
+        "feedback": {"type": "array", "items": {"type": "string"}},
+    },
 }
 
 

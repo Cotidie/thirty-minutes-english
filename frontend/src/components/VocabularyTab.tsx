@@ -35,7 +35,7 @@ interface Props {
 
 export function VocabularyTab({ items, sessionId, starred, onToggleStar, examples, onExample }: Props) {
   return (
-    <section className="tab-panel">
+    <section className="tab-panel is-wide">
       <p className="tab-brief">
         Take turns. Read the word and its sentence aloud, then explain in English what you think it means. Check only
         after both of you have tried.

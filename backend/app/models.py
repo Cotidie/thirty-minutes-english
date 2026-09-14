@@ -168,10 +168,10 @@ class ExampleFeedbackRequest(BaseModel):
 
 
 class ExampleFeedback(BaseModel):
-    """The sentence the native way, and a short line on each change made."""
+    """The sentence the native way, and a short line per change made, in order of weight."""
 
     paraphrase: str
-    feedback: str
+    feedback: list[str]
 
 
 class ExampleRequest(BaseModel):

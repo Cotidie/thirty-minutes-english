@@ -148,5 +148,6 @@ export interface Ask {
 /** A sentence said back the native way, and one line on the change that matters most. */
 export interface ExampleFeedback {
   paraphrase: string
-  feedback: string
+  /** One short sentence per change, most important first. */
+  feedback: string[]
 }
