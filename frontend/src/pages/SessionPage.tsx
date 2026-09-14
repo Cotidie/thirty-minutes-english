@@ -7,6 +7,7 @@ import { SessionTimer } from '../components/SessionTimer'
 import { SummaryTab } from '../components/SummaryTab'
 import { VocabularyTab } from '../components/VocabularyTab'
 import { PHASES } from '../lib/phases'
+import { useStars } from '../lib/useStars'
 import type { Session } from '../types'
 
 /** Sits after the timed phases; the timer never sends you here. */
@@ -14,6 +15,7 @@ const SUMMARY_TAB = PHASES.length
 
 export function SessionPage() {
   const { id } = useParams()
+  const { stars, toggle } = useStars(Number(id))
   const [session, setSession] = useState<Session | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [tab, setTab] = useState(0)
@@ -71,10 +73,22 @@ export function SessionPage() {
         </nav>
       </aside>
       <div className="content">
-        {tab === 0 && <ExpressionsTab items={content.expressions} />}
+        {tab === 0 && (
+          <ExpressionsTab
+            items={content.expressions}
+            starred={stars.expressions}
+            onToggleStar={(phrase) => toggle('expressions', phrase)}
+          />
+        )}
         {tab === 1 && <ArticleTab article={content.article} sessionId={session.id} />}
-        {tab === 2 && <VocabularyTab items={content.vocabulary} />}
-        {tab === SUMMARY_TAB && <SummaryTab sessionId={session.id} />}
+        {tab === 2 && (
+          <VocabularyTab
+            items={content.vocabulary}
+            starred={stars.words}
+            onToggleStar={(word) => toggle('words', word)}
+          />
+        )}
+        {tab === SUMMARY_TAB && <SummaryTab sessionId={session.id} content={content} stars={stars} />}
       </div>
     </main>
   )

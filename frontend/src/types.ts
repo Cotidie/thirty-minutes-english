@@ -43,6 +43,12 @@ export interface Topic {
   category: Category
 }
 
+/** Phrases and words starred in a session. */
+export interface Stars {
+  expressions: string[]
+  words: string[]
+}
+
 export interface TopicListing {
   topics: Topic[]
   /** Today's news half has not landed yet; the list is pool topics for now. */

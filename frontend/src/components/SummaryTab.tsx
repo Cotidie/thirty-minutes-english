@@ -1,13 +1,19 @@
 import { useEffect, useState } from 'react'
 import { api } from '../api'
-import type { Ask, Correction, Reading } from '../types'
+import type { Ask, Correction, Reading, SessionContent, Stars } from '../types'
+
+interface Props {
+  sessionId: number
+  content: SessionContent
+  stars: Stars
+}
 
 /**
- * What the session left behind: the expressions the coach handed over, and the
- * words it stopped the reader on. Both are extracted from transcripts the first
- * time this tab is opened, then kept.
+ * What the session left behind: what the pair starred, the expressions the
+ * coach handed over, and the words it stopped the reader on. The last two are
+ * extracted from transcripts the first time this tab is opened, then kept.
  */
-export function SummaryTab({ sessionId }: { sessionId: number }) {
+export function SummaryTab({ sessionId, content, stars }: Props) {
   const [asks, setAsks] = useState<Ask[] | null>(null)
   const [readings, setReadings] = useState<Reading[] | null>(null)
   const [error, setError] = useState<string | null>(null)
@@ -27,12 +33,42 @@ export function SummaryTab({ sessionId }: { sessionId: number }) {
   }, [sessionId])
 
   const corrections = (readings ?? []).flatMap((r) => r.corrections ?? [])
+  // Session order, so the list reads the way the tabs did.
+  const starredExpressions = content.expressions.filter((e) => stars.expressions.includes(e.phrase))
+  const starredWords = content.vocabulary.filter((v) => stars.words.includes(v.word))
+  const starredCount = starredExpressions.length + starredWords.length
   const loading = asks === null && readings === null && error === null
 
   return (
     <section className="tab-panel">
       {error && <p className="error">Could not read the session back: {error}</p>}
       {loading && <p className="empty">Reading it back…</p>}
+
+      <section className="summary-section">
+        <h2 className="summary-title">
+          Starred
+          <span className="summary-count">{starredCount}</span>
+        </h2>
+        {starredCount === 0 && <p className="empty">Nothing starred. Tap ☆ on an expression or word card.</p>}
+        {starredCount > 0 && (
+          <ul className="starred-list">
+            {starredExpressions.map((e) => (
+              <li key={`e-${e.phrase}`}>
+                <span className="starred-term">{e.phrase}</span>
+                <span className="starred-gloss">{e.meaning}</span>
+              </li>
+            ))}
+            {starredWords.map((v) => (
+              <li key={`w-${v.word}`}>
+                <span className="starred-term">
+                  {v.word} <em className="vocab-pos">{v.pos}</em>
+                </span>
+                <span className="starred-gloss">{v.definition}</span>
+              </li>
+            ))}
+          </ul>
+        )}
+      </section>
 
       <section className="summary-section">
         <h2 className="summary-title">

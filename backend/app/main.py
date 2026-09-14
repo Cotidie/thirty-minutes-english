@@ -22,6 +22,7 @@ from app.models import (
     ReadAloudRequest,
     Session,
     SessionSummary,
+    Stars,
 )
 from app.store import SessionStore
 from app.topics import TOPICS, pick_topic
@@ -117,6 +118,20 @@ def create_app(
         if not request.app.state.store.delete(session_id):
             raise HTTPException(status_code=404, detail="session not found")
         return Response(status_code=204)
+
+    @app.get("/api/sessions/{session_id}/stars", response_model=Stars)
+    def get_stars(session_id: int, request: Request) -> Stars:
+        store: SessionStore = request.app.state.store
+        if store.get(session_id) is None:
+            raise HTTPException(status_code=404, detail="session not found")
+        return store.get_stars(session_id)
+
+    @app.put("/api/sessions/{session_id}/stars", response_model=Stars)
+    def set_stars(session_id: int, body: Stars, request: Request) -> Stars:
+        store: SessionStore = request.app.state.store
+        if store.get(session_id) is None:
+            raise HTTPException(status_code=404, detail="session not found")
+        return store.set_stars(session_id, body)
 
     @app.post("/api/read-aloud/sessions", response_model=LiveSession, status_code=201)
     def start_read_aloud(body: ReadAloudRequest, request: Request) -> dict:

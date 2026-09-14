@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import type { VocabularyItem } from '../types'
+import { StarButton } from './StarButton'
 
 function VocabCard({ item }: { item: VocabularyItem }) {
   const [revealed, setRevealed] = useState(false)
@@ -21,7 +22,13 @@ function VocabCard({ item }: { item: VocabularyItem }) {
   )
 }
 
-export function VocabularyTab({ items }: { items: VocabularyItem[] }) {
+interface Props {
+  items: VocabularyItem[]
+  starred: string[]
+  onToggleStar: (word: string) => void
+}
+
+export function VocabularyTab({ items, starred, onToggleStar }: Props) {
   return (
     <section className="tab-panel">
       <p className="tab-brief">
@@ -30,7 +37,10 @@ export function VocabularyTab({ items }: { items: VocabularyItem[] }) {
       </p>
       <div className="vocab-grid">
         {items.map((item) => (
-          <VocabCard key={item.word} item={item} />
+          <div key={item.word} className="vocab-cell">
+            <VocabCard item={item} />
+            <StarButton label={item.word} on={starred.includes(item.word)} onToggle={() => onToggleStar(item.word)} />
+          </div>
         ))}
       </div>
     </section>

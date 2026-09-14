@@ -1,5 +1,5 @@
 import type { JobStatus } from './lib/progress'
-import type { Ask, LiveSession, Reading, Session, SessionSummary, TopicListing } from './types'
+import type { Ask, LiveSession, Reading, Session, SessionSummary, Stars, TopicListing } from './types'
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const res = await fetch(path, { headers: { 'Content-Type': 'application/json' }, ...init })
@@ -20,6 +20,9 @@ export const api = {
     request<JobStatus>('/api/sessions', { method: 'POST', body: JSON.stringify({ topic }) }),
   getJob: (id: string) => request<JobStatus>(`/api/jobs/${id}`),
   deleteSession: (id: number) => request<void>(`/api/sessions/${id}`, { method: 'DELETE' }),
+  getStars: (id: number) => request<Stars>(`/api/sessions/${id}/stars`),
+  setStars: (id: number, stars: Stars) =>
+    request<Stars>(`/api/sessions/${id}/stars`, { method: 'PUT', body: JSON.stringify(stars) }),
   startReadAloud: (paragraph: string, sdp: string) =>
     request<LiveSession>('/api/read-aloud/sessions', { method: 'POST', body: JSON.stringify({ paragraph, sdp }) }),
   startPhrase: (topic: string | null, sdp: string) =>

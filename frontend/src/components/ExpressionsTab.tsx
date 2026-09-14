@@ -1,7 +1,14 @@
 import { useState } from 'react'
 import type { Expression } from '../types'
+import { StarButton } from './StarButton'
 
-export function ExpressionsTab({ items }: { items: Expression[] }) {
+interface Props {
+  items: Expression[]
+  starred: string[]
+  onToggleStar: (phrase: string) => void
+}
+
+export function ExpressionsTab({ items, starred, onToggleStar }: Props) {
   return (
     <section className="tab-panel">
       <p className="tab-brief">
@@ -11,7 +18,14 @@ export function ExpressionsTab({ items }: { items: Expression[] }) {
       <ol className="expression-list">
         {items.map((item) => (
           <li key={item.phrase} className="expression">
-            <h3 className="expression-phrase">{item.phrase}</h3>
+            <div className="expression-head">
+              <h3 className="expression-phrase">{item.phrase}</h3>
+              <StarButton
+                label={item.phrase}
+                on={starred.includes(item.phrase)}
+                onToggle={() => onToggleStar(item.phrase)}
+              />
+            </div>
             <p className="expression-meaning">{item.meaning}</p>
             <UsageNote text={item.usage_note} />
             <ul className="expression-examples">

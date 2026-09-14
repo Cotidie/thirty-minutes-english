@@ -81,6 +81,13 @@ class Session(BaseModel):
     content: SessionContent
 
 
+class Stars(BaseModel):
+    """What the pair starred in a session, by phrase and by word."""
+
+    expressions: list[str] = []
+    words: list[str] = []
+
+
 class TopicListing(BaseModel):
     """The day's suggestions, and whether the news half is still on its way."""
 

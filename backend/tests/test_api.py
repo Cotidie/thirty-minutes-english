@@ -152,3 +152,15 @@ def test_ask_for_a_missing_session_is_404(client):
 
 def test_ask_rejects_empty_transcripts(client):
     assert client.post("/api/asks", json={"user_text": " ", "coach_text": "a"}).status_code == 422
+
+
+def test_stars_endpoint_round_trips_and_404s_on_unknown_session(client):
+    sid = create(client, "X")["session_id"]
+    assert client.get(f"/api/sessions/{sid}/stars").json() == {"expressions": [], "words": []}
+
+    body = {"expressions": ["a moving target"], "words": ["mitigate"]}
+    assert client.put(f"/api/sessions/{sid}/stars", json=body).json() == body
+    assert client.get(f"/api/sessions/{sid}/stars").json() == body
+
+    assert client.get("/api/sessions/999/stars").status_code == 404
+    assert client.put("/api/sessions/999/stars", json=body).status_code == 404

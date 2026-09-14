@@ -1,6 +1,6 @@
 import pytest
 
-from app.models import PhraseCard
+from app.models import PhraseCard, Stars
 from app.store import SessionStore
 from tests.conftest import sample_content
 
@@ -93,3 +93,17 @@ def test_deleting_a_session_takes_its_asks(store, content):
 
     store.delete(session.id)
     assert [a.user_text for a in store.list_asks()] == ["loose"]
+
+
+def test_stars_replace_as_a_set_and_go_with_the_session(store):
+    session = store.create(sample_content())
+    assert store.get_stars(session.id).expressions == []
+
+    saved = store.set_stars(session.id, Stars(expressions=["a moving target", "a moving target"], words=["mitigate"]))
+    assert saved == Stars(expressions=["a moving target"], words=["mitigate"])
+
+    store.set_stars(session.id, Stars(words=["ubiquitous"]))
+    assert store.get_stars(session.id) == Stars(expressions=[], words=["ubiquitous"])
+
+    store.delete(session.id)
+    assert store.get_stars(session.id) == Stars()

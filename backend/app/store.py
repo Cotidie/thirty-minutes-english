@@ -4,7 +4,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 
 from app.exclusions import Exclusions
-from app.models import Ask, Correction, PhraseCard, Reading, Session, SessionContent, SessionSummary
+from app.models import Ask, Correction, PhraseCard, Reading, Session, SessionContent, SessionSummary, Stars
 
 
 class SessionStore:
@@ -47,6 +47,16 @@ class SessionStore:
                     coach_text TEXT NOT NULL,
                     seconds REAL NOT NULL DEFAULT 0,
                     corrections_json TEXT
+                )
+                """
+            )
+            conn.execute(
+                """
+                CREATE TABLE IF NOT EXISTS stars (
+                    session_id INTEGER NOT NULL,
+                    kind TEXT NOT NULL,
+                    item TEXT NOT NULL,
+                    PRIMARY KEY (session_id, kind, item)
                 )
                 """
             )
@@ -101,7 +111,26 @@ class SessionStore:
             cur = conn.execute("DELETE FROM sessions WHERE id = ?", (session_id,))
             conn.execute("DELETE FROM asks WHERE session_id = ?", (session_id,))
             conn.execute("DELETE FROM readings WHERE session_id = ?", (session_id,))
+            conn.execute("DELETE FROM stars WHERE session_id = ?", (session_id,))
         return cur.rowcount > 0
+
+    def get_stars(self, session_id: int) -> Stars:
+        with self._connect() as conn:
+            rows = conn.execute(
+                "SELECT kind, item FROM stars WHERE session_id = ? ORDER BY rowid", (session_id,)
+            ).fetchall()
+        return Stars(
+            expressions=[r["item"] for r in rows if r["kind"] == "expression"],
+            words=[r["item"] for r in rows if r["kind"] == "word"],
+        )
+
+    def set_stars(self, session_id: int, stars: Stars) -> Stars:
+        rows = [(session_id, "expression", e) for e in dict.fromkeys(stars.expressions)]
+        rows += [(session_id, "word", w) for w in dict.fromkeys(stars.words)]
+        with self._connect() as conn:
+            conn.execute("DELETE FROM stars WHERE session_id = ?", (session_id,))
+            conn.executemany("INSERT INTO stars (session_id, kind, item) VALUES (?, ?, ?)", rows)
+        return self.get_stars(session_id)
 
     def recent_topics(self, limit: int) -> list[str]:
         with self._connect() as conn:
