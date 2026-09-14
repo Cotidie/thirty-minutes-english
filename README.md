@@ -69,7 +69,7 @@ dev.sh     둘 다 띄우는 스크립트
 
 ```sh
 cd backend && uv run pytest
-cd frontend && npx vitest run
+cd frontend && npm test
 ```
 
 설계 문서: `docs/superpowers/specs/2026-09-10-english-speaking-claude-design.md`
