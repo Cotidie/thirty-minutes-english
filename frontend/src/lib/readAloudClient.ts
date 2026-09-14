@@ -6,7 +6,7 @@ import { api } from '../api'
 import type { LiveEvent } from './liveSession'
 
 export interface ReadAloudConnection {
-  /** Asks the coach for its closing remark (the paragraph is done). */
+  /** Tells the coach the paragraph is done, so it signs off. */
   finish(): void
   /** Ends the round. `session.closed` arrives through onEvent afterwards. */
   close(): void
@@ -22,7 +22,7 @@ export interface ReadAloudOptions {
 }
 
 const ICE_TIMEOUT_MS = 10_000
-const FINISH_INSTRUCTION = 'The reader has finished. Give your closing now.'
+const FINISH_INSTRUCTION = 'The reader has finished. Say your closing now.'
 
 export async function connectReadAloud(opts: ReadAloudOptions): Promise<ReadAloudConnection> {
   const peer = new RTCPeerConnection()
