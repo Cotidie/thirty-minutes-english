@@ -631,7 +631,8 @@ a {
   background: var(--marker);
 }
 
-.practice-slip {
+/* Doubled so it beats .ask-slip's fixed width below: in a card the slip fills its column. */
+.ask-slip.practice-slip {
   width: min(34rem, 100%);
   box-shadow: none;
   font-family: var(--sans);
@@ -920,6 +921,8 @@ button.question.is-active {
 .vocab-cell {
   position: relative;
   display: grid;
+  /* One column pinned to the cell, so a practice slip cannot widen it past the grid track. */
+  grid-template-columns: minmax(0, 1fr);
   align-content: start;
   background: var(--paper);
 }
