@@ -20,14 +20,24 @@
 | `CLAUDE_EFFORT` | `xhigh` | reasoning effort. `low`, `medium`, `high`, `xhigh`, `max` |
 | `CLAUDE_SKILLS` | 비움 | 생성 전에 호출할 스킬. 쉼표 구분. 예: `stop-slop,cotidie:write-like-me` |
 | `DB_PATH` | `backend/data/sessions.db` | SQLite 파일 |
-| `OPENAI_API_KEY` | 비움 | Read aloud 코치용. 비우면 버튼이 503을 돌려준다 |
-| `READ_ALOUD_AGENT_DIR` | `../read-aloud-coach` | 코치 에이전트 정의 폴더(프롬프트, 세션 설정) |
+| `OPENAI_API_KEY` | 비움 | Read aloud 코치와 Ask 위젯용. 비우면 두 버튼이 503을 돌려준다 |
+| `READ_ALOUD_AGENT_DIR` | `../read-aloud-coach` | 발음 코치 정의 폴더(프롬프트, 세션 설정) |
+| `PHRASE_AGENT_DIR` | `../phrase-coach` | 표현 코치 정의 폴더 |
+| `PHRASE_CARD_MODEL` | `gpt-5.6-luna` | Ask 기록을 복습 카드로 정리하는 텍스트 모델 |
 
 ## Read aloud (GPT-Live)
 
-Article 탭의 문단마다 `Read aloud` 버튼이 있다. 누르면 브라우저 마이크가 GPT-Live(`gpt-live-1`)에 WebRTC로 붙고, 읽는 동안 원어민 코치가 듣다가 틀린 단어 발음이 나오면 그 자리에서 바르게 말해 준다. 발음만 본다. 끊어 읽기·억양은 보지 않고 문단을 대신 읽어 주지도 않는다. `Finish`를 누르면 마무리 한마디, `Stop`은 세션 종료. 분당 $0.05, 문단 하나에 약 $0.10.
+Article 탭의 문단마다 `Read aloud` 버튼이 있다. 누르면 브라우저 마이크가 GPT-Live(`gpt-live-1`)에 WebRTC로 붙고, 읽는 동안 원어민 코치가 듣다가 틀린 단어 발음이 나오면 그 자리에서 바르게 말해 준다. 발음만 본다. 끊어 읽기·억양은 보지 않고 문단을 대신 읽어 주지도 않는다. `Finish`를 누르면 코치가 인사하고 끝내며, `Stop`은 바로 세션 종료. 분당 $0.05, 문단 하나에 약 $0.10.
 
 에이전트 정의(프롬프트, 세션 설정, 검증 시나리오)는 `../read-aloud-coach/`에 있고 backend는 그 폴더를 읽기만 한다. backend `POST /api/read-aloud/sessions`가 브라우저의 SDP offer를 `POST https://api.openai.com/v1/live/sessions`에 중계한다. API 키는 backend 환경변수에만 둔다.
+
+## Ask (GPT-Live)
+
+어느 페이지에서든 오른쪽 아래 `🎤 Ask` 버튼이나 `A` 키를 누르면 표현 코치가 붙는다. 입력칸에 커서가 있으면 단축키는 무시한다. "눈치 좀 챙기라는 말 영어로 어떻게 해?"처럼 한국어로 물어도 되고, 자기가 쓴 영어가 어색한지 확인해도 된다. 답은 표현 하나 + 쓰임새 한 줄, 10초 이내. 코치가 5초간 조용하면 자동으로 닫히고, `Done`이나 `Esc`로 바로 닫아도 된다. 한 번에 약 $0.015.
+
+닫힐 때 자막 두 줄이 `asks` 테이블에 저장된다. 세션 안에서 물었으면 그 세션에 묶이고, 홈에서 물었으면 세션 없이 남는다. `Asks` 링크를 열면 그때 텍스트 모델이 한 번 돌아 카드(물은 말 / 추천 표현 / 대안 / 노트)로 정리하고, 만든 카드는 다시 만들지 않는다. 원문 자막은 카드 아래 `Transcript`에 접혀 있다.
+
+에이전트 정의는 `../phrase-coach/`에 있다. `../read-aloud-coach/`와 같은 규약이고, backend의 같은 `LiveAgent`가 둘 다 읽는다.
 
 ## Docker
 
@@ -60,8 +70,8 @@ docker compose up -d --build
 ## 구조
 
 ```
-backend/   FastAPI. app/{main,generator,read_aloud,store,topics,models}.py, tests/
-frontend/  React 19 + Vite + TS. src/{pages,components,lib}. lib/readAloudClient.ts가 WebRTC
+backend/   FastAPI. app/{main,generator,live,cards,store,topics,models}.py, tests/
+frontend/  React 19 + Vite + TS. src/{pages,components,lib}. lib/liveClient.ts가 WebRTC
 dev.sh     둘 다 띄우는 스크립트
 ```
 

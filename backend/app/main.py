@@ -4,6 +4,7 @@ from pathlib import Path
 
 from fastapi import FastAPI, HTTPException, Request, Response
 
+from app.cards import AskReview, CardExtractor, OpenAICardExtractor
 from app.generator import ClaudeCliGenerator, Generator
 from app.jobs import Executor, Job, JobRunner
 from app.live import AgentDefinition, LiveAgent, LiveSessionError, OpenAILiveSessions
@@ -34,11 +35,13 @@ def create_app(
     generator: Generator,
     executor: Executor | None = None,
     agents: dict[str, LiveAgent] | None = None,
+    extractor: CardExtractor | None = None,
 ) -> FastAPI:
     app = FastAPI(title="english-speaking-claude")
     app.state.store = store
     app.state.jobs = JobRunner(generator, store, executor)
     app.state.agents = agents or {}
+    app.state.review = AskReview(store, extractor)
 
     def live_agent(request: Request, name: str) -> LiveAgent:
         agent = request.app.state.agents.get(name)
@@ -123,7 +126,19 @@ def create_app(
     def list_asks(request: Request, session_id: int | None = None) -> list[Ask]:
         return request.app.state.store.list_asks(session_id)
 
+    @app.post("/api/asks/cards", response_model=list[Ask])
+    def ask_cards(request: Request, session_id: int | None = None) -> list[Ask]:
+        return request.app.state.review.cards_for(session_id)
+
     return app
+
+
+def card_extractor() -> CardExtractor | None:
+    api_key = os.environ.get("OPENAI_API_KEY", "").strip()
+    agent_dir = Path(os.environ.get(*AGENT_DIRS["phrase"]))
+    if not api_key or not (agent_dir / "cards.schema.json").is_file():
+        return None
+    return OpenAICardExtractor(api_key, agent_dir, os.environ.get("PHRASE_CARD_MODEL", "gpt-5.6-luna"))
 
 
 def live_agents() -> dict[str, LiveAgent]:
@@ -152,6 +167,7 @@ def default_app() -> FastAPI:
             skills=tuple(s for s in os.environ.get("CLAUDE_SKILLS", "").split(",") if s.strip()),
         ),
         agents=live_agents(),
+        extractor=card_extractor(),
     )
 
 

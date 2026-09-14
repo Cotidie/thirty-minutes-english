@@ -14,7 +14,7 @@ describe('applyLiveEvent', () => {
     s = applyLiveEvent(s, { type: 'session.output_transcript.delta', delta: 'Quick one:' })
     s = applyLiveEvent(s, { type: 'session.input_transcript.delta', delta: 'berified' })
     s = applyLiveEvent(s, { type: 'session.output_transcript.delta', delta: ' verify.' })
-    expect(s.reader).toBe('Researchers berified')
+    expect(s.user).toBe('Researchers berified')
     expect(s.coach).toBe('Quick one: verify.')
   })
 

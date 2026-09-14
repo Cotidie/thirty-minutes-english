@@ -1,8 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { api } from '../api'
-import { connectReadAloud } from './readAloudClient'
+import { connectAsk, connectReadAloud } from './liveClient'
 
-vi.mock('../api', () => ({ api: { startReadAloud: vi.fn() } }))
+vi.mock('../api', () => ({ api: { startReadAloud: vi.fn(), startPhrase: vi.fn() } }))
 
 // Minimal WebRTC stand-ins: enough to run the offer path and fire channel events.
 class FakeChannel extends EventTarget {
@@ -48,7 +48,7 @@ describe('connectReadAloud', () => {
     const onDisconnect = vi.fn()
     const audio = { play: async () => undefined } as unknown as HTMLAudioElement
 
-    await expect(connectReadAloud({ paragraph: 'p', audio, onEvent: vi.fn(), onDisconnect })).rejects.toThrow(
+    await expect(connectReadAloud('p', { audio, onEvent: vi.fn(), onDisconnect })).rejects.toThrow(
       'set OPENAI_API_KEY',
     )
     await new Promise((r) => setTimeout(r, 0))
@@ -64,7 +64,7 @@ describe('connectReadAloud', () => {
     const onDisconnect = vi.fn()
     const audio = { play: async () => undefined } as unknown as HTMLAudioElement
 
-    const conn = await connectReadAloud({ paragraph: 'p', audio, onEvent, onDisconnect })
+    const conn = await connectReadAloud('p', { audio, onEvent, onDisconnect })
     expect(vi.mocked(api.startReadAloud)).toHaveBeenCalledWith('p', 'v=0 offer')
     expect(lastPeer.setRemoteDescription).toHaveBeenCalledWith({ type: 'answer', sdp: 'v=0 answer' })
 
@@ -92,12 +92,33 @@ describe('connectReadAloud', () => {
     })
     const onDisconnect = vi.fn()
     const audio = { play: async () => undefined } as unknown as HTMLAudioElement
-    await connectReadAloud({ paragraph: 'p', audio, onEvent: vi.fn(), onDisconnect })
+    await connectReadAloud('p', { audio, onEvent: vi.fn(), onDisconnect })
 
     lastPeer.channel.dispatchEvent(
       new MessageEvent('message', { data: JSON.stringify({ type: 'session.closed', usage: { seconds: 3 } }) }),
     )
     await new Promise((r) => setTimeout(r, 0))
     expect(onDisconnect).not.toHaveBeenCalled()
+  })
+})
+
+describe('connectAsk', () => {
+  it('starts a phrase session with the topic and shares the round plumbing', async () => {
+    vi.mocked(api.startPhrase).mockResolvedValueOnce({
+      session: { id: 'live_2' },
+      transport: { type: 'webrtc', sdp: 'v=0 answer' },
+    })
+    const onEvent = vi.fn()
+    const audio = { play: async () => undefined } as unknown as HTMLAudioElement
+
+    const conn = await connectAsk('Digital twins', { audio, onEvent, onDisconnect: vi.fn() })
+    expect(vi.mocked(api.startPhrase)).toHaveBeenCalledWith('Digital twins', 'v=0 offer')
+
+    const channel = lastPeer.channel
+    channel.dispatchEvent(new MessageEvent('message', { data: JSON.stringify({ type: 'session.started' }) }))
+    expect(onEvent).toHaveBeenCalledWith({ type: 'session.started' })
+
+    conn.close()
+    expect(JSON.parse(channel.send.mock.calls[0][0]).type).toBe('session.close')
   })
 })

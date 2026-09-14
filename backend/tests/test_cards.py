@@ -1,0 +1,125 @@
+import json
+
+import pytest
+from fastapi.testclient import TestClient
+
+from app.cards import AskReview, OpenAICardExtractor
+from app.main import create_app
+from app.models import PhraseCard
+from app.store import SessionStore
+from tests.test_api import FakeGenerator, InlineExecutor
+
+
+class FakeExtractor:
+    def __init__(self, error: Exception | None = None):
+        self.batches: list[list[int]] = []
+        self.error = error
+
+    def extract(self, asks):
+        self.batches.append([a.id for a in asks])
+        if self.error:
+            raise self.error
+        return {
+            a.id: PhraseCard(asked=a.user_text, english=a.coach_text, alternatives=[], note="note")
+            for a in asks
+        }
+
+
+@pytest.fixture
+def store(tmp_path) -> SessionStore:
+    return SessionStore(tmp_path / "s.db")
+
+
+def test_extracts_only_the_asks_without_a_card(store):
+    first = store.add_ask(None, "눈치 좀 챙겨", "Read the room.", 11)
+    store.set_ask_card(first.id, PhraseCard(asked="눈치 좀 챙겨", english="Read the room.", note="kept"))
+    second = store.add_ask(None, "I have much work", "I'm swamped.", 9)
+    extractor = FakeExtractor()
+
+    cards = AskReview(store, extractor).cards_for()
+
+    assert extractor.batches == [[second.id]]
+    assert {a.id: a.card.note for a in cards} == {first.id: "kept", second.id: "note"}
+
+
+def test_a_second_review_calls_nothing(store):
+    store.add_ask(None, "q", "a", 1)
+    extractor = FakeExtractor()
+    review = AskReview(store, extractor)
+
+    review.cards_for()
+    review.cards_for()
+
+    assert len(extractor.batches) == 1
+
+
+def test_a_failed_extraction_still_returns_the_transcripts(store):
+    store.add_ask(None, "q", "a", 1)
+    cards = AskReview(store, FakeExtractor(ValueError("bad json"))).cards_for()
+    assert [a.coach_text for a in cards] == ["a"]
+    assert cards[0].card is None
+
+
+def test_review_without_an_extractor_returns_transcripts(store):
+    store.add_ask(None, "q", "a", 1)
+    assert AskReview(store, None).cards_for()[0].card is None
+
+
+def test_cards_endpoint_narrows_to_one_session(tmp_path):
+    extractor = FakeExtractor()
+    store = SessionStore(tmp_path / "s.db")
+    app = create_app(store, FakeGenerator(), InlineExecutor(), extractor=extractor)
+    with TestClient(app) as c:
+        session_id = c.post("/api/sessions", json={"topic": "Digital twins"}).json()["session_id"]
+        c.post("/api/asks", json={"session_id": session_id, "user_text": "mine", "coach_text": "a"})
+        c.post("/api/asks", json={"user_text": "loose", "coach_text": "b"})
+
+        scoped = c.post("/api/asks/cards", params={"session_id": session_id}).json()
+        assert [a["user_text"] for a in scoped] == ["mine"]
+        assert scoped[0]["card"]["english"] == "a"
+
+        assert len(c.post("/api/asks/cards").json()) == 2
+
+
+def test_extractor_sends_rounds_and_reads_the_answer(tmp_path, monkeypatch):
+    agent_dir = tmp_path / "phrase"
+    (agent_dir / "prompts").mkdir(parents=True)
+    (agent_dir / "prompts" / "summarize.md").write_text("Turn rounds into cards.")
+    (agent_dir / "cards.schema.json").write_text(json.dumps({"type": "object"}))
+    extractor = OpenAICardExtractor("sk-test", agent_dir, "gpt-5.6-luna")
+
+    sent = {}
+
+    class FakeResponse:
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *args):
+            return False
+
+        def read(self):
+            card = {"id": 7, "asked": "눈치", "english": "Read the room.", "alternatives": [], "note": "n"}
+            return json.dumps(
+                {"output": [{"content": [{"type": "output_text", "text": json.dumps({"cards": [card]})}]}]}
+            ).encode()
+
+    def fake_urlopen(req, timeout=0):
+        sent["body"] = json.loads(req.data)
+        sent["auth"] = req.headers["Authorization"]
+        return FakeResponse()
+
+    monkeypatch.setattr("app.cards.urllib.request.urlopen", fake_urlopen)
+    monkeypatch.setattr("app.cards.json.load", lambda res: json.loads(res.read()))
+
+    store = SessionStore(tmp_path / "s.db")
+    ask = store.add_ask(None, "눈치 좀 챙겨", "Read the room.", 11)
+    object.__setattr__(ask, "id", 7)
+
+    cards = extractor.extract([ask])
+
+    assert sent["auth"] == "Bearer sk-test"
+    assert sent["body"]["model"] == "gpt-5.6-luna"
+    assert json.loads(sent["body"]["input"][1]["content"]) == [
+        {"id": 7, "user": "눈치 좀 챙겨", "coach": "Read the room."}
+    ]
+    assert cards[7].english == "Read the room."

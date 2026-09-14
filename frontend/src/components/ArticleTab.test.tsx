@@ -3,7 +3,7 @@ import userEvent from '@testing-library/user-event'
 import { describe, expect, it, vi } from 'vitest'
 import { ArticleTab } from './ArticleTab'
 
-vi.mock('../lib/readAloudClient', () => ({
+vi.mock('../lib/liveClient', () => ({
   connectReadAloud: vi.fn(async () => ({ finish: vi.fn(), close: vi.fn(), dispose: vi.fn() })),
 }))
 

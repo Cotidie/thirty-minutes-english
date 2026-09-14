@@ -2,19 +2,22 @@ import { act, render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { LiveEvent } from '../lib/liveSession'
-import type { ReadAloudOptions } from '../lib/readAloudClient'
+import type { LiveConnection, LiveOptions } from '../lib/liveClient'
 import { ReadAloud } from './ReadAloud'
 
 const connection = { finish: vi.fn(), close: vi.fn(), dispose: vi.fn() }
 let emit: (e: LiveEvent) => void = () => undefined
 let drop: () => void = () => undefined
-const connect = vi.fn(async (opts: ReadAloudOptions) => {
+type RoundOptions = Omit<LiveOptions, 'start'>
+const connect = vi.fn(async (_paragraph: string, opts: RoundOptions): Promise<LiveConnection> => {
   emit = opts.onEvent
   drop = opts.onDisconnect
   return connection
 })
 
-vi.mock('../lib/readAloudClient', () => ({ connectReadAloud: (opts: ReadAloudOptions) => connect(opts) }))
+vi.mock('../lib/liveClient', () => ({
+  connectReadAloud: (paragraph: string, opts: RoundOptions) => connect(paragraph, opts),
+}))
 
 function renderIdle(active = false) {
   const onStart = vi.fn()
@@ -34,7 +37,7 @@ describe('ReadAloud', () => {
     const { onStart } = renderIdle()
     await userEvent.click(screen.getByRole('button', { name: 'Read aloud' }))
     expect(onStart).toHaveBeenCalled()
-    expect(connect.mock.calls[0][0].paragraph).toBe('Researchers verified it.')
+    expect(connect.mock.calls[0][0]).toBe('Researchers verified it.')
     expect(screen.getByRole('status')).toHaveTextContent('Connecting…')
 
     act(() => emit({ type: 'session.started', session: { id: 'live_1' } }))

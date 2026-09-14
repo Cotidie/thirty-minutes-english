@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { applyLiveEvent, initialLiveState, liveFailed, type LiveState } from '../lib/liveSession'
-import { connectReadAloud, type ReadAloudConnection } from '../lib/readAloudClient'
+import { connectReadAloud, type LiveConnection } from '../lib/liveClient'
 
 interface Props {
   paragraph: string
@@ -21,7 +21,7 @@ const STATUS_LABEL: Record<LiveState['status'], string> = {
 export function ReadAloud({ paragraph, active, onStart, onEnd }: Props) {
   const [state, setState] = useState<LiveState | null>(null)
   const audioRef = useRef<HTMLAudioElement>(null)
-  const connRef = useRef<ReadAloudConnection | null>(null)
+  const connRef = useRef<LiveConnection | null>(null)
 
   useEffect(() => () => connRef.current?.dispose(), [])
 
@@ -29,8 +29,7 @@ export function ReadAloud({ paragraph, active, onStart, onEnd }: Props) {
     onStart()
     setState(initialLiveState)
     try {
-      connRef.current = await connectReadAloud({
-        paragraph,
+      connRef.current = await connectReadAloud(paragraph, {
         audio: audioRef.current!,
         onEvent: (event) => setState((s) => applyLiveEvent(s ?? initialLiveState, event)),
         onDisconnect: () => setState((s) => liveFailed(s ?? initialLiveState, 'Connection dropped before the round ended.')),
@@ -78,10 +77,10 @@ export function ReadAloud({ paragraph, active, onStart, onEnd }: Props) {
             )}
           </div>
           {state.error && <p className="read-aloud-error">{state.error}</p>}
-          {(state.reader || state.coach) && (
+          {(state.user || state.coach) && (
             <dl className="read-aloud-captions">
               <dt>You</dt>
-              <dd>{state.reader}</dd>
+              <dd>{state.user}</dd>
               <dt>Coach</dt>
               <dd>{state.coach}</dd>
             </dl>

@@ -1,12 +1,12 @@
-// Browser side of one GPT-Live round over WebRTC: microphone in, coach audio
+// Browser side of one GPT-Live round over WebRTC: microphone in, agent audio
 // out, JSON events on the "oai-events" data channel. Session creation goes
 // through our backend, which holds the API key.
 
 import { api } from '../api'
 import type { LiveEvent } from './liveSession'
 
-export interface ReadAloudConnection {
-  /** Tells the coach the paragraph is done, so it signs off. */
+export interface LiveConnection {
+  /** Tells the agent the round is over, so it signs off. */
   finish(): void
   /** Ends the round. `session.closed` arrives through onEvent afterwards. */
   close(): void
@@ -14,17 +14,18 @@ export interface ReadAloudConnection {
   dispose(): void
 }
 
-export interface ReadAloudOptions {
-  paragraph: string
+export interface LiveOptions {
+  /** Starts the upstream session with our SDP offer and returns its answer. */
+  start: (sdp: string) => Promise<{ transport: { sdp: string } }>
   audio: HTMLAudioElement
   onEvent: (event: LiveEvent) => void
   onDisconnect: () => void
 }
 
 const ICE_TIMEOUT_MS = 10_000
-const FINISH_INSTRUCTION = 'The reader has finished. Say your closing now.'
+const FINISH_INSTRUCTION = 'The round is over. Say your closing now.'
 
-export async function connectReadAloud(opts: ReadAloudOptions): Promise<ReadAloudConnection> {
+export async function connectLive(opts: LiveOptions): Promise<LiveConnection> {
   const peer = new RTCPeerConnection()
   let microphone: MediaStream | undefined
   let finalized = false
@@ -67,7 +68,7 @@ export async function connectReadAloud(opts: ReadAloudOptions): Promise<ReadAlou
     const sdp = peer.localDescription?.sdp
     if (!sdp) throw new Error('Could not build a WebRTC offer')
 
-    const result = await api.startReadAloud(opts.paragraph, sdp)
+    const result = await opts.start(sdp)
     await peer.setRemoteDescription({ type: 'answer', sdp: result.transport.sdp })
   } catch (e) {
     dispose()
@@ -89,6 +90,18 @@ export async function connectReadAloud(opts: ReadAloudOptions): Promise<ReadAlou
     close: () => send({ type: 'session.close' }),
     dispose,
   }
+}
+
+type RoundOptions = Omit<LiveOptions, 'start'>
+
+/** Pronunciation coaching on one paragraph the user reads aloud. */
+export function connectReadAloud(paragraph: string, opts: RoundOptions): Promise<LiveConnection> {
+  return connectLive({ ...opts, start: (sdp) => api.startReadAloud(paragraph, sdp) })
+}
+
+/** One "how do I say this in English" question, with the session topic for context. */
+export function connectAsk(topic: string | null, opts: RoundOptions): Promise<LiveConnection> {
+  return connectLive({ ...opts, start: (sdp) => api.startPhrase(topic, sdp) })
 }
 
 function waitForIce(peer: RTCPeerConnection): Promise<void> {

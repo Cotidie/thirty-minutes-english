@@ -50,7 +50,24 @@ export interface Session {
   content: SessionContent
 }
 
-export interface ReadAloudSession {
+export interface LiveSession {
   session: { id: string }
   transport: { type: 'webrtc'; sdp: string }
+}
+
+export interface PhraseCard {
+  asked: string
+  english: string
+  alternatives: string[]
+  note: string
+}
+
+export interface Ask {
+  id: number
+  created_at: string
+  session_id: number | null
+  user_text: string
+  coach_text: string
+  seconds: number
+  card: PhraseCard | null
 }

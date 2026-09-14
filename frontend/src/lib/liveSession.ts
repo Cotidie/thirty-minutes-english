@@ -1,4 +1,4 @@
-// Pure state for one GPT-Live coaching round, driven by data-channel events.
+// Pure state for one GPT-Live round, driven by data-channel events.
 // Transcript fragments are appended verbatim per speaker (the API asks for no
 // trimming or spacing between deltas).
 
@@ -7,7 +7,7 @@ export type LiveStatus = 'connecting' | 'listening' | 'closing' | 'closed' | 'fa
 export interface LiveState {
   status: LiveStatus
   sessionId: string | null
-  reader: string
+  user: string
   coach: string
   seconds: number
   error: string | null
@@ -25,7 +25,7 @@ export interface LiveEvent {
 export const initialLiveState: LiveState = {
   status: 'connecting',
   sessionId: null,
-  reader: '',
+  user: '',
   coach: '',
   seconds: 0,
   error: null,
@@ -36,7 +36,7 @@ export function applyLiveEvent(state: LiveState, event: LiveEvent): LiveState {
     case 'session.started':
       return { ...state, status: 'listening', sessionId: event.session?.id ?? state.sessionId }
     case 'session.input_transcript.delta':
-      return { ...state, reader: state.reader + (event.delta ?? '') }
+      return { ...state, user: state.user + (event.delta ?? '') }
     case 'session.output_transcript.delta':
       return { ...state, coach: state.coach + (event.delta ?? '') }
     case 'session.usage.updated':
