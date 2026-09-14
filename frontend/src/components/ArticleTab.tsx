@@ -23,10 +23,8 @@ export function ArticleTab({ article, sessionId }: { article: Article; sessionId
   return (
     <section className="tab-panel">
       <p className="tab-brief">
-        Read silently for three minutes. Then each of you summarizes the article in your own words before opening the
-        questions. The first two are answered in the text, so click one to see the passage it comes from; the last one
-        is yours to argue about. Click a sentence to see it in Korean, and again for the English. Press Read aloud under
-        a paragraph to have a native-speaker coach stop you on a mispronounced word or a pause that breaks a phrase.
+        Read it, then each of you sums it up in your own words before the questions. Click a sentence for the Korean, a
+        question for its passage.
       </p>
       <article className="article" ref={bodyRef}>
         <h2 className="article-title">{article.title}</h2>

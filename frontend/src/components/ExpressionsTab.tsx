@@ -17,9 +17,8 @@ export function ExpressionsTab({ items, sessionId, starred, onToggleStar, exampl
   return (
     <section className="tab-panel">
       <p className="tab-brief">
-        For each expression: read the examples aloud, agree on when you would use it, then each of you presses Your
-        turn and says one new sentence about your own week. The coach says it back the way a native speaker would and
-        adds one line of feedback.
+        Read the examples aloud, then each of you makes one sentence of your own. Press Your turn to have it echoed back
+        the native way.
       </p>
       <ol className="expression-list">
         {items.map((item) => (
