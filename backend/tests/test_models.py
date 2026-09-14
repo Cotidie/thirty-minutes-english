@@ -24,3 +24,12 @@ def test_article_sources_default_to_empty_for_legacy_content():
 
     a = Article.model_validate({"title": "t", "body": "b", "questions": ["q"]})
     assert a.sources == []
+
+
+def test_correction_kind_defaults_to_pronunciation_for_old_records():
+    from app.models import Correction
+
+    old = Correction.model_validate({"word": "verified", "heard": "berified", "fix": "V"})
+    assert old.kind == "pronunciation"
+    new = Correction.model_validate({"kind": "phrasing", "word": "twice as long", "heard": "twice as / long", "fix": "one piece"})
+    assert new.kind == "phrasing"

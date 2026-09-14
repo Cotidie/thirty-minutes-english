@@ -27,7 +27,7 @@
 | `CLAUDE_SKILLS` | 비움 | 생성 전에 호출할 스킬. 쉼표 구분. 예: `stop-slop,cotidie:write-like-me` |
 | `DB_PATH` | `backend/data/sessions.db` | SQLite 파일 |
 | `OPENAI_API_KEY` | 비움 | Read aloud 코치와 Ask 위젯용. 비우면 두 버튼이 503을 돌려준다 |
-| `READ_ALOUD_AGENT_DIR` | `../read-aloud-coach` | 발음 코치 정의 폴더(프롬프트, 세션 설정) |
+| `READ_ALOUD_AGENT_DIR` | `../read-aloud-coach` | 발음·끊어 읽기 코치 정의 폴더(프롬프트, 세션 설정) |
 | `PHRASE_AGENT_DIR` | `../phrase-coach` | 표현 코치 정의 폴더 |
 | `SUMMARY_MODEL` | `gpt-5.6-luna` | Summary 탭에서 transcript를 정리하는 텍스트 모델 |
 | `TOPICS_MODEL` | `sonnet` | 하루 한 번 뉴스에서 추천 주제를 뽑는 모델 |
@@ -35,7 +35,7 @@
 
 ## Read aloud (GPT-Live)
 
-Article 탭의 문단마다 `Read aloud` 버튼이 있다. 누르면 브라우저 마이크가 GPT-Live(`gpt-live-1`)에 WebRTC로 붙고, 읽는 동안 원어민 코치가 듣다가 틀린 단어 발음이 나오면 그 자리에서 바르게 말해 준다. 발음만 본다. 끊어 읽기·억양은 보지 않고 문단을 대신 읽어 주지도 않는다. `Finish`를 누르면 코치가 인사하고 끝내며, `Stop`은 바로 세션 종료. 분당 $0.05, 문단 하나에 약 $0.10.
+Article 탭의 문단마다 `Read aloud` 버튼이 있다. 누르면 브라우저 마이크가 GPT-Live(`gpt-live-1`)에 WebRTC로 붙고, 읽는 동안 원어민 코치가 듣다가 이상한 발음이나 구 안에서 잘못 끊어 읽은 곳이 나오면 문장 끝을 기다리지 않고 바로 끼어들어 고친다. 이 두 가지만 본다. 억양은 보지 않고 문단을 대신 읽어 주지도 않는다. `Finish`를 누르면 코치가 인사하고 끝내며, `Stop`은 바로 세션 종료. 분당 $0.05, 문단 하나에 약 $0.10.
 
 에이전트 정의(프롬프트, 세션 설정, 검증 시나리오)는 `../read-aloud-coach/`에 있고 backend는 그 폴더를 읽기만 한다. backend `POST /api/read-aloud/sessions`가 브라우저의 SDP offer를 `POST https://api.openai.com/v1/live/sessions`에 중계한다. API 키는 backend 환경변수에만 둔다.
 
@@ -57,7 +57,7 @@ Article 탭의 문단마다 `Read aloud` 버튼이 있다. 누르면 브라우�
 |---|---|---|
 | Starred | 표현: 구문 / 뜻, 단어: 단어 · 품사 / 정의 (예문과 노트는 뺀 축약형) | `stars` 테이블 |
 | Expressions you asked for | 물은 말 / 추천 표현 / 대안 / 노트 | `asks` 테이블 |
-| Words to watch | 들린 대로 / 원래 단어 / 고칠 점 | `readings` 테이블 |
+| Reading to fix | 들린 대로 / 원래 단어나 구 / 고칠 점. 끊어 읽기 교정은 `phrasing` 표시 | `readings` 테이블 |
 
 Read aloud 라운드는 코치가 한마디라도 했으면 끝날 때 자동으로 `readings`에 저장된다(조용히 넘어간 라운드는 남길 게 없어 저장하지 않는다). Ask와 달리 저장 버튼이 없다.
 

@@ -77,7 +77,7 @@ class PhraseCardExtractor(OpenAIExtractor):
 
 
 class CorrectionExtractor(OpenAIExtractor):
-    """Readings to the list of words the coach stopped on."""
+    """Readings to the list of words and phrases the coach stopped on."""
 
     def __init__(self, api_key: str, agent_dir: Path, model: str, url: str = RESPONSES_URL):
         super().__init__(api_key, agent_dir, model, "feedback.schema.json", url)

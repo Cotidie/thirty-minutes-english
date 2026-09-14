@@ -30,8 +30,8 @@ const reading: Reading = {
   coach_text: 'Quick one: that was berified.',
   seconds: 31,
   corrections: [
-    { word: 'verified', heard: 'berified', fix: 'V, teeth on the lip', repeated_ok: true },
-    { word: 'three', heard: 'suh-ree', fix: 'Tongue between the teeth', repeated_ok: false },
+    { kind: 'pronunciation', word: 'verified', heard: 'berified', fix: 'V, teeth on the lip', repeated_ok: true },
+    { kind: 'phrasing', word: 'twice as long', heard: 'twice as / long', fix: 'one piece', repeated_ok: false },
   ],
 }
 
@@ -62,7 +62,8 @@ describe('SummaryTab', () => {
     expect(await screen.findByText('Read the room.')).toBeInTheDocument()
     expect(screen.getByText('Take a hint (blunter)')).toBeInTheDocument()
     expect(screen.getByText('verified')).toBeInTheDocument()
-    expect(screen.getByText('three')).toBeInTheDocument()
+    expect(screen.getByText('twice as long')).toBeInTheDocument()
+    expect(screen.getByText('phrasing')).toBeInTheDocument()
     expect(screen.getByText(/got it on the retry/)).toBeInTheDocument()
 
     expect(vi.mocked(api.askCards)).toHaveBeenCalledWith(3)

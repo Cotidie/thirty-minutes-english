@@ -100,7 +100,7 @@ export function SummaryTab({ sessionId, content, stars }: Props) {
 
       <section className="summary-section">
         <h2 className="summary-title">
-          Words to watch
+          Reading to fix
           {readings !== null && <span className="summary-count">{corrections.length}</span>}
         </h2>
         {readings?.length === 0 && <p className="empty">No paragraph read aloud yet. The Article tab has the button.</p>}
@@ -120,7 +120,10 @@ export function SummaryTab({ sessionId, content, stars }: Props) {
 function CorrectionRow({ correction }: { correction: Correction }) {
   return (
     <li className="ask-card">
-      <p className="ask-card-asked">{correction.heard}</p>
+      <p className="ask-card-asked">
+        {correction.kind === 'phrasing' && <span className="correction-kind">phrasing</span>}
+        {correction.heard}
+      </p>
       <div className="ask-card-body">
         <p className="ask-card-english">{correction.word}</p>
         <p className="ask-card-note">

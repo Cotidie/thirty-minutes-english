@@ -97,7 +97,7 @@ export async function connectLive(opts: LiveOptions): Promise<LiveConnection> {
 
 type RoundOptions = Omit<LiveOptions, 'start'>
 
-/** Pronunciation coaching on one paragraph the user reads aloud. */
+/** Pronunciation and phrasing coaching on one paragraph the user reads aloud. */
 export function connectReadAloud(paragraph: string, opts: RoundOptions): Promise<LiveConnection> {
   return connectLive({ ...opts, start: (sdp) => api.startReadAloud(paragraph, sdp) })
 }

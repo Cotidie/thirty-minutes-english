@@ -82,6 +82,7 @@ export interface PhraseCard {
 }
 
 export interface Correction {
+  kind: 'pronunciation' | 'phrasing'
   word: string
   heard: string
   fix: string

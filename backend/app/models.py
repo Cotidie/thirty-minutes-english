@@ -161,8 +161,9 @@ class ReadingRequest(BaseModel):
 
 
 class Correction(BaseModel):
-    """One word the coach stopped the reader on."""
+    """One thing the coach stopped the reader on: a word's sound, or a pause inside a phrase."""
 
+    kind: Literal["pronunciation", "phrasing"] = "pronunciation"  # rounds saved before phrasing had none
     word: str
     heard: str
     fix: str

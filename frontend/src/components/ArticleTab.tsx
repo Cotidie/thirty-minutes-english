@@ -19,8 +19,8 @@ export function ArticleTab({ article, sessionId }: { article: Article; sessionId
       <p className="tab-brief">
         Read silently for three minutes. Then each of you summarizes the article in your own words before opening the
         questions. The first two are answered in the text, so click one to see the passage it comes from; the last one
-        is yours to argue about. Press Read aloud under a paragraph to have a native-speaker coach listen and correct
-        your pronunciation as you read it.
+        is yours to argue about. Press Read aloud under a paragraph to have a native-speaker coach stop you on a
+        mispronounced word or a pause that breaks a phrase.
       </p>
       <article className="article" ref={bodyRef}>
         <h2 className="article-title">{article.title}</h2>
