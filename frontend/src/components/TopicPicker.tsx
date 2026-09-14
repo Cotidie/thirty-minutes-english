@@ -3,8 +3,11 @@ import type { Category, Topic } from '../types'
 
 interface Props {
   suggestions: Topic[]
+  /** The news half is still on its way; the list may change under you. */
+  pending: boolean
   busy: boolean
   onGenerate: (topic: string | null) => void
+  onRefresh: () => void
 }
 
 /** Colour carries the category, so the key names what each colour means. */
@@ -18,7 +21,7 @@ const CATEGORY_LABELS: Record<Category, string> = {
 
 const CATEGORY_ORDER: Category[] = ['news', 'tech', 'literature', 'history', 'world']
 
-export function TopicPicker({ suggestions, busy, onGenerate }: Props) {
+export function TopicPicker({ suggestions, pending, busy, onGenerate, onRefresh }: Props) {
   const [topic, setTopic] = useState('')
   // The server decides how many the day offers, and in what order.
   const shown = suggestions
@@ -32,9 +35,21 @@ export function TopicPicker({ suggestions, busy, onGenerate }: Props) {
         onGenerate(topic.trim() || null)
       }}
     >
-      <label htmlFor="topic" className="topic-label">
-        Today's topic
-      </label>
+      <div className="topic-head">
+        <label htmlFor="topic" className="topic-label">
+          Today's topic
+        </label>
+        <button
+          type="button"
+          className={`topic-refresh${pending ? ' is-pending' : ''}`}
+          aria-label="Refresh suggestions"
+          title={pending ? 'Looking for today\'s news…' : 'Deal new suggestions'}
+          disabled={pending || busy}
+          onClick={onRefresh}
+        >
+          ↻
+        </button>
+      </div>
       <div className="topic-row">
         <input
           id="topic"

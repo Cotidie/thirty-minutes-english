@@ -14,6 +14,7 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
 
 export const api = {
   topics: () => request<TopicListing>('/api/topics'),
+  refreshTopics: () => request<TopicListing>('/api/topics/refresh', { method: 'POST' }),
   listSessions: () => request<SessionSummary[]>('/api/sessions'),
   getSession: (id: number) => request<Session>(`/api/sessions/${id}`),
   startGeneration: (topic: string | null) =>

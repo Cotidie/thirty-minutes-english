@@ -122,3 +122,55 @@ def test_endpoint_serves_the_news_half_once_it_lands(tmp_path):
         assert [t["text"] for t in second["topics"][:FRESH_COUNT]] == NEWS
         assert {t["category"] for t in second["topics"][:FRESH_COUNT]} == {"news"}
         assert all(t["category"] for t in second["topics"])
+
+
+def test_refresh_redeals_the_pool_and_fetches_the_news_again(store):
+    source = FakeSource()
+    daily = DailyTopics(store, source)
+    daily.ensure_fetched()
+    before, _ = daily.listing()
+
+    source.fetch = lambda count: [f"later news {i}" for i in range(count)]  # type: ignore[method-assign]
+    daily.refresh()
+    after, pending = daily.listing()
+    assert pending is False  # the inline fetch already landed
+    assert texts(after[:FRESH_COUNT]) == [f"later news {i}" for i in range(FRESH_COUNT)]
+    assert after[FRESH_COUNT:] != before[FRESH_COUNT:]
+    assert len(after) == FRESH_COUNT + POOL_COUNT
+
+
+def test_refresh_without_a_source_still_redeals_the_pool(store):
+    daily = DailyTopics(store, None)
+    before, _ = daily.listing()
+    daily.refresh()
+    after, pending = daily.listing()
+    assert after != before
+    assert pending is False
+
+
+def test_refresh_endpoint_reports_pending_until_the_news_lands(tmp_path):
+    class SlowExecutor:
+        def __init__(self):
+            self.queued = []
+
+        def submit(self, fn, /, *args):
+            self.queued.append((fn, args))
+
+    store = SessionStore(tmp_path / "s.db")
+    executor = SlowExecutor()
+    app = create_app(store, FakeGenerator(), executor, topic_source=FakeSource())
+    with TestClient(app) as c:
+        c.get("/api/topics")
+        for fn, args in executor.queued:
+            fn(*args)
+        executor.queued.clear()
+        assert c.get("/api/topics").json()["pending"] is False
+
+        res = c.post("/api/topics/refresh").json()
+        assert res["pending"] is True
+        assert [t["text"] for t in res["topics"][:FRESH_COUNT]] == NEWS  # the old news half stays up meanwhile
+        assert len(executor.queued) == 1
+
+        for fn, args in executor.queued:
+            fn(*args)
+        assert c.get("/api/topics").json()["pending"] is False

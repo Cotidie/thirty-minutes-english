@@ -76,6 +76,10 @@ class DailyTopics:
         self.source = source
         self._executor = executor
         self._running: str | None = None
+        # A manual refresh: the day whose news half is being fetched again, and
+        # how many times the pool half has been redealt today.
+        self._refreshing: str | None = None
+        self._salt = 0
 
     def today(self) -> date:
         return datetime.now(UTC).date()
@@ -84,8 +88,8 @@ class DailyTopics:
         """The day's topics, and whether a fetch is still on its way."""
         day = self.today()
         fresh = self.store.get_daily_topics(day.isoformat()) or []
-        pool = pool_for_day(day, POOL_COUNT + FRESH_COUNT - len(fresh), exclude=fresh)
-        pending = not fresh and self.source is not None
+        pool = pool_for_day(day, POOL_COUNT + FRESH_COUNT - len(fresh), exclude=fresh, salt=self._salt)
+        pending = self.source is not None and (not fresh or self._refreshing == day.isoformat())
         news = [Topic(text=t, category=Category.NEWS) for t in fresh]
         return news + pool, pending
 
@@ -94,6 +98,18 @@ class DailyTopics:
         day = self.today().isoformat()
         if self.source is None or self._running == day or self.store.get_daily_topics(day) is not None:
             return
+        self._start(day)
+
+    def refresh(self) -> None:
+        """Deals a new pool half now and fetches the news half again in the background."""
+        day = self.today().isoformat()
+        self._salt += 1
+        if self.source is None or self._refreshing == day:
+            return
+        self._refreshing = day
+        self._start(day)
+
+    def _start(self, day: str) -> None:
         self._running = day
         if self._executor is None:
             self._fetch(day)
@@ -106,13 +122,20 @@ class DailyTopics:
             topics = self.source.fetch(FRESH_COUNT)
         except (GenerationError, KeyError, TypeError) as e:
             log.warning("could not fetch today's topics, staying on the pool: %s", e)
-            self._running = None
+            self._done(day, fetched=False)
             return
         if not topics:
             # No web access, or nothing cleared the bar. Leave the day unset so a
             # later request tries again rather than caching an empty news half.
             log.warning("no news topics came back for %s, staying on the pool", day)
-            self._running = None
+            self._done(day, fetched=False)
             return
         self.store.set_daily_topics(day, topics)
         log.info("topics for %s: %d from the news", day, len(topics))
+        self._done(day, fetched=True)
+
+    def _done(self, day: str, fetched: bool) -> None:
+        if not fetched:
+            self._running = None
+        if self._refreshing == day:
+            self._refreshing = None

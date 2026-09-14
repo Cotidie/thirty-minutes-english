@@ -93,6 +93,13 @@ def create_app(
     def list_sessions(request: Request) -> list[SessionSummary]:
         return request.app.state.store.list_all()
 
+    @app.post("/api/topics/refresh", response_model=TopicListing)
+    def refresh_topics(request: Request) -> TopicListing:
+        daily: DailyTopics = request.app.state.topics
+        daily.refresh()
+        topics, pending = daily.listing()
+        return TopicListing(topics=topics, pending=pending)
+
     @app.post("/api/sessions", response_model=JobStatus, status_code=202)
     def create_session(body: CreateSessionRequest, request: Request) -> JobStatus:
         store: SessionStore = request.app.state.store

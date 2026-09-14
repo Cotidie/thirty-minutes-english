@@ -111,11 +111,12 @@ WORLD_TOPICS = _pool(_WORLD, Category.WORLD)
 TOPICS: tuple[Topic, ...] = TECH_TOPICS + LITERATURE_TOPICS + HISTORY_TOPICS + WORLD_TOPICS
 
 
-def pool_for_day(day: date, count: int, exclude: list[str] | None = None) -> list[Topic]:
-    """The same slice all day, a different one tomorrow. Seeded by the date alone."""
+def pool_for_day(day: date, count: int, exclude: list[str] | None = None, salt: int = 0) -> list[Topic]:
+    """The same slice all day, a different one tomorrow. Seeded by the date, plus a
+    salt so a manual refresh can deal a fresh slice within the day."""
     taken = set(exclude or ())
     available = [t for t in TOPICS if t.text not in taken]
-    rng = random.Random(day.toordinal())
+    rng = random.Random(day.toordinal() * 1000 + salt)
     rng.shuffle(available)
     return available[: max(0, count)]
 
