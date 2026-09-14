@@ -50,6 +50,14 @@ class SessionStore:
                 )
                 """
             )
+            conn.execute(
+                """
+                CREATE TABLE IF NOT EXISTS topic_days (
+                    day TEXT PRIMARY KEY,
+                    topics_json TEXT NOT NULL
+                )
+                """
+            )
 
     def _connect(self) -> sqlite3.Connection:
         conn = sqlite3.connect(self._path)
@@ -193,6 +201,22 @@ class SessionStore:
         payload = json.dumps([c.model_dump() for c in corrections])
         with self._connect() as conn:
             conn.execute("UPDATE readings SET corrections_json = ? WHERE id = ?", (payload, reading_id))
+
+
+    # --- topic_days: the news half of one day's suggestions ------------------
+
+    def get_daily_topics(self, day: str) -> list[str] | None:
+        with self._connect() as conn:
+            row = conn.execute("SELECT topics_json FROM topic_days WHERE day = ?", (day,)).fetchone()
+        return json.loads(row["topics_json"]) if row else None
+
+    def set_daily_topics(self, day: str, topics: list[str]) -> None:
+        with self._connect() as conn:
+            conn.execute(
+                "INSERT INTO topic_days (day, topics_json) VALUES (?, ?)"
+                " ON CONFLICT(day) DO UPDATE SET topics_json = excluded.topics_json",
+                (day, json.dumps(topics, ensure_ascii=False)),
+            )
 
 
 def _reading(row: sqlite3.Row) -> Reading:

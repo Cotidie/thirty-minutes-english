@@ -59,7 +59,7 @@ class JobRunner:
     ) -> None:
         self._generator = generator
         self._store = store
-        self._executor = executor or ThreadPoolExecutor(max_workers=2)
+        self.executor = executor or ThreadPoolExecutor(max_workers=2)
         self._jobs: dict[str, Job] = {}
         self._durations: deque[float] = deque(maxlen=5)
         self._lock = Lock()
@@ -68,7 +68,7 @@ class JobRunner:
         job = Job(id=uuid.uuid4().hex[:12], topic=topic)
         with self._lock:
             self._jobs[job.id] = job
-        self._executor.submit(self._run, job)
+        self.executor.submit(self._run, job)
         return job
 
     def get(self, job_id: str) -> Job | None:

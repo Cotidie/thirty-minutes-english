@@ -63,6 +63,13 @@ class Session(BaseModel):
     content: SessionContent
 
 
+class TopicListing(BaseModel):
+    """The day's suggestions, and whether the news half is still on its way."""
+
+    topics: list[str]
+    pending: bool
+
+
 class CreateSessionRequest(BaseModel):
     topic: str | None = None
 

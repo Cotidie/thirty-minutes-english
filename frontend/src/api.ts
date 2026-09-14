@@ -1,5 +1,5 @@
 import type { JobStatus } from './lib/progress'
-import type { Ask, LiveSession, Reading, Session, SessionSummary } from './types'
+import type { Ask, LiveSession, Reading, Session, SessionSummary, TopicListing } from './types'
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const res = await fetch(path, { headers: { 'Content-Type': 'application/json' }, ...init })
@@ -13,7 +13,7 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
 }
 
 export const api = {
-  topics: () => request<string[]>('/api/topics'),
+  topics: () => request<TopicListing>('/api/topics'),
   listSessions: () => request<SessionSummary[]>('/api/sessions'),
   getSession: (id: number) => request<Session>(`/api/sessions/${id}`),
   startGeneration: (topic: string | null) =>

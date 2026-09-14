@@ -95,8 +95,12 @@ def test_delete_session(client):
     assert client.delete(f"/api/sessions/{sid}").status_code == 404
 
 
-def test_topics_endpoint(client):
-    assert client.get("/api/topics").json() == list(TOPICS)
+def test_topics_endpoint_offers_a_stable_daily_slice(client):
+    body = client.get("/api/topics").json()
+    assert len(body["topics"]) == 12
+    assert set(body["topics"]) <= set(TOPICS)
+    assert body["pending"] is False  # no news source configured in tests
+    assert client.get("/api/topics").json()["topics"] == body["topics"]
 
 
 def test_job_reports_failure_when_generator_fails(tmp_path):

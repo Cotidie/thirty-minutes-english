@@ -1,0 +1,100 @@
+from datetime import date
+
+import pytest
+from fastapi.testclient import TestClient
+
+from app.claude_cli import GenerationError
+from app.daily_topics import FRESH_COUNT, POOL_COUNT, DailyTopics
+from app.main import create_app
+from app.store import SessionStore
+from app.topics import TOPICS, pool_for_day
+from tests.test_api import FakeGenerator, InlineExecutor
+
+NEWS = [f"news topic {i}" for i in range(FRESH_COUNT)]
+
+
+class FakeSource:
+    def __init__(self, error: Exception | None = None):
+        self.calls = 0
+        self.error = error
+
+    def fetch(self, count: int) -> list[str]:
+        self.calls += 1
+        if self.error:
+            raise self.error
+        return NEWS[:count]
+
+
+@pytest.fixture
+def store(tmp_path) -> SessionStore:
+    return SessionStore(tmp_path / "s.db")
+
+
+def test_pool_slice_holds_all_day_and_turns_over_at_midnight():
+    today = pool_for_day(date(2026, 9, 14), 6)
+    assert today == pool_for_day(date(2026, 9, 14), 6)
+    assert today != pool_for_day(date(2026, 9, 15), 6)
+    assert set(today) <= set(TOPICS)
+    assert len(set(today)) == 6
+
+
+def test_pool_slice_leaves_out_what_the_news_already_covers():
+    taken = list(TOPICS[:3])
+    assert not set(pool_for_day(date(2026, 9, 14), 6, exclude=taken)) & set(taken)
+
+
+def test_the_day_starts_on_the_pool_then_keeps_what_the_news_gave(store):
+    source = FakeSource()
+    daily = DailyTopics(store, source)
+
+    topics, pending = daily.listing()
+    assert pending is True
+    assert len(topics) == FRESH_COUNT + POOL_COUNT
+    assert not set(topics) & set(NEWS)
+
+    daily.ensure_fetched()
+    topics, pending = daily.listing()
+    assert pending is False
+    assert topics[:FRESH_COUNT] == NEWS
+    assert len(topics) == FRESH_COUNT + POOL_COUNT
+
+
+def test_a_day_is_fetched_once(store):
+    source = FakeSource()
+    daily = DailyTopics(store, source)
+    daily.ensure_fetched()
+    daily.ensure_fetched()
+    DailyTopics(store, source).ensure_fetched()  # a restart on the same day
+    assert source.calls == 1
+
+
+def test_a_failed_fetch_leaves_a_full_list_of_pool_topics(store):
+    source = FakeSource(GenerationError("claude timed out after 180s"))
+    daily = DailyTopics(store, source)
+    daily.ensure_fetched()
+
+    topics, pending = daily.listing()
+    assert len(topics) == FRESH_COUNT + POOL_COUNT
+    assert set(topics) <= set(TOPICS)
+    assert pending is True  # it may still succeed later today
+
+
+def test_without_a_source_nothing_is_pending(store):
+    daily = DailyTopics(store, None)
+    daily.ensure_fetched()
+    topics, pending = daily.listing()
+    assert pending is False
+    assert len(topics) == FRESH_COUNT + POOL_COUNT
+
+
+def test_endpoint_serves_the_news_half_once_it_lands(tmp_path):
+    store = SessionStore(tmp_path / "s.db")
+    app = create_app(store, FakeGenerator(), InlineExecutor(), topic_source=FakeSource())
+    with TestClient(app) as c:
+        first = c.get("/api/topics").json()
+        # InlineExecutor runs the fetch during that first request
+        assert first["topics"][:FRESH_COUNT] == NEWS or first["pending"] is True
+
+        second = c.get("/api/topics").json()
+        assert second["pending"] is False
+        assert second["topics"][:FRESH_COUNT] == NEWS

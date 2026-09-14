@@ -6,14 +6,9 @@ import { TopicPicker } from '../components/TopicPicker'
 import type { JobStatus } from '../lib/progress'
 import type { SessionSummary } from '../types'
 
-function shuffle<T>(items: T[]): T[] {
-  const out = [...items]
-  for (let i = out.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1))
-    ;[out[i], out[j]] = [out[j], out[i]]
-  }
-  return out
-}
+/** How often to look back for the day's news topics while they are still coming. */
+const TOPIC_POLL_MS = 15_000
+const TOPIC_POLL_LIMIT = 12
 
 export function HomePage() {
   const navigate = useNavigate()
@@ -24,8 +19,28 @@ export function HomePage() {
   const busy = job !== null && job.status === 'running'
 
   useEffect(() => {
-    api.topics().then((t) => setTopics(shuffle(t))).catch(() => setTopics([]))
     api.listSessions().then(setSessions).catch((e: Error) => setError(e.message))
+  }, [])
+
+  // Today's news topics are fetched on the server the first time anyone asks.
+  // Until they land, the pool fills the list, so keep looking for a while.
+  useEffect(() => {
+    let live = true
+    let tries = 0
+    const load = () => {
+      api
+        .topics()
+        .then((listing) => {
+          if (!live) return
+          setTopics(listing.topics)
+          if (listing.pending && ++tries < TOPIC_POLL_LIMIT) window.setTimeout(load, TOPIC_POLL_MS)
+        })
+        .catch(() => live && setTopics([]))
+    }
+    load()
+    return () => {
+      live = false
+    }
   }, [])
 
   useEffect(() => {

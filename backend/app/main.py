@@ -5,12 +5,14 @@ from pathlib import Path
 from fastapi import FastAPI, HTTPException, Request, Response
 
 from app.cards import AskReview, CorrectionExtractor, Extractor, PhraseCardExtractor, ReadingReview
+from app.daily_topics import ClaudeTopicSource, DailyTopics, TopicSource
 from app.generator import ClaudeCliGenerator, Generator
 from app.jobs import Executor, Job, JobRunner
 from app.live import AgentDefinition, LiveAgent, LiveSessionError, OpenAILiveSessions
 from app.models import (
     Ask,
     AskRequest,
+    TopicListing,
     Reading,
     ReadingRequest,
     CreateSessionRequest,
@@ -39,10 +41,12 @@ def create_app(
     agents: dict[str, LiveAgent] | None = None,
     extractor: Extractor | None = None,
     corrections: Extractor | None = None,
+    topic_source: TopicSource | None = None,
 ) -> FastAPI:
     app = FastAPI(title="english-speaking-claude")
     app.state.store = store
     app.state.jobs = JobRunner(generator, store, executor)
+    app.state.topics = DailyTopics(store, topic_source, app.state.jobs.executor)
     app.state.agents = agents or {}
     app.state.asks = AskReview(store, extractor)
     app.state.readings = ReadingReview(store, corrections)
@@ -73,9 +77,12 @@ def create_app(
             error=job.error,
         )
 
-    @app.get("/api/topics", response_model=list[str])
-    def list_topics() -> list[str]:
-        return list(TOPICS)
+    @app.get("/api/topics", response_model=TopicListing)
+    def list_topics(request: Request) -> TopicListing:
+        daily: DailyTopics = request.app.state.topics
+        daily.ensure_fetched()
+        topics, pending = daily.listing()
+        return TopicListing(topics=topics, pending=pending)
 
     @app.get("/api/sessions", response_model=list[SessionSummary])
     def list_sessions(request: Request) -> list[SessionSummary]:
@@ -183,6 +190,10 @@ def default_app() -> FastAPI:
             skills=tuple(s for s in os.environ.get("CLAUDE_SKILLS", "").split(",") if s.strip()),
         ),
         agents=live_agents(),
+        topic_source=ClaudeTopicSource(
+            model=os.environ.get("TOPICS_MODEL", "sonnet"),
+            effort=os.environ.get("TOPICS_EFFORT", "medium"),
+        ),
         extractor=_extractor("phrase", "cards.schema.json", PhraseCardExtractor),
         corrections=_extractor("read-aloud", "feedback.schema.json", CorrectionExtractor),
     )

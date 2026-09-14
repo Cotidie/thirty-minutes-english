@@ -8,7 +8,8 @@ interface Props {
 
 export function TopicPicker({ suggestions, busy, onGenerate }: Props) {
   const [topic, setTopic] = useState('')
-  const shown = suggestions.slice(0, 6)
+  // The server decides how many the day offers, and in what order.
+  const shown = suggestions
 
   return (
     <form

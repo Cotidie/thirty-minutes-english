@@ -1,4 +1,5 @@
 import random
+from datetime import date
 
 TECH_TOPICS: tuple[str, ...] = (
     "Digital twins in manufacturing",
@@ -96,6 +97,15 @@ WORLD_TOPICS: tuple[str, ...] = (
 )
 
 TOPICS: tuple[str, ...] = TECH_TOPICS + LITERATURE_TOPICS + HISTORY_TOPICS + WORLD_TOPICS
+
+
+def pool_for_day(day: date, count: int, exclude: list[str] | None = None) -> list[str]:
+    """The same slice all day, a different one tomorrow. Seeded by the date alone."""
+    taken = set(exclude or ())
+    available = [t for t in TOPICS if t not in taken]
+    rng = random.Random(day.toordinal())
+    rng.shuffle(available)
+    return available[: max(0, count)]
 
 
 def pick_topic(recent: list[str], rng: random.Random | None = None) -> str:

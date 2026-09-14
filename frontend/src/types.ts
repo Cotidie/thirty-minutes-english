@@ -36,6 +36,12 @@ export interface SessionContent {
   vocabulary: VocabularyItem[]
 }
 
+export interface TopicListing {
+  topics: string[]
+  /** Today's news half has not landed yet; the list is pool topics for now. */
+  pending: boolean
+}
+
 export interface SessionSummary {
   id: number
   created_at: string
