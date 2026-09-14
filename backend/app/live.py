@@ -1,10 +1,11 @@
-"""Read-aloud coaching sessions on GPT-Live. The agent (prompt, voice, session
-shape) is defined in the read-aloud-coach folder; this module only fills the
-paragraph in and relays the browser's WebRTC offer to OpenAI."""
+"""GPT-Live voice agents. An agent (prompt, voice, session shape) is defined in
+its own folder outside this app; this module fills the template's placeholders
+in and relays the browser's WebRTC offer to OpenAI."""
 
 import copy
 import json
 import logging
+import re
 import urllib.error
 import urllib.request
 from pathlib import Path
@@ -14,7 +15,7 @@ log = logging.getLogger(__name__)
 
 LIVE_SESSIONS_URL = "https://api.openai.com/v1/live/sessions"
 INSTRUCTIONS_PLACEHOLDER = "<contents of prompts/live.md>"
-PARAGRAPH_PLACEHOLDER = "{{paragraph}}"
+PLACEHOLDER = re.compile(r"\{\{(\w+)\}\}")
 
 
 class LiveSessionError(Exception):
@@ -25,19 +26,22 @@ class LiveSessionError(Exception):
 
 
 class AgentDefinition:
-    """session.json plus prompts/live.md from the agent folder."""
+    """session.json plus prompts/live.md from an agent folder."""
 
     def __init__(self, agent_dir: Path):
         self.template = json.loads((agent_dir / "session.json").read_text())
         self.instructions = (agent_dir / "prompts" / "live.md").read_text()
 
-    def session_for(self, paragraph: str) -> dict:
+    def session_for(self, **values: str) -> dict:
+        """The session object with `instructions` filled in and every {{name}}
+        in the input messages replaced. An unknown placeholder is left alone."""
         session = copy.deepcopy(self.template)
         session["instructions"] = self.instructions
         for message in session.get("input", []):
             for part in message.get("content", []):
-                if PARAGRAPH_PLACEHOLDER in part.get("text", ""):
-                    part["text"] = part["text"].replace(PARAGRAPH_PLACEHOLDER, paragraph)
+                text = part.get("text")
+                if text:
+                    part["text"] = PLACEHOLDER.sub(lambda m: values.get(m.group(1), m.group(0)), text)
         return session
 
 
@@ -74,12 +78,13 @@ def _error_message(raw: bytes) -> str:
         return raw.decode(errors="replace")[:300]
 
 
-class ReadAloudCoach:
-    def __init__(self, definition: AgentDefinition, sessions: LiveSessions):
+class LiveAgent:
+    def __init__(self, name: str, definition: AgentDefinition, sessions: LiveSessions):
+        self.name = name
         self.definition = definition
         self.sessions = sessions
 
-    def start(self, paragraph: str, sdp: str) -> dict:
-        result = self.sessions.create(self.definition.session_for(paragraph), sdp)
-        log.info("read-aloud session %s started", result.get("session", {}).get("id"))
+    def start(self, sdp: str, **values: str) -> dict:
+        result = self.sessions.create(self.definition.session_for(**values), sdp)
+        log.info("%s session %s started", self.name, result.get("session", {}).get("id"))
         return result

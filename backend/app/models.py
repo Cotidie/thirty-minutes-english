@@ -80,19 +80,55 @@ class JobStatus(BaseModel):
     error: str | None = None
 
 
+def _not_blank(value: str) -> str:
+    if not value.strip():
+        raise ValueError("must not be blank")
+    return value
+
+
 class ReadAloudRequest(BaseModel):
     paragraph: str
     sdp: str
 
-    @field_validator("paragraph", "sdp")
-    @classmethod
-    def not_blank(cls, value: str) -> str:
-        if not value.strip():
-            raise ValueError("must not be blank")
-        return value
+    _check = field_validator("paragraph", "sdp")(_not_blank)
 
 
-class ReadAloudSession(BaseModel):
+class PhraseRequest(BaseModel):
+    sdp: str
+    topic: str | None = None
+
+    _check = field_validator("sdp")(_not_blank)
+
+
+class AskRequest(BaseModel):
+    session_id: int | None = None
+    user_text: str
+    coach_text: str
+    seconds: float = 0
+
+    _check = field_validator("user_text", "coach_text")(_not_blank)
+
+
+class PhraseCard(BaseModel):
+    """One reviewable answer, pulled out of a round's transcripts."""
+
+    asked: str
+    english: str
+    alternatives: list[str] = []
+    note: str = ""
+
+
+class Ask(BaseModel):
+    id: int
+    created_at: datetime
+    session_id: int | None
+    user_text: str
+    coach_text: str
+    seconds: float
+    card: PhraseCard | None = None
+
+
+class LiveSession(BaseModel):
     """Passthrough of OpenAI's session-creation answer: {session: {id}, transport: {type, sdp}}."""
 
     session: dict

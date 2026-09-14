@@ -6,13 +6,26 @@ from fastapi import FastAPI, HTTPException, Request, Response
 
 from app.generator import ClaudeCliGenerator, Generator
 from app.jobs import Executor, Job, JobRunner
-from app.models import CreateSessionRequest, JobStatus, ReadAloudRequest, ReadAloudSession, Session, SessionSummary
-from app.read_aloud import AgentDefinition, LiveSessionError, OpenAILiveSessions, ReadAloudCoach
+from app.live import AgentDefinition, LiveAgent, LiveSessionError, OpenAILiveSessions
+from app.models import (
+    Ask,
+    AskRequest,
+    CreateSessionRequest,
+    JobStatus,
+    LiveSession,
+    PhraseRequest,
+    ReadAloudRequest,
+    Session,
+    SessionSummary,
+)
 from app.store import SessionStore
 from app.topics import TOPICS, pick_topic
 
 ROOT = Path(__file__).resolve().parent.parent
-READ_ALOUD_AGENT_DIR = ROOT.parent.parent / "read-aloud-coach"
+AGENT_DIRS = {
+    "read-aloud": ("READ_ALOUD_AGENT_DIR", ROOT.parent.parent / "read-aloud-coach"),
+    "phrase": ("PHRASE_AGENT_DIR", ROOT.parent.parent / "phrase-coach"),
+}
 RECENT_TOPIC_WINDOW = 10
 
 
@@ -20,12 +33,24 @@ def create_app(
     store: SessionStore,
     generator: Generator,
     executor: Executor | None = None,
-    coach: ReadAloudCoach | None = None,
+    agents: dict[str, LiveAgent] | None = None,
 ) -> FastAPI:
     app = FastAPI(title="english-speaking-claude")
     app.state.store = store
     app.state.jobs = JobRunner(generator, store, executor)
-    app.state.coach = coach
+    app.state.agents = agents or {}
+
+    def live_agent(request: Request, name: str) -> LiveAgent:
+        agent = request.app.state.agents.get(name)
+        if agent is None:
+            raise HTTPException(status_code=503, detail=f"{name} is off: set OPENAI_API_KEY on the backend")
+        return agent
+
+    def start_live(agent: LiveAgent, sdp: str, **values: str) -> dict:
+        try:
+            return agent.start(sdp, **values)
+        except LiveSessionError as e:
+            raise HTTPException(status_code=502, detail=f"GPT-Live session failed: {e.message}") from e
 
     def status_of(job: Job, runner: JobRunner) -> JobStatus:
         return JobStatus(
@@ -79,25 +104,42 @@ def create_app(
             raise HTTPException(status_code=404, detail="session not found")
         return Response(status_code=204)
 
-    @app.post("/api/read-aloud/sessions", response_model=ReadAloudSession, status_code=201)
+    @app.post("/api/read-aloud/sessions", response_model=LiveSession, status_code=201)
     def start_read_aloud(body: ReadAloudRequest, request: Request) -> dict:
-        coach: ReadAloudCoach | None = request.app.state.coach
-        if coach is None:
-            raise HTTPException(status_code=503, detail="read-aloud is off: set OPENAI_API_KEY on the backend")
-        try:
-            return coach.start(body.paragraph, body.sdp)
-        except LiveSessionError as e:
-            raise HTTPException(status_code=502, detail=f"GPT-Live session failed: {e.message}") from e
+        return start_live(live_agent(request, "read-aloud"), body.sdp, paragraph=body.paragraph)
+
+    @app.post("/api/phrase/sessions", response_model=LiveSession, status_code=201)
+    def start_phrase(body: PhraseRequest, request: Request) -> dict:
+        return start_live(live_agent(request, "phrase"), body.sdp, topic=body.topic or "an English conversation")
+
+    @app.post("/api/asks", response_model=Ask, status_code=201)
+    def add_ask(body: AskRequest, request: Request) -> Ask:
+        store: SessionStore = request.app.state.store
+        if body.session_id is not None and store.get(body.session_id) is None:
+            raise HTTPException(status_code=404, detail="session not found")
+        return store.add_ask(body.session_id, body.user_text, body.coach_text, body.seconds)
+
+    @app.get("/api/asks", response_model=list[Ask])
+    def list_asks(request: Request, session_id: int | None = None) -> list[Ask]:
+        return request.app.state.store.list_asks(session_id)
 
     return app
 
 
-def read_aloud_coach() -> ReadAloudCoach | None:
+def live_agents() -> dict[str, LiveAgent]:
+    """Every agent whose folder is present, once an API key is configured."""
     api_key = os.environ.get("OPENAI_API_KEY", "").strip()
     if not api_key:
-        return None
-    agent_dir = Path(os.environ.get("READ_ALOUD_AGENT_DIR", READ_ALOUD_AGENT_DIR))
-    return ReadAloudCoach(AgentDefinition(agent_dir), OpenAILiveSessions(api_key))
+        return {}
+    sessions = OpenAILiveSessions(api_key)
+    agents = {}
+    for name, (env_var, default) in AGENT_DIRS.items():
+        agent_dir = Path(os.environ.get(env_var, default))
+        if (agent_dir / "session.json").is_file():
+            agents[name] = LiveAgent(name, AgentDefinition(agent_dir), sessions)
+        else:
+            logging.getLogger(__name__).warning("%s agent folder not found: %s", name, agent_dir)
+    return agents
 
 
 def default_app() -> FastAPI:
@@ -109,7 +151,7 @@ def default_app() -> FastAPI:
             effort=os.environ.get("CLAUDE_EFFORT", "xhigh"),
             skills=tuple(s for s in os.environ.get("CLAUDE_SKILLS", "").split(",") if s.strip()),
         ),
-        coach=read_aloud_coach(),
+        agents=live_agents(),
     )
 
 

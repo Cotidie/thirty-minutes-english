@@ -1,5 +1,13 @@
+import pytest
+
+from app.models import PhraseCard
 from app.store import SessionStore
 from tests.conftest import sample_content
+
+
+@pytest.fixture
+def store(tmp_path) -> SessionStore:
+    return SessionStore(tmp_path / "s.db")
 
 
 def test_create_then_get_roundtrip(tmp_path, content):
@@ -54,3 +62,34 @@ def test_used_items_collects_distinct_phrases_and_words_newest_first(tmp_path):
 
 def test_used_items_is_empty_on_fresh_store(tmp_path):
     assert not SessionStore(tmp_path / "s.db").used_items()
+
+
+def test_asks_round_trip_newest_first(store, content):
+    session = store.create(content)
+    store.add_ask(session.id, "눈치 좀 챙겨", "Read the room.", 12.5)
+    store.add_ask(None, "I have much work", "I'm swamped.", 9)
+
+    everything = store.list_asks()
+    assert [a.user_text for a in everything] == ["I have much work", "눈치 좀 챙겨"]
+    assert everything[0].session_id is None
+    assert everything[1].seconds == 12.5
+    assert [a.user_text for a in store.list_asks(session.id)] == ["눈치 좀 챙겨"]
+
+
+def test_cards_are_stored_per_ask(store):
+    ask = store.add_ask(None, "눈치 좀 챙겨", "Read the room.", 12)
+    assert store.list_asks()[0].card is None
+
+    store.set_ask_card(ask.id, PhraseCard(asked="눈치 좀 챙겨", english="Read the room.", note="friends or coworkers"))
+    saved = store.list_asks()[0].card
+    assert saved is not None and saved.english == "Read the room."
+    assert saved.alternatives == []
+
+
+def test_deleting_a_session_takes_its_asks(store, content):
+    session = store.create(content)
+    store.add_ask(session.id, "q", "a", 1)
+    store.add_ask(None, "loose", "a", 1)
+
+    store.delete(session.id)
+    assert [a.user_text for a in store.list_asks()] == ["loose"]
