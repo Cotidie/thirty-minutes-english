@@ -156,6 +156,24 @@ class ExampleSessionRequest(BaseModel):
     _check = field_validator("sdp", "expression", "meaning")(_not_blank)
 
 
+class ExampleFeedbackRequest(BaseModel):
+    """One sentence a reader made with a target, for the coach to say back and judge."""
+
+    expression: str
+    meaning: str
+    usage_note: str = ""
+    user_text: str
+
+    _check = field_validator("expression", "meaning", "user_text")(_not_blank)
+
+
+class ExampleFeedback(BaseModel):
+    """The sentence the native way, and one line on the change that matters most."""
+
+    paraphrase: str
+    feedback: str
+
+
 class ExampleRequest(BaseModel):
     session_id: int
     expression: str

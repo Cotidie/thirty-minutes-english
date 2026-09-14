@@ -17,6 +17,8 @@ services:
       SUMMARY_MODEL: ${SUMMARY_MODEL:-gpt-5.6-luna}
       TOPICS_MODEL: ${TOPICS_MODEL:-sonnet}
       TOPICS_EFFORT: ${TOPICS_EFFORT:-medium}
+      EXAMPLE_MODEL: ${EXAMPLE_MODEL:-opus}
+      EXAMPLE_EFFORT: ${EXAMPLE_EFFORT:-low}
     volumes:
       - ./backend/data:/data
       - ../read-aloud-coach:/agents/read-aloud-coach:ro

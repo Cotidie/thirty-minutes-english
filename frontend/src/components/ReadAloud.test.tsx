@@ -8,7 +8,7 @@ import { ReadAloud } from './ReadAloud'
 
 vi.mock('../api', () => ({ api: { addReading: vi.fn(async () => ({})) } }))
 
-const connection = { microphone: {} as MediaStream, finish: vi.fn(), close: vi.fn(), dispose: vi.fn() }
+const connection = { microphone: {} as MediaStream, finish: vi.fn(), say: vi.fn(), close: vi.fn(), dispose: vi.fn() }
 let emit: (e: LiveEvent) => void = () => undefined
 let drop: () => void = () => undefined
 type RoundOptions = Omit<LiveOptions, 'start'>

@@ -144,3 +144,9 @@ export interface Ask {
   seconds: number
   card: PhraseCard | null
 }
+
+/** A sentence said back the native way, and one line on the change that matters most. */
+export interface ExampleFeedback {
+  paraphrase: string
+  feedback: string
+}

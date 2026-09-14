@@ -640,6 +640,16 @@ a {
   line-height: 1.45;
 }
 
+/* The written answer: the native version, then the one line of feedback. */
+.practice-answer {
+  display: grid;
+  gap: 0.15rem;
+}
+
+.practice-answer span + span {
+  color: var(--muted);
+}
+
 /* ↻ and ✕ in the slip's top bar */
 .slip-icon {
   border: 1px solid var(--line);

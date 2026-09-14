@@ -30,16 +30,20 @@ class ClaudeCli:
         self,
         model: str = "opus",
         effort: str = "xhigh",
-        mcp_config: dict = FIRECRAWL_MCP,
+        mcp_config: dict | None = FIRECRAWL_MCP,
         timeout_s: float = 300,
+        tools: tuple[str, ...] = BUILTIN_TOOLS,
     ) -> None:
         self.model = model
         self.effort = effort
         self.mcp_config = mcp_config
         self.timeout_s = timeout_s
+        self.tools = tools
 
     def build_command(self, schema: dict) -> list[str]:
-        return [
+        """`--tools ""` runs with no tools at all; without an MCP config no server is loaded either."""
+        allowed = self.tools + (FIRECRAWL_TOOLS if self.mcp_config else ())
+        cmd = [
             "claude",
             "-p",
             "--model",
@@ -52,16 +56,15 @@ class ClaudeCli:
             "--json-schema",
             json.dumps(schema),
             "--tools",
-            ",".join(BUILTIN_TOOLS),
-            "--allowedTools",
-            ",".join(BUILTIN_TOOLS + FIRECRAWL_TOOLS),
-            "--setting-sources",
-            "user",
-            "--strict-mcp-config",
-            "--mcp-config",
-            json.dumps(self.mcp_config),
-            "--no-session-persistence",
+            ",".join(self.tools),
         ]
+        if allowed:
+            cmd += ["--allowedTools", ",".join(allowed)]
+        cmd += ["--setting-sources", "user", "--strict-mcp-config"]
+        if self.mcp_config:
+            cmd += ["--mcp-config", json.dumps(self.mcp_config)]
+        cmd.append("--no-session-persistence")
+        return cmd
 
     def run(self, prompt: str, schema: dict, on_event: OnEvent | None = None) -> dict:
         """The result envelope of one run. Raises GenerationError for every failure."""

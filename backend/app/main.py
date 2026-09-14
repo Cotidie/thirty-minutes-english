@@ -5,7 +5,9 @@ from pathlib import Path
 from fastapi import FastAPI, HTTPException, Request, Response
 
 from app.cards import AskReview, CorrectionExtractor, Extractor, PhraseCardExtractor, ReadingReview
+from app.claude_cli import GenerationError
 from app.daily_topics import ClaudeTopicSource, DailyTopics, TopicSource
+from app.example_feedback import ExampleCoach
 from app.generator import ClaudeCliGenerator, Generator
 from app.jobs import Executor, Job, JobRunner
 from app.live import AgentDefinition, LiveAgent, LiveSessionError, OpenAILiveSessions
@@ -17,6 +19,8 @@ from app.models import (
     ReadingRequest,
     CreateSessionRequest,
     Example,
+    ExampleFeedback,
+    ExampleFeedbackRequest,
     ExampleRequest,
     ExampleSessionRequest,
     JobStatus,
@@ -47,6 +51,7 @@ def create_app(
     extractor: Extractor | None = None,
     corrections: Extractor | None = None,
     topic_source: TopicSource | None = None,
+    example_coach: ExampleCoach | None = None,
 ) -> FastAPI:
     app = FastAPI(title="english-speaking-claude")
     app.state.store = store
@@ -55,6 +60,7 @@ def create_app(
     app.state.agents = agents or {}
     app.state.asks = AskReview(store, extractor)
     app.state.readings = ReadingReview(store, corrections)
+    app.state.example_coach = example_coach
 
     def live_agent(request: Request, name: str) -> LiveAgent:
         agent = request.app.state.agents.get(name)
@@ -165,6 +171,16 @@ def create_app(
             usage_note=body.usage_note or "none",
         )
 
+    @app.post("/api/example/feedback", response_model=ExampleFeedback)
+    def example_feedback(body: ExampleFeedbackRequest, request: Request) -> ExampleFeedback:
+        coach: ExampleCoach | None = request.app.state.example_coach
+        if coach is None:
+            raise HTTPException(status_code=503, detail="example coach is off: the example-coach folder is missing")
+        try:
+            return coach.feedback(body.expression, body.meaning, body.usage_note, body.user_text)
+        except GenerationError as e:
+            raise HTTPException(status_code=502, detail=f"feedback failed: {e}") from e
+
     @app.post("/api/examples", response_model=Example, status_code=201)
     def add_example(body: ExampleRequest, request: Request) -> Example:
         store: SessionStore = request.app.state.store
@@ -246,7 +262,17 @@ def default_app() -> FastAPI:
         ),
         extractor=_extractor("phrase", "cards.schema.json", PhraseCardExtractor),
         corrections=_extractor("read-aloud", "feedback.schema.json", CorrectionExtractor),
+        example_coach=_example_coach(),
     )
+
+
+def _example_coach() -> ExampleCoach | None:
+    """The text half of the example coach, once its folder carries the feedback prompt."""
+    agent_dir = Path(os.environ.get(*AGENT_DIRS["example"]))
+    if not (agent_dir / "prompts" / "feedback.md").is_file():
+        logging.getLogger(__name__).warning("example-coach feedback prompt not found: %s", agent_dir)
+        return None
+    return ExampleCoach.with_cli(agent_dir, os.environ.get("EXAMPLE_MODEL", "opus"), os.environ.get("EXAMPLE_EFFORT", "low"))
 
 
 app = default_app()

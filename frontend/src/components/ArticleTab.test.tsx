@@ -4,7 +4,7 @@ import { describe, expect, it, vi } from 'vitest'
 import { ArticleTab } from './ArticleTab'
 
 vi.mock('../lib/liveClient', () => ({
-  connectReadAloud: vi.fn(async () => ({ microphone: {}, finish: vi.fn(), close: vi.fn(), dispose: vi.fn() })),
+  connectReadAloud: vi.fn(async () => ({ microphone: {}, finish: vi.fn(), say: vi.fn(), close: vi.fn(), dispose: vi.fn() })),
 }))
 
 const article = {
