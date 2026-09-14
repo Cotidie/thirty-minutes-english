@@ -60,6 +60,8 @@ export interface TopicListing {
   topics: Topic[]
   /** Today's news half has not landed yet; the list is pool topics for now. */
   pending: boolean
+  /** Why the last news fetch brought nothing, or null once one succeeds. */
+  error: string | null
 }
 
 export interface SessionSummary {

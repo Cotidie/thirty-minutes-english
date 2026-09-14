@@ -42,3 +42,11 @@ def test_text_after_finalizing_does_not_regress():
     t.feed(assistant(tool_use("StructuredOutput")))
     t.feed(assistant({"type": "text", "text": "done"}))
     assert t.progress.stage == Stage.FINALIZING
+
+
+def test_builtin_web_search_counts_as_a_search():
+    seen: list[Progress] = []
+    t = StreamTracker(seen.append)
+    t.feed(assistant(tool_use("WebSearch")))
+    t.feed(assistant(tool_use("WebFetch")))
+    assert seen == [Progress(Stage.SEARCHING, 1), Progress(Stage.SEARCHING, 2)]

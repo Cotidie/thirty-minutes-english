@@ -35,6 +35,10 @@ def texts(topics) -> list[str]:
     return [t.text for t in topics]
 
 
+def parts(listing) -> tuple[list, bool]:
+    return listing.topics, listing.pending
+
+
 def test_pool_slice_holds_all_day_and_turns_over_at_midnight():
     today = pool_for_day(date(2026, 9, 14), 6)
     assert today == pool_for_day(date(2026, 9, 14), 6)
@@ -52,13 +56,13 @@ def test_the_day_starts_on_the_pool_then_keeps_what_the_news_gave(store):
     source = FakeSource()
     daily = DailyTopics(store, source)
 
-    topics, pending = daily.listing()
-    assert pending is True
+    topics, pending = parts(daily.listing())
+    assert pending is False  # nothing asked for yet
     assert len(topics) == FRESH_COUNT + POOL_COUNT
     assert not set(texts(topics)) & set(NEWS)
 
     daily.ensure_fetched()
-    topics, pending = daily.listing()
+    topics, pending = parts(daily.listing())
     assert pending is False
     assert texts(topics[:FRESH_COUNT]) == NEWS
     assert {t.category for t in topics[:FRESH_COUNT]} == {Category.NEWS}
@@ -81,13 +85,14 @@ def test_an_empty_fetch_is_not_cached_and_is_tried_again(store):
     daily = DailyTopics(store, source)
     daily.ensure_fetched()
 
-    topics, pending = daily.listing()
+    topics, pending = parts(daily.listing())
     assert set(topics) <= set(TOPICS)
-    assert pending is True
+    assert pending is False  # nothing is running until someone asks again
+    assert "no stories" in daily.listing().error
 
     source.fetch = FakeSource().fetch  # type: ignore[method-assign]
     daily.ensure_fetched()
-    assert texts(daily.listing()[0][:FRESH_COUNT]) == NEWS
+    assert texts(daily.listing().topics[:FRESH_COUNT]) == NEWS
 
 
 def test_a_failed_fetch_leaves_a_full_list_of_pool_topics(store):
@@ -95,16 +100,17 @@ def test_a_failed_fetch_leaves_a_full_list_of_pool_topics(store):
     daily = DailyTopics(store, source)
     daily.ensure_fetched()
 
-    topics, pending = daily.listing()
+    topics, pending = parts(daily.listing())
     assert len(topics) == FRESH_COUNT + POOL_COUNT
     assert set(topics) <= set(TOPICS)
-    assert pending is True  # it may still succeed later today
+    assert pending is False  # the next request may try again, but nothing is running now
+    assert daily.listing().error == "claude timed out after 180s"
 
 
 def test_without_a_source_nothing_is_pending(store):
     daily = DailyTopics(store, None)
     daily.ensure_fetched()
-    topics, pending = daily.listing()
+    topics, pending = parts(daily.listing())
     assert pending is False
     assert len(topics) == FRESH_COUNT + POOL_COUNT
 
@@ -128,11 +134,11 @@ def test_refresh_redeals_the_pool_and_fetches_the_news_again(store):
     source = FakeSource()
     daily = DailyTopics(store, source)
     daily.ensure_fetched()
-    before, _ = daily.listing()
+    before, _ = parts(daily.listing())
 
     source.fetch = lambda count: [f"later news {i}" for i in range(count)]  # type: ignore[method-assign]
     daily.refresh()
-    after, pending = daily.listing()
+    after, pending = parts(daily.listing())
     assert pending is False  # the inline fetch already landed
     assert texts(after[:FRESH_COUNT]) == [f"later news {i}" for i in range(FRESH_COUNT)]
     assert after[FRESH_COUNT:] != before[FRESH_COUNT:]
@@ -141,9 +147,9 @@ def test_refresh_redeals_the_pool_and_fetches_the_news_again(store):
 
 def test_refresh_without_a_source_still_redeals_the_pool(store):
     daily = DailyTopics(store, None)
-    before, _ = daily.listing()
+    before, _ = parts(daily.listing())
     daily.refresh()
-    after, pending = daily.listing()
+    after, pending = parts(daily.listing())
     assert after != before
     assert pending is False
 
@@ -174,3 +180,36 @@ def test_refresh_endpoint_reports_pending_until_the_news_lands(tmp_path):
         for fn, args in executor.queued:
             fn(*args)
         assert c.get("/api/topics").json()["pending"] is False
+
+
+def test_pending_is_true_only_while_a_fetch_is_in_flight(store):
+    class HeldExecutor:
+        def __init__(self):
+            self.queued = []
+
+        def submit(self, fn, /, *args):
+            self.queued.append((fn, args))
+
+    source = FakeSource()
+    source.fetch = lambda count: []  # type: ignore[method-assign]
+    executor = HeldExecutor()
+    daily = DailyTopics(store, source, executor)
+
+    daily.ensure_fetched()
+    assert daily.listing().pending is True
+    daily.ensure_fetched()
+    assert len(executor.queued) == 1  # one fetch at a time
+
+    for fn, args in executor.queued:
+        fn(*args)
+    assert daily.listing().pending is False  # it failed, and nothing else is running
+
+
+def test_endpoint_reports_the_failure_until_a_fetch_succeeds(tmp_path):
+    store = SessionStore(tmp_path / "s.db")
+    source = FakeSource(GenerationError("claude exited 1: no such tool"))
+    app = create_app(store, FakeGenerator(), InlineExecutor(), topic_source=source)
+    with TestClient(app) as c:
+        assert c.get("/api/topics").json()["error"] == "claude exited 1: no such tool"
+        source.error = None
+        assert c.post("/api/topics/refresh").json()["error"] is None

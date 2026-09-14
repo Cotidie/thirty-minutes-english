@@ -7,7 +7,7 @@ from datetime import UTC, date, datetime
 from typing import Protocol
 
 from app.claude_cli import ClaudeCli, GenerationError, structured_output
-from app.models import Category, Topic
+from app.models import Category, Topic, TopicListing
 from app.store import SessionStore
 from app.topics import pool_for_day
 
@@ -49,8 +49,8 @@ field. At least one should sit near technology, industry or science. Skip anythi
 party politics or a running war's daily movements, and skip celebrity news.
 
 Run at most 4 searches, and spend one of them on what the major outlets are leading with right now. \
-If you have no web search tool in this session, or the searches return nothing usable, return an empty \
-list. Never invent a story, and never return placeholder text or a note about the tools you were given. \
+Search with firecrawl_search when it is offered; if it is missing or fails, use WebSearch instead. \
+If neither works, or the searches return nothing usable, return an empty list. Never invent a story, and never return placeholder text or a note about the tools you were given. \
 Return only the structured output."""
 
 
@@ -75,28 +75,28 @@ class DailyTopics:
         self.store = store
         self.source = source
         self._executor = executor
-        self._running: str | None = None
-        # A manual refresh: the day whose news half is being fetched again, and
-        # how many times the pool half has been redealt today.
-        self._refreshing: str | None = None
+        # The day whose news fetch is running right now, and how many times
+        # the pool half has been redealt today.
+        self._inflight: str | None = None
         self._salt = 0
+        # Why the last fetch brought nothing, for the screen. Cleared when one succeeds.
+        self._error: str | None = None
 
     def today(self) -> date:
         return datetime.now(UTC).date()
 
-    def listing(self) -> tuple[list[Topic], bool]:
-        """The day's topics, and whether a fetch is still on its way."""
+    def listing(self) -> TopicListing:
+        """The day's topics, whether a fetch is still on its way, and the last failure."""
         day = self.today()
         fresh = self.store.get_daily_topics(day.isoformat()) or []
         pool = pool_for_day(day, POOL_COUNT + FRESH_COUNT - len(fresh), exclude=fresh, salt=self._salt)
-        pending = self.source is not None and (not fresh or self._refreshing == day.isoformat())
         news = [Topic(text=t, category=Category.NEWS) for t in fresh]
-        return news + pool, pending
+        return TopicListing(topics=news + pool, pending=self._inflight == day.isoformat(), error=self._error)
 
     def ensure_fetched(self) -> None:
         """Starts the day's fetch if it has not run yet. Safe to call on every request."""
         day = self.today().isoformat()
-        if self.source is None or self._running == day or self.store.get_daily_topics(day) is not None:
+        if self.source is None or self._inflight == day or self.store.get_daily_topics(day) is not None:
             return
         self._start(day)
 
@@ -104,13 +104,12 @@ class DailyTopics:
         """Deals a new pool half now and fetches the news half again in the background."""
         day = self.today().isoformat()
         self._salt += 1
-        if self.source is None or self._refreshing == day:
+        if self.source is None or self._inflight == day:
             return
-        self._refreshing = day
         self._start(day)
 
     def _start(self, day: str) -> None:
-        self._running = day
+        self._inflight = day
         if self._executor is None:
             self._fetch(day)
         else:
@@ -119,23 +118,20 @@ class DailyTopics:
     def _fetch(self, day: str) -> None:
         assert self.source is not None
         try:
-            topics = self.source.fetch(FRESH_COUNT)
+            self._keep(day, self.source.fetch(FRESH_COUNT))
         except (GenerationError, KeyError, TypeError) as e:
+            self._error = str(e)
             log.warning("could not fetch today's topics, staying on the pool: %s", e)
-            self._done(day, fetched=False)
-            return
+        finally:
+            self._inflight = None
+
+    def _keep(self, day: str, topics: list[str]) -> None:
         if not topics:
-            # No web access, or nothing cleared the bar. Leave the day unset so a
-            # later request tries again rather than caching an empty news half.
+            # Nothing cleared the bar, or the CLI had no working search tool. Leave the
+            # day unset so a later request tries again rather than caching an empty half.
+            self._error = "the search brought back no stories (is web search working for the claude CLI?)"
             log.warning("no news topics came back for %s, staying on the pool", day)
-            self._done(day, fetched=False)
             return
+        self._error = None
         self.store.set_daily_topics(day, topics)
         log.info("topics for %s: %d from the news", day, len(topics))
-        self._done(day, fetched=True)
-
-    def _done(self, day: str, fetched: bool) -> None:
-        if not fetched:
-            self._running = None
-        if self._refreshing == day:
-            self._refreshing = None

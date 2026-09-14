@@ -13,8 +13,10 @@ from collections.abc import Callable
 FIRECRAWL_MCP: dict = {
     "mcpServers": {"firecrawl": {"type": "http", "url": "https://mcp.firecrawl.dev/v2/mcp-oauth"}}
 }
-BUILTIN_TOOLS = ("Skill", "Read")
-WEB_TOOLS = ("mcp__firecrawl__firecrawl_search", "mcp__firecrawl__firecrawl_scrape")
+# WebSearch and WebFetch are the fallback when the firecrawl MCP is missing or
+# its OAuth token has lapsed; the prompts say to try firecrawl first.
+BUILTIN_TOOLS = ("Skill", "Read", "WebSearch", "WebFetch")
+FIRECRAWL_TOOLS = ("mcp__firecrawl__firecrawl_search", "mcp__firecrawl__firecrawl_scrape")
 
 OnEvent = Callable[[dict], None]
 
@@ -52,7 +54,7 @@ class ClaudeCli:
             "--tools",
             ",".join(BUILTIN_TOOLS),
             "--allowedTools",
-            ",".join(BUILTIN_TOOLS + WEB_TOOLS),
+            ",".join(BUILTIN_TOOLS + FIRECRAWL_TOOLS),
             "--setting-sources",
             "user",
             "--strict-mcp-config",

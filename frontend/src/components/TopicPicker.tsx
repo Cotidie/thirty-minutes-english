@@ -5,6 +5,8 @@ interface Props {
   suggestions: Topic[]
   /** The news half is still on its way; the list may change under you. */
   pending: boolean
+  /** Why the news half is missing, when the last fetch failed. */
+  error?: string | null
   busy: boolean
   onGenerate: (topic: string | null) => void
   onRefresh: () => void
@@ -21,7 +23,7 @@ const CATEGORY_LABELS: Record<Category, string> = {
 
 const CATEGORY_ORDER: Category[] = ['news', 'tech', 'literature', 'history', 'world']
 
-export function TopicPicker({ suggestions, pending, busy, onGenerate, onRefresh }: Props) {
+export function TopicPicker({ suggestions, pending, error, busy, onGenerate, onRefresh }: Props) {
   const [topic, setTopic] = useState('')
   // The server decides how many the day offers, and in what order.
   const shown = suggestions
@@ -50,6 +52,11 @@ export function TopicPicker({ suggestions, pending, busy, onGenerate, onRefresh 
           ↻
         </button>
       </div>
+      {error && !pending && (
+        <p className="topic-notice" role="status">
+          Today's news could not be fetched: {error}. These are all from the standing pool.
+        </p>
+      )}
       <div className="topic-row">
         <input
           id="topic"

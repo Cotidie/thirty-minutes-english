@@ -127,8 +127,8 @@ For each give the phrase, a plain-English meaning, a usage note of at most 20 wo
 one thing learners get wrong; no full sentences needed), and 2 example sentences that sound like real speech.
 
 2. article: a short article of 250 to 350 words on the topic, written for a smart general reader. \
-If web search tools are available, run at most 3 searches to ground the article in accurate, current \
-facts (dates, names, figures) and prefer a recent development or debate as the angle; never invent \
+Run at most 3 searches, with firecrawl_search when it is offered and WebSearch when it is missing or \
+fails, to ground the article in accurate, current facts (dates, names, figures) and prefer a recent development or debate as the angle; never invent \
 specifics you did not verify. In sources, list only the web pages you actually drew on (page title \
 and exact URL from the search results); leave it empty if you used none. \
 Use 3 to 5 paragraphs separated by blank lines. Take a clear angle so there is something to discuss. \

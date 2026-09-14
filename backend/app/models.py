@@ -103,10 +103,11 @@ class Stars(BaseModel):
 
 
 class TopicListing(BaseModel):
-    """The day's suggestions, and whether the news half is still on its way."""
+    """The day's suggestions, whether the news half is still on its way, and why the last fetch failed."""
 
     topics: list[Topic]
     pending: bool
+    error: str | None = None
 
 
 class CreateSessionRequest(BaseModel):

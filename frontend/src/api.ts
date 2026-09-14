@@ -20,6 +20,8 @@ export const api = {
   startGeneration: (topic: string | null) =>
     request<JobStatus>('/api/sessions', { method: 'POST', body: JSON.stringify({ topic }) }),
   getJob: (id: string) => request<JobStatus>(`/api/jobs/${id}`),
+  /** Generations still running on the server, oldest first. */
+  listJobs: () => request<JobStatus[]>('/api/jobs'),
   deleteSession: (id: number) => request<void>(`/api/sessions/${id}`, { method: 'DELETE' }),
   getStars: (id: number) => request<Stars>(`/api/sessions/${id}/stars`),
   setStars: (id: number, stars: Stars) =>

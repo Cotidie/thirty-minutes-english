@@ -185,3 +185,32 @@ def test_examples_stack_under_a_session_in_the_order_made(client):
 
     client.delete(f"/api/sessions/{sid}")
     assert client.get("/api/examples", params={"session_id": sid}).json() == []
+
+
+class HeldExecutor:
+    """Keeps submitted jobs unstarted until the test releases them."""
+
+    def __init__(self):
+        self.held: list = []
+
+    def submit(self, fn, /, *args):
+        self.held.append((fn, args))
+
+    def release(self):
+        for fn, args in self.held:
+            fn(*args)
+        self.held.clear()
+
+
+def test_jobs_endpoint_lists_only_running_jobs(tmp_path):
+    executor = HeldExecutor()
+    app = create_app(SessionStore(tmp_path / "s.db"), FakeGenerator(), executor)
+    with TestClient(app) as client:
+        assert client.get("/api/jobs").json() == []
+        first = create(client, "First")
+        second = create(client, "Second")
+        assert [j["id"] for j in client.get("/api/jobs").json()] == [first["id"], second["id"]]
+        assert client.get("/api/jobs").json()[0]["status"] == "running"
+
+        executor.release()
+        assert client.get("/api/jobs").json() == []

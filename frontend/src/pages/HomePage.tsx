@@ -1,55 +1,33 @@
-import { useEffect, useState } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
-import { api } from '../api'
-import { GenerationProgress } from '../components/GenerationProgress'
-import { TopicPicker } from '../components/TopicPicker'
-import type { JobStatus } from '../lib/progress'
-import { useTopics } from '../lib/useTopics'
-import type { SessionSummary } from '../types'
+import { useCallback, useEffect, useState } from "react";
+import { Link, useNavigate } from "react-router-dom";
+import { api } from "../api";
+import { GenerationProgress } from "../components/GenerationProgress";
+import { TopicPicker } from "../components/TopicPicker";
+import { useGenerationJob } from "../lib/useGenerationJob";
+import { useTopics } from "../lib/useTopics";
+import type { SessionSummary } from "../types";
 
 export function HomePage() {
-  const navigate = useNavigate()
-  const { topics, pending, refresh } = useTopics()
-  const [sessions, setSessions] = useState<SessionSummary[]>([])
-  const [job, setJob] = useState<JobStatus | null>(null)
-  const [error, setError] = useState<string | null>(null)
-  const busy = job !== null && job.status === 'running'
+  const navigate = useNavigate();
+  const { topics, pending, error: topicError, refresh } = useTopics();
+  const open = useCallback(
+    (sessionId: number) => navigate(`/s/${sessionId}`),
+    [navigate],
+  );
+  const { job, running: busy, error, start: generate } = useGenerationJob(open);
+  const [sessions, setSessions] = useState<SessionSummary[]>([]);
+  const [loadError, setLoadError] = useState<string | null>(null);
 
   useEffect(() => {
-    api.listSessions().then(setSessions).catch((e: Error) => setError(e.message))
-  }, [])
-
-  useEffect(() => {
-    if (!busy || !job) return
-    const timer = setInterval(() => {
-      api
-        .getJob(job.id)
-        .then((next) => {
-          setJob(next)
-          if (next.status === 'done' && next.session_id !== null) navigate(`/s/${next.session_id}`)
-          if (next.status === 'failed') setError(next.error ?? 'generation failed')
-        })
-        .catch((e: Error) => {
-          setError(e.message)
-          setJob(null)
-        })
-    }, 1000)
-    return () => clearInterval(timer)
-  }, [busy, job, navigate])
-
-  async function generate(topic: string | null) {
-    setError(null)
-    try {
-      setJob(await api.startGeneration(topic))
-    } catch (e) {
-      setError((e as Error).message)
-      setJob(null)
-    }
-  }
+    api
+      .listSessions()
+      .then(setSessions)
+      .catch((e: Error) => setLoadError(e.message));
+  }, []);
 
   async function remove(id: number) {
-    await api.deleteSession(id)
-    setSessions((s) => s.filter((x) => x.id !== id))
+    await api.deleteSession(id);
+    setSessions((s) => s.filter((x) => x.id !== id));
   }
 
   return (
@@ -57,13 +35,24 @@ export function HomePage() {
       <header className="home-header">
         <h1 className="brand">Thirty minutes of English</h1>
         <p className="lede">
-          Six expressions, one short article, twelve words. Everything you two need to talk for half an hour.
+          Six expressions, one short article, twelve words. Everything you two
+          need to talk for half an hour.
         </p>
       </header>
 
-      <TopicPicker suggestions={topics} pending={pending} busy={busy} onGenerate={generate} onRefresh={refresh} />
-      {job && job.status !== 'failed' && <GenerationProgress job={job} />}
+      <TopicPicker
+        suggestions={topics}
+        pending={pending}
+        error={topicError}
+        busy={busy}
+        onGenerate={generate}
+        onRefresh={refresh}
+      />
+      {job && job.status !== "failed" && <GenerationProgress job={job} />}
       {error && <p className="error">Could not create the session: {error}</p>}
+      {loadError && (
+        <p className="error">Could not load past sessions: {loadError}</p>
+      )}
 
       <section className="history">
         <h2 className="history-title">
@@ -73,7 +62,9 @@ export function HomePage() {
           </Link>
         </h2>
         {sessions.length === 0 ? (
-          <p className="empty">Nothing yet. Generate the first session above.</p>
+          <p className="empty">
+            Nothing yet. Generate the first session above.
+          </p>
         ) : (
           <ul className="history-list">
             {sessions.map((s) => (
@@ -83,7 +74,12 @@ export function HomePage() {
                   {s.title}
                   <span className="history-topic">{s.topic}</span>
                 </Link>
-                <button type="button" className="btn btn-link" onClick={() => remove(s.id)} aria-label={`Delete ${s.title}`}>
+                <button
+                  type="button"
+                  className="btn btn-link"
+                  onClick={() => remove(s.id)}
+                  aria-label={`Delete ${s.title}`}
+                >
                   Delete
                 </button>
               </li>
@@ -92,9 +88,12 @@ export function HomePage() {
         )}
       </section>
     </main>
-  )
+  );
 }
 
 function formatDate(iso: string): string {
-  return new Date(iso).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })
+  return new Date(iso).toLocaleDateString(undefined, {
+    month: "short",
+    day: "numeric",
+  });
 }

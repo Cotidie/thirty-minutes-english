@@ -75,6 +75,11 @@ class JobRunner:
         with self._lock:
             return self._jobs.get(job_id)
 
+    def running(self) -> list[Job]:
+        """Unfinished jobs, oldest first."""
+        with self._lock:
+            return [job for job in self._jobs.values() if job.status == "running"]
+
     def expected_seconds(self) -> float:
         with self._lock:
             return median(self._durations) if self._durations else self.DEFAULT_EXPECTED_SECONDS

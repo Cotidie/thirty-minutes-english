@@ -50,11 +50,14 @@ def test_prompt_states_counts_and_relaxed_vocabulary_rule():
     assert "even if they do not appear in the article" in prompt
 
 
-def test_build_command_exposes_skill_read_and_firecrawl_only():
+def test_build_command_exposes_skill_read_builtin_web_and_firecrawl():
     cmd = ClaudeCliGenerator(model="sonnet").build_command()
-    assert cmd[cmd.index("--tools") + 1] == "Skill,Read"
+    assert cmd[cmd.index("--tools") + 1] == "Skill,Read,WebSearch,WebFetch"
     allowed = cmd[cmd.index("--allowedTools") + 1].split(",")
-    assert allowed == ["Skill", "Read", "mcp__firecrawl__firecrawl_search", "mcp__firecrawl__firecrawl_scrape"]
+    assert allowed == [
+        "Skill", "Read", "WebSearch", "WebFetch",
+        "mcp__firecrawl__firecrawl_search", "mcp__firecrawl__firecrawl_scrape",
+    ]
     assert cmd[cmd.index("--setting-sources") + 1] == "user"
     assert "--restricted" not in cmd
     assert "--strict-mcp-config" in cmd
@@ -65,6 +68,11 @@ def test_build_command_exposes_skill_read_and_firecrawl_only():
 def test_prompt_mentions_topic():
     gen = ClaudeCliGenerator(model="sonnet")
     assert "Digital twins" in gen.build_prompt("Digital twins")
+
+
+def test_prompt_falls_back_to_builtin_web_search():
+    prompt = ClaudeCliGenerator(model="sonnet").build_prompt("x")
+    assert "firecrawl_search when it is offered and WebSearch when it is missing or fails" in prompt
 
 
 def test_prompt_lists_skills_when_configured():

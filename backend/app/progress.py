@@ -46,7 +46,7 @@ class StreamTracker:
             name = block.get("name", "")
             if name == "Skill":
                 self._stage = Stage.SKILLS
-            elif name.startswith("mcp__"):
+            elif name.startswith("mcp__") or name in ("WebSearch", "WebFetch"):
                 self._searches += 1
                 self._stage = Stage.SEARCHING
             elif name == "StructuredOutput":

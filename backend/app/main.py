@@ -86,8 +86,7 @@ def create_app(
     def list_topics(request: Request) -> TopicListing:
         daily: DailyTopics = request.app.state.topics
         daily.ensure_fetched()
-        topics, pending = daily.listing()
-        return TopicListing(topics=topics, pending=pending)
+        return daily.listing()
 
     @app.get("/api/sessions", response_model=list[SessionSummary])
     def list_sessions(request: Request) -> list[SessionSummary]:
@@ -97,8 +96,7 @@ def create_app(
     def refresh_topics(request: Request) -> TopicListing:
         daily: DailyTopics = request.app.state.topics
         daily.refresh()
-        topics, pending = daily.listing()
-        return TopicListing(topics=topics, pending=pending)
+        return daily.listing()
 
     @app.post("/api/sessions", response_model=JobStatus, status_code=202)
     def create_session(body: CreateSessionRequest, request: Request) -> JobStatus:
@@ -108,6 +106,11 @@ def create_app(
             store.recent_topics(RECENT_TOPIC_WINDOW)
         )
         return status_of(runner.start(topic), runner)
+
+    @app.get("/api/jobs", response_model=list[JobStatus])
+    def list_running_jobs(request: Request) -> list[JobStatus]:
+        runner: JobRunner = request.app.state.jobs
+        return [status_of(job, runner) for job in runner.running()]
 
     @app.get("/api/jobs/{job_id}", response_model=JobStatus)
     def get_job(job_id: str, request: Request) -> JobStatus:

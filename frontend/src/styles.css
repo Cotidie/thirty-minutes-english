@@ -181,6 +181,12 @@ a {
   }
 }
 
+.topic-notice {
+  margin: 0 0 0.6rem;
+  font-size: 0.85rem;
+  color: #9c2b1e;
+}
+
 .topic-row {
   display: flex;
   gap: 0.6rem;
@@ -1454,13 +1460,19 @@ button.question.is-active {
   line-height: 1.3;
   margin: 0;
   justify-self: start;
+}
+
+/* Inline so the marker follows each line rather than pooling under the paragraph. */
+.ask-card-english mark {
+  color: inherit;
   background: linear-gradient(transparent 64%, var(--marker-soft) 64%);
+  -webkit-box-decoration-break: clone;
+  box-decoration-break: clone;
 }
 
 .ask-card-english.is-missing {
   font-size: 1rem;
   color: var(--muted);
-  background: none;
 }
 
 .ask-card-alt {
