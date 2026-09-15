@@ -297,13 +297,13 @@ a {
   gap: 0.35rem;
 }
 
+/* Solid ink, not the chip's pale fill: a dot this small needs the dark colour to be telling. */
 .chip-key li::before {
   content: '';
-  width: 0.55rem;
-  height: 0.55rem;
+  width: 0.6rem;
+  height: 0.6rem;
   border-radius: 50%;
-  background: var(--cat-fill);
-  border: 1px solid var(--cat-line);
+  background: var(--cat-ink);
 }
 
 .history-aside {
