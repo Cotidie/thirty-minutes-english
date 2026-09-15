@@ -112,7 +112,7 @@ SESSION_SCHEMA: dict = {
 
 PROMPT_TEMPLATE = """You are preparing material for a 30-minute English conversation practice session \
 between two Korean graduate students at roughly B2 level who want to sound natural. Topics rotate across \
-technology, literature, and world history; treat each as a general-interest subject, not a specialist one.
+technology, literature, world history, Korean society, and research life; treat each as a general-interest subject, not a specialist one.
 
 Today's article topic: {topic}
 

@@ -14,6 +14,7 @@ from app.topics import pool_for_day
 log = logging.getLogger(__name__)
 
 FRESH_COUNT = 6
+KOREA_COUNT = 2  # of the news half, stories from Korea
 POOL_COUNT = 6
 
 TOPICS_SCHEMA: dict = {
@@ -31,7 +32,7 @@ TOPICS_SCHEMA: dict = {
 }
 
 PROMPT = """Search the news from the last seven days and give me {count} topics for a short English \
-article a pair of adult learners will argue about over coffee today.
+article a pair of adult learners in Korea will argue about over coffee today.
 
 Take only stories that ran big. A story qualifies if it led the front page or the top of the home page \
 at major international outlets (Reuters, AP, BBC, the Financial Times, The New York Times, The Guardian, \
@@ -40,15 +41,22 @@ Two independent major outlets covering it prominently is the bar. If you cannot 
 cleared it, drop it and take the next one. Leave out trade-press items, single-company product news, \
 and local stories with no wider consequence.
 
-Each topic is one line: a noun phrase of at most 10 words, in plain English, naming the dispute rather \
-than reporting the headline. "Who pays when the grid runs short" rather than "Country X raises power \
-prices 12%". No dates, no figures, and no story that only makes sense to people who followed it all week.
+{korea_count} of the {count} must be Korean stories: ones leading the English-language Korean outlets \
+(Yonhap, The Korea Herald, Korea JoongAng Daily, The Korea Times) this week, judged by the same bar. \
+Put them first. The rest come from the world at large.
+
+Each topic is one line: a noun phrase of at most 7 words, shaped like a chapter heading, naming the \
+subject of the dispute. "Blame for the Java Sea ferry disaster" or "BRICS as a trade alternative", \
+never "Who bears responsibility for the Java Sea ferry disaster" or "Country X raises power prices 12%". \
+Do not open with a question word (who, whether, why, how, what). No dates, no figures, and no story that \
+only makes sense to people who followed it all week.
 
 Spread them out: no two on the same story, and between them cover more than one region and more than one \
 field. At least one should sit near technology, industry or science. Skip anything whose only angle is \
 party politics or a running war's daily movements, and skip celebrity news.
 
-Run at most 4 searches, and spend one of them on what the major outlets are leading with right now. \
+Run at most 5 searches: one on what the major international outlets are leading with right now, one on \
+what the Korean outlets are leading with, and the rest to check that a story cleared the bar. \
 Search with firecrawl_search when it is offered; if it is missing or fails, use WebSearch instead. \
 If neither works, or the searches return nothing usable, return an empty list. Never invent a story, and never return placeholder text or a note about the tools you were given. \
 Return only the structured output."""
@@ -63,7 +71,7 @@ class ClaudeTopicSource:
         self._cli = ClaudeCli(model=model, effort=effort, timeout_s=timeout_s)
 
     def fetch(self, count: int) -> list[str]:
-        envelope = self._cli.run(PROMPT.format(count=count), TOPICS_SCHEMA)
+        envelope = self._cli.run(PROMPT.format(count=count, korea_count=KOREA_COUNT), TOPICS_SCHEMA)
         topics = structured_output(envelope)["topics"]
         return [t.strip() for t in topics if t.strip()]
 

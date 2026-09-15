@@ -98,6 +98,60 @@ _WORLD: tuple[str, ...] = (
     "Carbon border taxes and the trade fights they start",
 )
 
+# Home ground for a pair of Korean learners: the arguments Koreans have among
+# themselves, phrased so the article can look for the latest turn in each.
+_KOREA: tuple[str, ...] = (
+    "Korea's birth rate and what could reverse it",
+    "Mandatory military service in a shrinking Korea",
+    "Hagwon culture and the price of a university seat",
+    "Seoul housing prices and the jeonse lease system",
+    "Chaebol power and the reform that never comes",
+    "Korea's dependence on semiconductor exports",
+    "Regional decline beyond the Seoul metro area",
+    "Nuclear power's place in Korea's energy mix",
+    "Foreign workers in Korea's factories and farms",
+    "Korea's pension arithmetic and the retirement age",
+    "K-pop as soft power and as an industry",
+    "The gender divide among young Koreans",
+    "Korea's long working hours and the four-day week",
+    "Delivery apps and gig work in Korean cities",
+    "Medical school quotas and the doctors' strikes",
+    "Korean unification: goal, slogan, or memory",
+    "Korea's suicide rate and the mental health taboo",
+    "Living alone in Korea and the convenience store economy",
+    "Korean food's global moment, from kimchi to gimbap",
+    "Twelve years of English class and still afraid to speak",
+    "Naver and Kakao against the global platforms",
+    "AI and the future of Korean manufacturing jobs",
+)
+
+# The working life of two master's students: how research gets done, judged,
+# published and paid for.
+_RESEARCH: tuple[str, ...] = (
+    "How to read a paper in an hour",
+    "The reproducibility crisis in machine learning research",
+    "Peer review: broken, or the least bad option",
+    "Master's, PhD, or industry: what the extra years buy",
+    "Working with an advisor who is never around",
+    "Publish or perish and the rise of paper mills",
+    "LLMs as co-authors: where the line is",
+    "Open access and who pays for publishing",
+    "Conference deadlines and the culture of the all-nighter",
+    "Negative results and why nobody publishes them",
+    "Citation counts as a measure of a scientist",
+    "Writing a thesis nobody will read",
+    "Presenting research to people outside your field",
+    "Simulation results versus the real factory floor",
+    "Industry-funded research and its blind spots",
+    "Lab culture: hierarchy, hours, and burnout",
+    "Choosing a research topic that is still open in three years",
+    "Benchmarks, leaderboards, and what they hide",
+    "Research ethics beyond the consent form",
+    "Writing papers in a second language",
+    "The gap between a paper's claim and its code",
+    "Academic conferences: networking, tourism, or science",
+)
+
 
 def _pool(texts: tuple[str, ...], category: Category) -> tuple[Topic, ...]:
     return tuple(Topic(text=t, category=category) for t in texts)
@@ -107,8 +161,10 @@ TECH_TOPICS = _pool(_TECH, Category.TECH)
 LITERATURE_TOPICS = _pool(_LITERATURE, Category.LITERATURE)
 HISTORY_TOPICS = _pool(_HISTORY, Category.HISTORY)
 WORLD_TOPICS = _pool(_WORLD, Category.WORLD)
+KOREA_TOPICS = _pool(_KOREA, Category.KOREA)
+RESEARCH_TOPICS = _pool(_RESEARCH, Category.RESEARCH)
 
-TOPICS: tuple[Topic, ...] = TECH_TOPICS + LITERATURE_TOPICS + HISTORY_TOPICS + WORLD_TOPICS
+TOPICS: tuple[Topic, ...] = TECH_TOPICS + LITERATURE_TOPICS + HISTORY_TOPICS + WORLD_TOPICS + KOREA_TOPICS + RESEARCH_TOPICS
 
 
 def pool_for_day(day: date, count: int, exclude: list[str] | None = None, salt: int = 0) -> list[Topic]:

@@ -19,9 +19,11 @@ const CATEGORY_LABELS: Record<Category, string> = {
   literature: 'Literature',
   history: 'History',
   world: 'World',
+  korea: 'Korea',
+  research: 'Research',
 }
 
-const CATEGORY_ORDER: Category[] = ['news', 'tech', 'literature', 'history', 'world']
+const CATEGORY_ORDER: Category[] = ['news', 'korea', 'research', 'tech', 'literature', 'history', 'world']
 
 export function TopicPicker({ suggestions, pending, error, busy, onGenerate, onRefresh }: Props) {
   const [topic, setTopic] = useState('')

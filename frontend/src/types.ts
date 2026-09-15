@@ -43,7 +43,7 @@ export interface SessionContent {
   vocabulary: VocabularyItem[]
 }
 
-export type Category = 'tech' | 'literature' | 'history' | 'world' | 'news'
+export type Category = 'tech' | 'literature' | 'history' | 'world' | 'korea' | 'research' | 'news'
 
 export interface Topic {
   text: string

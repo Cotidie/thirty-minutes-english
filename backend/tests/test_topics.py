@@ -1,7 +1,16 @@
 import random
 
 from app.models import Category
-from app.topics import HISTORY_TOPICS, LITERATURE_TOPICS, TECH_TOPICS, TOPICS, WORLD_TOPICS, pick_topic
+from app.topics import (
+    HISTORY_TOPICS,
+    KOREA_TOPICS,
+    LITERATURE_TOPICS,
+    RESEARCH_TOPICS,
+    TECH_TOPICS,
+    TOPICS,
+    WORLD_TOPICS,
+    pick_topic,
+)
 
 TEXTS = tuple(t.text for t in TOPICS)
 
@@ -20,8 +29,8 @@ def test_pick_topic_is_random_among_unused():
     assert len(picks) > 1
 
 
-def test_topics_span_four_domains():
-    pools = (TECH_TOPICS, LITERATURE_TOPICS, HISTORY_TOPICS, WORLD_TOPICS)
+def test_topics_span_six_domains():
+    pools = (TECH_TOPICS, LITERATURE_TOPICS, HISTORY_TOPICS, WORLD_TOPICS, KOREA_TOPICS, RESEARCH_TOPICS)
     assert set(TOPICS) == set().union(*(set(p) for p in pools))
     assert min(len(p) for p in pools) >= 10
     assert len(set(TEXTS)) == len(TEXTS)
@@ -33,6 +42,8 @@ def test_every_topic_carries_its_own_category():
         Category.LITERATURE: LITERATURE_TOPICS,
         Category.HISTORY: HISTORY_TOPICS,
         Category.WORLD: WORLD_TOPICS,
+        Category.KOREA: KOREA_TOPICS,
+        Category.RESEARCH: RESEARCH_TOPICS,
     }
     for category, pool in expected.items():
         assert {t.category for t in pool} == {category}

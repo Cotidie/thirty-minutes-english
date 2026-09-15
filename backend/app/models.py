@@ -12,6 +12,8 @@ class Category(StrEnum):
     LITERATURE = "literature"
     HISTORY = "history"
     WORLD = "world"
+    KOREA = "korea"
+    RESEARCH = "research"
     NEWS = "news"
 
 
