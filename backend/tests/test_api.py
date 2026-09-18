@@ -3,6 +3,7 @@ from fastapi.testclient import TestClient
 
 from app.generator import GenerationError
 from app.main import create_app
+from app.wiring import Services
 from app.progress import Progress, Stage
 from app.store import SessionStore
 from app.topics import TOPICS
@@ -39,7 +40,7 @@ class FailingGenerator:
 @pytest.fixture
 def client(tmp_path):
     gen = FakeGenerator()
-    app = create_app(SessionStore(tmp_path / "s.db"), gen, InlineExecutor())
+    app = create_app(SessionStore(tmp_path / "s.db"), Services(gen), InlineExecutor())
     with TestClient(app) as c:
         c.generator = gen
         yield c
@@ -106,7 +107,7 @@ def test_topics_endpoint_offers_a_stable_daily_slice(client):
 
 
 def test_job_reports_failure_when_generator_fails(tmp_path):
-    app = create_app(SessionStore(tmp_path / "s.db"), FailingGenerator(), InlineExecutor())
+    app = create_app(SessionStore(tmp_path / "s.db"), Services(FailingGenerator()), InlineExecutor())
     with TestClient(app) as c:
         job = c.post("/api/sessions", json={"topic": "X"}).json()
     assert job["status"] == "failed"
@@ -204,7 +205,7 @@ class HeldExecutor:
 
 def test_jobs_endpoint_lists_only_running_jobs(tmp_path):
     executor = HeldExecutor()
-    app = create_app(SessionStore(tmp_path / "s.db"), FakeGenerator(), executor)
+    app = create_app(SessionStore(tmp_path / "s.db"), Services(FakeGenerator()), executor)
     with TestClient(app) as client:
         assert client.get("/api/jobs").json() == []
         first = create(client, "First")

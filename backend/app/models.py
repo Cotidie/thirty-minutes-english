@@ -136,26 +136,26 @@ def _not_blank(value: str) -> str:
 
 
 class ReadAloudRequest(BaseModel):
-    paragraph: str
-    sdp: str
+    """`sdp` is the browser's WebRTC offer; only the OpenAI provider needs one."""
 
-    _check = field_validator("paragraph", "sdp")(_not_blank)
+    paragraph: str
+    sdp: str | None = None
+
+    _check = field_validator("paragraph")(_not_blank)
 
 
 class PhraseRequest(BaseModel):
-    sdp: str
+    sdp: str | None = None
     topic: str | None = None
-
-    _check = field_validator("sdp")(_not_blank)
 
 
 class ExampleSessionRequest(BaseModel):
-    sdp: str
+    sdp: str | None = None
     expression: str
     meaning: str
     usage_note: str = ""
 
-    _check = field_validator("sdp", "expression", "meaning")(_not_blank)
+    _check = field_validator("expression", "meaning")(_not_blank)
 
 
 class ExampleFeedbackRequest(BaseModel):
@@ -258,7 +258,30 @@ class Ask(BaseModel):
 
 
 class LiveSession(BaseModel):
-    """Passthrough of OpenAI's session-creation answer: {session: {id}, transport: {type, sdp}}."""
+    """Passthrough of the provider's answer, tagged with `provider`. OpenAI:
+    {session: {id}, transport: {type, sdp}}. Gemini: {url, setup}."""
 
-    session: dict
-    transport: dict
+    model_config = ConfigDict(extra="allow")
+
+    provider: Literal["openai", "gemini"]
+
+
+class SettingField(BaseModel):
+    key: str
+    group: Literal["voice", "claude", "text"]
+    value: str
+    source: Literal["env", "db", "default"]
+    secret: bool
+    default: str
+    choices: list[str] | None
+    suggestions: list[str]
+
+
+class SettingsView(BaseModel):
+    fields: list[SettingField]
+
+
+class SettingsUpdate(BaseModel):
+    """Keys to write. A null value drops the override so the env default shows through."""
+
+    values: dict[str, str | None]

@@ -5,6 +5,7 @@ from fastapi.testclient import TestClient
 
 from app.cards import AskReview, CorrectionExtractor, PhraseCardExtractor, ReadingReview
 from app.main import create_app
+from app.wiring import Services
 from app.models import Correction, PhraseCard
 from app.store import SessionStore
 from tests.test_api import FakeGenerator, InlineExecutor
@@ -68,7 +69,7 @@ def test_review_without_an_extractor_returns_transcripts(store):
 def test_cards_endpoint_narrows_to_one_session(tmp_path):
     extractor = FakeExtractor()
     store = SessionStore(tmp_path / "s.db")
-    app = create_app(store, FakeGenerator(), InlineExecutor(), extractor=extractor)
+    app = create_app(store, Services(FakeGenerator(), extractor=extractor), InlineExecutor())
     with TestClient(app) as c:
         session_id = c.post("/api/sessions", json={"topic": "Digital twins"}).json()["session_id"]
         c.post("/api/asks", json={"session_id": session_id, "user_text": "mine", "coach_text": "a"})
@@ -140,7 +141,7 @@ class FakeCorrections:
 def test_readings_are_kept_and_read_back_with_their_corrections(tmp_path):
     corrections = FakeCorrections()
     store = SessionStore(tmp_path / "s.db")
-    app = create_app(store, FakeGenerator(), InlineExecutor(), corrections=corrections)
+    app = create_app(store, Services(FakeGenerator(), corrections=corrections), InlineExecutor())
     with TestClient(app) as c:
         session_id = c.post("/api/sessions", json={"topic": "Digital twins"}).json()["session_id"]
         created = c.post(
@@ -176,7 +177,7 @@ def test_a_clean_read_keeps_an_empty_correction_list(tmp_path):
 
 
 def test_reading_rejects_a_round_with_no_coach_line(tmp_path):
-    app = create_app(SessionStore(tmp_path / "s.db"), FakeGenerator(), InlineExecutor())
+    app = create_app(SessionStore(tmp_path / "s.db"), Services(FakeGenerator()), InlineExecutor())
     with TestClient(app) as c:
         body = {"paragraph": "Researchers verified it.", "user_text": "read it", "coach_text": "  "}
         assert c.post("/api/readings", json=body).status_code == 422

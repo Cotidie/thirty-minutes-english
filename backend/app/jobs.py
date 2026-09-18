@@ -57,7 +57,7 @@ class JobRunner:
     def __init__(
         self, generator: Generator, store: SessionStore, executor: Executor | None = None
     ) -> None:
-        self._generator = generator
+        self.generator = generator
         self._store = store
         self.executor = executor or ThreadPoolExecutor(max_workers=2)
         self._jobs: dict[str, Job] = {}
@@ -90,7 +90,7 @@ class JobRunner:
             exclude = used.thin(1 - self.REPEAT_ALLOWANCE, random.Random())
             log.info("job %s: banning %d/%d expressions, %d/%d words", job.id,
                      len(exclude.expressions), len(used.expressions), len(exclude.words), len(used.words))
-            content = self._generator.generate(job.topic, on_progress=job.apply, exclude=exclude)
+            content = self.generator.generate(job.topic, on_progress=job.apply, exclude=exclude)
         except GenerationError as e:
             job.error = str(e)
             job.status = "failed"

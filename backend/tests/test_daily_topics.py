@@ -6,6 +6,7 @@ from fastapi.testclient import TestClient
 from app.claude_cli import GenerationError
 from app.daily_topics import FRESH_COUNT, POOL_COUNT, DailyTopics
 from app.main import create_app
+from app.wiring import Services
 from app.models import Category
 from app.store import SessionStore
 from app.topics import TOPICS, pool_for_day
@@ -117,7 +118,7 @@ def test_without_a_source_nothing_is_pending(store):
 
 def test_endpoint_serves_the_news_half_once_it_lands(tmp_path):
     store = SessionStore(tmp_path / "s.db")
-    app = create_app(store, FakeGenerator(), InlineExecutor(), topic_source=FakeSource())
+    app = create_app(store, Services(FakeGenerator(), topic_source=FakeSource()), InlineExecutor())
     with TestClient(app) as c:
         first = c.get("/api/topics").json()
         # InlineExecutor runs the fetch during that first request
@@ -164,7 +165,7 @@ def test_refresh_endpoint_reports_pending_until_the_news_lands(tmp_path):
 
     store = SessionStore(tmp_path / "s.db")
     executor = SlowExecutor()
-    app = create_app(store, FakeGenerator(), executor, topic_source=FakeSource())
+    app = create_app(store, Services(FakeGenerator(), topic_source=FakeSource()), executor)
     with TestClient(app) as c:
         c.get("/api/topics")
         for fn, args in executor.queued:
@@ -208,7 +209,7 @@ def test_pending_is_true_only_while_a_fetch_is_in_flight(store):
 def test_endpoint_reports_the_failure_until_a_fetch_succeeds(tmp_path):
     store = SessionStore(tmp_path / "s.db")
     source = FakeSource(GenerationError("claude exited 1: no such tool"))
-    app = create_app(store, FakeGenerator(), InlineExecutor(), topic_source=source)
+    app = create_app(store, Services(FakeGenerator(), topic_source=source), InlineExecutor())
     with TestClient(app) as c:
         assert c.get("/api/topics").json()["error"] == "claude exited 1: no such tool"
         source.error = None

@@ -1,16 +1,15 @@
 import logging
 import os
+from collections.abc import Callable
 from pathlib import Path
 
 from fastapi import FastAPI, HTTPException, Request, Response
 
-from app.cards import AskReview, CorrectionExtractor, Extractor, PhraseCardExtractor, ReadingReview
+from app.cards import AskReview, ReadingReview
 from app.claude_cli import GenerationError
-from app.daily_topics import ClaudeTopicSource, DailyTopics, TopicSource
-from app.example_feedback import ExampleCoach
-from app.generator import ClaudeCliGenerator, Generator
+from app.daily_topics import DailyTopics
 from app.jobs import Executor, Job, JobRunner
-from app.live import AgentDefinition, LiveAgent, LiveSessionError, OpenAILiveSessions
+from app.live import LiveAgent, LiveSessionError
 from app.models import (
     Ask,
     AskRequest,
@@ -29,10 +28,15 @@ from app.models import (
     ReadAloudRequest,
     Session,
     SessionSummary,
+    SettingField,
+    SettingsUpdate,
+    SettingsView,
     Stars,
 )
+from app.settings import InvalidSetting, Settings, SettingsStore
 from app.store import SessionStore
-from app.topics import TOPICS, pick_topic
+from app.topics import pick_topic
+from app.wiring import Services, build_services
 
 ROOT = Path(__file__).resolve().parent.parent
 AGENT_DIRS = {
@@ -43,36 +47,55 @@ AGENT_DIRS = {
 RECENT_TOPIC_WINDOW = 10
 
 
+Rebuild = Callable[[Settings], Services]
+
+
 def create_app(
     store: SessionStore,
-    generator: Generator,
+    services: Services,
     executor: Executor | None = None,
-    agents: dict[str, LiveAgent] | None = None,
-    extractor: Extractor | None = None,
-    corrections: Extractor | None = None,
-    topic_source: TopicSource | None = None,
-    example_coach: ExampleCoach | None = None,
+    settings_store: SettingsStore | None = None,
+    rebuild: Rebuild | None = None,
+    env: dict[str, str] | None = None,
 ) -> FastAPI:
+    """`rebuild` turns saved settings into fresh services; without it a settings
+    change is stored but the running services stay as they are (tests)."""
     app = FastAPI(title="english-speaking-claude")
     app.state.store = store
-    app.state.jobs = JobRunner(generator, store, executor)
-    app.state.topics = DailyTopics(store, topic_source, app.state.jobs.executor)
-    app.state.agents = agents or {}
-    app.state.asks = AskReview(store, extractor)
-    app.state.readings = ReadingReview(store, corrections)
-    app.state.example_coach = example_coach
+    app.state.settings_store = settings_store or SettingsStore(store.path)
+    app.state.env = os.environ if env is None else env
+    app.state.rebuild = rebuild
+    app.state.jobs = JobRunner(services.generator, store, executor)
+    app.state.topics = DailyTopics(store, services.topic_source, app.state.jobs.executor)
+    app.state.asks = AskReview(store, services.extractor)
+    app.state.readings = ReadingReview(store, services.corrections)
+    app.state.services = services
+
+    def current_settings(request: Request) -> Settings:
+        return Settings.resolve(request.app.state.env, request.app.state.settings_store)
+
+    def apply_services(request: Request, services: Services) -> None:
+        state = request.app.state
+        state.services = services
+        state.jobs.generator = services.generator
+        state.topics.source = services.topic_source
+        state.asks.extractor = services.extractor
+        state.readings.extractor = services.corrections
 
     def live_agent(request: Request, name: str) -> LiveAgent:
-        agent = request.app.state.agents.get(name)
+        services: Services = request.app.state.services
+        agent = services.agents.get(name)
         if agent is None:
-            raise HTTPException(status_code=503, detail=f"{name} is off: set OPENAI_API_KEY on the backend")
+            raise HTTPException(
+                status_code=503, detail=f"{name} is off: set {services.voice_key_name} in Settings"
+            )
         return agent
 
-    def start_live(agent: LiveAgent, sdp: str, **values: str) -> dict:
+    def start_live(agent: LiveAgent, sdp: str | None, **values: str) -> dict:
         try:
             return agent.start(sdp, **values)
         except LiveSessionError as e:
-            raise HTTPException(status_code=502, detail=f"GPT-Live session failed: {e.message}") from e
+            raise HTTPException(status_code=502, detail=f"voice session failed: {e.message}") from e
 
     def status_of(job: Job, runner: JobRunner) -> JobStatus:
         return JobStatus(
@@ -87,6 +110,22 @@ def create_app(
             session_id=job.session_id,
             error=job.error,
         )
+
+    @app.get("/api/settings", response_model=SettingsView)
+    def get_settings(request: Request) -> SettingsView:
+        return SettingsView(fields=[SettingField(**vars(f)) for f in current_settings(request).fields()])
+
+    @app.put("/api/settings", response_model=SettingsView)
+    def put_settings(body: SettingsUpdate, request: Request) -> SettingsView:
+        try:
+            request.app.state.settings_store.save(body.values)
+        except InvalidSetting as e:
+            raise HTTPException(status_code=400, detail=str(e)) from e
+        settings = current_settings(request)
+        rebuild: Rebuild | None = request.app.state.rebuild
+        if rebuild is not None:
+            apply_services(request, rebuild(settings))
+        return SettingsView(fields=[SettingField(**vars(f)) for f in settings.fields()])
 
     @app.get("/api/topics", response_model=TopicListing)
     def list_topics(request: Request) -> TopicListing:
@@ -173,7 +212,7 @@ def create_app(
 
     @app.post("/api/example/feedback", response_model=ExampleFeedback)
     def example_feedback(body: ExampleFeedbackRequest, request: Request) -> ExampleFeedback:
-        coach: ExampleCoach | None = request.app.state.example_coach
+        coach = request.app.state.services.example_coach
         if coach is None:
             raise HTTPException(status_code=503, detail="example coach is off: the example-coach folder is missing")
         try:
@@ -221,58 +260,21 @@ def create_app(
     return app
 
 
-def _extractor(agent: str, schema: str, build) -> Extractor | None:
-    """An extractor per agent folder, once a key and that folder's schema exist."""
-    api_key = os.environ.get("OPENAI_API_KEY", "").strip()
-    agent_dir = Path(os.environ.get(*AGENT_DIRS[agent]))
-    if not api_key or not (agent_dir / schema).is_file():
-        return None
-    return build(api_key, agent_dir, os.environ.get("SUMMARY_MODEL", "gpt-5.6-luna"))
-
-
-def live_agents() -> dict[str, LiveAgent]:
-    """Every agent whose folder is present, once an API key is configured."""
-    api_key = os.environ.get("OPENAI_API_KEY", "").strip()
-    if not api_key:
-        return {}
-    sessions = OpenAILiveSessions(api_key)
-    agents = {}
-    for name, (env_var, default) in AGENT_DIRS.items():
-        agent_dir = Path(os.environ.get(env_var, default))
-        if (agent_dir / "session.json").is_file():
-            agents[name] = LiveAgent(name, AgentDefinition(agent_dir), sessions)
-        else:
-            logging.getLogger(__name__).warning("%s agent folder not found: %s", name, agent_dir)
-    return agents
+def agent_dirs() -> dict[str, Path]:
+    return {name: Path(os.environ.get(env_var, default)) for name, (env_var, default) in AGENT_DIRS.items()}
 
 
 def default_app() -> FastAPI:
     logging.basicConfig(level=logging.INFO, format="%(levelname)s %(name)s: %(message)s")
+    store = SessionStore(os.environ.get("DB_PATH", ROOT / "data" / "sessions.db"))
+    settings_store = SettingsStore(store.path)
+    dirs = agent_dirs()
     return create_app(
-        SessionStore(os.environ.get("DB_PATH", ROOT / "data" / "sessions.db")),
-        ClaudeCliGenerator(
-            model=os.environ.get("CLAUDE_MODEL", "opus"),
-            effort=os.environ.get("CLAUDE_EFFORT", "xhigh"),
-            skills=tuple(s for s in os.environ.get("CLAUDE_SKILLS", "").split(",") if s.strip()),
-        ),
-        agents=live_agents(),
-        topic_source=ClaudeTopicSource(
-            model=os.environ.get("TOPICS_MODEL", "sonnet"),
-            effort=os.environ.get("TOPICS_EFFORT", "medium"),
-        ),
-        extractor=_extractor("phrase", "cards.schema.json", PhraseCardExtractor),
-        corrections=_extractor("read-aloud", "feedback.schema.json", CorrectionExtractor),
-        example_coach=_example_coach(),
+        store,
+        build_services(Settings.resolve(os.environ, settings_store), dirs),
+        settings_store=settings_store,
+        rebuild=lambda settings: build_services(settings, dirs),
     )
-
-
-def _example_coach() -> ExampleCoach | None:
-    """The text half of the example coach, once its folder carries the feedback prompt."""
-    agent_dir = Path(os.environ.get(*AGENT_DIRS["example"]))
-    if not (agent_dir / "prompts" / "feedback.md").is_file():
-        logging.getLogger(__name__).warning("example-coach feedback prompt not found: %s", agent_dir)
-        return None
-    return ExampleCoach.with_cli(agent_dir, os.environ.get("EXAMPLE_MODEL", "opus"), os.environ.get("EXAMPLE_EFFORT", "low"))
 
 
 app = default_app()
