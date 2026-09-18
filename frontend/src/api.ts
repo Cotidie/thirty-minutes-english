@@ -1,5 +1,19 @@
 import type { JobStatus } from './lib/progress'
-import type { Ask, Example, ExampleFeedback, LiveSession, PracticeTarget, Reading, Session, SessionSummary, Stars, TopicListing } from './types'
+import type {
+  Ask,
+  Example,
+  ExampleFeedback,
+  LiveSession,
+  PracticeTarget,
+  Reading,
+  Session,
+  SessionSummary,
+  SettingsUpdate,
+  SettingsView,
+  Stars,
+  TopicListing,
+  VoiceProvider,
+} from './types'
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const res = await fetch(path, { headers: { 'Content-Type': 'application/json' }, ...init })
@@ -26,11 +40,20 @@ export const api = {
   getStars: (id: number) => request<Stars>(`/api/sessions/${id}/stars`),
   setStars: (id: number, stars: Stars) =>
     request<Stars>(`/api/sessions/${id}/stars`, { method: 'PUT', body: JSON.stringify(stars) }),
-  startReadAloud: (paragraph: string, sdp: string) =>
+  getSettings: () => request<SettingsView>('/api/settings'),
+  putSettings: (values: SettingsUpdate) =>
+    request<SettingsView>('/api/settings', { method: 'PUT', body: JSON.stringify({ values }) }),
+  /** Which voice provider a round will land on, read right before opening one. */
+  voiceProvider: async (): Promise<VoiceProvider> => {
+    const { fields } = await request<SettingsView>('/api/settings')
+    return fields.find((f) => f.key === 'VOICE_PROVIDER')?.value === 'gemini' ? 'gemini' : 'openai'
+  },
+  /** `sdp` is the WebRTC offer; only the OpenAI provider takes one. */
+  startReadAloud: (paragraph: string, sdp?: string) =>
     request<LiveSession>('/api/read-aloud/sessions', { method: 'POST', body: JSON.stringify({ paragraph, sdp }) }),
-  startPhrase: (topic: string | null, sdp: string) =>
+  startPhrase: (topic: string | null, sdp?: string) =>
     request<LiveSession>('/api/phrase/sessions', { method: 'POST', body: JSON.stringify({ topic, sdp }) }),
-  startExample: (target: PracticeTarget, sdp: string) =>
+  startExample: (target: PracticeTarget, sdp?: string) =>
     request<LiveSession>('/api/example/sessions', {
       method: 'POST',
       body: JSON.stringify({ sdp, expression: target.text, meaning: target.meaning, usage_note: target.note }),

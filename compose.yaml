@@ -11,6 +11,11 @@ services:
       CLAUDE_EFFORT: ${CLAUDE_EFFORT:-xhigh}
       CLAUDE_SKILLS: ${CLAUDE_SKILLS:-}
       OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      GEMINI_API_KEY: ${GEMINI_API_KEY:-}
+      VOICE_PROVIDER: ${VOICE_PROVIDER:-openai}
+      VOICE_MODEL: ${VOICE_MODEL:-}
+      VOICE_THINKING: ${VOICE_THINKING:-low}
+      VOICE_NAME: ${VOICE_NAME:-Kore}
       READ_ALOUD_AGENT_DIR: /agents/read-aloud-coach
       PHRASE_AGENT_DIR: /agents/phrase-coach
       EXAMPLE_AGENT_DIR: /agents/example-coach

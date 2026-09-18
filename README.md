@@ -2,7 +2,7 @@
 
 - 목표: 친구와 하루 30분 영어 회화 연습. 매 세션 표현 6개 + 짧은 아티클(기술 · 문학 · 세계사 · 최근 세계 이슈) + B2~C1+ 어휘 12개를 Claude가 생성.
 - 상태: 진행 중 (v1 동작)
-- 다음 할 일: 며칠 써보고 표현 난이도와 아티클 길이 조정
+- 다음 할 일: 설정 모달에서 provider를 `gemini`로 바꿔 Read aloud · Ask · Practice 세 코치를 실제로 돌려 보고 GPT-Live와 비교
 
 ## 실행
 
@@ -22,11 +22,16 @@
 
 | 환경변수 | 기본값 | 용도 |
 |---|---|---|
+| `VOICE_PROVIDER` | `openai` | 음성 코치 3종의 provider. `openai`(GPT-Live, WebRTC) 또는 `gemini`(Gemini Live, WebSocket) |
+| `VOICE_MODEL` | provider별 | 비우면 `gpt-live-1` / `gemini-3.8-live-extended-thinking` |
+| `VOICE_THINKING` | `low` | `gemini-3.8-live-extended-thinking`의 thinking 수준. `low`, `medium`, `high` |
+| `VOICE_NAME` | `Kore` | Gemini 음성 이름. OpenAI는 각 코치 `session.json`의 voice를 쓴다 |
+| `GEMINI_API_KEY` | 비움 | Gemini Live용. provider가 `gemini`인데 비어 있으면 세 버튼이 503 |
 | `CLAUDE_MODEL` | `opus` | 생성 모델. `sonnet`이면 더 빠름 |
 | `CLAUDE_EFFORT` | `xhigh` | reasoning effort. `low`, `medium`, `high`, `xhigh`, `max` |
 | `CLAUDE_SKILLS` | 비움 | 생성 전에 호출할 스킬. 쉼표 구분. 예: `stop-slop,cotidie:write-like-me` |
 | `DB_PATH` | `backend/data/sessions.db` | SQLite 파일 |
-| `OPENAI_API_KEY` | 비움 | Read aloud 코치와 Ask 위젯용. 비우면 두 버튼이 503을 돌려준다 |
+| `OPENAI_API_KEY` | 비움 | GPT-Live 코치(provider가 `openai`일 때)와 Summary 탭 텍스트 추출용 |
 | `READ_ALOUD_AGENT_DIR` | `../read-aloud-coach` | 발음·끊어 읽기 코치 정의 폴더(프롬프트, 세션 설정) |
 | `EXAMPLE_AGENT_DIR` | `../example-coach` | Your turn / Practice 코치 정의 폴더 |
 | `PHRASE_AGENT_DIR` | `../phrase-coach` | 표현 코치 정의 폴더 |
@@ -39,6 +44,26 @@
 ## Article 한국어 번역
 
 세션을 만들 때 아티클 본문을 문장 단위로 번역해 함께 저장한다(`article.translation`, `{en, ko}` 쌍). 화면에서는 숨겨져 있다가 문장을 클릭하면 영어가 가라앉고 그 자리에 한국어가 떠오른다. 다시 클릭하면 영어로 돌아간다. 번역은 모델이 문단 전체를 보면서 문장별로 만들고, `en`이 본문에 글자 그대로 없는 쌍은 backend가 버리므로 그 문장은 영어로만 남는다. 번역이 없는 예전 세션은 클릭해도 아무 일도 없다.
+
+## 설정 모달
+
+모든 페이지 우상단 ⚙(단축키 `,`)가 위 표의 환경변수를 전부 편집하는 모달을 연다(`DB_PATH`, `*_AGENT_DIR`, `FRONTEND_PORT`, `CLAUDE_CODE_OAUTH_TOKEN`처럼 재시작이 필요한 인프라 값은 제외). 값마다 출처가 붙는다: `env`(.env 또는 compose), `db`(모달에서 저장), `default`(코드 기본값). 저장은 `PUT /api/settings`로 SQLite `settings` 테이블에 들어가고 env 값을 덮어쓴다. 저장 직후 backend가 생성기·주제 소스·음성 코치·추출기를 다시 조립하므로 재시작 없이 다음 라운드부터 바뀐 provider와 모델이 쓰인다. `Reset`은 DB 오버라이드를 지워 env 값이 다시 보이게 한다. API 키는 마스킹(`…끝 4자`)으로만 내려오고 입력칸을 비워 두면 그대로 유지된다.
+
+## 음성 코치 provider (GPT-Live / Gemini Live)
+
+세 코치(Read aloud · Ask · Your turn/Practice)는 같은 `LiveConnection` 인터페이스(`microphone`, `finish`, `say`, `close`) 위에서 돌고, provider는 `frontend/src/lib/live/transport.ts`가 라운드를 열 때 설정을 읽어 고른다. 에이전트 정의 폴더(`prompts/live.md`, `session.json`)는 provider와 무관하게 하나다.
+
+| | OpenAI `gpt-live-1` | Gemini `gemini-3.8-live(-extended-thinking)` |
+|---|---|---|
+| 전송 | WebRTC. backend가 SDP offer를 중계 (`lib/live/openaiWebrtc.ts`) | WebSocket. backend가 1회용 ephemeral token을 발급하고 setup 메시지를 만들어 줌 (`lib/live/geminiWebsocket.ts`) |
+| 오디오 | 브라우저 트랙 그대로 | AudioWorklet 2개(`public/worklets/`): 마이크 → 16 kHz PCM 청크, 24 kHz PCM 수신 → 같은 `<audio>`로 재생 |
+| 지시(`say`, `finish`) | `session.instructions.append` | `clientContent` 사용자 턴 |
+| 개발자 컨텍스트(문단, 주제, 표현) | `session.json`의 developer 메시지 | `systemInstruction` 끝에 이어 붙임 |
+| 자막 | `session.*_transcript.delta` | `inputTranscription`/`outputTranscription`을 같은 이벤트명으로 변환 (`lib/live/geminiEvents.ts`) |
+| 초 단위 사용량 | 서버 `usage.seconds` | 프론트 벽시계 |
+| 비용 | 분당 $0.05, 15초 최소 과금 | 입력 $0.005/분 + 출력 $0.018/분(thinking 토큰 포함). 최소 과금 없음. 문단 하나 Read aloud 약 $0.05 |
+
+Gemini 세션은 오디오만일 때 15분 상한이며 코치 라운드는 그보다 훨씬 짧다. Extended Thinking은 `VOICE_THINKING`만큼 뒤에서 생각하며 말하고, 즉답이 필요한 발음 교정에는 `low`로 시작한다. 브라우저에는 API 키가 가지 않는다: 소켓 URL의 `access_token`은 1회용이고 모델이 고정되어 있다.
 
 ## Read aloud (GPT-Live)
 
@@ -113,8 +138,9 @@ docker compose up -d --build
 ## 구조
 
 ```
-backend/   FastAPI. app/{main,generator,claude_cli,daily_topics,live,cards,store,topics,models}.py, tests/
-frontend/  React 19 + Vite + TS. src/{pages,components,lib}. lib/liveClient.ts가 WebRTC
+backend/   FastAPI. app/{main,wiring,settings,generator,claude_cli,daily_topics,live,cards,store,topics,models}.py, tests/
+           wiring.py가 설정으로 서비스를 조립하고, settings.py가 env + SQLite 오버라이드를 합친다
+frontend/  React 19 + Vite + TS. src/{pages,components,lib}. lib/live/가 provider별 전송(openaiWebrtc, geminiWebsocket)
 dev.sh     둘 다 띄우는 스크립트
 ```
 

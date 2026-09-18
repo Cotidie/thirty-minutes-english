@@ -178,10 +178,12 @@ def test_gemini_provider_mints_a_locked_token_and_returns_the_setup(agent_dir, m
     monkeypatch.setattr("app.live.urllib.request.urlopen", post)
     voice = GeminiVoice("AIza-test", "gemini-3.8-live-extended-thinking", "Puck", "low")
     answer = voice.open(AgentDefinition(agent_dir), None, paragraph=PARAGRAPH)
+    assert answer["provider"] == "gemini"
 
     sent = json.loads(post.requests[0].data)
     assert sent["uses"] == 1
-    assert sent["liveConnectConstraints"] == {"model": "models/gemini-3.8-live-extended-thinking"}
+    assert sent["bidiGenerateContentSetup"]["model"] == "models/gemini-3.8-live-extended-thinking"
+    assert sent["bidiGenerateContentSetup"] == answer["setup"]
     assert sent["expireTime"].endswith("Z") and sent["newSessionExpireTime"].endswith("Z")
     assert post.requests[0].get_header("X-goog-api-key") == "AIza-test"
     assert answer["provider"] == "gemini"

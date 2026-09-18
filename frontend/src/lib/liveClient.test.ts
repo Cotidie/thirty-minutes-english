@@ -2,7 +2,9 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { api } from '../api'
 import { connectAsk, connectReadAloud } from './liveClient'
 
-vi.mock('../api', () => ({ api: { startReadAloud: vi.fn(), startPhrase: vi.fn() } }))
+vi.mock('../api', () => ({
+  api: { startReadAloud: vi.fn(), startPhrase: vi.fn(), voiceProvider: vi.fn(async () => 'openai') },
+}))
 
 // Minimal WebRTC stand-ins: enough to run the offer path and fire channel events.
 class FakeChannel extends EventTarget {
@@ -57,6 +59,7 @@ describe('connectReadAloud', () => {
 
   it('applies the answer, forwards events, and reports a drop only when the channel closes early', async () => {
     vi.mocked(api.startReadAloud).mockResolvedValueOnce({
+      provider: 'openai',
       session: { id: 'live_1' },
       transport: { type: 'webrtc', sdp: 'v=0 answer' },
     })
@@ -87,6 +90,7 @@ describe('connectReadAloud', () => {
 
   it('treats the close after session.closed as normal', async () => {
     vi.mocked(api.startReadAloud).mockResolvedValueOnce({
+      provider: 'openai',
       session: { id: 'live_1' },
       transport: { type: 'webrtc', sdp: 'v=0 answer' },
     })
@@ -105,6 +109,7 @@ describe('connectReadAloud', () => {
 describe('connectAsk', () => {
   it('starts a phrase session with the topic and shares the round plumbing', async () => {
     vi.mocked(api.startPhrase).mockResolvedValueOnce({
+      provider: 'openai',
       session: { id: 'live_2' },
       transport: { type: 'webrtc', sdp: 'v=0 answer' },
     })

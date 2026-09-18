@@ -116,8 +116,9 @@ class OpenAIVoice:
 
 
 class GeminiVoice:
-    """Mints a one-use ephemeral token locked to the model, and hands the
-    browser the token, the WebSocket URL, and the setup message to send first."""
+    """Mints a one-use ephemeral token locked to the whole setup (model, voice,
+    system instruction), and hands the browser the token in the WebSocket URL
+    plus that same setup message to send first."""
 
     name = "gemini"
     TOKEN_TTL = timedelta(minutes=30)
@@ -141,20 +142,17 @@ class GeminiVoice:
 
     def open(self, definition: AgentDefinition, sdp: str | None, **values: str) -> dict:
         now = datetime.now(UTC)
+        setup = definition.gemini_setup(self.model, self.voice, self.thinking_level, **values)
         body = json.dumps(
             {
                 "uses": 1,
                 "expireTime": _rfc3339(now + self.TOKEN_TTL),
                 "newSessionExpireTime": _rfc3339(now + self.CONNECT_WINDOW),
-                "liveConnectConstraints": {"model": f"models/{self.model}"},
+                "bidiGenerateContentSetup": setup,
             }
         ).encode()
         token = _post(self.tokens_url, body, {"x-goog-api-key": self.api_key})
-        return {
-            "provider": self.name,
-            "url": f"{self.live_url}?access_token={token['name']}",
-            "setup": definition.gemini_setup(self.model, self.voice, self.thinking_level, **values),
-        }
+        return {"provider": self.name, "url": f"{self.live_url}?access_token={token['name']}", "setup": setup}
 
 
 def _rfc3339(moment: datetime) -> str:
