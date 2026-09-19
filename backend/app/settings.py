@@ -10,7 +10,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Literal
 
-Group = Literal["voice", "claude", "text"]
+Group = Literal["keys", "voice", "claude", "text"]
 
 EFFORTS = ("low", "medium", "high", "xhigh", "max")
 CLAUDE_MODELS = ("opus", "sonnet")
@@ -66,12 +66,12 @@ class Spec:
 
 
 SPECS: tuple[Spec, ...] = (
+    Spec("OPENAI_API_KEY", "keys", secret=True),
+    Spec("GEMINI_API_KEY", "keys", secret=True),
     Spec("VOICE_PROVIDER", "voice", "openai", choices=("openai", "gemini")),
     Spec("VOICE_MODEL", "voice", suggestions=(OPENAI_VOICE_MODEL, *GEMINI_VOICE_MODELS)),
     Spec("VOICE_THINKING", "voice", "low", choices=THINKING_LEVELS),
     Spec("VOICE_NAME", "voice", "Kore", choices=tuple(GEMINI_VOICES), labels=GEMINI_VOICES),
-    Spec("OPENAI_API_KEY", "voice", secret=True),
-    Spec("GEMINI_API_KEY", "voice", secret=True),
     Spec("CLAUDE_MODEL", "claude", "opus", suggestions=CLAUDE_MODELS),
     Spec("CLAUDE_EFFORT", "claude", "xhigh", choices=EFFORTS),
     Spec("CLAUDE_SKILLS", "claude"),

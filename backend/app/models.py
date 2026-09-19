@@ -268,7 +268,7 @@ class LiveSession(BaseModel):
 
 class SettingField(BaseModel):
     key: str
-    group: Literal["voice", "claude", "text"]
+    group: Literal["keys", "voice", "claude", "text"]
     value: str
     secret: bool
     default: str

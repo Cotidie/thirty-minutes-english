@@ -95,7 +95,7 @@ export interface GeminiLiveSession {
 export type LiveSession = OpenAILiveSession | GeminiLiveSession
 export type VoiceProvider = LiveSession['provider']
 
-export type SettingGroup = 'voice' | 'claude' | 'text'
+export type SettingGroup = 'keys' | 'voice' | 'claude' | 'text'
 
 /** One runtime setting, its effective value; secrets come masked. */
 export interface SettingField {

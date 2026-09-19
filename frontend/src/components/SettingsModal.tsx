@@ -8,6 +8,7 @@ interface Props {
 }
 
 const GROUP_TITLE: Record<SettingGroup, string> = {
+  keys: 'API keys',
   voice: 'Voice coach',
   claude: 'Claude generation',
   text: 'Summary text model',
@@ -109,7 +110,7 @@ export function SettingsModal({ open, onClose }: Props) {
     return f.suggestions.filter((m) => (provider === 'gemini' ? m.startsWith('gemini') : !m.startsWith('gemini')))
   }
 
-  const groups = (['voice', 'claude', 'text'] as const).map((g) => ({
+  const groups = (['keys', 'voice', 'claude', 'text'] as const).map((g) => ({
     group: g,
     fields: (fields ?? []).filter((f) => f.group === g && visible(f)),
   }))

@@ -35,8 +35,8 @@ const FIELDS: SettingField[] = [
     choices: ['Kore', 'Puck'],
     labels: { Kore: 'Firm', Puck: 'Upbeat' },
   }),
-  field({ key: 'OPENAI_API_KEY', group: 'voice', value: '…1234', secret: true }),
-  field({ key: 'GEMINI_API_KEY', group: 'voice', secret: true }),
+  field({ key: 'OPENAI_API_KEY', group: 'keys', value: '…1234', secret: true }),
+  field({ key: 'GEMINI_API_KEY', group: 'keys', secret: true }),
   field({ key: 'CLAUDE_MODEL', group: 'claude', value: 'sonnet', default: 'opus', suggestions: ['opus', 'sonnet'] }),
   field({ key: 'SUMMARY_MODEL', group: 'text', value: 'gpt-5.6-luna', default: 'gpt-5.6-luna' }),
 ]
@@ -60,6 +60,8 @@ describe('SettingsModal', () => {
     expect(key.value).toBe('')
     expect(key.placeholder).toBe('…1234')
     expect((screen.getByLabelText(/CLAUDE_MODEL/) as HTMLInputElement).value).toBe('sonnet')
+    const legends = Array.from(document.querySelectorAll('legend')).map((l) => l.textContent)
+    expect(legends).toEqual(['API keys', 'Voice coach', 'Claude generation', 'Summary text model'])
   })
 
   it('hides the Gemini-only fields under OpenAI and shows them once the provider flips', async () => {

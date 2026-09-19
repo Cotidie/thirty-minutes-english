@@ -95,7 +95,7 @@ def test_get_masks_secrets(tmp_path):
         fields = {f["key"]: f for f in c.get("/api/settings").json()["fields"]}
     assert fields["OPENAI_API_KEY"] == {
         "key": "OPENAI_API_KEY",
-        "group": "voice",
+        "group": "keys",
         "value": "…1234",
         "secret": True,
         "default": "",
