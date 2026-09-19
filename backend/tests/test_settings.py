@@ -14,30 +14,18 @@ def store(tmp_path):
 
 
 def test_default_when_neither_env_nor_db(store):
-    settings = Settings.resolve({}, store)
-    assert settings.get("VOICE_PROVIDER") == "openai"
-    assert settings.source("VOICE_PROVIDER") == "default"
+    assert Settings.resolve({}, store).get("VOICE_PROVIDER") == "openai"
 
 
 def test_env_beats_default_and_blank_env_counts_as_unset(store):
     settings = Settings.resolve({"CLAUDE_MODEL": "sonnet", "TOPICS_MODEL": "  "}, store)
     assert settings.get("CLAUDE_MODEL") == "sonnet"
-    assert settings.source("CLAUDE_MODEL") == "env"
     assert settings.get("TOPICS_MODEL") == "sonnet"
-    assert settings.source("TOPICS_MODEL") == "default"
 
 
-def test_db_beats_env(store):
+def test_saved_beats_env(store):
     store.save({"VOICE_PROVIDER": "gemini"})
-    settings = Settings.resolve({"VOICE_PROVIDER": "openai"}, store)
-    assert settings.voice_provider == "gemini"
-    assert settings.source("VOICE_PROVIDER") == "db"
-
-
-def test_none_clears_the_override(store):
-    store.save({"VOICE_PROVIDER": "gemini"})
-    store.save({"VOICE_PROVIDER": None})
-    assert Settings.resolve({"VOICE_PROVIDER": "openai"}, store).voice_provider == "openai"
+    assert Settings.resolve({"VOICE_PROVIDER": "openai"}, store).voice_provider == "gemini"
 
 
 def test_rejects_unknown_key_and_bad_choice(store):
@@ -45,6 +33,8 @@ def test_rejects_unknown_key_and_bad_choice(store):
         store.save({"NOPE": "x"})
     with pytest.raises(InvalidSetting):
         store.save({"VOICE_PROVIDER": "anthropic"})
+    with pytest.raises(InvalidSetting):
+        store.save({"VOICE_NAME": "Siri"})
     assert store.load() == {}
 
 
@@ -73,6 +63,7 @@ def test_fields_mask_secrets_and_carry_metadata():
     assert fields["GEMINI_API_KEY"].value == ""
     assert fields["CLAUDE_EFFORT"].choices == ("low", "medium", "high", "xhigh", "max")
     assert "gemini-3.8-live" in fields["VOICE_MODEL"].suggestions
+    assert "Kore" in fields["VOICE_NAME"].choices and len(fields["VOICE_NAME"].choices) == 30
     assert fields["VOICE_MODEL"].group == "voice"
 
 
@@ -95,21 +86,22 @@ def settings_client(tmp_path, env, rebuild=None):
     return TestClient(app)
 
 
-def test_get_masks_secrets_and_names_sources(tmp_path):
+def test_get_masks_secrets(tmp_path):
     with settings_client(tmp_path, {"OPENAI_API_KEY": "sk-openai-1234", "CLAUDE_MODEL": "sonnet"}) as c:
         fields = {f["key"]: f for f in c.get("/api/settings").json()["fields"]}
     assert fields["OPENAI_API_KEY"] == {
         "key": "OPENAI_API_KEY",
         "group": "voice",
         "value": "…1234",
-        "source": "env",
         "secret": True,
         "default": "",
         "choices": None,
         "suggestions": [],
+        "labels": {},
     }
-    assert fields["CLAUDE_MODEL"]["value"] == "sonnet" and fields["CLAUDE_MODEL"]["source"] == "env"
-    assert fields["VOICE_PROVIDER"]["source"] == "default"
+    assert fields["CLAUDE_MODEL"]["value"] == "sonnet"
+    assert fields["VOICE_NAME"]["choices"][:2] == ["Zephyr", "Puck"]
+    assert fields["VOICE_NAME"]["labels"]["Kore"] == "Firm"
 
 
 def test_put_stores_overrides_and_rebuilds_services(tmp_path):
@@ -123,7 +115,7 @@ def test_put_stores_overrides_and_rebuilds_services(tmp_path):
         res = c.put("/api/settings", json={"values": {"VOICE_PROVIDER": "gemini", "GEMINI_API_KEY": "AIza-x-5678"}})
         assert res.status_code == 200
         fields = {f["key"]: f for f in res.json()["fields"]}
-        assert fields["VOICE_PROVIDER"] == fields["VOICE_PROVIDER"] | {"value": "gemini", "source": "db"}
+        assert fields["VOICE_PROVIDER"]["value"] == "gemini"
         assert fields["GEMINI_API_KEY"]["value"] == "…5678"
         # The live endpoints now name the Gemini key when the provider has none.
         assert "GEMINI_API_KEY" in c.post("/api/phrase/sessions", json={}).json()["detail"]
@@ -136,12 +128,4 @@ def test_put_rejects_bad_values_without_saving(tmp_path):
     with settings_client(tmp_path, {}) as c:
         assert c.put("/api/settings", json={"values": {"VOICE_PROVIDER": "anthropic"}}).status_code == 400
         assert c.put("/api/settings", json={"values": {"NOPE": "x"}}).status_code == 400
-        assert {f["key"]: f["source"] for f in c.get("/api/settings").json()["fields"]}["VOICE_PROVIDER"] == "default"
-
-
-def test_put_null_clears_an_override(tmp_path):
-    with settings_client(tmp_path, {"CLAUDE_EFFORT": "high"}) as c:
-        c.put("/api/settings", json={"values": {"CLAUDE_EFFORT": "max"}})
-        res = c.put("/api/settings", json={"values": {"CLAUDE_EFFORT": None}})
-    field = {f["key"]: f for f in res.json()["fields"]}["CLAUDE_EFFORT"]
-    assert field["value"] == "high" and field["source"] == "env"
+        assert {f["key"]: f["value"] for f in c.get("/api/settings").json()["fields"]}["VOICE_PROVIDER"] == "openai"

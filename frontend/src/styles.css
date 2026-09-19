@@ -1619,14 +1619,9 @@ button.question.is-active {
 
 .settings-row {
   display: grid;
-  grid-template-columns: minmax(11rem, 1fr) minmax(0, 1.4fr) auto;
+  grid-template-columns: minmax(11rem, 1fr) minmax(0, 1.4fr);
   align-items: center;
   gap: 0.6rem;
-}
-
-.settings-row.is-cleared input,
-.settings-row.is-cleared select {
-  color: var(--muted);
 }
 
 .settings-row label {
@@ -1640,19 +1635,6 @@ button.question.is-active {
   font-size: 0.8rem;
   overflow: hidden;
   text-overflow: ellipsis;
-}
-
-.settings-source {
-  font-size: 0.68rem;
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
-  color: var(--muted);
-}
-
-.settings-source.is-db {
-  color: var(--ink);
-  background: var(--marker-soft);
-  padding: 0 0.3rem;
 }
 
 .settings-row input,
@@ -1669,19 +1651,6 @@ button.question.is-active {
 
 .settings-row input::placeholder {
   color: var(--muted);
-}
-
-.settings-reset {
-  padding: 0.2rem 0.5rem;
-  border: 1px solid var(--line);
-  border-radius: 999px;
-  background: transparent;
-  font-size: 0.75rem;
-  cursor: pointer;
-}
-
-.settings-reset:hover {
-  border-color: var(--ink);
 }
 
 .settings-foot {
@@ -1708,7 +1677,7 @@ button.question.is-active {
 
 @media (max-width: 40rem) {
   .settings-row {
-    grid-template-columns: 1fr auto;
+    grid-template-columns: 1fr;
   }
 
   .settings-row label {

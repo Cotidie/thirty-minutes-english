@@ -1,7 +1,8 @@
-"""Runtime settings. Every value has an environment default; the settings
-modal writes overrides into a SQLite table, and the app rebuilds its services
-from the merged result without a restart. Infra values that need a restart
-(DB path, agent folders, ports, the Claude OAuth token) stay out of here."""
+"""Runtime settings. The environment seeds each value; what the user saves
+in the settings modal lives in a SQLite table and wins from then on, and the
+app rebuilds its services from the result without a restart. Infra values
+that need a restart (DB path, agent folders, ports, the Claude OAuth token)
+stay out of here."""
 
 import sqlite3
 from collections.abc import Mapping
@@ -10,7 +11,6 @@ from pathlib import Path
 from typing import Literal
 
 Group = Literal["voice", "claude", "text"]
-Source = Literal["env", "db", "default"]
 
 EFFORTS = ("low", "medium", "high", "xhigh", "max")
 CLAUDE_MODELS = ("opus", "sonnet")
@@ -18,6 +18,40 @@ OPENAI_VOICE_MODEL = "gpt-live-1"
 GEMINI_VOICE_MODEL = "gemini-3.8-live-extended-thinking"
 GEMINI_VOICE_MODELS = ("gemini-3.8-live", GEMINI_VOICE_MODEL)
 THINKING_LEVELS = ("low", "medium", "high")
+# The Gemini API has no voices.list; this is the TTS list the Live native-audio
+# models share (ai.google.dev/gemini-api/docs/speech-generation#voices).
+GEMINI_VOICES = {
+    "Zephyr": "Bright",
+    "Puck": "Upbeat",
+    "Charon": "Informative",
+    "Kore": "Firm",
+    "Fenrir": "Excitable",
+    "Leda": "Youthful",
+    "Orus": "Firm",
+    "Aoede": "Breezy",
+    "Callirrhoe": "Easy-going",
+    "Autonoe": "Bright",
+    "Enceladus": "Breathy",
+    "Iapetus": "Clear",
+    "Umbriel": "Easy-going",
+    "Algieba": "Smooth",
+    "Despina": "Smooth",
+    "Erinome": "Clear",
+    "Algenib": "Gravelly",
+    "Rasalgethi": "Informative",
+    "Laomedeia": "Upbeat",
+    "Achernar": "Soft",
+    "Alnilam": "Firm",
+    "Schedar": "Even",
+    "Gacrux": "Mature",
+    "Pulcherrima": "Forward",
+    "Achird": "Friendly",
+    "Zubenelgenubi": "Casual",
+    "Vindemiatrix": "Gentle",
+    "Sadachbia": "Lively",
+    "Sadaltager": "Knowledgeable",
+    "Sulafat": "Warm",
+}
 
 
 @dataclass(frozen=True)
@@ -28,13 +62,14 @@ class Spec:
     secret: bool = False
     choices: tuple[str, ...] | None = None  # strict: a value outside is rejected
     suggestions: tuple[str, ...] = ()  # free text with a menu of common values
+    labels: Mapping[str, str] | None = None  # a short description per choice, for the menu
 
 
 SPECS: tuple[Spec, ...] = (
     Spec("VOICE_PROVIDER", "voice", "openai", choices=("openai", "gemini")),
     Spec("VOICE_MODEL", "voice", suggestions=(OPENAI_VOICE_MODEL, *GEMINI_VOICE_MODELS)),
     Spec("VOICE_THINKING", "voice", "low", choices=THINKING_LEVELS),
-    Spec("VOICE_NAME", "voice", "Kore"),
+    Spec("VOICE_NAME", "voice", "Kore", choices=tuple(GEMINI_VOICES), labels=GEMINI_VOICES),
     Spec("OPENAI_API_KEY", "voice", secret=True),
     Spec("GEMINI_API_KEY", "voice", secret=True),
     Spec("CLAUDE_MODEL", "claude", "opus", suggestions=CLAUDE_MODELS),
@@ -53,18 +88,18 @@ class InvalidSetting(ValueError):
     pass
 
 
-def validate(values: Mapping[str, str | None]) -> None:
-    """Rejects unknown keys and values outside a strict choice list. None clears an override."""
+def validate(values: Mapping[str, str]) -> None:
+    """Rejects unknown keys and values outside a strict choice list."""
     for key, value in values.items():
         spec = SPEC_BY_KEY.get(key)
         if spec is None:
             raise InvalidSetting(f"unknown setting {key}")
-        if value is not None and spec.choices and value not in spec.choices:
+        if spec.choices and value not in spec.choices:
             raise InvalidSetting(f"{key} must be one of {', '.join(spec.choices)}")
 
 
 class SettingsStore:
-    """The overrides table. Same file as the sessions, its own table."""
+    """What the user saved. Same file as the sessions, its own table."""
 
     def __init__(self, path: Path | str) -> None:
         self._path = Path(path)
@@ -79,54 +114,42 @@ class SettingsStore:
         with self._connect() as conn:
             return dict(conn.execute("SELECT key, value FROM settings").fetchall())
 
-    def save(self, values: Mapping[str, str | None]) -> None:
-        """Writes each value; None removes the override so the env default shows through."""
+    def save(self, values: Mapping[str, str]) -> None:
         validate(values)
         with self._connect() as conn:
             for key, value in values.items():
-                if value is None:
-                    conn.execute("DELETE FROM settings WHERE key = ?", (key,))
-                else:
-                    conn.execute("INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)", (key, value))
+                conn.execute("INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)", (key, value))
 
 
 @dataclass(frozen=True)
 class Field:
-    """One setting as the modal sees it: the effective value (secrets masked) and where it came from."""
+    """One setting as the modal sees it: the effective value, secrets masked."""
 
     key: str
     group: Group
     value: str
-    source: Source
     secret: bool
     default: str
     choices: tuple[str, ...] | None
     suggestions: tuple[str, ...]
+    labels: dict[str, str]
 
 
 class Settings:
-    """Env defaults under DB overrides. Blank env values count as unset."""
+    """Saved values first, then the environment, then the code default. Blank env values count as unset."""
 
-    def __init__(self, env: Mapping[str, str], overrides: Mapping[str, str]) -> None:
+    def __init__(self, env: Mapping[str, str], saved: Mapping[str, str]) -> None:
         self._env = {k: v.strip() for k, v in env.items() if k in SPEC_BY_KEY}
-        self._overrides = dict(overrides)
+        self._saved = dict(saved)
 
     @classmethod
     def resolve(cls, env: Mapping[str, str], store: SettingsStore) -> "Settings":
         return cls(env, store.load())
 
-    def source(self, key: str) -> Source:
-        if key in self._overrides:
-            return "db"
-        if self._env.get(key):
-            return "env"
-        return "default"
-
     def get(self, key: str) -> str:
-        spec = SPEC_BY_KEY[key]
-        if key in self._overrides:
-            return self._overrides[key]
-        return self._env.get(key) or spec.default
+        if key in self._saved:
+            return self._saved[key]
+        return self._env.get(key) or SPEC_BY_KEY[key].default
 
     def fields(self) -> list[Field]:
         return [
@@ -134,11 +157,11 @@ class Settings:
                 key=spec.key,
                 group=spec.group,
                 value=mask(self.get(spec.key)) if spec.secret else self.get(spec.key),
-                source=self.source(spec.key),
                 secret=spec.secret,
                 default=spec.default,
                 choices=spec.choices,
                 suggestions=spec.suggestions,
+                labels=dict(spec.labels or {}),
             )
             for spec in SPECS
         ]

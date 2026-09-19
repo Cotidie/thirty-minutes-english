@@ -270,11 +270,11 @@ class SettingField(BaseModel):
     key: str
     group: Literal["voice", "claude", "text"]
     value: str
-    source: Literal["env", "db", "default"]
     secret: bool
     default: str
     choices: list[str] | None
     suggestions: list[str]
+    labels: dict[str, str] = {}
 
 
 class SettingsView(BaseModel):
@@ -282,6 +282,4 @@ class SettingsView(BaseModel):
 
 
 class SettingsUpdate(BaseModel):
-    """Keys to write. A null value drops the override so the env default shows through."""
-
-    values: dict[str, str | None]
+    values: dict[str, str]

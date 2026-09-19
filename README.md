@@ -26,7 +26,7 @@ docker compose up -d --build
 | `VOICE_PROVIDER` | `openai` | 음성 코치 3종의 provider. `openai`(GPT-Live, WebRTC) 또는 `gemini`(Gemini Live, WebSocket) |
 | `VOICE_MODEL` | provider별 | 비우면 `gpt-live-1` / `gemini-3.8-live-extended-thinking` |
 | `VOICE_THINKING` | `low` | `gemini-3.8-live-extended-thinking`의 thinking 수준. `low`, `medium`, `high` |
-| `VOICE_NAME` | `Kore` | Gemini 음성 이름. OpenAI는 각 코치 `session.json`의 voice를 쓴다 |
+| `VOICE_NAME` | `Kore` | Gemini 음성. Gemini API에 목록 조회 API가 없어 TTS 문서의 30개(Live native audio 모델과 공유)를 코드에 두고 모달에서 고른다. OpenAI는 각 코치 `session.json`의 voice를 쓴다 |
 | `GEMINI_API_KEY` | 비움 | Gemini Live용. provider가 `gemini`인데 비어 있으면 세 버튼이 503 |
 | `CLAUDE_MODEL` | `opus` | 생성 모델. `sonnet`이면 더 빠름 |
 | `CLAUDE_EFFORT` | `xhigh` | reasoning effort. `low`, `medium`, `high`, `xhigh`, `max` |
@@ -48,7 +48,7 @@ docker compose up -d --build
 
 ## 설정 모달
 
-모든 페이지 우상단 ⚙(단축키 `,`)가 위 표의 환경변수를 전부 편집하는 모달을 연다(`DB_PATH`, `*_AGENT_DIR`, `FRONTEND_PORT`, `CLAUDE_CODE_OAUTH_TOKEN`처럼 재시작이 필요한 인프라 값은 제외). 값마다 출처가 붙는다: `env`(.env 또는 compose), `db`(모달에서 저장), `default`(코드 기본값). 저장은 `PUT /api/settings`로 SQLite `settings` 테이블에 들어가고 env 값을 덮어쓴다. 저장 직후 backend가 생성기·주제 소스·음성 코치·추출기를 다시 조립하므로 재시작 없이 다음 라운드부터 바뀐 provider와 모델이 쓰인다. `Reset`은 DB 오버라이드를 지워 env 값이 다시 보이게 한다. API 키는 마스킹(`…끝 4자`)으로만 내려오고 입력칸을 비워 두면 그대로 유지된다.
+모든 페이지 우상단 ⚙(단축키 `,`)가 위 표의 환경변수를 전부 편집하는 모달을 연다(`DB_PATH`, `*_AGENT_DIR`, `FRONTEND_PORT`, `CLAUDE_CODE_OAUTH_TOKEN`처럼 재시작이 필요한 인프라 값은 제외). `.env`는 초기값일 뿐이고, 모달에서 저장한 값은 `PUT /api/settings`로 SQLite `settings` 테이블에 남아 그 뒤로는 그 값이 쓰인다(컨테이너를 다시 만들어도 `backend/data`에 남는다). 저장 직후 backend가 생성기·주제 소스·음성 코치·추출기를 다시 조립하므로 재시작 없이 다음 라운드부터 바뀐 provider와 모델이 쓰인다. API 키는 마스킹(`…끝 4자`)으로만 내려오고 입력칸을 비워 두면 그대로 유지된다.
 
 ## 음성 코치 provider (GPT-Live / Gemini Live)
 

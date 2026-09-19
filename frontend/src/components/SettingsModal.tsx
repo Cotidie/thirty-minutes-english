@@ -19,15 +19,15 @@ const PROVIDER_MODEL_DEFAULT: Record<string, string> = {
 }
 
 /**
- * Every runtime setting on one card. The backend keeps env defaults under the
- * DB overrides written here and rebuilds its services on save, so a new
- * provider or model is live for the next round without a restart.
+ * Every runtime setting on one card. What is saved here is kept in the
+ * backend's database and wins over the environment from then on; the backend
+ * rebuilds its services on save, so a new provider or model is live for the
+ * next round without a restart.
  */
 export function SettingsModal({ open, onClose }: Props) {
   const dialogRef = useRef<HTMLDialogElement>(null)
   const [fields, setFields] = useState<SettingField[] | null>(null)
   const [draft, setDraft] = useState<Record<string, string>>({})
-  const [cleared, setCleared] = useState<Set<string>>(new Set())
   const [saving, setSaving] = useState(false)
   const [notice, setNotice] = useState<{ kind: 'ok' | 'error'; text: string } | null>(null)
 
@@ -42,7 +42,6 @@ export function SettingsModal({ open, onClose }: Props) {
     if (!open) return
     let live = true
     setNotice(null)
-    setCleared(new Set())
     api.getSettings().then(
       ({ fields }) => {
         if (!live) return
@@ -61,26 +60,12 @@ export function SettingsModal({ open, onClose }: Props) {
   const changes = useMemo<SettingsUpdate>(() => {
     const update: SettingsUpdate = {}
     for (const f of fields ?? []) {
-      if (cleared.has(f.key)) update[f.key] = null
-      else if (f.secret ? draft[f.key] !== '' : draft[f.key] !== f.value) update[f.key] = draft[f.key]
+      if (f.secret ? draft[f.key] !== '' : draft[f.key] !== f.value) update[f.key] = draft[f.key]
     }
     return update
-  }, [cleared, draft, fields])
+  }, [draft, fields])
 
-  const edit = (key: string, value: string) => {
-    setDraft((d) => ({ ...d, [key]: value }))
-    setCleared((c) => {
-      if (!c.has(key)) return c
-      const next = new Set(c)
-      next.delete(key)
-      return next
-    })
-  }
-
-  const clear = (field: SettingField) => {
-    setCleared((c) => new Set(c).add(field.key))
-    setDraft((d) => ({ ...d, [field.key]: field.secret ? '' : field.default }))
-  }
+  const edit = (key: string, value: string) => setDraft((d) => ({ ...d, [key]: value }))
 
   const save = async () => {
     setSaving(true)
@@ -89,7 +74,6 @@ export function SettingsModal({ open, onClose }: Props) {
       const { fields } = await api.putSettings(changes)
       setFields(fields)
       setDraft(Object.fromEntries(fields.map((f) => [f.key, f.secret ? '' : f.value])))
-      setCleared(new Set())
       setNotice({ kind: 'ok', text: 'Saved. The next round uses these.' })
     } catch (e) {
       setNotice({ kind: 'error', text: e instanceof Error ? e.message : String(e) })
@@ -126,9 +110,7 @@ export function SettingsModal({ open, onClose }: Props) {
       >
         <header className="settings-head">
           <h2>Settings</h2>
-          <p className="settings-lede">
-            Env values are the defaults. Anything saved here overrides them, with no restart.
-          </p>
+          <p className="settings-lede">Saved values apply to the next round. No restart.</p>
         </header>
         {fields === null ? (
           <p className="settings-loading">{notice?.kind === 'error' ? notice.text : 'Loading…'}</p>
@@ -137,10 +119,9 @@ export function SettingsModal({ open, onClose }: Props) {
             <fieldset key={group} className="settings-group">
               <legend>{GROUP_TITLE[group]}</legend>
               {fields.map((f) => (
-                <div key={f.key} className={`settings-row${cleared.has(f.key) ? ' is-cleared' : ''}`}>
+                <div key={f.key} className="settings-row">
                   <label htmlFor={`setting-${f.key}`}>
                     <code>{f.key}</code>
-                    <span className={`settings-source is-${f.source}`}>{f.source}</span>
                   </label>
                   <Control
                     field={f}
@@ -149,13 +130,6 @@ export function SettingsModal({ open, onClose }: Props) {
                     placeholder={f.key === 'VOICE_MODEL' ? PROVIDER_MODEL_DEFAULT[provider] : f.secret ? f.value || 'not set' : f.default}
                     onChange={(v) => edit(f.key, v)}
                   />
-                  {f.source === 'db' && !cleared.has(f.key) ? (
-                    <button type="button" className="settings-reset" onClick={() => clear(f)} title="Drop the override">
-                      Reset
-                    </button>
-                  ) : (
-                    <span />
-                  )}
                 </div>
               ))}
             </fieldset>
@@ -190,7 +164,7 @@ function Control({ field, value, suggestions, placeholder, onChange }: ControlPr
       <select id={id} value={value} onChange={(e) => onChange(e.target.value)}>
         {field.choices.map((c) => (
           <option key={c} value={c}>
-            {c}
+            {field.labels[c] ? `${c} · ${field.labels[c]}` : c}
           </option>
         ))}
       </select>

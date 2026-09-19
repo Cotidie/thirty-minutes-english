@@ -97,26 +97,26 @@ export type VoiceProvider = LiveSession['provider']
 
 export type SettingGroup = 'voice' | 'claude' | 'text'
 
-/** One runtime setting: env default under a DB override, secrets masked. */
+/** One runtime setting, its effective value; secrets come masked. */
 export interface SettingField {
   key: string
   group: SettingGroup
   value: string
-  source: 'env' | 'db' | 'default'
   secret: boolean
   default: string
   /** Strict list: the backend rejects anything else. */
   choices: string[] | null
   /** Free text with a menu of common values. */
   suggestions: string[]
+  /** A short description per choice, shown in the menu. */
+  labels: Record<string, string>
 }
 
 export interface SettingsView {
   fields: SettingField[]
 }
 
-/** null drops the override so the env default shows through. */
-export type SettingsUpdate = Record<string, string | null>
+export type SettingsUpdate = Record<string, string>
 
 export interface PhraseCard {
   asked: string
