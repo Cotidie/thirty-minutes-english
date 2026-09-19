@@ -1,0 +1,17 @@
+# Development overlay: source bind-mounted, both servers reload on save.
+#   docker compose -f compose.yaml -f compose.dev.yaml up --build
+services:
+  backend:
+    command: ["uv", "run", "uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8765", "--reload"]
+    volumes:
+      - ./backend/app:/app/app
+      - ./backend/tests:/app/tests
+
+  frontend:
+    build:
+      context: ./frontend
+      target: dev
+    volumes:
+      - ./frontend/src:/app/src
+      - ./frontend/public:/app/public
+      - ./frontend/index.html:/app/index.html

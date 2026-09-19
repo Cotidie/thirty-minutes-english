@@ -7,7 +7,8 @@
 ## 실행
 
 ```sh
-./dev.sh          # backend :8765 + frontend :5173
+cp .env.example .env               # 처음 한 번. 키는 비워 두고 앱의 ⚙ 설정 모달에서 넣어도 된다
+docker compose up -d --build
 ```
 
 `http://localhost:5173` 접속. 주제를 비워 두면 풀(`backend/app/topics.py`)에서 최근 10회에 안 나온 주제를 자동으로 고른다.
@@ -108,14 +109,9 @@ Read aloud 라운드는 코치가 한마디라도 했으면 끝날 때 자동으
 
 ## Docker
 
-```sh
-cp .env.example .env               # 모델, 스킬, 포트 기입. 토큰은 비워도 된다
-docker compose up -d --build
-```
-
 인증은 호스트의 `~/.claude/.credentials.json`(claude.ai 로그인 + firecrawl OAuth)을 컨테이너 시작 시 복사한다. 호스트에서 로그인이 바뀌면 `docker compose restart backend`. 호스트 로그인과 분리하려면 `claude setup-token` 값을 `.env`의 `CLAUDE_CODE_OAUTH_TOKEN`에 넣는다.
 
-`http://localhost:5173` 접속. 포트가 겹치면 `.env`의 `FRONTEND_PORT`를 바꾼다.
+포트가 겹치면 `.env`의 `FRONTEND_PORT`를 바꾼다.
 
 | 서비스 | 내용 |
 |---|---|
@@ -123,6 +119,14 @@ docker compose up -d --build
 | frontend | Vite 빌드를 nginx로 서빙. `/api`를 backend:8765로 프록시, 타임아웃 600초 |
 
 스킬은 호스트의 `~/.claude/skills`와 `~/.claude/plugins`를 읽기 전용으로 같은 경로에 마운트한다(플러그인 매니페스트가 절대경로를 쓰므로 컨테이너 HOME을 호스트와 맞춘다). 호스트 `settings.json`에서는 `enabledPlugins`만 가져오므로 훅과 권한 설정은 컨테이너 안에서 돌지 않는다. MCP는 `--strict-mcp-config`로 firecrawl(HTTP)만 붙인다.
+
+### 개발
+
+```sh
+docker compose -f compose.yaml -f compose.dev.yaml up --build
+```
+
+`compose.dev.yaml`이 소스를 bind mount하고 backend는 `uvicorn --reload`, frontend는 Vite dev 서버(`Dockerfile`의 `dev` 스테이지, `/api`는 `backend:8765`로 프록시)로 띄운다. 파일을 저장하면 둘 다 바로 반영된다. 같은 포트 `5173`을 쓴다.
 
 ## 세션 진행 (30분)
 
@@ -141,14 +145,16 @@ docker compose up -d --build
 backend/   FastAPI. app/{main,wiring,settings,generator,claude_cli,daily_topics,live,cards,store,topics,models}.py, tests/
            wiring.py가 설정으로 서비스를 조립하고, settings.py가 env + SQLite 오버라이드를 합친다
 frontend/  React 19 + Vite + TS. src/{pages,components,lib}. lib/live/가 provider별 전송(openaiWebrtc, geminiWebsocket)
-dev.sh     둘 다 띄우는 스크립트
+compose.yaml      사용용. compose.dev.yaml을 겹치면 개발용(핫 리로드)
 ```
 
 ## 테스트
 
+개발 overlay가 떠 있는 상태에서:
+
 ```sh
-cd backend && uv run pytest
-cd frontend && npm test
+docker compose exec backend uv run pytest      # 처음 한 번 pytest를 내려받는다
+docker compose exec frontend npm test
 ```
 
 설계 문서: `docs/superpowers/specs/2026-09-10-english-speaking-claude-design.md`
