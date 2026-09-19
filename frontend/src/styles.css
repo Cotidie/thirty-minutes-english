@@ -1653,6 +1653,40 @@ button.question.is-active {
   color: var(--muted);
 }
 
+.settings-keytest {
+  grid-column: 2;
+  display: flex;
+  align-items: baseline;
+  gap: 0.5rem;
+  min-width: 0;
+  font-size: 0.8rem;
+}
+
+.settings-test {
+  padding: 0.15rem 0.55rem;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: transparent;
+  font-size: 0.75rem;
+  cursor: pointer;
+}
+
+.settings-test:hover:not(:disabled) {
+  border-color: var(--ink);
+}
+
+.settings-keytest-result {
+  overflow-wrap: anywhere;
+}
+
+.settings-keytest-result.is-ok {
+  color: #2f6b3a;
+}
+
+.settings-keytest-result.is-error {
+  color: #a2321f;
+}
+
 .settings-foot {
   display: flex;
   align-items: center;
@@ -1678,6 +1712,10 @@ button.question.is-active {
 @media (max-width: 40rem) {
   .settings-row {
     grid-template-columns: 1fr;
+  }
+
+  .settings-keytest {
+    grid-column: 1;
   }
 
   .settings-row label {

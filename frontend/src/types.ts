@@ -118,6 +118,13 @@ export interface SettingsView {
 
 export type SettingsUpdate = Record<string, string>
 
+export type ApiKeyName = 'OPENAI_API_KEY' | 'GEMINI_API_KEY'
+
+export interface KeyTestResult {
+  ok: boolean
+  message: string
+}
+
 export interface PhraseCard {
   asked: string
   english: string

@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { api } from '../api'
-import type { SettingField, SettingGroup, SettingsUpdate } from '../types'
+import type { ApiKeyName, KeyTestResult, SettingField, SettingGroup, SettingsUpdate } from '../types'
 
 interface Props {
   open: boolean
@@ -29,6 +29,7 @@ export function SettingsModal({ open, onClose }: Props) {
   const [fields, setFields] = useState<SettingField[] | null>(null)
   const [draft, setDraft] = useState<Record<string, string>>({})
   const [saving, setSaving] = useState(false)
+  const [keyTests, setKeyTests] = useState<Record<string, KeyTestResult | 'testing'>>({})
   const [notice, setNotice] = useState<{ kind: 'ok' | 'error'; text: string } | null>(null)
 
   useEffect(() => {
@@ -42,6 +43,7 @@ export function SettingsModal({ open, onClose }: Props) {
     if (!open) return
     let live = true
     setNotice(null)
+    setKeyTests({})
     api.getSettings().then(
       ({ fields }) => {
         if (!live) return
@@ -65,7 +67,21 @@ export function SettingsModal({ open, onClose }: Props) {
     return update
   }, [draft, fields])
 
-  const edit = (key: string, value: string) => setDraft((d) => ({ ...d, [key]: value }))
+  const edit = (key: string, value: string) => {
+    setDraft((d) => ({ ...d, [key]: value }))
+    setKeyTests((t) => (key in t ? { ...t, [key]: undefined } as Record<string, KeyTestResult | 'testing'> : t))
+  }
+
+  /** Tries the typed key, or the saved one when the field is blank. */
+  const testKey = async (key: ApiKeyName) => {
+    setKeyTests((t) => ({ ...t, [key]: 'testing' }))
+    try {
+      const result = await api.testKey(key, draft[key] ?? '')
+      setKeyTests((t) => ({ ...t, [key]: result }))
+    } catch (e) {
+      setKeyTests((t) => ({ ...t, [key]: { ok: false, message: e instanceof Error ? e.message : String(e) } }))
+    }
+  }
 
   const save = async () => {
     setSaving(true)
@@ -130,6 +146,9 @@ export function SettingsModal({ open, onClose }: Props) {
                     placeholder={f.key === 'VOICE_MODEL' ? PROVIDER_MODEL_DEFAULT[provider] : f.secret ? f.value || 'not set' : f.default}
                     onChange={(v) => edit(f.key, v)}
                   />
+                  {isApiKey(f.key) && (
+                    <KeyTest state={keyTests[f.key]} onTest={() => void testKey(f.key as ApiKeyName)} />
+                  )}
                 </div>
               ))}
             </fieldset>
@@ -146,6 +165,24 @@ export function SettingsModal({ open, onClose }: Props) {
         </footer>
       </form>
     </dialog>
+  )
+}
+
+const isApiKey = (key: string): key is ApiKeyName => key === 'OPENAI_API_KEY' || key === 'GEMINI_API_KEY'
+
+function KeyTest({ state, onTest }: { state: KeyTestResult | 'testing' | undefined; onTest: () => void }) {
+  return (
+    <div className="settings-keytest">
+      <button type="button" className="settings-test" onClick={onTest} disabled={state === 'testing'}>
+        {state === 'testing' ? 'Testing…' : 'Test'}
+      </button>
+      {state && state !== 'testing' && (
+        <span className={`settings-keytest-result is-${state.ok ? 'ok' : 'error'}`} role="status">
+          {state.ok ? '✓ ' : '✗ '}
+          {state.message}
+        </span>
+      )}
+    </div>
   )
 }
 

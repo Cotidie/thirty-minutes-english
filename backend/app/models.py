@@ -283,3 +283,15 @@ class SettingsView(BaseModel):
 
 class SettingsUpdate(BaseModel):
     values: dict[str, str]
+
+
+class KeyTestRequest(BaseModel):
+    """Which key to try. `value` is what is typed in the modal; blank means the saved key."""
+
+    key: Literal["OPENAI_API_KEY", "GEMINI_API_KEY"]
+    value: str = ""
+
+
+class KeyTestResult(BaseModel):
+    ok: bool
+    message: str

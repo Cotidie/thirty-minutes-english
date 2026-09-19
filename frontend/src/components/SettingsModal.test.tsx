@@ -1,11 +1,11 @@
-import { render, screen, waitFor } from '@testing-library/react'
+import { render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { api } from '../api'
 import type { SettingField } from '../types'
 import { SettingsModal } from './SettingsModal'
 
-vi.mock('../api', () => ({ api: { getSettings: vi.fn(), putSettings: vi.fn() } }))
+vi.mock('../api', () => ({ api: { getSettings: vi.fn(), putSettings: vi.fn(), testKey: vi.fn() } }))
 
 function field(partial: Partial<SettingField> & Pick<SettingField, 'key' | 'group'>): SettingField {
   return {
@@ -44,6 +44,7 @@ const FIELDS: SettingField[] = [
 beforeEach(() => {
   vi.mocked(api.getSettings).mockReset().mockResolvedValue({ fields: FIELDS })
   vi.mocked(api.putSettings).mockReset().mockImplementation(async () => ({ fields: FIELDS }))
+  vi.mocked(api.testKey).mockReset()
 })
 
 async function open() {
@@ -97,6 +98,21 @@ describe('SettingsModal', () => {
       GEMINI_API_KEY: 'AIza-new',
     })
     expect(await screen.findByRole('status')).toHaveTextContent('Saved')
+  })
+
+  it('tests the typed key and shows the verdict beside it', async () => {
+    vi.mocked(api.testKey).mockResolvedValueOnce({ ok: false, message: '401: Incorrect API key provided' })
+    await open()
+    const row = screen.getByLabelText(/OPENAI_API_KEY/).closest<HTMLElement>('.settings-row')!
+    await userEvent.type(screen.getByLabelText(/OPENAI_API_KEY/), 'sk-typed')
+    await userEvent.click(within(row).getByRole('button', { name: 'Test' }))
+
+    expect(api.testKey).toHaveBeenCalledWith('OPENAI_API_KEY', 'sk-typed')
+    expect(await within(row).findByRole('status')).toHaveTextContent('✗ 401: Incorrect API key provided')
+
+    vi.mocked(api.testKey).mockResolvedValueOnce({ ok: true, message: 'key works' })
+    await userEvent.click(within(row).getByRole('button', { name: 'Test' }))
+    expect(await within(row).findByRole('status')).toHaveTextContent('✓ key works')
   })
 
   it('shows the backend error when saving fails', async () => {
