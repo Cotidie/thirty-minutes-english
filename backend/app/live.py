@@ -33,7 +33,9 @@ class LiveSessionError(Exception):
 
 class AgentDefinition:
     """session.json plus prompts/live.md from an agent folder. The session file
-    is in OpenAI's shape; Gemini's setup is derived from the same two files."""
+    is in OpenAI's shape; Gemini's setup is derived from the same two files. An
+    optional `gemini` block in session.json holds setup fields only Gemini has
+    (say `realtimeInputConfig`) and never reaches OpenAI."""
 
     def __init__(self, agent_dir: Path):
         self.template = json.loads((agent_dir / "session.json").read_text())
@@ -43,6 +45,7 @@ class AgentDefinition:
         """The OpenAI session object with `instructions` filled in and every
         {{name}} in the input messages replaced. An unknown placeholder is left alone."""
         session = copy.deepcopy(self.template)
+        session.pop("gemini", None)
         session["instructions"] = self.instructions
         for message in session.get("input", []):
             for part in message.get("content", []):
@@ -80,6 +83,7 @@ class AgentDefinition:
             "systemInstruction": {"parts": [{"text": instruction}]},
             "inputAudioTranscription": {},
             "outputAudioTranscription": {},
+            **copy.deepcopy(self.template.get("gemini", {})),
         }
 
 

@@ -35,17 +35,22 @@ export interface Decoded {
   goAway: boolean
 }
 
+/** Gemini's transcription marks a silent turn or plain noise with a tag; neither is speech. */
+const TRANSCRIPT_MARKERS = /<(?:no speech|noise|silence)>/gi
+
+export function spoken(text: string): string {
+  return text.replace(TRANSCRIPT_MARKERS, '')
+}
+
 export function decodeServerMessage(msg: GeminiServerMessage): Decoded {
   const events: LiveEvent[] = []
   const audio: string[] = []
   const content = msg.serverContent
   if (msg.setupComplete) events.push({ type: 'session.started' })
-  if (content?.inputTranscription?.text) {
-    events.push({ type: 'session.input_transcript.delta', delta: content.inputTranscription.text })
-  }
-  if (content?.outputTranscription?.text) {
-    events.push({ type: 'session.output_transcript.delta', delta: content.outputTranscription.text })
-  }
+  const heard = spoken(content?.inputTranscription?.text ?? '')
+  if (heard) events.push({ type: 'session.input_transcript.delta', delta: heard })
+  const said = spoken(content?.outputTranscription?.text ?? '')
+  if (said) events.push({ type: 'session.output_transcript.delta', delta: said })
   for (const part of content?.modelTurn?.parts ?? []) {
     if (part.inlineData?.data && (part.inlineData.mimeType ?? '').startsWith('audio/pcm')) {
       audio.push(part.inlineData.data)

@@ -16,6 +16,18 @@ describe('decodeServerMessage', () => {
     ])
   })
 
+  it('drops the silent-turn and noise markers Gemini puts in transcripts', () => {
+    const silent = decodeServerMessage({ serverContent: { outputTranscription: { text: '<no speech>' } } })
+    expect(silent.events).toEqual([])
+    const mixed = decodeServerMessage({
+      serverContent: { inputTranscription: { text: '<noise>the courtroom.' }, outputTranscription: { text: '<no speech>Goodbye.' } },
+    })
+    expect(mixed.events).toEqual([
+      { type: 'session.input_transcript.delta', delta: 'the courtroom.' },
+      { type: 'session.output_transcript.delta', delta: 'Goodbye.' },
+    ])
+  })
+
   it('collects pcm audio parts in order and skips other parts', () => {
     const decoded = decodeServerMessage({
       serverContent: {
