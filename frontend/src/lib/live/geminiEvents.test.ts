@@ -44,9 +44,8 @@ describe('decodeServerMessage', () => {
     expect(decoded.events).toEqual([])
   })
 
-  it('flags interruption, turn completion, and goAway', () => {
+  it('flags interruption and goAway', () => {
     expect(decodeServerMessage({ serverContent: { interrupted: true } }).interrupted).toBe(true)
-    expect(decodeServerMessage({ serverContent: { turnComplete: true } }).turnComplete).toBe(true)
     expect(decodeServerMessage({ goAway: { timeLeft: '10s' } }).goAway).toBe(true)
     expect(decodeServerMessage({}).interrupted).toBe(false)
   })

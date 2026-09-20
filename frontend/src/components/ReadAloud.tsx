@@ -3,7 +3,7 @@ import { api } from '../api'
 import { startAzureAssessor, type Assessor } from '../lib/assessor/azure'
 import { Judge, type AzureWord } from '../lib/assessor/judge'
 import { connectReadAloud, type LiveConnection } from '../lib/liveClient'
-import { applyLiveEvent, initialLiveState, liveFailed, type LiveState } from '../lib/liveSession'
+import { spoken } from '../lib/liveSession'
 import { ReadingText, type Shown } from './ReadingText'
 
 interface Props {
@@ -16,143 +16,206 @@ interface Props {
   onEnd: () => void
 }
 
-const STATUS_LABEL: Record<LiveState['status'], string> = {
+type Phase = 'connecting' | 'listening' | 'done' | 'failed'
+
+const STATUS_LABEL: Record<Phase, string> = {
   connecting: 'Connecting…',
   listening: 'Listening. Read the paragraph aloud; click a mark to hear it.',
-  closing: 'Wrapping up…',
-  closed: 'Round over.',
+  done: 'Round over. The marks stay: click one to hear it.',
   failed: 'Could not start.',
 }
 
-/** Everything one round holds besides the live state: the coach, the assessor, and its verdicts. */
+/** The coach stays on this long after its last word, then hangs up. */
+export const COACH_SILENCE_MS = 2000
+/** No word at all from the coach by then: hang up anyway. */
+const COACH_TIMEOUT_MS = 15_000
+
+/** The reading: the microphone, Azure on it, and the judge's verdicts on the paragraph. */
 interface Round {
-  coach: LiveConnection
+  microphone: MediaStream
   assessor: Assessor | null
   judge: Judge
   findings: Shown[]
-  /** Paragraph positions the reader clicked, so only those get a spoken "Good." */
-  asked: Set<number>
+  heard: string
+  startedAt: number
 }
 
+/** One coach call for one clicked mark: opened, spoken, hung up. */
+interface Call {
+  coach: LiveConnection
+  timer: ReturnType<typeof setTimeout> | null
+}
+
+/**
+ * Read aloud with the assessor as the only listener. Azure marks the paragraph
+ * as the reader goes; the coach is dialled only when a mark is clicked, says
+ * its two beats, and hangs up.
+ */
 export function ReadAloud({ paragraph, sessionId, active, onStart, onEnd }: Props) {
-  const [state, setState] = useState<LiveState | null>(null)
+  const [phase, setPhase] = useState<Phase | null>(null)
+  const [error, setError] = useState<string | null>(null)
+  const [heard, setHeard] = useState('')
+  const [seconds, setSeconds] = useState(0)
   const [findings, setFindings] = useState<Shown[]>([])
   const [open, setOpen] = useState<number | null>(null)
+  const [said, setSaid] = useState('')
   const audioRef = useRef<HTMLAudioElement>(null)
   const roundRef = useRef<Round | null>(null)
+  const callRef = useRef<Call | null>(null)
 
   useEffect(
     () => () => {
-      roundRef.current?.coach.dispose()
-      void roundRef.current?.assessor?.stop()
+      hangUp()
+      void endRound()
     },
     [],
   )
 
   const start = async () => {
     onStart()
-    setState(initialLiveState)
+    setPhase('connecting')
+    setError(null)
+    setHeard('')
+    setSeconds(0)
     setFindings([])
     setOpen(null)
+    setSaid('')
     try {
-      // The assessor is what makes the round worth paying for: no token, no round.
       const session = await api.assessorToken()
-      const judge = new Judge({ wordScore: session.word_score, breakConfidence: session.break_confidence }, paragraph)
-      const coach = await connectReadAloud(paragraph, {
-        audio: audioRef.current!,
-        onEvent: (event) => {
-          setState((s) => {
-            const next = applyLiveEvent(s ?? initialLiveState, event)
-            if (event.type === 'session.closed') {
-              void roundRef.current?.assessor?.stop()
-              void keep(next)
-            }
-            return next
-          })
-        },
-        onDisconnect: () => {
-          void roundRef.current?.assessor?.stop()
-          setState((s) => liveFailed(s ?? initialLiveState, 'Connection dropped before the round ended.'))
-        },
-      })
-      const round: Round = { coach, assessor: null, judge, findings: [], asked: new Set() }
+      const microphone = await navigator.mediaDevices.getUserMedia({ audio: true })
+      const round: Round = {
+        microphone,
+        assessor: null,
+        judge: new Judge({ wordScore: session.word_score, breakConfidence: session.break_confidence }, paragraph),
+        findings: [],
+        heard: '',
+        startedAt: Date.now(),
+      }
       roundRef.current = round
       round.assessor = await startAzureAssessor({
-        microphone: coach.microphone,
+        microphone,
         paragraph,
         session,
-        onSegment: (words) => judged(round, words),
-        onError: (message) => setState((s) => ({ ...(s ?? initialLiveState), error: `Assessor: ${message}` })),
+        onSegment: (words, text) => judged(round, words, text),
+        onError: (message) => setError(`Assessor: ${message}`),
       })
+      setPhase('listening')
     } catch (e) {
-      roundRef.current?.coach.dispose()
-      setState((s) => liveFailed(s ?? initialLiveState, e instanceof Error ? e.message : String(e)))
+      void endRound()
+      setError(e instanceof Error ? e.message : String(e))
+      setPhase('failed')
     }
   }
 
-  /** One recognised segment: mark the paragraph, and tell the coach when a word it corrected came out right. */
-  const judged = (round: Round, words: AzureWord[]) => {
+  /** One recognised segment: extend the transcript and mark the paragraph. */
+  const judged = (round: Round, words: AzureWord[], text: string) => {
     const { findings: fresh, confirmed } = round.judge.segment(words)
-    if (confirmed.some((c) => round.asked.has(c.at))) round.coach.confirm()
-    round.findings = round.findings.map((f) =>
-      confirmed.some((c) => c.at === f.at && c.kind === f.kind) ? { ...f, repeated_ok: true } : f,
-    )
-    round.findings = [...round.findings, ...fresh.map((f) => ({ ...f, repeated_ok: false }))]
+    round.findings = [
+      ...round.findings.map((f) => (confirmed.some((c) => c.at === f.at && c.kind === f.kind) ? { ...f, repeated_ok: true } : f)),
+      ...fresh.map((f) => ({ ...f, repeated_ok: false })),
+    ]
     setFindings(round.findings)
+    if (text) {
+      round.heard = round.heard ? `${round.heard} ${text}` : text
+      setHeard(round.heard)
+    }
   }
 
-  /** The reader clicked a mark: show the card and have the coach say it. */
-  const ask = (index: number) => {
+  /** Releases the microphone and Azure. Safe to call twice. */
+  const endRound = async () => {
     const round = roundRef.current
     if (!round) return
-    setOpen(index)
-    const f = round.findings[index]
-    if (round.asked.has(f.at) || f.repeated_ok) return
-    round.asked.add(f.at)
-    round.coach.correct(f)
+    round.microphone.getTracks().forEach((t) => t.stop())
+    const { assessor } = round
+    round.assessor = null
+    await assessor?.stop()
   }
 
-  /** A round with findings or coach speech is worth keeping; a silent clean one has nothing to file. */
-  const keep = async (live: LiveState) => {
-    const corrections = (roundRef.current?.findings ?? []).map(({ kind, word, heard, fix, repeated_ok }) => ({
-      kind,
-      word,
-      heard,
-      fix,
-      repeated_ok,
-    }))
-    if (!live.coach.trim() && corrections.length === 0) return
+  /** The reader clicked a mark: show its card and have the coach say it. */
+  const ask = (index: number) => {
+    setOpen(index)
+    const f = roundRef.current?.findings[index]
+    if (f) void speak(f)
+  }
+
+  const speak = async (finding: Shown) => {
+    hangUp()
+    setSaid('')
+    let text = ''
+    try {
+      const coach = await connectReadAloud(paragraph, {
+        audio: audioRef.current!,
+        onEvent: (event) => {
+          if (event.type === 'session.started') coach.correct(finding)
+          if (event.type === 'session.output_transcript.delta') {
+            text = spoken(text + (event.delta ?? ''))
+            setSaid(text)
+            linger(COACH_SILENCE_MS)
+          }
+          if (event.type === 'session.closed') hangUp()
+        },
+        onDisconnect: hangUp,
+      })
+      // The coach only speaks here; what the reader says next is Azure's to judge.
+      coach.microphone.getAudioTracks().forEach((t) => (t.enabled = false))
+      callRef.current = { coach, timer: null }
+      linger(COACH_TIMEOUT_MS)
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e))
+    }
+  }
+
+  /** Hang up once the coach has been quiet this long. */
+  const linger = (ms: number) => {
+    const call = callRef.current
+    if (!call) return
+    if (call.timer) clearTimeout(call.timer)
+    call.timer = setTimeout(() => call.coach.close(), ms)
+  }
+
+  const hangUp = () => {
+    const call = callRef.current
+    if (!call) return
+    callRef.current = null
+    if (call.timer) clearTimeout(call.timer)
+    call.coach.dispose()
+  }
+
+  /** The reader is done: the round is filed; the marks stay clickable. */
+  const done = async () => {
+    const round = roundRef.current
+    if (!round) return
+    const elapsed = Math.round((Date.now() - round.startedAt) / 1000)
+    setSeconds(elapsed)
+    setPhase('done')
+    await endRound()
+    if (round.findings.length === 0) return
     await api
       .addReading({
         session_id: sessionId,
         paragraph,
-        user_text: live.user.trim(),
-        coach_text: live.coach.trim() || 'Goodbye.',
-        seconds: live.seconds,
-        corrections,
+        user_text: round.heard,
+        coach_text: '',
+        seconds: elapsed,
+        corrections: round.findings.map(({ kind, word, heard, fix, repeated_ok }) => ({ kind, word, heard, fix, repeated_ok })),
       })
       .catch(() => undefined)
   }
 
-  /** The reader is done: the coach signs off. Open marks stay on the page, unspoken. */
-  const done = () => roundRef.current?.coach.finish()
-  const stop = () => {
-    setState((s) => (s ? { ...s, status: 'closing' } : s))
-    roundRef.current?.coach.close()
-  }
   const reset = () => {
+    hangUp()
+    void endRound()
     roundRef.current = null
-    setState(null)
+    setPhase(null)
     onEnd()
   }
 
-  const live = state !== null && state.status !== 'closed' && state.status !== 'failed'
   const card = open === null ? null : findings[open]
 
   return (
-    <div className={`read-aloud${live ? ' is-live' : ''}`}>
+    <div className={`read-aloud${phase === 'listening' ? ' is-live' : ''}`}>
       <audio ref={audioRef} autoPlay />
-      {state === null ? (
+      {phase === null ? (
         <button type="button" className="read-aloud-start" onClick={start} disabled={active}>
           Read aloud
         </button>
@@ -164,30 +227,30 @@ export function ReadAloud({ paragraph, sessionId, active, onStart, onEnd }: Prop
               <b>{card.word}</b>
               {card.kind === 'phrasing' ? `paused after "${card.word.split(' ')[0]}": say it as one piece` : `heard ${card.heard}: say ${card.fix}`}
               {card.repeated_ok && <span className="read-aloud-ok">✓</span>}
+              {said && <span className="reading-said">{said}</span>}
             </p>
           )}
           <div className="read-aloud-bar">
             <span className="read-aloud-status" role="status">
-              {STATUS_LABEL[state.status]}
+              {STATUS_LABEL[phase]}
             </span>
-            {state.seconds > 0 && <span className="read-aloud-seconds">{state.seconds}s</span>}
-            {state.status === 'listening' && (
-              <>
-                <button type="button" onClick={done}>Done</button>
-                <button type="button" onClick={stop}>Stop</button>
-              </>
+            {seconds > 0 && <span className="read-aloud-seconds">{seconds}s</span>}
+            {phase === 'listening' && (
+              <button type="button" onClick={() => void done()}>
+                Done
+              </button>
             )}
-            {(state.status === 'closed' || state.status === 'failed') && (
-              <button type="button" onClick={reset}>Close</button>
+            {(phase === 'done' || phase === 'failed') && (
+              <button type="button" onClick={reset}>
+                Close
+              </button>
             )}
           </div>
-          {state.error && <p className="read-aloud-error">{state.error}</p>}
-          {(state.user || state.coach) && (
+          {error && <p className="read-aloud-error">{error}</p>}
+          {heard && (
             <dl className="read-aloud-captions">
               <dt>You</dt>
-              <dd>{state.user}</dd>
-              <dt>Coach</dt>
-              <dd>{state.coach}</dd>
+              <dd>{heard}</dd>
             </dl>
           )}
         </>

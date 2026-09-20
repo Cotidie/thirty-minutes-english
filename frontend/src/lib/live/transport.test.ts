@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { CONFIRM_INSTRUCTION, correctionInstruction } from './transport'
+import { correctionInstruction } from './transport'
 
 const verified = { kind: 'pronunciation' as const, word: 'verified', heard: 'b for v', fix: 'vɛrɪfaɪd', at: 1 }
 const asLong = { kind: 'phrasing' as const, word: 'as long', heard: 'as / long', fix: 'keep it together', at: 4 }
@@ -16,8 +16,4 @@ describe('correctionInstruction', () => {
       'Correction: "as long", paused after "as".',
     )
   })
-})
-
-it('confirms in one word', () => {
-  expect(CONFIRM_INSTRUCTION).toBe('Repeat OK.')
 })

@@ -72,14 +72,14 @@ Gemini 세션은 오디오만일 때 15분 상한이며 코치 라운드는 그�
 
 ## Read aloud
 
-Article 탭의 문단마다 `Read aloud` 버튼이 있다. 누르면 마이크가 두 곳으로 간다. 하나는 음성 코치(GPT-Live 또는 Gemini Live), 하나는 Azure Pronunciation Assessment. 판정은 Azure가 한다: 문단을 참조 텍스트로 두고 인식된 구간마다 단어·음소 점수와 단어 앞 휴지 확신도를 돌려준다. 브라우저의 `lib/assessor/judge.ts`가 finding(단어 점수 < `ASSESS_WORD_SCORE`, 또는 UnexpectedBreak > `ASSESS_BREAK_CONFIDENCE`)을 고르고 문단의 그 자리에 표시한다. 코치는 지시를 받았을 때만 말한다. 스스로 판정하지 않는다. 오디오 LLM에게 판정을 맡겼을 때 놓치던 v/b, th, 구 안 멈춤이 이 구조의 이유다(`docs/2026-09-21-pronunciation-coach-research.md`).
+Article 탭의 문단마다 `Read aloud` 버튼이 있다. 누르면 마이크가 Azure Pronunciation Assessment로만 간다. 음성 코치(GPT-Live 또는 Gemini Live)는 읽는 동안 켜지지 않는다. 판정은 Azure가 한다: 문단을 참조 텍스트로 두고 인식된 구간마다 단어·음소 점수와 단어 앞 휴지 확신도를 돌려준다. 브라우저의 `lib/assessor/judge.ts`가 finding(단어 점수 < `ASSESS_WORD_SCORE`, 또는 UnexpectedBreak > `ASSESS_BREAK_CONFIDENCE`)을 고르고 문단의 그 자리에 표시한다. 코치는 지시를 받았을 때만 말한다. 스스로 판정하지 않는다. 오디오 LLM에게 판정을 맡겼을 때 놓치던 v/b, th, 구 안 멈춤이 이 구조의 이유다(`docs/2026-09-21-pronunciation-coach-research.md`).
 
 | 시점 | 화면 | 코치 |
 |---|---|---|
-| 읽는 동안 | 문단이 단어 단위로 바뀌고, 틀린 단어에 붉은 밑줄, 구 안 멈춤은 두 단어 사이 붉은 `\|` | 침묵 |
-| 표시 클릭 | 아래에 카드("heard b for v: say v") | 두 박자 "You said berify. It's verify. Try it."(`Correction:`). 같은 자리는 한 번만 |
-| 다시 읽어 맞음 | 표시가 초록 ✓ | 클릭했던 것이면 "Good"(`Repeat OK:`), 아니면 침묵 |
-| `Done` | 표시는 그대로 남아 라운드가 끝난 뒤에도 클릭할 수 있다 | "Goodbye". 클릭 안 한 표시는 말하지 않는다 |
+| 읽는 동안 | 문단이 단어 단위로 바뀌고, 틀린 단어에 붉은 밑줄, 구 안 멈춤은 두 단어 사이 붉은 `\|` | 꺼져 있음 |
+| 표시 클릭 | 아래에 카드("heard b for v: say v")와 코치가 한 말 | 세션 하나를 열어 두 박자 "You said berify. It's verify. Try it."(`Correction:`)를 말하고, 2초 조용하면 끊는다. 코치 마이크는 꺼 둔다 |
+| 다시 읽어 맞음 | 표시가 초록 ✓ (Azure가 확인) | |
+| `Done` | 마이크와 Azure를 놓는다. 표시는 남아 그 뒤에도 클릭할 수 있다 | |
 
 라운드가 끝나면 `POST /api/readings`에 `corrections`로 함께 저장된다. Summary 탭은 `GET /api/readings`로 그 목록을 읽는다. 텍스트 모델로 transcript를 정리하던 단계는 없앴다.
 

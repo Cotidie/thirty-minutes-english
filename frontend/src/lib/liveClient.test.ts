@@ -75,12 +75,8 @@ describe('connectReadAloud', () => {
     channel.dispatchEvent(new MessageEvent('message', { data: JSON.stringify({ type: 'session.started' }) }))
     expect(onEvent).toHaveBeenCalledWith({ type: 'session.started' })
 
-    conn.finish()
     conn.close()
-    expect(channel.send.mock.calls.map(([raw]) => JSON.parse(raw).type)).toEqual([
-      'session.instructions.append',
-      'session.close',
-    ])
+    expect(channel.send.mock.calls.map(([raw]) => JSON.parse(raw).type)).toEqual(['session.close'])
 
     // Server drops the channel with no final event: that is a disconnect.
     channel.dispatchEvent(new Event('close'))

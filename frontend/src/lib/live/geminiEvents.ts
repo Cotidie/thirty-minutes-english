@@ -15,7 +15,6 @@ export interface GeminiServerMessage {
     modelTurn?: { parts?: Part[] }
     inputTranscription?: { text?: string }
     outputTranscription?: { text?: string }
-    turnComplete?: boolean
     interrupted?: boolean
     generationComplete?: boolean
   }
@@ -29,14 +28,9 @@ export interface Decoded {
   audio: string[]
   /** The user spoke over the coach: drop whatever is still queued to play. */
   interrupted: boolean
-  /** The coach has said everything it will for this turn. */
-  turnComplete: boolean
   /** The server will close the socket soon; the close that follows is not a drop. */
   goAway: boolean
 }
-
-/** Gemini's transcription marks a silent turn or plain noise with a tag; neither is speech. */
-
 
 export function decodeServerMessage(msg: GeminiServerMessage): Decoded {
   const events: LiveEvent[] = []
@@ -59,7 +53,6 @@ export function decodeServerMessage(msg: GeminiServerMessage): Decoded {
     events,
     audio,
     interrupted: content?.interrupted === true,
-    turnComplete: content?.turnComplete === true,
     goAway: msg.goAway !== undefined,
   }
 }

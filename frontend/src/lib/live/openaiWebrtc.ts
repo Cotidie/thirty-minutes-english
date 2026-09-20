@@ -3,8 +3,6 @@
 
 import type { LiveEvent } from '../liveSession'
 import {
-  CONFIRM_INSTRUCTION,
-  FINISH_INSTRUCTION,
   correctionInstruction,
   sayInstruction,
   type LiveConnection,
@@ -73,10 +71,8 @@ export async function connectOpenAI(opts: LiveOptions): Promise<LiveConnection> 
 
   return {
     microphone,
-    finish: () => instruct('finish', FINISH_INSTRUCTION),
     say: (text) => instruct('say', sayInstruction(text)),
     correct: (finding) => instruct('correct', correctionInstruction(finding)),
-    confirm: () => instruct('confirm', CONFIRM_INSTRUCTION),
     close: () => send({ type: 'session.close' }),
     dispose,
   }

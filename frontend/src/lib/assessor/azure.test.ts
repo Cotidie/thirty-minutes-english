@@ -86,8 +86,8 @@ describe('startAzureAssessor', () => {
     expect(applied[0].prosody).toBe(true)
 
     const words = [{ Word: 'researchers', Offset: 0, Duration: 1, PronunciationAssessment: { AccuracyScore: 90, ErrorType: 'None' } }]
-    reco.recognized?.(null, { result: { reason: 3, properties: { getProperty: () => JSON.stringify({ NBest: [{ Words: words }] }) } } })
-    expect(onSegment).toHaveBeenCalledWith(words)
+    reco.recognized?.(null, { result: { reason: 3, text: 'Researchers', properties: { getProperty: () => JSON.stringify({ NBest: [{ Words: words }] }) } } })
+    expect(onSegment).toHaveBeenCalledWith(words, 'Researchers')
 
     await assessor.stop()
     expect(reco.stopped).toBe(true)

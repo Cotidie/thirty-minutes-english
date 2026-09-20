@@ -1,7 +1,6 @@
 // Azure Pronunciation Assessment on the round's microphone. The SDK does the
-// streaming; we hand it the same MediaStream the coach already has, the
-// paragraph as reference text, and pass every recognised segment's word list
-// to the caller. The SDK is a megabyte, so it loads on first use only.
+// streaming; we hand it the MediaStream, the paragraph as reference text, and
+// pass every recognised segment's word list and text to the caller. The SDK is a megabyte, so it loads on first use only.
 
 import type { AssessorSession } from '../../types'
 import type { AzureWord } from './judge'
@@ -14,7 +13,7 @@ export interface AssessorOptions {
   microphone: MediaStream
   paragraph: string
   session: AssessorSession
-  onSegment: (words: AzureWord[]) => void
+  onSegment: (words: AzureWord[], text: string) => void
   onError: (message: string) => void
 }
 
@@ -47,7 +46,7 @@ export async function startAzureAssessor(opts: AssessorOptions): Promise<Assesso
     if (e.result.reason !== sdk.ResultReason.RecognizedSpeech) return
     const raw = e.result.properties.getProperty(sdk.PropertyId.SpeechServiceResponse_JsonResult)
     const json = JSON.parse(raw) as { NBest?: { Words?: AzureWord[] }[] }
-    opts.onSegment(json.NBest?.[0]?.Words ?? [])
+    opts.onSegment(json.NBest?.[0]?.Words ?? [], e.result.text)
   }
   recognizer.canceled = (_, e) => {
     if (e.errorDetails) opts.onError(e.errorDetails)

@@ -8,8 +8,6 @@ import type { Finding } from '../assessor/judge'
 import type { LiveEvent } from '../liveSession'
 import { audioChunk, decodeServerMessage, fromBase64, textTurn, toBase64, type GeminiServerMessage } from './geminiEvents'
 import {
-  CONFIRM_INSTRUCTION,
-  FINISH_INSTRUCTION,
   correctionInstruction,
   sayInstruction,
   type LiveConnection,
@@ -46,8 +44,6 @@ class GeminiRound implements LiveConnection {
   /** Set once the round is over on purpose: a socket close is then the end, not a drop. */
   private finalized = false
   private disposed = false
-  /** After `finish`: close once the coach's closing line has played out. */
-  private finishing = false
   /** Server messages come as Blobs; decoding in order needs a chain. */
   private inbox: Promise<void> = Promise.resolve()
 
@@ -71,9 +67,6 @@ class GeminiRound implements LiveConnection {
     this.player = new AudioWorkletNode(this.playback, 'pcm-player')
     const speaker = this.playback.createMediaStreamDestination()
     this.player.connect(speaker)
-    this.player.port.onmessage = ({ data }) => {
-      if (data?.type === 'drained' && this.finishing) this.close()
-    }
     this.opts.audio.srcObject = speaker.stream
     this.opts.audio.play().catch(() => undefined)
 
@@ -125,12 +118,11 @@ class GeminiRound implements LiveConnection {
   }
 
   private receive(msg: GeminiServerMessage): void {
-    const { events, audio, interrupted, turnComplete, goAway } = decodeServerMessage(msg)
+    const { events, audio, interrupted, goAway } = decodeServerMessage(msg)
     if (interrupted) this.player.port.postMessage({ type: 'flush' })
     for (const chunk of audio) this.player.port.postMessage(fromBase64(chunk))
     for (const event of events) this.emit(event)
     if (goAway) this.finalized = true
-    if (turnComplete && this.finishing) this.player.port.postMessage({ type: 'drain' })
   }
 
   private onClose(e: CloseEvent): void {
@@ -158,21 +150,12 @@ class GeminiRound implements LiveConnection {
     if (this.socket?.readyState === WebSocket.OPEN) this.socket.send(JSON.stringify(payload))
   }
 
-  finish(): void {
-    this.finishing = true
-    this.send(textTurn(FINISH_INSTRUCTION))
-  }
-
   say(text: string): void {
     this.send(textTurn(sayInstruction(text)))
   }
 
   correct(finding: Finding): void {
     this.send(textTurn(correctionInstruction(finding)))
-  }
-
-  confirm(): void {
-    this.send(textTurn(CONFIRM_INSTRUCTION))
   }
 
   close(): void {

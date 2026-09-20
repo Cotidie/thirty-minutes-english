@@ -9,9 +9,13 @@ vi.mock('../api', () => ({
     assessorToken: vi.fn(async () => ({ token: 't', region: 'koreacentral', word_score: 60, break_confidence: 0.75 })),
   },
 }))
+Object.defineProperty(navigator, 'mediaDevices', {
+  value: { getUserMedia: vi.fn(async () => ({ getTracks: () => [], getAudioTracks: () => [] })) },
+  configurable: true,
+})
 vi.mock('../lib/assessor/azure', () => ({ startAzureAssessor: vi.fn(async () => ({ stop: vi.fn(async () => undefined) })) }))
 vi.mock('../lib/liveClient', () => ({
-  connectReadAloud: vi.fn(async () => ({ microphone: {}, finish: vi.fn(), say: vi.fn(), correct: vi.fn(), confirm: vi.fn(), close: vi.fn(), dispose: vi.fn() })),
+  connectReadAloud: vi.fn(async () => ({ microphone: { getAudioTracks: () => [] }, say: vi.fn(), correct: vi.fn(), close: vi.fn(), dispose: vi.fn() })),
 }))
 
 const article = {
@@ -63,7 +67,7 @@ describe('ArticleTab', () => {
     expect(buttons).toHaveLength(2)
 
     await userEvent.click(buttons[0])
-    expect(screen.getByRole('status')).toHaveTextContent('Connecting')
+    expect(screen.getByRole('status')).toHaveTextContent(/Connecting|Listening/)
     expect(screen.getByRole('button', { name: 'Read aloud' })).toBeDisabled()
   })
 })

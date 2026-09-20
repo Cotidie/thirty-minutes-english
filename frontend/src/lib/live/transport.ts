@@ -12,14 +12,10 @@ import { connectOpenAI } from './openaiWebrtc'
 export interface LiveConnection {
   /** The live microphone track, so the UI can show that sound is going in. */
   microphone: MediaStream
-  /** Tells the coach the round is over, so it signs off. */
-  finish(): void
   /** Has the coach read this text aloud, word for word. */
   say(text: string): void
   /** Hands the coach the finding the reader clicked; the reader is listening. */
   correct(finding: Finding): void
-  /** Tells the coach the reader read it right this time. */
-  confirm(): void
   /** Ends the round. `session.closed` arrives through onEvent afterwards. */
   close(): void
   /** Drops everything without waiting for the final event. */
@@ -34,8 +30,6 @@ export interface LiveOptions {
   onDisconnect: () => void
 }
 
-export const FINISH_INSTRUCTION = 'The round is over. Say your closing now.'
-export const CONFIRM_INSTRUCTION = 'Repeat OK.'
 export const sayInstruction = (text: string) => `Now say exactly this, word for word, then stop: ${text}`
 
 /** The finding the reader clicked; the prompt says how to say it. */

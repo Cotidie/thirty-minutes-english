@@ -2,7 +2,6 @@
 // transport opens the context at 24 kHz). Messages in:
 //   ArrayBuffer            a chunk to queue
 //   { type: 'flush' }      drop the queue (the user interrupted the coach)
-//   { type: 'drain' }      answer { type: 'drained' } once the queue runs dry
 // Silence plays when the queue is empty.
 
 class PcmPlayer extends AudioWorkletProcessor {
@@ -10,24 +9,14 @@ class PcmPlayer extends AudioWorkletProcessor {
     super()
     this.queue = []
     this.offset = 0
-    this.drainRequested = false
     this.port.onmessage = ({ data }) => {
       if (data instanceof ArrayBuffer) {
         this.queue.push(new Int16Array(data))
       } else if (data?.type === 'flush') {
         this.queue = []
         this.offset = 0
-      } else if (data?.type === 'drain') {
-        this.drainRequested = true
-        this.reportIfDrained()
       }
     }
-  }
-
-  reportIfDrained() {
-    if (!this.drainRequested || this.queue.length > 0) return
-    this.drainRequested = false
-    this.port.postMessage({ type: 'drained' })
   }
 
   process(_inputs, outputs) {
@@ -46,7 +35,6 @@ class PcmPlayer extends AudioWorkletProcessor {
       }
     }
     for (let i = written; i < out.length; i++) out[i] = 0
-    this.reportIfDrained()
     return true
   }
 }

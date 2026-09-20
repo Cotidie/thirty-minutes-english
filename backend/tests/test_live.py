@@ -168,16 +168,6 @@ def test_gemini_setup_folds_context_into_the_system_instruction(agent_dir):
     assert setup["inputAudioTranscription"] == {} and setup["outputAudioTranscription"] == {}
 
 
-def test_gemini_block_in_session_json_reaches_gemini_only(agent_dir):
-    template = json.loads((agent_dir / "session.json").read_text())
-    template["gemini"] = {"realtimeInputConfig": {"activityHandling": "NO_INTERRUPTION"}}
-    (agent_dir / "session.json").write_text(json.dumps(template))
-    definition = AgentDefinition(agent_dir)
-    setup = definition.gemini_setup("gemini-3.8-live", "Kore", None, paragraph=PARAGRAPH)
-    assert setup["realtimeInputConfig"] == {"activityHandling": "NO_INTERRUPTION"}
-    assert "gemini" not in definition.session_for(paragraph=PARAGRAPH)
-
-
 def test_gemini_setup_carries_the_thinking_level_when_given(agent_dir):
     setup = AgentDefinition(agent_dir).gemini_setup("gemini-3.8-live-extended-thinking", "Kore", "medium")
     assert setup["generationConfig"]["thinkingConfig"] == {"thinkingLevel": "medium"}

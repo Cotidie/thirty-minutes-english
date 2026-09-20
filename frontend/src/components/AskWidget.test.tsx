@@ -7,7 +7,7 @@ import type { LiveConnection, LiveOptions } from '../lib/liveClient'
 import type { LiveEvent } from '../lib/liveSession'
 import { AskWidget } from './AskWidget'
 
-const connection = { microphone: {} as MediaStream, finish: vi.fn(), say: vi.fn(), correct: vi.fn(), confirm: vi.fn(), close: vi.fn(), dispose: vi.fn() }
+const connection = { microphone: {} as MediaStream, say: vi.fn(), correct: vi.fn(), close: vi.fn(), dispose: vi.fn() }
 let emit: (e: LiveEvent) => void = () => undefined
 type RoundOptions = Omit<LiveOptions, 'start'>
 const connect = vi.fn(async (_topic: string | null, opts: RoundOptions): Promise<LiveConnection> => {

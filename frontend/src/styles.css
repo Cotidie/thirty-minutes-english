@@ -1773,6 +1773,12 @@ button.question.is-active {
   margin-right: 0.4rem;
 }
 
+.reading-said {
+  display: block;
+  margin-top: 0.2rem;
+  color: var(--muted);
+}
+
 .reading-card .read-aloud-ok {
   margin-left: 0.4rem;
   color: #35633c;
