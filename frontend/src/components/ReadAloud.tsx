@@ -13,7 +13,8 @@ interface Props {
   /** Only one paragraph may hold the microphone at a time. */
   active: boolean
   onStart: () => void
-  onEnd: () => void
+  /** The microphone is free. `kept` when the marks stay on the page for clicking. */
+  onEnd: (kept: boolean) => void
 }
 
 type Phase = 'connecting' | 'listening' | 'done' | 'failed'
@@ -134,8 +135,7 @@ export function ReadAloud({ paragraph, sessionId, active, onStart, onEnd }: Prop
   /** The reader clicked a mark: show its card and have the coach say it. */
   const ask = (index: number) => {
     setOpen(index)
-    const f = roundRef.current?.findings[index]
-    if (f) void speak(f)
+    void speak(findings[index])
   }
 
   const speak = async (finding: Shown) => {
@@ -209,34 +209,37 @@ export function ReadAloud({ paragraph, sessionId, active, onStart, onEnd }: Prop
       .catch(() => undefined)
   }
 
+  /** Close: the marks stay for clicking; a round with none is gone. */
   const reset = () => {
     hangUp()
     void endRound()
     roundRef.current = null
     setPhase(null)
-    onEnd()
+    if (findings.length === 0) setHeard('')
+    onEnd(findings.length > 0)
   }
 
   const card = open === null ? null : findings[open]
+  const shown = phase !== null || findings.length > 0
 
   return (
     <div className={`read-aloud${phase === 'listening' ? ' is-live' : ''}`}>
       <audio ref={audioRef} autoPlay />
+      {shown && <ReadingText paragraph={paragraph} findings={findings} open={open} onOpen={ask} />}
+      {card && (
+        <p className="reading-card">
+          <b>{card.word}</b>
+          <span className="reading-heard">{card.kind === 'phrasing' ? 'one piece' : card.heard}</span>
+          {card.repeated_ok && <span className="read-aloud-ok">✓</span>}
+          {said && <span className="reading-said">{said}</span>}
+        </p>
+      )}
       {phase === null ? (
         <button type="button" className="read-aloud-start" onClick={start} disabled={active}>
-          Read aloud
+          {shown ? 'Read again' : 'Read aloud'}
         </button>
       ) : (
         <>
-          <ReadingText paragraph={paragraph} findings={findings} open={open} onOpen={ask} />
-          {card && (
-            <p className="reading-card">
-              <b>{card.word}</b>
-              <span className="reading-heard">{card.kind === 'phrasing' ? 'one piece' : card.heard}</span>
-              {card.repeated_ok && <span className="read-aloud-ok">✓</span>}
-              {said && <span className="reading-said">{said}</span>}
-            </p>
-          )}
           <div className="read-aloud-bar">
             <span className="read-aloud-status" role="status">
               {STATUS_LABEL[phase]}

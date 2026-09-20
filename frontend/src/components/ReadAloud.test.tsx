@@ -117,8 +117,24 @@ describe('ReadAloud round', () => {
     expect(vi.mocked(api.addReading)).not.toHaveBeenCalled()
 
     await userEvent.click(screen.getByRole('button', { name: 'Close' }))
-    expect(onEnd).toHaveBeenCalled()
+    expect(onEnd).toHaveBeenCalledWith(false)
     expect(screen.getByRole('button', { name: 'Read aloud' })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /b for v/ })).not.toBeInTheDocument()
+  })
+
+  it('keeps the marks after Close, still clickable, with Read again on offer', async () => {
+    const { onEnd } = renderIdle()
+    await startRound()
+    act(() => segment([berified], 'berified'))
+    await userEvent.click(screen.getByRole('button', { name: 'Done' }))
+    await waitFor(() => expect(assessor.stop).toHaveBeenCalled())
+    await userEvent.click(screen.getByRole('button', { name: 'Close' }))
+    expect(onEnd).toHaveBeenCalledWith(true)
+
+    expect(screen.getByRole('button', { name: 'Read again' })).toBeInTheDocument()
+    await userEvent.click(screen.getByRole('button', { name: 'verified: b for v' }))
+    await waitFor(() => expect(connect).toHaveBeenCalled())
+    expect(screen.getByText('b for v')).toBeInTheDocument()
   })
 
   it('fails before touching the microphone when the assessor is off', async () => {

@@ -8,6 +8,8 @@ import { Run, Sentence } from './Sentence'
 export function ArticleTab({ article, sessionId }: { article: Article; sessionId: number | null }) {
   const [active, setActive] = useState<number | null>(null)
   const [reading, setReading] = useState<number | null>(null)
+  /** Paragraphs still showing their read-aloud marks after the round. */
+  const [marked, setMarked] = useState<Set<number>>(new Set())
   const bodyRef = useRef<HTMLElement>(null)
   const paragraphs = article.body
     .split(/\n\s*\n/)
@@ -32,7 +34,7 @@ export function ArticleTab({ article, sessionId }: { article: Article; sessionId
           const spans = markedSpans(p, evidence)
           return (
             <div key={i} className="paragraph">
-              <p hidden={reading === i}>
+              <p hidden={reading === i || marked.has(i)}>
                 {sentences[i].map((piece, j) => {
                   const segments = segmentsIn(piece.text, spans, piece.start)
                   return piece.ko === null ? (
@@ -47,7 +49,15 @@ export function ArticleTab({ article, sessionId }: { article: Article; sessionId
                 sessionId={sessionId}
                 active={reading !== null && reading !== i}
                 onStart={() => setReading(i)}
-                onEnd={() => setReading(null)}
+                onEnd={(kept) => {
+                  setReading(null)
+                  setMarked((m) => {
+                    const next = new Set(m)
+                    if (kept) next.add(i)
+                    else next.delete(i)
+                    return next
+                  })
+                }}
               />
             </div>
           )
