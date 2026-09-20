@@ -96,16 +96,18 @@ const norm = (word: string) => word.toLowerCase().replace(/[^\p{L}\p{N}']/gu, ''
 export class Judge {
   private open: Finding[] = []
   private readonly words: string[]
+  private readonly raw: string[]
   private cursor = 0
   private readonly t: Thresholds
 
   constructor(t: Thresholds, paragraph: string) {
     this.t = t
-    this.words = tokens(paragraph).map(norm)
+    this.raw = tokens(paragraph)
+    this.words = this.raw.map(norm)
   }
 
   segment(words: AzureWord[]): Verdict {
-    const all = findingsIn(words, this.t, this.locate(words))
+    const all = findingsIn(words, this.t, this.locate(words)).filter((f) => f.kind !== 'phrasing' || !this.punctuatedBefore(f.at))
     const confirmed = this.open.filter((p) => readRight(p, words, all))
     this.open = this.open.filter((p) => !confirmed.includes(p))
     const findings = all.filter((f) => !this.open.some((p) => p.at === f.at && p.kind === f.kind))
@@ -132,6 +134,11 @@ export class Judge {
     })
   }
 
+  /** A pause after a period or comma is the reader's to take. */
+  private punctuatedBefore(at: number): boolean {
+    return at > 0 && PUNCTUATED.test(this.raw[at - 1])
+  }
+
   private openPosition(target: string): number {
     for (const p of this.open) {
       const parts = p.word.split(' ').map(norm)
@@ -144,6 +151,7 @@ export class Judge {
 
 /** A segment this short after a finding is a retry, not more of the paragraph. */
 const RETRY_WORDS = 3
+const PUNCTUATED = /[.,;:!?…"”')\]]$/
 
 function readRight(pending: Finding, words: AzureWord[], findings: Finding[]): boolean {
   const said = words.map((w) => norm(w.Word))

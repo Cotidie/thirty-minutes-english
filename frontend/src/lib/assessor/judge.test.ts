@@ -89,6 +89,12 @@ describe('Judge', () => {
     expect(judge.segment([word('as', 90), word('long', 93)]).confirmed.map((f) => f.word)).toEqual(['as long'])
   })
 
+  it('lets a pause stand after a period or comma', () => {
+    const judge = new Judge(T, 'They verified it. Twice, as long as it held.')
+    const { findings } = judge.segment([word('it', 90), word('twice', 88, brokenLong.PronunciationAssessment), word('as', 88, brokenLong.PronunciationAssessment), brokenLong])
+    expect(findings.map((f) => f.word)).toEqual(['as long'])
+  })
+
   it('confirms a phrasing finding when the pair comes back without a break', () => {
     const judge = new Judge(T, PARAGRAPH)
     judge.segment([word('as', 88), brokenLong])

@@ -1773,10 +1773,14 @@ button.question.is-active {
   margin-right: 0.4rem;
 }
 
+.reading-heard {
+  color: var(--muted);
+}
+
 .reading-said {
   display: block;
-  margin-top: 0.2rem;
-  color: var(--muted);
+  margin-top: 0.25rem;
+  font-style: italic;
 }
 
 .reading-card .read-aloud-ok {

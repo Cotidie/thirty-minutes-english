@@ -159,7 +159,7 @@ describe('ReadAloud marks', () => {
       await userEvent.click(screen.getByRole('button', { name: 'verified: b for v' }))
       await waitFor(() => expect(connect).toHaveBeenCalledWith('Researchers verified it.', expect.anything()))
       expect(coachTrack.enabled).toBe(false)
-      expect(screen.getByText(/heard b for v: say v/)).toBeInTheDocument()
+      expect(screen.getByText('b for v')).toBeInTheDocument()
 
       act(() => emit({ type: 'session.started' }))
       expect(connection.correct).toHaveBeenCalledWith(expect.objectContaining({ word: 'verified', at: 1 }))
@@ -178,6 +178,18 @@ describe('ReadAloud marks', () => {
     } finally {
       vi.useRealTimers()
     }
+  })
+
+  it('sends the correction when session.started arrives during connect', async () => {
+    connect.mockImplementationOnce(async (_paragraph, opts) => {
+      opts.onEvent({ type: 'session.started' })
+      return connection
+    })
+    renderIdle()
+    await startRound()
+    act(() => segment([berified], 'berified'))
+    await userEvent.click(screen.getByRole('button', { name: 'verified: b for v' }))
+    await waitFor(() => expect(connection.correct).toHaveBeenCalledTimes(1))
   })
 
   it('still dials the coach after Done, and drops the call on Close', async () => {

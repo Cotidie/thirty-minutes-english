@@ -142,11 +142,17 @@ export function ReadAloud({ paragraph, sessionId, active, onStart, onEnd }: Prop
     hangUp()
     setSaid('')
     let text = ''
+    // Gemini reports session.started while connecting, before `coach` exists.
+    let coach: LiveConnection | null = null
+    let started = false
     try {
-      const coach = await connectReadAloud(paragraph, {
+      coach = await connectReadAloud(paragraph, {
         audio: audioRef.current!,
         onEvent: (event) => {
-          if (event.type === 'session.started') coach.correct(finding)
+          if (event.type === 'session.started') {
+            started = true
+            coach?.correct(finding)
+          }
           if (event.type === 'session.output_transcript.delta') {
             text = spoken(text + (event.delta ?? ''))
             setSaid(text)
@@ -159,6 +165,7 @@ export function ReadAloud({ paragraph, sessionId, active, onStart, onEnd }: Prop
       // The coach only speaks here; what the reader says next is Azure's to judge.
       coach.microphone.getAudioTracks().forEach((t) => (t.enabled = false))
       callRef.current = { coach, timer: null }
+      if (started) coach.correct(finding)
       linger(COACH_TIMEOUT_MS)
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e))
@@ -225,7 +232,7 @@ export function ReadAloud({ paragraph, sessionId, active, onStart, onEnd }: Prop
           {card && (
             <p className="reading-card">
               <b>{card.word}</b>
-              {card.kind === 'phrasing' ? `paused after "${card.word.split(' ')[0]}": say it as one piece` : `heard ${card.heard}: say ${card.fix}`}
+              <span className="reading-heard">{card.kind === 'phrasing' ? 'one piece' : card.heard}</span>
               {card.repeated_ok && <span className="read-aloud-ok">✓</span>}
               {said && <span className="reading-said">{said}</span>}
             </p>
