@@ -6,7 +6,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from app.assessor import AzureAssessor
-from app.cards import CorrectionExtractor, Extractor, PhraseCardExtractor
+from app.cards import Extractor, PhraseCardExtractor
 from app.daily_topics import ClaudeTopicSource, TopicSource
 from app.example_feedback import ExampleCoach
 from app.generator import ClaudeCliGenerator, Generator
@@ -24,7 +24,6 @@ class Services:
     topic_source: TopicSource | None = None
     agents: dict[str, LiveAgent] | None = None
     extractor: Extractor | None = None
-    corrections: Extractor | None = None
     example_coach: ExampleCoach | None = None
     assessor: AzureAssessor | None = None
     voice_key_name: str = "OPENAI_API_KEY"
@@ -45,9 +44,6 @@ def build_services(settings: Settings, agent_dirs: dict[str, Path]) -> Services:
         topic_source=ClaudeTopicSource(model=settings.get("TOPICS_MODEL"), effort=settings.get("TOPICS_EFFORT")),
         agents=_live_agents(settings, agent_dirs),
         extractor=_extractor(openai_key, agent_dirs["phrase"], "cards.schema.json", settings, PhraseCardExtractor),
-        corrections=_extractor(
-            openai_key, agent_dirs["read-aloud"], "feedback.schema.json", settings, CorrectionExtractor
-        ),
         example_coach=_example_coach(settings, agent_dirs["example"]),
         assessor=_assessor(settings),
         voice_key_name=settings.voice_api_key_name,

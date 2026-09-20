@@ -3,10 +3,10 @@ import json
 import pytest
 from fastapi.testclient import TestClient
 
-from app.cards import AskReview, CorrectionExtractor, PhraseCardExtractor, ReadingReview
+from app.cards import AskReview, PhraseCardExtractor
 from app.main import create_app
 from app.wiring import Services
-from app.models import Correction, PhraseCard
+from app.models import PhraseCard
 from app.store import SessionStore
 from tests.test_api import FakeGenerator, InlineExecutor
 
@@ -126,95 +126,8 @@ def test_extractor_sends_rounds_and_reads_the_answer(tmp_path, monkeypatch):
     assert cards[7].english == "Read the room."
 
 
-class FakeCorrections:
-    def __init__(self):
-        self.batches: list[list[int]] = []
-
-    def extract(self, readings):
-        self.batches.append([r.id for r in readings])
-        return {
-            r.id: [Correction(word="verified", heard="berified", fix="V, teeth on the lip")]
-            for r in readings
-        }
-
-
-def test_readings_are_kept_and_read_back_with_their_corrections(tmp_path):
-    corrections = FakeCorrections()
-    store = SessionStore(tmp_path / "s.db")
-    app = create_app(store, Services(FakeGenerator(), corrections=corrections), InlineExecutor())
-    with TestClient(app) as c:
-        session_id = c.post("/api/sessions", json={"topic": "Digital twins"}).json()["session_id"]
-        created = c.post(
-            "/api/readings",
-            json={
-                "session_id": session_id,
-                "paragraph": "Researchers verified it.",
-                "user_text": "researchers berified it",
-                "coach_text": "Quick one: that was berified. Verify.",
-                "seconds": 31,
-            },
-        )
-        assert created.status_code == 201
-        assert created.json()["corrections"] is None
-
-        scoped = c.post("/api/readings/corrections", params={"session_id": session_id}).json()
-        assert [x["word"] for x in scoped[0]["corrections"]] == ["verified"]
-
-        # a second open re-uses what was written
-        c.post("/api/readings/corrections", params={"session_id": session_id})
-        assert len(corrections.batches) == 1
-
-
-def test_a_clean_read_keeps_an_empty_correction_list(tmp_path):
-    class NoFindings:
-        def extract(self, readings):
-            return {r.id: [] for r in readings}
-
-    store = SessionStore(tmp_path / "s.db")
-    store.add_reading(None, "Researchers verified it.", "researchers verified it", "Goodbye.", 28)
-    readings = ReadingReview(store, NoFindings()).corrections_for()
-    assert readings[0].corrections == []
-
-
 def test_reading_rejects_a_round_with_no_coach_line(tmp_path):
     app = create_app(SessionStore(tmp_path / "s.db"), Services(FakeGenerator()), InlineExecutor())
     with TestClient(app) as c:
         body = {"paragraph": "Researchers verified it.", "user_text": "read it", "coach_text": "  "}
         assert c.post("/api/readings", json=body).status_code == 422
-
-
-def test_correction_extractor_sends_the_paragraph(tmp_path, monkeypatch):
-    agent_dir = tmp_path / "read-aloud"
-    (agent_dir / "prompts").mkdir(parents=True)
-    (agent_dir / "prompts" / "summarize.md").write_text("Turn rounds into corrections.")
-    (agent_dir / "feedback.schema.json").write_text(json.dumps({"title": "ReadAloudFeedback", "type": "object"}))
-    extractor = CorrectionExtractor("sk-test", agent_dir, "gpt-5.6-luna")
-
-    sent = {}
-
-    class FakeResponse:
-        def __enter__(self):
-            return self
-
-        def __exit__(self, *args):
-            return False
-
-        def read(self):
-            entry = {"id": 4, "corrections": [{"word": "verified", "heard": "berified", "fix": "teeth on the lip"}]}
-            return json.dumps(
-                {"output": [{"content": [{"type": "output_text", "text": json.dumps({"readings": [entry]})}]}]}
-            ).encode()
-
-    monkeypatch.setattr("app.cards.urllib.request.urlopen", lambda req, timeout=0: (sent.update(body=json.loads(req.data)), FakeResponse())[1])
-    monkeypatch.setattr("app.cards.json.load", lambda res: json.loads(res.read()))
-
-    store = SessionStore(tmp_path / "s.db")
-    reading = store.add_reading(None, "Researchers verified it.", "researchers berified it", "Verify.", 31)
-    object.__setattr__(reading, "id", 4)
-
-    found = extractor.extract([reading])
-
-    assert json.loads(sent["body"]["input"][1]["content"]) == [
-        {"id": 4, "paragraph": "Researchers verified it.", "reader": "researchers berified it", "coach": "Verify."}
-    ]
-    assert found[4][0].fix == "teeth on the lip"

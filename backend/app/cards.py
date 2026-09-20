@@ -1,7 +1,7 @@
-"""Review records for live rounds. GPT-Live has no structured output, so a
+"""Review records for Ask rounds. GPT-Live has no structured output, so a
 round leaves two transcripts behind; a text model turns a batch of them into
-records once, when the user opens the summary. Each agent folder carries the
-prompt and schema for its own kind of round."""
+cards once, when the user opens the summary. The agent folder carries the
+prompt and schema."""
 
 import json
 import logging
@@ -10,7 +10,7 @@ import urllib.request
 from pathlib import Path
 from typing import Protocol
 
-from app.models import Ask, Correction, PhraseCard, Reading
+from app.models import Ask, PhraseCard
 from app.store import SessionStore
 
 log = logging.getLogger(__name__)
@@ -76,24 +76,6 @@ class PhraseCardExtractor(OpenAIExtractor):
         return {card["id"]: PhraseCard.model_validate(card) for card in answer["cards"]}
 
 
-class CorrectionExtractor(OpenAIExtractor):
-    """Readings to the list of words and phrases the coach stopped on."""
-
-    def __init__(self, api_key: str, agent_dir: Path, model: str, url: str = RESPONSES_URL):
-        super().__init__(api_key, agent_dir, model, "feedback.schema.json", url)
-
-    def extract(self, rounds: list[Reading]) -> dict[int, list[Correction]]:
-        rows = [
-            {"id": r.id, "paragraph": r.paragraph, "reader": r.user_text, "coach": r.coach_text}
-            for r in sorted(rounds, key=lambda r: r.id)
-        ]
-        answer = self.respond(rows)
-        return {
-            entry["id"]: [Correction.model_validate(c) for c in entry["corrections"]]
-            for entry in answer["readings"]
-        }
-
-
 def _output_text(payload: dict) -> str:
     """The first output_text part of a Responses answer."""
     for item in payload.get("output", []):
@@ -134,14 +116,3 @@ class AskReview(Review):
             ask.card = card
 
         return self._fill(asks, [a for a in asks if a.card is None], keep)
-
-
-class ReadingReview(Review):
-    def corrections_for(self, session_id: int | None = None) -> list[Reading]:
-        readings = self.store.list_readings(session_id)
-
-        def keep(reading: Reading, corrections: list[Correction]) -> None:
-            self.store.set_reading_corrections(reading.id, corrections)
-            reading.corrections = corrections
-
-        return self._fill(readings, [r for r in readings if r.corrections is None], keep)

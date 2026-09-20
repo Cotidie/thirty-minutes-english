@@ -244,14 +244,21 @@ class SessionStore:
     # --- readings: one paragraph read aloud, and what the coach stopped on --
 
     def add_reading(
-        self, session_id: int | None, paragraph: str, user_text: str, coach_text: str, seconds: float
+        self,
+        session_id: int | None,
+        paragraph: str,
+        user_text: str,
+        coach_text: str,
+        seconds: float,
+        corrections: list[Correction],
     ) -> Reading:
         created_at = datetime.now(UTC)
+        payload = json.dumps([c.model_dump() for c in corrections])
         with self._connect() as conn:
             cur = conn.execute(
-                "INSERT INTO readings (created_at, session_id, paragraph, user_text, coach_text, seconds)"
-                " VALUES (?, ?, ?, ?, ?, ?)",
-                (created_at.isoformat(), session_id, paragraph, user_text, coach_text, seconds),
+                "INSERT INTO readings (created_at, session_id, paragraph, user_text, coach_text, seconds, corrections_json)"
+                " VALUES (?, ?, ?, ?, ?, ?, ?)",
+                (created_at.isoformat(), session_id, paragraph, user_text, coach_text, seconds, payload),
             )
             reading_id = cur.lastrowid
         assert reading_id is not None
@@ -263,6 +270,7 @@ class SessionStore:
             user_text=user_text,
             coach_text=coach_text,
             seconds=seconds,
+            corrections=corrections,
         )
 
     def list_readings(self, session_id: int | None = None) -> list[Reading]:
@@ -275,12 +283,6 @@ class SessionStore:
         with self._connect() as conn:
             rows = conn.execute(sql + " ORDER BY id DESC", params).fetchall()
         return [_reading(row) for row in rows]
-
-    def set_reading_corrections(self, reading_id: int, corrections: list[Correction]) -> None:
-        payload = json.dumps([c.model_dump() for c in corrections])
-        with self._connect() as conn:
-            conn.execute("UPDATE readings SET corrections_json = ? WHERE id = ?", (payload, reading_id))
-
 
     # --- topic_days: the news half of one day's suggestions ------------------
 

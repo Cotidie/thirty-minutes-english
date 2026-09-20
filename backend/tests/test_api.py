@@ -215,3 +215,30 @@ def test_jobs_endpoint_lists_only_running_jobs(tmp_path):
 
         executor.release()
         assert client.get("/api/jobs").json() == []
+
+
+def test_readings_keep_their_corrections_and_list_per_session(client):
+    session_id = client.post("/api/sessions", json={"topic": "Digital twins"}).json()["session_id"]
+    body = {
+        "session_id": session_id,
+        "paragraph": "Researchers verified it.",
+        "user_text": "researchers berified it",
+        "coach_text": "Berify. Verify. Go on.",
+        "seconds": 31,
+        "corrections": [
+            {"kind": "pronunciation", "word": "verified", "heard": "b for v", "fix": "vɛrɪfaɪd", "repeated_ok": True}
+        ],
+    }
+    created = client.post("/api/readings", json=body)
+    assert created.status_code == 201
+    assert created.json()["corrections"][0]["word"] == "verified"
+
+    listed = client.get("/api/readings", params={"session_id": session_id}).json()
+    assert [r["id"] for r in listed] == [created.json()["id"]]
+    assert listed[0]["corrections"][0]["repeated_ok"] is True
+    assert client.get("/api/readings", params={"session_id": session_id + 1}).json() == []
+
+
+def test_a_reading_without_corrections_is_a_clean_read(client):
+    body = {"paragraph": "Researchers verified it.", "user_text": "researchers verified it", "coach_text": "Goodbye."}
+    assert client.post("/api/readings", json=body).json()["corrections"] == []

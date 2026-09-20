@@ -6,7 +6,7 @@ from pathlib import Path
 from fastapi import FastAPI, HTTPException, Request, Response
 
 from app.assessor import AssessorError
-from app.cards import AskReview, ReadingReview
+from app.cards import AskReview
 from app.claude_cli import GenerationError
 from app.daily_topics import DailyTopics
 from app.jobs import Executor, Job, JobRunner
@@ -73,7 +73,6 @@ def create_app(
     app.state.jobs = JobRunner(services.generator, store, executor)
     app.state.topics = DailyTopics(store, services.topic_source, app.state.jobs.executor)
     app.state.asks = AskReview(store, services.extractor)
-    app.state.readings = ReadingReview(store, services.corrections)
     app.state.services = services
 
     def current_settings(request: Request) -> Settings:
@@ -85,7 +84,6 @@ def create_app(
         state.jobs.generator = services.generator
         state.topics.source = services.topic_source
         state.asks.extractor = services.extractor
-        state.readings.extractor = services.corrections
 
     def live_agent(request: Request, name: str) -> LiveAgent:
         services: Services = request.app.state.services
@@ -273,11 +271,13 @@ def create_app(
         store: SessionStore = request.app.state.store
         if body.session_id is not None and store.get(body.session_id) is None:
             raise HTTPException(status_code=404, detail="session not found")
-        return store.add_reading(body.session_id, body.paragraph, body.user_text, body.coach_text, body.seconds)
+        return store.add_reading(
+            body.session_id, body.paragraph, body.user_text, body.coach_text, body.seconds, body.corrections
+        )
 
-    @app.post("/api/readings/corrections", response_model=list[Reading])
-    def reading_corrections(request: Request, session_id: int | None = None) -> list[Reading]:
-        return request.app.state.readings.corrections_for(session_id)
+    @app.get("/api/readings", response_model=list[Reading])
+    def list_readings(request: Request, session_id: int | None = None) -> list[Reading]:
+        return request.app.state.store.list_readings(session_id)
 
     return app
 

@@ -204,16 +204,6 @@ class PhraseCard(BaseModel):
     note: str = ""
 
 
-class ReadingRequest(BaseModel):
-    session_id: int | None = None
-    paragraph: str
-    user_text: str
-    coach_text: str
-    seconds: float = 0
-
-    _check = field_validator("paragraph", "coach_text")(_not_blank)
-
-
 class Correction(BaseModel):
     """One thing the coach stopped the reader on: a word's sound, or a pause inside a phrase."""
 
@@ -222,6 +212,17 @@ class Correction(BaseModel):
     heard: str
     fix: str
     repeated_ok: bool = False
+
+
+class ReadingRequest(BaseModel):
+    session_id: int | None = None
+    paragraph: str
+    user_text: str
+    coach_text: str
+    seconds: float = 0
+    corrections: list[Correction] = []
+
+    _check = field_validator("paragraph", "coach_text")(_not_blank)
 
 
 class Reading(BaseModel):
