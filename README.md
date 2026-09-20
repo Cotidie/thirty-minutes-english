@@ -28,6 +28,11 @@ docker compose up -d --build
 | `VOICE_THINKING` | `low` | `gemini-3.8-live-extended-thinking`의 thinking 수준. `low`, `medium`, `high` |
 | `VOICE_NAME` | `Kore` | Gemini 음성. Gemini API에 목록 조회 API가 없어 TTS 문서의 30개(Live native audio 모델과 공유)를 코드에 두고 모달에서 고른다. OpenAI는 각 코치 `session.json`의 voice를 쓴다 |
 | `GEMINI_API_KEY` | 비움 | Gemini Live용. provider가 `gemini`인데 비어 있으면 세 버튼이 503 |
+| `AZURE_SPEECH_KEY` | 비움 | Read aloud 판정기(Azure Pronunciation Assessment). 비어 있으면 Read aloud 버튼이 503 |
+| `AZURE_SPEECH_REGION` | `koreacentral` | Azure Speech 리소스 리전 |
+| `ASSESS_FEEDBACK` | `interrupt` | `interrupt`: finding마다 코치가 바로 끼어듦. `after`: Done 뒤 한 번에 짚어 줌 |
+| `ASSESS_WORD_SCORE` | `60` | 단어 AccuracyScore가 이 값 아래면 발음 교정 |
+| `ASSESS_BREAK_CONFIDENCE` | `0.75` | 단어 앞 UnexpectedBreak confidence가 이 값 위면 끊어읽기 교정 |
 | `CLAUDE_MODEL` | `opus` | 생성 모델. `sonnet`이면 더 빠름 |
 | `CLAUDE_EFFORT` | `xhigh` | reasoning effort. `low`, `medium`, `high`, `xhigh`, `max` |
 | `CLAUDE_SKILLS` | 비움 | 생성 전에 호출할 스킬. 쉼표 구분. 예: `stop-slop,cotidie:write-like-me` |
@@ -66,11 +71,18 @@ docker compose up -d --build
 
 Gemini 세션은 오디오만일 때 15분 상한이며 코치 라운드는 그보다 훨씬 짧다. Extended Thinking은 `VOICE_THINKING`만큼 뒤에서 생각하며 말하고, 즉답이 필요한 발음 교정에는 `low`로 시작한다. 브라우저에는 API 키가 가지 않는다: 소켓 URL의 `access_token`은 1회용이고 모델이 고정되어 있다.
 
-## Read aloud (GPT-Live)
+## Read aloud
 
-Article 탭의 문단마다 `Read aloud` 버튼이 있다. 누르면 브라우저 마이크가 GPT-Live(`gpt-live-1`)에 WebRTC로 붙고, 읽는 동안 원어민 코치가 듣다가 이상한 발음이나 구 안에서 잘못 끊어 읽은 곳이 나오면 문장 끝을 기다리지 않고 바로 끼어들어 고친다. 이 두 가지만 본다. 억양은 보지 않고 문단을 대신 읽어 주지도 않는다. `Finish`를 누르면 코치가 인사하고 끝내며, `Stop`은 바로 세션 종료. 분당 $0.05, 문단 하나에 약 $0.10.
+Article 탭의 문단마다 `Read aloud` 버튼이 있다. 누르면 마이크가 두 곳으로 간다. 하나는 음성 코치(GPT-Live 또는 Gemini Live), 하나는 Azure Pronunciation Assessment. 판정은 Azure가 한다: 문단을 참조 텍스트로 두고 인식된 구간마다 단어·음소 점수와 단어 앞 휴지 확신도를 돌려준다. 브라우저의 `lib/assessor/judge.ts`가 finding(단어 점수 < `ASSESS_WORD_SCORE`, 또는 UnexpectedBreak > `ASSESS_BREAK_CONFIDENCE`)을 고르고 코치에게 지시로 넘긴다. 코치는 지시를 받았을 때만 말한다. 스스로 판정하지 않는다. 오디오 LLM에게 판정을 맡겼을 때 놓치던 v/b, th, 구 안 멈춤이 이 구조의 이유다(`docs/2026-09-21-pronunciation-coach-research.md`).
 
-에이전트 정의(프롬프트, 세션 설정, 검증 시나리오)는 `../read-aloud-coach/`에 있고 backend는 그 폴더를 읽기만 한다. backend `POST /api/read-aloud/sessions`가 브라우저의 SDP offer를 `POST https://api.openai.com/v1/live/sessions`에 중계한다. API 키는 backend 환경변수에만 둔다.
+| `ASSESS_FEEDBACK` | 읽는 동안 | `Done` | 그 뒤 |
+|---|---|---|---|
+| `interrupt` | finding마다 코치가 바로 끼어든다(`Correction:`). 구간당 1개, 단어당 2회 | 코치가 "Goodbye" | `Stop` |
+| `after` | 코치 침묵. finding은 칩으로만 쌓인다 | 코치가 finding 전부를 순서대로 짚는다(`Review:`) | 따라 읽으면 "Good"(`Repeat OK:`). `Stop` |
+
+finding은 자막 위 칩으로 바로 뜨고(따라 읽기 성공은 ✓), 라운드가 끝나면 `POST /api/readings`에 `corrections`로 함께 저장된다. Summary 탭은 `GET /api/readings`로 그 목록을 읽는다. 텍스트 모델로 transcript를 정리하던 단계는 없앴다.
+
+Azure 키는 backend에만 있다. `GET /api/assessor/token`이 10분짜리 토큰과 임계값·피드백 시점을 내주고, 브라우저는 `microsoft-cognitiveservices-speech-sdk`로 직접 스트리밍한다(구간 무음 400 ms, en-US, IPA, prosody on). 무료 F0 리소스는 월 5시간, 동시 1세션. 문단 하나 약 1~2분. 에이전트 정의(프롬프트, 세션 설정, 검증 시나리오)는 `../read-aloud-coach/`에 있고 backend는 그 폴더를 읽기만 한다.
 
 ## Ask (GPT-Live)
 
@@ -103,7 +115,7 @@ Expressions 탭의 표현마다 노란 `Your turn: one sentence each.` 라벨이
 
 Read aloud 라운드는 코치가 한마디라도 했으면 끝날 때 자동으로 `readings`에 저장된다(조용히 넘어간 라운드는 남길 게 없어 저장하지 않는다). Ask와 달리 저장 버튼이 없다.
 
-탭을 처음 열 때 텍스트 모델이 두 번 돌아(카드용, 교정용) transcript를 정리하고 결과를 각 행에 캐시한다. 두 번째부터는 호출하지 않는다. 프롬프트와 스키마는 각 에이전트 폴더에 있다(`phrase-coach/cards.schema.json`, `read-aloud-coach/feedback.schema.json`).
+탭을 처음 열 때 텍스트 모델이 한 번 돌아 Ask transcript를 카드로 정리하고 결과를 각 행에 캐시한다. 두 번째부터는 호출하지 않는다. 프롬프트와 스키마는 `phrase-coach/cards.schema.json`에 있다. Read aloud 교정은 라운드가 끝날 때 판정기 finding으로 이미 저장돼 있어 모델 호출이 없다.
 
 홈의 `Asks` 링크는 세션과 무관하게 지금까지 물어본 표현 전체를 보여준다.
 
