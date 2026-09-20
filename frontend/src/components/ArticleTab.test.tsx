@@ -3,6 +3,13 @@ import userEvent from '@testing-library/user-event'
 import { describe, expect, it, vi } from 'vitest'
 import { ArticleTab } from './ArticleTab'
 
+vi.mock('../api', () => ({
+  api: {
+    addReading: vi.fn(async () => ({})),
+    assessorToken: vi.fn(async () => ({ token: 't', region: 'koreacentral', word_score: 60, break_confidence: 0.75, feedback: 'interrupt' })),
+  },
+}))
+vi.mock('../lib/assessor/azure', () => ({ startAzureAssessor: vi.fn(async () => ({ stop: vi.fn(async () => undefined) })) }))
 vi.mock('../lib/liveClient', () => ({
   connectReadAloud: vi.fn(async () => ({ microphone: {}, finish: vi.fn(), say: vi.fn(), correct: vi.fn(), confirm: vi.fn(), review: vi.fn(), close: vi.fn(), dispose: vi.fn() })),
 }))

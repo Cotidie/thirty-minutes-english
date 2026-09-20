@@ -1,12 +1,28 @@
-import { act, render, screen } from '@testing-library/react'
+import { act, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { LiveEvent } from '../lib/liveSession'
 import type { LiveConnection, LiveOptions } from '../lib/liveClient'
+import type { AzureWord } from '../lib/assessor/judge'
+import type { AssessorOptions } from '../lib/assessor/azure'
 import { api } from '../api'
 import { ReadAloud } from './ReadAloud'
 
-vi.mock('../api', () => ({ api: { addReading: vi.fn(async () => ({})) } }))
+const session = { token: 'eyJ.t', region: 'koreacentral', word_score: 60, break_confidence: 0.75, feedback: 'interrupt' as const }
+vi.mock('../api', () => ({
+  api: {
+    addReading: vi.fn(async () => ({})),
+    assessorToken: vi.fn(async () => session),
+  },
+}))
+
+let segment: (words: AzureWord[]) => void = () => undefined
+const assessor = { stop: vi.fn(async () => undefined) }
+const startAssessor = vi.fn(async (opts: AssessorOptions) => {
+  segment = opts.onSegment
+  return assessor
+})
+vi.mock('../lib/assessor/azure', () => ({ startAzureAssessor: (opts: AssessorOptions) => startAssessor(opts) }))
 
 const connection = { microphone: {} as MediaStream, finish: vi.fn(), say: vi.fn(), correct: vi.fn(), confirm: vi.fn(), review: vi.fn(), close: vi.fn(), dispose: vi.fn() }
 let emit: (e: LiveEvent) => void = () => undefined
@@ -31,13 +47,21 @@ function renderIdle(active = false) {
 
 beforeEach(() => {
   vi.mocked(api.addReading).mockClear()
+  vi.mocked(api.assessorToken).mockClear().mockResolvedValue(session)
   connect.mockClear()
-  connection.finish.mockClear()
-  connection.close.mockClear()
+  startAssessor.mockClear()
+  assessor.stop.mockClear()
+  for (const fn of [connection.finish, connection.close, connection.correct, connection.confirm, connection.review]) fn.mockClear()
 })
 
+/** Click Read aloud and wait until both the coach and the assessor are up. */
+async function startRound() {
+  await userEvent.click(screen.getByRole('button', { name: 'Read aloud' }))
+  await waitFor(() => expect(startAssessor).toHaveBeenCalled())
+}
+
 describe('ReadAloud', () => {
-  it('connects on click, shows captions, and relays Finish and Stop', async () => {
+  it('connects on click, shows captions, and relays Done and Stop', async () => {
     const { onStart } = renderIdle()
     await userEvent.click(screen.getByRole('button', { name: 'Read aloud' }))
     expect(onStart).toHaveBeenCalled()
@@ -56,7 +80,8 @@ describe('ReadAloud', () => {
     expect(screen.getByText('Quick one: verify.')).toBeInTheDocument()
     expect(screen.getByText('14s')).toBeInTheDocument()
 
-    await userEvent.click(screen.getByRole('button', { name: 'Finish' }))
+    await waitFor(() => expect(startAssessor).toHaveBeenCalled())
+    await userEvent.click(screen.getByRole('button', { name: 'Done' }))
     expect(connection.finish).toHaveBeenCalled()
     await userEvent.click(screen.getByRole('button', { name: 'Stop' }))
     expect(connection.close).toHaveBeenCalled()
@@ -71,7 +96,7 @@ describe('ReadAloud', () => {
     expect(screen.getByRole('status')).toHaveTextContent('Round over')
     expect(screen.getByText('90s')).toBeInTheDocument()
 
-    await userEvent.click(screen.getByRole('button', { name: 'Done' }))
+    await userEvent.click(screen.getByRole('button', { name: 'Close' }))
     expect(onEnd).toHaveBeenCalled()
     expect(screen.getByRole('button', { name: 'Read aloud' })).toBeInTheDocument()
   })
@@ -82,7 +107,7 @@ describe('ReadAloud', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Read aloud' }))
     expect(await screen.findByText('Permission denied')).toBeInTheDocument()
     expect(screen.getByRole('status')).toHaveTextContent('Could not start')
-    await userEvent.click(screen.getByRole('button', { name: 'Done' }))
+    await userEvent.click(screen.getByRole('button', { name: 'Close' }))
 
     await userEvent.click(screen.getByRole('button', { name: 'Read aloud' }))
     act(() => emit({ type: 'session.started' }))
@@ -111,14 +136,81 @@ describe('ReadAloud records', () => {
       user_text: 'researchers berified it',
       coach_text: 'Quick one: that was berified.',
       seconds: 31,
+      corrections: [],
     })
 
     vi.mocked(api.addReading).mockClear()
-    await userEvent.click(screen.getByRole('button', { name: 'Done' }))
+    await userEvent.click(screen.getByRole('button', { name: 'Close' }))
     await userEvent.click(screen.getByRole('button', { name: 'Read aloud' }))
     act(() => emit({ type: 'session.started', session: { id: 'live_2' } }))
     act(() => emit({ type: 'session.input_transcript.delta', delta: 'researchers verified it' }))
     act(() => emit({ type: 'session.closed', usage: { seconds: 28 } }))
     expect(vi.mocked(api.addReading)).not.toHaveBeenCalled()
+  })
+})
+
+const berified: AzureWord = {
+  Word: 'verified',
+  Offset: 0,
+  Duration: 1,
+  PronunciationAssessment: { AccuracyScore: 41, ErrorType: 'Mispronunciation' },
+  Phonemes: [{ Phoneme: 'v', PronunciationAssessment: { AccuracyScore: 8, NBestPhonemes: [{ Phoneme: 'b', Score: 80 }] } }],
+}
+const verified: AzureWord = { Word: 'verified', Offset: 0, Duration: 1, PronunciationAssessment: { AccuracyScore: 88, ErrorType: 'None' } }
+
+describe('ReadAloud assessor', () => {
+  it('starts Azure on the round microphone with the paragraph, and stops it when the round closes', async () => {
+    renderIdle()
+    await startRound()
+    expect(startAssessor.mock.calls[0][0]).toMatchObject({ microphone: connection.microphone, paragraph: 'Researchers verified it.', session })
+    act(() => emit({ type: 'session.started' }))
+    act(() => emit({ type: 'session.closed', usage: { seconds: 20 } }))
+    expect(assessor.stop).toHaveBeenCalled()
+  })
+
+  it('hands a finding to the coach, lists it, confirms the repeat, and saves both', async () => {
+    renderIdle()
+    await startRound()
+    act(() => emit({ type: 'session.started' }))
+
+    act(() => segment([berified]))
+    expect(connection.correct).toHaveBeenCalledWith(expect.objectContaining({ kind: 'pronunciation', word: 'verified', heard: 'b for v' }))
+    expect(screen.getByRole('list', { name: 'Findings' })).toHaveTextContent('verified')
+
+    act(() => segment([verified]))
+    expect(connection.confirm).toHaveBeenCalled()
+
+    act(() => emit({ type: 'session.closed', usage: { seconds: 40 } }))
+    expect(vi.mocked(api.addReading)).toHaveBeenCalledWith(
+      expect.objectContaining({
+        corrections: [{ kind: 'pronunciation', word: 'verified', heard: 'b for v', fix: 'v', repeated_ok: true }],
+      }),
+    )
+  })
+
+  it('in after mode stays quiet while reading and reviews everything on Done', async () => {
+    vi.mocked(api.assessorToken).mockResolvedValue({ ...session, feedback: 'after' })
+    renderIdle()
+    await startRound()
+    act(() => emit({ type: 'session.started' }))
+
+    act(() => segment([berified]))
+    expect(connection.correct).not.toHaveBeenCalled()
+    expect(screen.getByRole('list', { name: 'Findings' })).toHaveTextContent('verified')
+
+    await userEvent.click(screen.getByRole('button', { name: 'Done' }))
+    expect(connection.review).toHaveBeenCalledWith([expect.objectContaining({ word: 'verified' })])
+    expect(connection.finish).not.toHaveBeenCalled()
+
+    act(() => segment([verified]))
+    expect(connection.confirm).toHaveBeenCalled()
+  })
+
+  it('fails the round before connecting when the assessor is off', async () => {
+    vi.mocked(api.assessorToken).mockRejectedValueOnce(new Error('Read aloud is off: set AZURE_SPEECH_KEY in Settings'))
+    renderIdle()
+    await userEvent.click(screen.getByRole('button', { name: 'Read aloud' }))
+    expect(await screen.findByText('Read aloud is off: set AZURE_SPEECH_KEY in Settings')).toBeInTheDocument()
+    expect(connect).not.toHaveBeenCalled()
   })
 })
