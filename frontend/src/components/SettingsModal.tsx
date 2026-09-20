@@ -111,7 +111,7 @@ export function SettingsModal({ open, onClose }: Props) {
     return f.suggestions.filter((m) => (provider === 'gemini' ? m.startsWith('gemini') : !m.startsWith('gemini')))
   }
 
-  const groups = (['keys', 'voice', 'claude', 'text'] as const).map((g) => ({
+  const groups = (['keys', 'voice', 'assess', 'claude', 'text'] as const).map((g) => ({
     group: g,
     fields: (fields ?? []).filter((f) => f.group === g && visible(f)),
   }))

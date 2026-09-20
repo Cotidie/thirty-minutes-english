@@ -37,6 +37,16 @@ const FIELDS: SettingField[] = [
   }),
   field({ key: 'OPENAI_API_KEY', group: 'keys', value: '…1234', secret: true }),
   field({ key: 'GEMINI_API_KEY', group: 'keys', secret: true }),
+  field({ key: 'AZURE_SPEECH_KEY', group: 'keys', secret: true }),
+  field({ key: 'AZURE_SPEECH_REGION', group: 'assess', value: 'koreacentral', default: 'koreacentral' }),
+  field({
+    key: 'ASSESS_FEEDBACK',
+    group: 'assess',
+    value: 'interrupt',
+    default: 'interrupt',
+    choices: ['interrupt', 'after'],
+    labels: { interrupt: 'Coach cuts in at each finding', after: 'One review after Done' },
+  }),
   field({ key: 'CLAUDE_MODEL', group: 'claude', value: 'sonnet', default: 'opus', suggestions: ['opus', 'sonnet'] }),
   field({ key: 'SUMMARY_MODEL', group: 'text', value: 'gpt-5.6-luna', default: 'gpt-5.6-luna' }),
 ]
@@ -123,5 +133,18 @@ describe('SettingsModal', () => {
     await userEvent.selectOptions(screen.getByLabelText(/VOICE_PROVIDER/), 'gemini')
     await userEvent.click(screen.getByRole('button', { name: 'Save' }))
     expect(await screen.findByRole('status')).toHaveTextContent('must be one of')
+  })
+})
+
+describe('SettingsModal assessor', () => {
+  it('shows the assessor group and a Test button beside the Azure key', async () => {
+    vi.mocked(api.testKey).mockResolvedValueOnce({ ok: true, message: 'key works' })
+    await open()
+    expect(screen.getByText('Read aloud assessor')).toBeInTheDocument()
+    expect(screen.getByLabelText(/ASSESS_FEEDBACK/)).toHaveValue('interrupt')
+    const row = screen.getByLabelText(/AZURE_SPEECH_KEY/).closest<HTMLElement>('.settings-row')!
+    await userEvent.click(within(row).getByRole('button', { name: 'Test' }))
+    expect(api.testKey).toHaveBeenCalledWith('AZURE_SPEECH_KEY', '')
+    expect(await within(row).findByRole('status')).toHaveTextContent('✓ key works')
   })
 })
