@@ -134,8 +134,8 @@ export function ReadAloud({ paragraph, sessionId, active, onStart, onEnd }: Prop
       .catch(() => undefined)
   }
 
-  /** The reader is done: the coach goes over what is still open, or signs off when nothing is. */
-  const done = () => roundRef.current?.coach.review(roundRef.current.judge.pending())
+  /** The reader is done: the coach signs off. Open marks stay on the page, unspoken. */
+  const done = () => roundRef.current?.coach.finish()
   const stop = () => {
     setState((s) => (s ? { ...s, status: 'closing' } : s))
     roundRef.current?.coach.close()

@@ -20,8 +20,6 @@ export interface LiveConnection {
   correct(finding: Finding): void
   /** Tells the coach the reader read it right this time. */
   confirm(): void
-  /** Hands the coach every open finding at once, after the reader is done. */
-  review(findings: Finding[]): void
   /** Ends the round. `session.closed` arrives through onEvent afterwards. */
   close(): void
   /** Drops everything without waiting for the final event. */
@@ -45,15 +43,6 @@ export const correctionInstruction = (f: Finding) =>
   f.kind === 'pronunciation'
     ? `Correction: the reader mispronounced "${f.word}" (heard ${f.heard}) and is asking about it now. Two beats: "You said" the word as they said it, then "It's" the word right. Then "Try it."`
     : `Correction: the reader paused inside "${f.word}" (${f.heard}) and is asking about it now. Two beats: "You stopped after '${f.word.split(' ')[0]}'", then "${f.word}" as one piece. Then "Try it."`
-
-/** One review of everything open; with nothing open the coach just signs off. */
-export const reviewInstruction = (findings: Finding[]) => {
-  if (findings.length === 0) return FINISH_INSTRUCTION
-  const items = findings
-    .map((f, i) => (f.kind === 'pronunciation' ? `${i + 1}) "${f.word}": heard ${f.heard}.` : `${i + 1}) "${f.word}": paused after "${f.word.split(' ')[0]}".`))
-    .join(' ')
-  return `Review: the reader has finished. Go through these in order, two beats each: what they said, then the right version. ${items} Then say: "Read those back to me." and wait.`
-}
 
 export async function connectLive(opts: LiveOptions): Promise<LiveConnection> {
   const provider = await api.voiceProvider()

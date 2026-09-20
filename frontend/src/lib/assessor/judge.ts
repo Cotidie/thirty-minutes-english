@@ -114,11 +114,6 @@ export class Judge {
     return { findings, confirmed }
   }
 
-  /** What is still unconfirmed, in reading order. */
-  pending(): Finding[] {
-    return [...this.open].sort((a, b) => a.at - b.at)
-  }
-
   /**
    * Paragraph index of each said word. A short segment that matches an open
    * finding is the reader trying that word again, so it lands on the finding;

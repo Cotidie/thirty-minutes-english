@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { CONFIRM_INSTRUCTION, FINISH_INSTRUCTION, correctionInstruction, reviewInstruction } from './transport'
+import { CONFIRM_INSTRUCTION, correctionInstruction } from './transport'
 
 const verified = { kind: 'pronunciation' as const, word: 'verified', heard: 'b for v', fix: 'vɛrɪfaɪd', score: 41, at: 1 }
 const asLong = { kind: 'phrasing' as const, word: 'as long', heard: 'as / long', fix: 'keep it together', score: 0.9, at: 4 }
@@ -15,18 +15,6 @@ describe('correctionInstruction', () => {
     expect(correctionInstruction(asLong)).toBe(
       'Correction: the reader paused inside "as long" (as / long) and is asking about it now. Two beats: "You stopped after \'as\'", then "as long" as one piece. Then "Try it."',
     )
-  })
-})
-
-describe('reviewInstruction', () => {
-  it('numbers every open finding and asks for them back', () => {
-    expect(reviewInstruction([verified, asLong])).toBe(
-      'Review: the reader has finished. Go through these in order, two beats each: what they said, then the right version. 1) "verified": heard b for v. 2) "as long": paused after "as". Then say: "Read those back to me." and wait.',
-    )
-  })
-
-  it('is the plain closing when nothing is open', () => {
-    expect(reviewInstruction([])).toBe(FINISH_INSTRUCTION)
   })
 })
 

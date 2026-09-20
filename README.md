@@ -79,7 +79,7 @@ Article 탭의 문단마다 `Read aloud` 버튼이 있다. 누르면 마이크�
 | 읽는 동안 | 문단이 단어 단위로 바뀌고, 틀린 단어에 붉은 밑줄, 구 안 멈춤은 두 단어 사이 붉은 `\|` | 침묵 |
 | 표시 클릭 | 아래에 카드("heard b for v: say v") | 두 박자 "You said berify. It's verify. Try it."(`Correction:`). 같은 자리는 한 번만 |
 | 다시 읽어 맞음 | 표시가 초록 ✓ | 클릭했던 것이면 "Good"(`Repeat OK:`), 아니면 침묵 |
-| `Done` | | 아직 ✓ 아닌 것을 순서대로 짚는다(`Review:`). 없으면 "Goodbye" |
+| `Done` | 표시는 그대로 남아 라운드가 끝난 뒤에도 클릭할 수 있다 | "Goodbye". 클릭 안 한 표시는 말하지 않는다 |
 
 라운드가 끝나면 `POST /api/readings`에 `corrections`로 함께 저장된다. Summary 탭은 `GET /api/readings`로 그 목록을 읽는다. 텍스트 모델로 transcript를 정리하던 단계는 없앴다.
 

@@ -8,7 +8,7 @@ import { SILENCE_MS, type RoundOptions } from '../lib/useLiveRound'
 import type { Example, PracticeTarget } from '../types'
 import { Practice } from './Practice'
 
-const connection = { microphone: {} as MediaStream, finish: vi.fn(), say: vi.fn(), correct: vi.fn(), confirm: vi.fn(), review: vi.fn(), close: vi.fn(), dispose: vi.fn() }
+const connection = { microphone: {} as MediaStream, finish: vi.fn(), say: vi.fn(), correct: vi.fn(), confirm: vi.fn(), close: vi.fn(), dispose: vi.fn() }
 let emit: (e: LiveEvent) => void = () => undefined
 const connect = vi.fn(async (_target: PracticeTarget, opts: RoundOptions): Promise<LiveConnection> => {
   emit = opts.onEvent

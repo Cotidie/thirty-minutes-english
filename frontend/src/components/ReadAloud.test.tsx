@@ -24,7 +24,7 @@ const startAssessor = vi.fn(async (opts: AssessorOptions) => {
 })
 vi.mock('../lib/assessor/azure', () => ({ startAzureAssessor: (opts: AssessorOptions) => startAssessor(opts) }))
 
-const connection = { microphone: {} as MediaStream, finish: vi.fn(), say: vi.fn(), correct: vi.fn(), confirm: vi.fn(), review: vi.fn(), close: vi.fn(), dispose: vi.fn() }
+const connection = { microphone: {} as MediaStream, finish: vi.fn(), say: vi.fn(), correct: vi.fn(), confirm: vi.fn(), close: vi.fn(), dispose: vi.fn() }
 let emit: (e: LiveEvent) => void = () => undefined
 let drop: () => void = () => undefined
 type RoundOptions = Omit<LiveOptions, 'start'>
@@ -51,7 +51,7 @@ beforeEach(() => {
   connect.mockClear()
   startAssessor.mockClear()
   assessor.stop.mockClear()
-  for (const fn of [connection.finish, connection.close, connection.correct, connection.confirm, connection.review]) fn.mockClear()
+  for (const fn of [connection.finish, connection.close, connection.correct, connection.confirm]) fn.mockClear()
 })
 
 /** Click Read aloud and wait until both the coach and the assessor are up. */
@@ -82,7 +82,7 @@ describe('ReadAloud', () => {
 
     await waitFor(() => expect(startAssessor).toHaveBeenCalled())
     await userEvent.click(screen.getByRole('button', { name: 'Done' }))
-    expect(connection.review).toHaveBeenCalledWith([])
+    expect(connection.finish).toHaveBeenCalled()
     await userEvent.click(screen.getByRole('button', { name: 'Stop' }))
     expect(connection.close).toHaveBeenCalled()
     expect(screen.getByRole('status')).toHaveTextContent('Wrapping up')
@@ -222,13 +222,14 @@ describe('ReadAloud assessor', () => {
     expect(screen.getByRole('button', { name: 'verified: b for v' })).toHaveClass('is-ok')
   })
 
-  it('reviews what is still open on Done', async () => {
+  it('closes without a word about open findings on Done', async () => {
     renderIdle()
     await startRound()
     act(() => emit({ type: 'session.started' }))
     act(() => segment([berified]))
     await userEvent.click(screen.getByRole('button', { name: 'Done' }))
-    expect(connection.review).toHaveBeenCalledWith([expect.objectContaining({ word: 'verified' })])
+    expect(connection.finish).toHaveBeenCalled()
+    expect(connection.correct).not.toHaveBeenCalled()
   })
 
   it('fails the round before connecting when the assessor is off', async () => {

@@ -86,7 +86,7 @@ describe('Judge', () => {
     const repeat = judge.segment([word('verified', 85)])
     expect(repeat.findings).toEqual([])
     expect(repeat.confirmed.map((f) => f.word)).toEqual(['verified'])
-    expect(judge.pending().map((f) => f.word)).toEqual(['as long'])
+    expect(judge.segment([word('as', 90), word('long', 93)]).confirmed.map((f) => f.word)).toEqual(['as long'])
   })
 
   it('confirms a phrasing finding when the pair comes back without a break', () => {
@@ -100,6 +100,6 @@ describe('Judge', () => {
     const judge = new Judge(T, PARAGRAPH)
     judge.segment([berified])
     expect(judge.segment([berified])).toEqual({ findings: [], confirmed: [] })
-    expect(judge.pending()).toHaveLength(1)
+    expect(judge.segment([word('verified', 90)]).confirmed).toHaveLength(1)
   })
 })

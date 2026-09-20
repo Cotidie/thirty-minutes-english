@@ -2,7 +2,7 @@
 // rest of the app already understands (the OpenAI names), plus the audio
 // chunks and turn signals the transport itself acts on.
 
-import type { LiveEvent } from '../liveSession'
+import { spoken, type LiveEvent } from '../liveSession'
 
 interface Part {
   inlineData?: { mimeType?: string; data?: string }
@@ -36,11 +36,7 @@ export interface Decoded {
 }
 
 /** Gemini's transcription marks a silent turn or plain noise with a tag; neither is speech. */
-const TRANSCRIPT_MARKERS = /<(?:no speech|noise|silence)>/gi
 
-export function spoken(text: string): string {
-  return text.replace(TRANSCRIPT_MARKERS, '')
-}
 
 export function decodeServerMessage(msg: GeminiServerMessage): Decoded {
   const events: LiveEvent[] = []

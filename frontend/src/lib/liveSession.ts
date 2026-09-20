@@ -1,6 +1,7 @@
-// Pure state for one GPT-Live round, driven by data-channel events.
-// Transcript fragments are appended verbatim per speaker (the API asks for no
-// trimming or spacing between deltas).
+// Pure state for one live round, driven by transport events. Transcript
+// fragments are appended verbatim per speaker (the API asks for no trimming
+// or spacing between deltas); Gemini's silence markers are dropped once the
+// pieces have joined, since they arrive split across deltas.
 
 export type LiveStatus = 'connecting' | 'listening' | 'closing' | 'closed' | 'failed'
 
@@ -31,14 +32,21 @@ export const initialLiveState: LiveState = {
   error: null,
 }
 
+const TRANSCRIPT_MARKERS = /<(?:no speech|noise|silence)>/gi
+
+/** The transcript without Gemini's markers for silent or noisy turns. */
+export function spoken(text: string): string {
+  return text.replace(TRANSCRIPT_MARKERS, '')
+}
+
 export function applyLiveEvent(state: LiveState, event: LiveEvent): LiveState {
   switch (event.type) {
     case 'session.started':
       return { ...state, status: 'listening', sessionId: event.session?.id ?? state.sessionId }
     case 'session.input_transcript.delta':
-      return { ...state, user: state.user + (event.delta ?? '') }
+      return { ...state, user: spoken(state.user + (event.delta ?? '')) }
     case 'session.output_transcript.delta':
-      return { ...state, coach: state.coach + (event.delta ?? '') }
+      return { ...state, coach: spoken(state.coach + (event.delta ?? '')) }
     case 'session.usage.updated':
       return { ...state, seconds: event.usage?.seconds ?? state.seconds }
     case 'session.closed':

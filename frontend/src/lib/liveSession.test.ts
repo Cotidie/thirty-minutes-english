@@ -8,6 +8,14 @@ describe('applyLiveEvent', () => {
     expect(s.sessionId).toBe('live_1')
   })
 
+  it('drops a silence marker even when it arrives in pieces', () => {
+    let s = initialLiveState
+    s = applyLiveEvent(s, { type: 'session.output_transcript.delta', delta: '<no' })
+    s = applyLiveEvent(s, { type: 'session.output_transcript.delta', delta: ' speech><no speech>' })
+    s = applyLiveEvent(s, { type: 'session.output_transcript.delta', delta: 'You said berify.' })
+    expect(s.coach).toBe('You said berify.')
+  })
+
   it('appends transcript deltas verbatim per speaker', () => {
     let s = initialLiveState
     s = applyLiveEvent(s, { type: 'session.input_transcript.delta', delta: 'Researchers ' })

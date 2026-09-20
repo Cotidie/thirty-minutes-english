@@ -6,7 +6,6 @@ import {
   CONFIRM_INSTRUCTION,
   FINISH_INSTRUCTION,
   correctionInstruction,
-  reviewInstruction,
   sayInstruction,
   type LiveConnection,
   type LiveOptions,
@@ -78,7 +77,6 @@ export async function connectOpenAI(opts: LiveOptions): Promise<LiveConnection> 
     say: (text) => instruct('say', sayInstruction(text)),
     correct: (finding) => instruct('correct', correctionInstruction(finding)),
     confirm: () => instruct('confirm', CONFIRM_INSTRUCTION),
-    review: (findings) => instruct('review', reviewInstruction(findings)),
     close: () => send({ type: 'session.close' }),
     dispose,
   }

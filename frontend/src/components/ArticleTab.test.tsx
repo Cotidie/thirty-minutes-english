@@ -11,7 +11,7 @@ vi.mock('../api', () => ({
 }))
 vi.mock('../lib/assessor/azure', () => ({ startAzureAssessor: vi.fn(async () => ({ stop: vi.fn(async () => undefined) })) }))
 vi.mock('../lib/liveClient', () => ({
-  connectReadAloud: vi.fn(async () => ({ microphone: {}, finish: vi.fn(), say: vi.fn(), correct: vi.fn(), confirm: vi.fn(), review: vi.fn(), close: vi.fn(), dispose: vi.fn() })),
+  connectReadAloud: vi.fn(async () => ({ microphone: {}, finish: vi.fn(), say: vi.fn(), correct: vi.fn(), confirm: vi.fn(), close: vi.fn(), dispose: vi.fn() })),
 }))
 
 const article = {

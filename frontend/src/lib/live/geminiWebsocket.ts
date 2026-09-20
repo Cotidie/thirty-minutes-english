@@ -11,7 +11,6 @@ import {
   CONFIRM_INSTRUCTION,
   FINISH_INSTRUCTION,
   correctionInstruction,
-  reviewInstruction,
   sayInstruction,
   type LiveConnection,
   type LiveOptions,
@@ -174,10 +173,6 @@ class GeminiRound implements LiveConnection {
 
   confirm(): void {
     this.send(textTurn(CONFIRM_INSTRUCTION))
-  }
-
-  review(findings: Finding[]): void {
-    this.send(textTurn(reviewInstruction(findings)))
   }
 
   close(): void {
