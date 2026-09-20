@@ -35,14 +35,14 @@ export interface LiveOptions {
 }
 
 export const FINISH_INSTRUCTION = 'The round is over. Say your closing now.'
-export const CONFIRM_INSTRUCTION = 'Repeat OK: the reader read it right this time. Say "Good." and nothing else.'
+export const CONFIRM_INSTRUCTION = 'Repeat OK.'
 export const sayInstruction = (text: string) => `Now say exactly this, word for word, then stop: ${text}`
 
-/** Two beats: the problem as the reader said it, then the right version. The reader asked by clicking. */
+/** The finding the reader clicked; the prompt says how to say it. */
 export const correctionInstruction = (f: Finding) =>
   f.kind === 'pronunciation'
-    ? `Correction: the reader mispronounced "${f.word}" (heard ${f.heard}) and is asking about it now. Two beats: "You said" the word as they said it, then "It's" the word right. Then "Try it."`
-    : `Correction: the reader paused inside "${f.word}" (${f.heard}) and is asking about it now. Two beats: "You stopped after '${f.word.split(' ')[0]}'", then "${f.word}" as one piece. Then "Try it."`
+    ? `Correction: "${f.word}", heard ${f.heard}.`
+    : `Correction: "${f.word}", paused after "${f.word.split(' ')[0]}".`
 
 export async function connectLive(opts: LiveOptions): Promise<LiveConnection> {
   const provider = await api.voiceProvider()

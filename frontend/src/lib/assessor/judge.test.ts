@@ -31,12 +31,12 @@ const brokenLong = word('long', 95, {
 describe('findingsIn', () => {
   it('reports a low word score as a pronunciation finding with the heard sound', () => {
     const [f] = findingsIn([word('researchers', 92), berified], T)
-    expect(f).toEqual({ kind: 'pronunciation', word: 'verified', heard: 'b for v', fix: 'vɛr', score: 41, at: -1 })
+    expect(f).toEqual({ kind: 'pronunciation', word: 'verified', heard: 'b for v', fix: 'vɛr', at: -1 })
   })
 
   it('reports an unexpected break before a word as a phrasing finding on the pair', () => {
     const [f] = findingsIn([word('twice', 90), word('as', 88), brokenLong], T, [0, 1, 2])
-    expect(f).toEqual({ kind: 'phrasing', word: 'as long', heard: 'as / long', fix: 'keep it together', score: 0.91, at: 2 })
+    expect(f).toEqual({ kind: 'phrasing', word: 'as long', heard: 'as / long', fix: 'keep it together', at: 2 })
   })
 
   it('ignores omissions, insertions, breaks under the threshold, and a break on the first word', () => {

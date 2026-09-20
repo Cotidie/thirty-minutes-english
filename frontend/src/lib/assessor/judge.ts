@@ -40,7 +40,6 @@ export interface Finding {
   heard: string
   /** The few-word fix the coach relays. */
   fix: string
-  score: number
   /** Index of the word in the paragraph; for phrasing, of the second word (the pause sits before it). -1 when unplaced. */
   at: number
 }
@@ -61,11 +60,11 @@ export function findingsIn(words: AzureWord[], t: Thresholds, positions: number[
     const breakConfidence = pa.Feedback?.Prosody?.Break?.UnexpectedBreak?.Confidence ?? 0
     if (i > 0 && breakConfidence > t.breakConfidence) {
       const prev = words[i - 1].Word
-      found.push({ kind: 'phrasing', word: `${prev} ${w.Word}`, heard: `${prev} / ${w.Word}`, fix: 'keep it together', score: breakConfidence, at: positions[i] })
+      found.push({ kind: 'phrasing', word: `${prev} ${w.Word}`, heard: `${prev} / ${w.Word}`, fix: 'keep it together', at: positions[i] })
     }
     // Azure's own Mispronunciation tag sits at a fixed 60; the setting is the one knob here.
     if (pa.AccuracyScore < t.wordScore) {
-      found.push({ kind: 'pronunciation', word: w.Word, heard: heardSound(w, t.wordScore), fix: expectedSound(w), score: pa.AccuracyScore, at: positions[i] })
+      found.push({ kind: 'pronunciation', word: w.Word, heard: heardSound(w, t.wordScore), fix: expectedSound(w), at: positions[i] })
     }
   })
   return found
