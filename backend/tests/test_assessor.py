@@ -25,7 +25,7 @@ class Reply:
         return self.text.encode()
 
 
-def test_session_carries_the_token_region_thresholds_and_feedback(monkeypatch):
+def test_session_carries_the_token_region_and_thresholds(monkeypatch):
     seen = {}
 
     def fake_urlopen(req, timeout=0):
@@ -35,13 +35,12 @@ def test_session_carries_the_token_region_thresholds_and_feedback(monkeypatch):
         return Reply("eyJ.token")
 
     monkeypatch.setattr("app.assessor.urllib.request.urlopen", fake_urlopen)
-    assessor = AzureAssessor("az-key", "koreacentral", word_score=60, break_confidence=0.75, feedback="after")
+    assessor = AzureAssessor("az-key", "koreacentral", word_score=60, break_confidence=0.75)
     assert assessor.session() == {
         "token": "eyJ.token",
         "region": "koreacentral",
         "word_score": 60,
         "break_confidence": 0.75,
-        "feedback": "after",
     }
     assert seen == {
         "url": "https://koreacentral.api.cognitive.microsoft.com/sts/v1.0/issueToken",
@@ -58,7 +57,7 @@ def test_azure_errors_become_assessor_errors(monkeypatch):
 
     monkeypatch.setattr("app.assessor.urllib.request.urlopen", fail)
     with pytest.raises(AssessorError) as e:
-        AzureAssessor("az-key", "koreacentral", 60, 0.75, "interrupt").session()
+        AzureAssessor("az-key", "koreacentral", 60, 0.75).session()
     assert e.value.status == 401
     assert "bad key" in e.value.message
 
@@ -74,13 +73,13 @@ def test_token_endpoint_is_503_until_azure_is_configured(tmp_path):
 def test_token_endpoint_returns_the_azure_session(tmp_path):
     class Minted(AzureAssessor):
         def session(self):
-            return {"token": "eyJ.t", "region": "koreacentral", "word_score": 55, "break_confidence": 0.8, "feedback": "interrupt"}
+            return {"token": "eyJ.t", "region": "koreacentral", "word_score": 55, "break_confidence": 0.8}
 
-    services = Services(FakeGenerator(), assessor=Minted("k", "koreacentral", 55, 0.8, "interrupt"))
+    services = Services(FakeGenerator(), assessor=Minted("k", "koreacentral", 55, 0.8))
     app = create_app(SessionStore(tmp_path / "s.db"), services, InlineExecutor())
     with TestClient(app) as c:
         body = c.get("/api/assessor/token").json()
-    assert body == {"token": "eyJ.t", "region": "koreacentral", "word_score": 55, "break_confidence": 0.8, "feedback": "interrupt"}
+    assert body == {"token": "eyJ.t", "region": "koreacentral", "word_score": 55, "break_confidence": 0.8}
 
 
 def test_token_endpoint_relays_azure_failures_as_502(tmp_path):

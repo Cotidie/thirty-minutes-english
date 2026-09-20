@@ -16,9 +16,9 @@ export interface LiveConnection {
   finish(): void
   /** Has the coach read this text aloud, word for word. */
   say(text: string): void
-  /** Hands the coach one assessor finding to interrupt with. */
+  /** Hands the coach the finding the reader clicked; the reader is listening. */
   correct(finding: Finding): void
-  /** Tells the coach the reader's repeat came out right. */
+  /** Tells the coach the reader read it right this time. */
   confirm(): void
   /** Hands the coach every open finding at once, after the reader is done. */
   review(findings: Finding[]): void
@@ -37,14 +37,14 @@ export interface LiveOptions {
 }
 
 export const FINISH_INSTRUCTION = 'The round is over. Say your closing now.'
-export const CONFIRM_INSTRUCTION = 'Repeat OK: the reader repeated it right. Say "Good." and nothing else.'
+export const CONFIRM_INSTRUCTION = 'Repeat OK: the reader read it right this time. Say "Good." and nothing else.'
 export const sayInstruction = (text: string) => `Now say exactly this, word for word, then stop: ${text}`
 
-/** Two beats: the problem as the reader said it, then the right version. */
+/** Two beats: the problem as the reader said it, then the right version. The reader asked by clicking. */
 export const correctionInstruction = (f: Finding) =>
   f.kind === 'pronunciation'
-    ? `Correction: the reader mispronounced "${f.word}" (heard ${f.heard}). Interrupt now, two beats: "You said" the word as they said it, then "It's" the word right, then "Go on."`
-    : `Correction: the reader paused inside "${f.word}" (${f.heard}). Interrupt now, two beats: "You stopped after '${f.word.split(' ')[0]}'", then "${f.word}" as one piece, then "Go on."`
+    ? `Correction: the reader mispronounced "${f.word}" (heard ${f.heard}) and is asking about it now. Two beats: "You said" the word as they said it, then "It's" the word right. Then "Try it."`
+    : `Correction: the reader paused inside "${f.word}" (${f.heard}) and is asking about it now. Two beats: "You stopped after '${f.word.split(' ')[0]}'", then "${f.word}" as one piece. Then "Try it."`
 
 /** One review of everything open; with nothing open the coach just signs off. */
 export const reviewInstruction = (findings: Finding[]) => {

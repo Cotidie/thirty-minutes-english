@@ -39,14 +39,6 @@ const FIELDS: SettingField[] = [
   field({ key: 'GEMINI_API_KEY', group: 'keys', secret: true }),
   field({ key: 'AZURE_SPEECH_KEY', group: 'keys', secret: true }),
   field({ key: 'AZURE_SPEECH_REGION', group: 'assess', value: 'koreacentral', default: 'koreacentral' }),
-  field({
-    key: 'ASSESS_FEEDBACK',
-    group: 'assess',
-    value: 'interrupt',
-    default: 'interrupt',
-    choices: ['interrupt', 'after'],
-    labels: { interrupt: 'Coach cuts in at each finding', after: 'One review after Done' },
-  }),
   field({ key: 'CLAUDE_MODEL', group: 'claude', value: 'sonnet', default: 'opus', suggestions: ['opus', 'sonnet'] }),
   field({ key: 'SUMMARY_MODEL', group: 'text', value: 'gpt-5.6-luna', default: 'gpt-5.6-luna' }),
 ]
@@ -141,7 +133,7 @@ describe('SettingsModal assessor', () => {
     vi.mocked(api.testKey).mockResolvedValueOnce({ ok: true, message: 'key works' })
     await open()
     expect(screen.getByText('Read aloud assessor')).toBeInTheDocument()
-    expect(screen.getByLabelText(/ASSESS_FEEDBACK/)).toHaveValue('interrupt')
+    expect(screen.getByLabelText(/AZURE_SPEECH_REGION/)).toHaveValue('koreacentral')
     const row = screen.getByLabelText(/AZURE_SPEECH_KEY/).closest<HTMLElement>('.settings-row')!
     await userEvent.click(within(row).getByRole('button', { name: 'Test' }))
     expect(api.testKey).toHaveBeenCalledWith('AZURE_SPEECH_KEY', '')

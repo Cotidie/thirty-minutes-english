@@ -131,8 +131,6 @@ export interface AssessorSession {
   region: string
   word_score: number
   break_confidence: number
-  /** `interrupt`: the coach cuts in per finding. `after`: one review once the reader presses Done. */
-  feedback: 'interrupt' | 'after'
 }
 
 export interface PhraseCard {

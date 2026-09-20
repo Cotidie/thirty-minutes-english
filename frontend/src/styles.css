@@ -1723,31 +1723,57 @@ button.question.is-active {
   }
 }
 
-.read-aloud-findings {
-  list-style: none;
-  margin: 0.5rem 0 0;
-  padding: 0;
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.4rem;
+/* The paragraph as it is read: findings sit on the words, a click opens one. */
+.reading-text {
+  margin: 0;
+  font-family: var(--serif);
+  font-size: 1.08rem;
+  line-height: 1.7;
 }
 
-.read-aloud-findings li {
+.reading-hit {
+  all: unset;
+  cursor: pointer;
+  border-bottom: 2px solid var(--cat-ink, #8f3a2a);
+  background: #fbeeea;
+  border-radius: 2px;
+  padding: 0 0.1em;
+}
+
+.reading-hit.is-phrasing {
+  color: #8f3a2a;
+  font-weight: 600;
+  margin: 0 0.15em;
+  padding: 0 0.2em;
+  background: none;
+}
+
+.reading-hit.is-ok {
+  border-bottom-color: #35633c;
+  background: #ebf4ec;
+  color: inherit;
+}
+
+.reading-hit.is-open,
+.reading-hit:focus-visible {
+  outline: 2px solid var(--ink);
+  outline-offset: 1px;
+}
+
+.reading-card {
+  margin: 0.5rem 0 0;
+  padding: 0.4rem 0.7rem;
   border: 1px solid var(--line);
-  border-radius: 999px;
-  padding: 0.1rem 0.6rem;
+  border-radius: 6px;
+  background: var(--paper);
   font-size: 0.9rem;
 }
 
-.read-aloud-findings li.is-phrasing {
-  border-style: dashed;
+.reading-card b {
+  margin-right: 0.4rem;
 }
 
-.read-aloud-findings li.is-ok {
-  opacity: 0.6;
-}
-
-.read-aloud-ok {
-  margin-left: 0.3rem;
-  color: var(--marker);
+.reading-card .read-aloud-ok {
+  margin-left: 0.4rem;
+  color: #35633c;
 }

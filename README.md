@@ -2,7 +2,7 @@
 
 - 목표: 친구와 하루 30분 영어 회화 연습. 매 세션 표현 6개 + 짧은 아티클(기술 · 문학 · 세계사 · 최근 세계 이슈) + B2~C1+ 어휘 12개를 Claude가 생성.
 - 상태: 진행 중 (v1 동작, Read aloud는 Azure 판정기 위에서 돎)
-- 다음 할 일: Read aloud를 실제로 읽어 Azure finding 칩과 코치 반응 확인(`../read-aloud-coach/evals/cases.md` 2번, 7번). `ASSESS_FEEDBACK=after`도 한 번. 임계값 튜닝은 `docs/2026-09-21-assessor-benchmark.md`
+- 다음 할 일: Read aloud를 실제로 읽어 문단 위 표시와 클릭 시 코치 반응 확인(`../read-aloud-coach/evals/cases.md` 2번, 7번, 14번). 임계값 튜닝은 `docs/2026-09-21-assessor-benchmark.md`
 
 ## 실행
 
@@ -30,7 +30,6 @@ docker compose up -d --build
 | `GEMINI_API_KEY` | 비움 | Gemini Live용. provider가 `gemini`인데 비어 있으면 세 버튼이 503 |
 | `AZURE_SPEECH_KEY` | 비움 | Read aloud 판정기(Azure Pronunciation Assessment). 비어 있으면 Read aloud 버튼이 503 |
 | `AZURE_SPEECH_REGION` | `koreacentral` | Azure Speech 리소스 리전 |
-| `ASSESS_FEEDBACK` | `interrupt` | `interrupt`: finding마다 코치가 바로 끼어듦. `after`: Done 뒤 한 번에 짚어 줌 |
 | `ASSESS_WORD_SCORE` | `60` | 단어 AccuracyScore가 이 값 아래면 발음 교정 |
 | `ASSESS_BREAK_CONFIDENCE` | `0.75` | 단어 앞 UnexpectedBreak confidence가 이 값 위면 끊어읽기 교정 |
 | `CLAUDE_MODEL` | `opus` | 생성 모델. `sonnet`이면 더 빠름 |
@@ -73,14 +72,16 @@ Gemini 세션은 오디오만일 때 15분 상한이며 코치 라운드는 그�
 
 ## Read aloud
 
-Article 탭의 문단마다 `Read aloud` 버튼이 있다. 누르면 마이크가 두 곳으로 간다. 하나는 음성 코치(GPT-Live 또는 Gemini Live), 하나는 Azure Pronunciation Assessment. 판정은 Azure가 한다: 문단을 참조 텍스트로 두고 인식된 구간마다 단어·음소 점수와 단어 앞 휴지 확신도를 돌려준다. 브라우저의 `lib/assessor/judge.ts`가 finding(단어 점수 < `ASSESS_WORD_SCORE`, 또는 UnexpectedBreak > `ASSESS_BREAK_CONFIDENCE`)을 고르고 코치에게 지시로 넘긴다. 코치는 지시를 받았을 때만 말한다. 스스로 판정하지 않는다. 오디오 LLM에게 판정을 맡겼을 때 놓치던 v/b, th, 구 안 멈춤이 이 구조의 이유다(`docs/2026-09-21-pronunciation-coach-research.md`).
+Article 탭의 문단마다 `Read aloud` 버튼이 있다. 누르면 마이크가 두 곳으로 간다. 하나는 음성 코치(GPT-Live 또는 Gemini Live), 하나는 Azure Pronunciation Assessment. 판정은 Azure가 한다: 문단을 참조 텍스트로 두고 인식된 구간마다 단어·음소 점수와 단어 앞 휴지 확신도를 돌려준다. 브라우저의 `lib/assessor/judge.ts`가 finding(단어 점수 < `ASSESS_WORD_SCORE`, 또는 UnexpectedBreak > `ASSESS_BREAK_CONFIDENCE`)을 고르고 문단의 그 자리에 표시한다. 코치는 지시를 받았을 때만 말한다. 스스로 판정하지 않는다. 오디오 LLM에게 판정을 맡겼을 때 놓치던 v/b, th, 구 안 멈춤이 이 구조의 이유다(`docs/2026-09-21-pronunciation-coach-research.md`).
 
-| `ASSESS_FEEDBACK` | 읽는 동안 | `Done` | 그 뒤 |
-|---|---|---|---|
-| `interrupt` | finding마다 코치가 바로 끼어든다(`Correction:`). 구간당 1개, 단어당 2회 | 코치가 "Goodbye" | `Stop` |
-| `after` | 코치 침묵. finding은 칩으로만 쌓인다 | 코치가 finding 전부를 순서대로 짚는다(`Review:`) | 따라 읽으면 "Good"(`Repeat OK:`). `Stop` |
+| 시점 | 화면 | 코치 |
+|---|---|---|
+| 읽는 동안 | 문단이 단어 단위로 바뀌고, 틀린 단어에 붉은 밑줄, 구 안 멈춤은 두 단어 사이 붉은 `\|` | 침묵 |
+| 표시 클릭 | 아래에 카드("heard b for v: say v") | 두 박자 "You said berify. It's verify. Try it."(`Correction:`). 같은 자리는 한 번만 |
+| 다시 읽어 맞음 | 표시가 초록 ✓ | 클릭했던 것이면 "Good"(`Repeat OK:`), 아니면 침묵 |
+| `Done` | | 아직 ✓ 아닌 것을 순서대로 짚는다(`Review:`). 없으면 "Goodbye" |
 
-finding은 자막 위 칩으로 바로 뜨고(따라 읽기 성공은 ✓), 라운드가 끝나면 `POST /api/readings`에 `corrections`로 함께 저장된다. Summary 탭은 `GET /api/readings`로 그 목록을 읽는다. 텍스트 모델로 transcript를 정리하던 단계는 없앴다.
+라운드가 끝나면 `POST /api/readings`에 `corrections`로 함께 저장된다. Summary 탭은 `GET /api/readings`로 그 목록을 읽는다. 텍스트 모델로 transcript를 정리하던 단계는 없앴다.
 
 Azure 키는 backend에만 있다. `GET /api/assessor/token`이 10분짜리 토큰과 임계값·피드백 시점을 내주고, 브라우저는 `microsoft-cognitiveservices-speech-sdk`로 직접 스트리밍한다(구간 무음 400 ms, en-US, IPA, prosody on). 무료 F0 리소스는 월 5시간, 동시 1세션. 문단 하나 약 1~2분. 에이전트 정의(프롬프트, 세션 설정, 검증 시나리오)는 `../read-aloud-coach/`에 있고 backend는 그 폴더를 읽기만 한다.
 

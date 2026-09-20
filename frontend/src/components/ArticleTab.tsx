@@ -32,7 +32,7 @@ export function ArticleTab({ article, sessionId }: { article: Article; sessionId
           const spans = markedSpans(p, evidence)
           return (
             <div key={i} className="paragraph">
-              <p>
+              <p hidden={reading === i}>
                 {sentences[i].map((piece, j) => {
                   const segments = segmentsIn(piece.text, spans, piece.start)
                   return piece.ko === null ? (

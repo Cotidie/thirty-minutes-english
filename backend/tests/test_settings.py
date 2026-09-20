@@ -188,12 +188,10 @@ def test_azure_settings_have_defaults_and_typed_accessors(store):
     assert settings.azure_speech_region == "koreacentral"
     assert settings.assess_word_score == 60
     assert settings.assess_break_confidence == 0.75
-    assert settings.assess_feedback == "interrupt"
-    store.save({"ASSESS_WORD_SCORE": "50", "ASSESS_BREAK_CONFIDENCE": "0.9", "ASSESS_FEEDBACK": "after"})
+    store.save({"ASSESS_WORD_SCORE": "50", "ASSESS_BREAK_CONFIDENCE": "0.9"})
     settings = Settings.resolve({}, store)
     assert settings.assess_word_score == 50
     assert settings.assess_break_confidence == 0.9
-    assert settings.assess_feedback == "after"
 
 
 def test_azure_key_is_masked_in_fields(store):
@@ -203,13 +201,11 @@ def test_azure_key_is_masked_in_fields(store):
     assert fields["AZURE_SPEECH_REGION"].group == "assess"
 
 
-def test_threshold_settings_reject_non_numbers_and_bad_modes(store):
+def test_threshold_settings_reject_non_numbers(store):
     with pytest.raises(InvalidSetting):
         store.save({"ASSESS_WORD_SCORE": "sixty"})
     with pytest.raises(InvalidSetting):
         store.save({"ASSESS_BREAK_CONFIDENCE": "1.5"})
-    with pytest.raises(InvalidSetting):
-        store.save({"ASSESS_FEEDBACK": "later"})
 
 
 def test_key_test_for_azure_posts_to_the_region_token_endpoint(tmp_path, monkeypatch):

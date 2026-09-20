@@ -1,9 +1,8 @@
-// Pure rules that turn one Azure-recognised segment into what the coach says.
-// Azure scores every word of the paragraph the reader just said; this file
-// decides which findings are worth a correction, and whether a repeat after a
-// correction came out right. Two modes: `interrupt` corrects as the reader
-// goes (one finding per segment, two tries per word); `after` only collects
-// while they read and confirms repeats once `finish()` has been called.
+// Pure rules that turn one Azure-recognised segment into findings on the
+// paragraph. Azure scores every word the reader just said; this file decides
+// which are worth showing, where in the paragraph they sit, and whether a
+// later read of the same word came out right. Nothing here speaks: the reader
+// asks for a correction by clicking a finding.
 
 export interface AzurePhoneme {
   Phoneme: string
@@ -33,8 +32,6 @@ export interface Thresholds {
   breakConfidence: number
 }
 
-export type FeedbackMode = 'interrupt' | 'after'
-
 export interface Finding {
   kind: 'pronunciation' | 'phrasing'
   /** The word, or for phrasing the two words that stay together. */
@@ -44,19 +41,19 @@ export interface Finding {
   /** The few-word fix the coach relays. */
   fix: string
   score: number
+  /** Index of the word in the paragraph; for phrasing, of the second word (the pause sits before it). -1 when unplaced. */
+  at: number
 }
 
 export interface Verdict {
-  /** New findings to act on: at most one in `interrupt` mode. */
+  /** New findings, one per paragraph position. */
   findings: Finding[]
-  /** Earlier findings the reader has now repeated right. */
+  /** Earlier findings the reader has now read right. */
   confirmed: Finding[]
 }
 
-const MAX_TRIES = 2
-
-/** Every finding in a segment, in reading order. */
-export function findingsIn(words: AzureWord[], t: Thresholds): Finding[] {
+/** Every finding in a segment, in reading order, with `at` from `positions` (one per word). */
+export function findingsIn(words: AzureWord[], t: Thresholds, positions: number[] = words.map(() => -1)): Finding[] {
   const found: Finding[] = []
   words.forEach((w, i) => {
     const pa = w.PronunciationAssessment
@@ -64,11 +61,11 @@ export function findingsIn(words: AzureWord[], t: Thresholds): Finding[] {
     const breakConfidence = pa.Feedback?.Prosody?.Break?.UnexpectedBreak?.Confidence ?? 0
     if (i > 0 && breakConfidence > t.breakConfidence) {
       const prev = words[i - 1].Word
-      found.push({ kind: 'phrasing', word: `${prev} ${w.Word}`, heard: `${prev} / ${w.Word}`, fix: 'keep it together', score: breakConfidence })
+      found.push({ kind: 'phrasing', word: `${prev} ${w.Word}`, heard: `${prev} / ${w.Word}`, fix: 'keep it together', score: breakConfidence, at: positions[i] })
     }
     // Azure's own Mispronunciation tag sits at a fixed 60; the setting is the one knob here.
     if (pa.AccuracyScore < t.wordScore) {
-      found.push({ kind: 'pronunciation', word: w.Word, heard: heardSound(w, t.wordScore), fix: expectedSound(w), score: pa.AccuracyScore })
+      found.push({ kind: 'pronunciation', word: w.Word, heard: heardSound(w, t.wordScore), fix: expectedSound(w), score: pa.AccuracyScore, at: positions[i] })
     }
   })
   return found
@@ -88,51 +85,75 @@ function expectedSound(w: AzureWord): string {
   return (w.Phonemes ?? []).map((p) => p.Phoneme).join('')
 }
 
-/** Holds what has been corrected, so a later segment can confirm the repeat. */
-export class Judge {
-  private pending: Finding[] = []
-  private tries = new Map<string, number>()
-  /** In `after` mode, repeats only count once the reader has finished. */
-  private listening: boolean
-  private readonly t: Thresholds
-  private readonly mode: FeedbackMode
+/** The paragraph split on whitespace, punctuation kept for display. */
+export const tokens = (paragraph: string): string[] => paragraph.split(/\s+/).filter(Boolean)
 
-  constructor(t: Thresholds, mode: FeedbackMode = 'interrupt') {
+const norm = (word: string) => word.toLowerCase().replace(/[^\p{L}\p{N}']/gu, '')
+
+/**
+ * Collects findings while the reader goes, placed on the paragraph, and
+ * confirms one when a later segment carries its words clean.
+ */
+export class Judge {
+  private open: Finding[] = []
+  private readonly words: string[]
+  private cursor = 0
+  private readonly t: Thresholds
+
+  constructor(t: Thresholds, paragraph: string) {
     this.t = t
-    this.mode = mode
-    this.listening = mode === 'interrupt'
+    this.words = tokens(paragraph).map(norm)
   }
 
   segment(words: AzureWord[]): Verdict {
-    const all = findingsIn(words, this.t)
-    const confirmed = this.listening ? this.pending.filter((p) => repeatedRight(p, words, all)) : []
-    this.pending = this.pending.filter((p) => !confirmed.includes(p))
-
-    const fresh = all.filter((f) => (this.tries.get(f.word) ?? 0) < (this.mode === 'interrupt' ? MAX_TRIES : 1))
-    const findings = this.mode === 'interrupt' ? fresh.slice(0, 1) : dedupe(fresh)
-    for (const f of findings) {
-      this.tries.set(f.word, (this.tries.get(f.word) ?? 0) + 1)
-      this.pending = [...this.pending.filter((p) => p.word !== f.word), f]
-    }
+    const all = findingsIn(words, this.t, this.locate(words))
+    const confirmed = this.open.filter((p) => readRight(p, words, all))
+    this.open = this.open.filter((p) => !confirmed.includes(p))
+    const findings = all.filter((f) => !this.open.some((p) => p.at === f.at && p.kind === f.kind))
+    this.open = [...this.open, ...findings]
     return { findings, confirmed }
   }
 
-  /** The reader is done: what is still uncorrected, in reading order. Repeats count from now on. */
-  finish(): Finding[] {
-    this.listening = true
-    return [...this.pending]
+  /** What is still unconfirmed, in reading order. */
+  pending(): Finding[] {
+    return [...this.open].sort((a, b) => a.at - b.at)
+  }
+
+  /**
+   * Paragraph index of each said word. A short segment that matches an open
+   * finding is the reader trying that word again, so it lands on the finding;
+   * otherwise words are found forward from the last match, or from the top
+   * when the reader went back.
+   */
+  private locate(words: AzureWord[]): number[] {
+    const retry = words.length <= RETRY_WORDS
+    return words.map((w) => {
+      const target = norm(w.Word)
+      const again = retry ? this.openPosition(target) : -1
+      if (again >= 0) return again
+      let i = this.words.indexOf(target, this.cursor)
+      if (i < 0) i = this.words.indexOf(target)
+      if (i >= 0) this.cursor = i + 1
+      return i
+    })
+  }
+
+  private openPosition(target: string): number {
+    for (const p of this.open) {
+      const parts = p.word.split(' ').map(norm)
+      const k = parts.indexOf(target)
+      if (k >= 0) return p.at - (parts.length - 1 - k)
+    }
+    return -1
   }
 }
 
-function dedupe(findings: Finding[]): Finding[] {
-  const seen = new Set<string>()
-  return findings.filter((f) => !seen.has(f.word) && seen.add(f.word))
-}
+/** A segment this short after a finding is a retry, not more of the paragraph. */
+const RETRY_WORDS = 3
 
-function repeatedRight(pending: Finding, words: AzureWord[], findings: Finding[]): boolean {
-  const said = words.map((w) => w.Word.toLowerCase())
-  const target = pending.word.toLowerCase().split(' ')
-  const present = target.every((t) => said.includes(t))
-  const stillWrong = findings.some((f) => f.word === pending.word)
+function readRight(pending: Finding, words: AzureWord[], findings: Finding[]): boolean {
+  const said = words.map((w) => norm(w.Word))
+  const present = pending.word.split(' ').map(norm).every((t) => said.includes(t))
+  const stillWrong = findings.some((f) => f.at === pending.at && f.kind === pending.kind)
   return present && !stillWrong
 }

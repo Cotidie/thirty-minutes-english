@@ -60,7 +60,6 @@ def _assessor(settings: Settings) -> AzureAssessor | None:
         settings.azure_speech_region,
         settings.assess_word_score,
         settings.assess_break_confidence,
-        settings.assess_feedback,
     )
 
 

@@ -6,7 +6,7 @@ import { ArticleTab } from './ArticleTab'
 vi.mock('../api', () => ({
   api: {
     addReading: vi.fn(async () => ({})),
-    assessorToken: vi.fn(async () => ({ token: 't', region: 'koreacentral', word_score: 60, break_confidence: 0.75, feedback: 'interrupt' })),
+    assessorToken: vi.fn(async () => ({ token: 't', region: 'koreacentral', word_score: 60, break_confidence: 0.75 })),
   },
 }))
 vi.mock('../lib/assessor/azure', () => ({ startAzureAssessor: vi.fn(async () => ({ stop: vi.fn(async () => undefined) })) }))

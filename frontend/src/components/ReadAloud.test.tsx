@@ -8,7 +8,7 @@ import type { AssessorOptions } from '../lib/assessor/azure'
 import { api } from '../api'
 import { ReadAloud } from './ReadAloud'
 
-const session = { token: 'eyJ.t', region: 'koreacentral', word_score: 60, break_confidence: 0.75, feedback: 'interrupt' as const }
+const session = { token: 'eyJ.t', region: 'koreacentral', word_score: 60, break_confidence: 0.75 }
 vi.mock('../api', () => ({
   api: {
     addReading: vi.fn(async () => ({})),
@@ -82,7 +82,7 @@ describe('ReadAloud', () => {
 
     await waitFor(() => expect(startAssessor).toHaveBeenCalled())
     await userEvent.click(screen.getByRole('button', { name: 'Done' }))
-    expect(connection.finish).toHaveBeenCalled()
+    expect(connection.review).toHaveBeenCalledWith([])
     await userEvent.click(screen.getByRole('button', { name: 'Stop' }))
     expect(connection.close).toHaveBeenCalled()
     expect(screen.getByRole('status')).toHaveTextContent('Wrapping up')
@@ -168,17 +168,41 @@ describe('ReadAloud assessor', () => {
     expect(assessor.stop).toHaveBeenCalled()
   })
 
-  it('hands a finding to the coach, lists it, confirms the repeat, and saves both', async () => {
+  it('marks a finding on the paragraph without a word from the coach', async () => {
     renderIdle()
     await startRound()
     act(() => emit({ type: 'session.started' }))
-
     act(() => segment([berified]))
-    expect(connection.correct).toHaveBeenCalledWith(expect.objectContaining({ kind: 'pronunciation', word: 'verified', heard: 'b for v' }))
-    expect(screen.getByRole('list', { name: 'Findings' })).toHaveTextContent('verified')
+    const hit = screen.getByRole('button', { name: 'verified: b for v' })
+    expect(hit).toHaveClass('is-pronunciation')
+    expect(connection.correct).not.toHaveBeenCalled()
+    expect(screen.queryByText(/say v/)).not.toBeInTheDocument()
+  })
+
+  it('opens the card and has the coach speak when a mark is clicked, once per word', async () => {
+    renderIdle()
+    await startRound()
+    act(() => emit({ type: 'session.started' }))
+    act(() => segment([berified]))
+
+    await userEvent.click(screen.getByRole('button', { name: 'verified: b for v' }))
+    expect(connection.correct).toHaveBeenCalledWith(expect.objectContaining({ kind: 'pronunciation', word: 'verified', heard: 'b for v', at: 1 }))
+    expect(screen.getByText(/heard b for v: say v/)).toBeInTheDocument()
+
+    await userEvent.click(screen.getByRole('button', { name: 'verified: b for v' }))
+    expect(connection.correct).toHaveBeenCalledTimes(1)
+  })
+
+  it('confirms a clicked finding when the word comes back clean, and saves it as repeated', async () => {
+    renderIdle()
+    await startRound()
+    act(() => emit({ type: 'session.started' }))
+    act(() => segment([berified]))
+    await userEvent.click(screen.getByRole('button', { name: 'verified: b for v' }))
 
     act(() => segment([verified]))
     expect(connection.confirm).toHaveBeenCalled()
+    expect(screen.getByRole('button', { name: 'verified: b for v' })).toHaveClass('is-ok')
 
     act(() => emit({ type: 'session.closed', usage: { seconds: 40 } }))
     expect(vi.mocked(api.addReading)).toHaveBeenCalledWith(
@@ -188,22 +212,23 @@ describe('ReadAloud assessor', () => {
     )
   })
 
-  it('in after mode stays quiet while reading and reviews everything on Done', async () => {
-    vi.mocked(api.assessorToken).mockResolvedValue({ ...session, feedback: 'after' })
+  it('stays silent when an unclicked finding clears itself', async () => {
     renderIdle()
     await startRound()
     act(() => emit({ type: 'session.started' }))
-
     act(() => segment([berified]))
-    expect(connection.correct).not.toHaveBeenCalled()
-    expect(screen.getByRole('list', { name: 'Findings' })).toHaveTextContent('verified')
+    act(() => segment([verified]))
+    expect(connection.confirm).not.toHaveBeenCalled()
+    expect(screen.getByRole('button', { name: 'verified: b for v' })).toHaveClass('is-ok')
+  })
 
+  it('reviews what is still open on Done', async () => {
+    renderIdle()
+    await startRound()
+    act(() => emit({ type: 'session.started' }))
+    act(() => segment([berified]))
     await userEvent.click(screen.getByRole('button', { name: 'Done' }))
     expect(connection.review).toHaveBeenCalledWith([expect.objectContaining({ word: 'verified' })])
-    expect(connection.finish).not.toHaveBeenCalled()
-
-    act(() => segment([verified]))
-    expect(connection.confirm).toHaveBeenCalled()
   })
 
   it('fails the round before connecting when the assessor is off', async () => {

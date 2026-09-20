@@ -274,7 +274,6 @@ class AssessorSession(BaseModel):
     region: str
     word_score: int
     break_confidence: float
-    feedback: Literal["interrupt", "after"]
 
 
 class SettingField(BaseModel):

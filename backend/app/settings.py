@@ -18,8 +18,6 @@ OPENAI_VOICE_MODEL = "gpt-live-1"
 GEMINI_VOICE_MODEL = "gemini-3.8-live-extended-thinking"
 GEMINI_VOICE_MODELS = ("gemini-3.8-live", GEMINI_VOICE_MODEL)
 THINKING_LEVELS = ("low", "medium", "high")
-FEEDBACK_MODES = ("interrupt", "after")
-FEEDBACK_LABELS = {"interrupt": "Coach cuts in at each finding", "after": "One review after Done"}
 # The Gemini API has no voices.list; this is the TTS list the Live native-audio
 # models share (ai.google.dev/gemini-api/docs/speech-generation#voices).
 GEMINI_VOICES = {
@@ -77,7 +75,6 @@ SPECS: tuple[Spec, ...] = (
     Spec("VOICE_THINKING", "voice", "low", choices=THINKING_LEVELS),
     Spec("VOICE_NAME", "voice", "Kore", choices=tuple(GEMINI_VOICES), labels=GEMINI_VOICES),
     Spec("AZURE_SPEECH_REGION", "assess", "koreacentral"),
-    Spec("ASSESS_FEEDBACK", "assess", "interrupt", choices=FEEDBACK_MODES, labels=FEEDBACK_LABELS),
     Spec("ASSESS_WORD_SCORE", "assess", "60", number=(0, 100)),
     Spec("ASSESS_BREAK_CONFIDENCE", "assess", "0.75", number=(0, 1)),
     Spec("CLAUDE_MODEL", "claude", "opus", suggestions=CLAUDE_MODELS),
@@ -224,10 +221,6 @@ class Settings:
     @property
     def azure_speech_region(self) -> str:
         return self.get("AZURE_SPEECH_REGION")
-
-    @property
-    def assess_feedback(self) -> str:
-        return self.get("ASSESS_FEEDBACK")
 
     @property
     def assess_word_score(self) -> int:

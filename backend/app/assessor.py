@@ -1,7 +1,7 @@
 """The pronunciation assessor the browser streams the reader's microphone to.
 Azure scores each recognised segment against the paragraph; the backend only
 mints the short-lived token so the key never leaves the server, and passes
-along how the browser should judge with it (thresholds, feedback timing)."""
+along the thresholds the browser judges with."""
 
 import json
 import urllib.error
@@ -26,14 +26,12 @@ class AzureAssessor:
         region: str,
         word_score: int,
         break_confidence: float,
-        feedback: str,
         url: str = TOKEN_URL,
     ):
         self.key = key
         self.region = region
         self.word_score = word_score
         self.break_confidence = break_confidence
-        self.feedback = feedback
         self.url = url
 
     def session(self) -> dict:
@@ -56,7 +54,6 @@ class AzureAssessor:
             "region": self.region,
             "word_score": self.word_score,
             "break_confidence": self.break_confidence,
-            "feedback": self.feedback,
         }
 
 
