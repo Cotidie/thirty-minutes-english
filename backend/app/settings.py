@@ -10,7 +10,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Literal
 
-Group = Literal["keys", "voice", "claude", "text"]
+Group = Literal["keys", "voice", "assess", "claude", "text"]
 
 EFFORTS = ("low", "medium", "high", "xhigh", "max")
 CLAUDE_MODELS = ("opus", "sonnet")
@@ -18,6 +18,8 @@ OPENAI_VOICE_MODEL = "gpt-live-1"
 GEMINI_VOICE_MODEL = "gemini-3.8-live-extended-thinking"
 GEMINI_VOICE_MODELS = ("gemini-3.8-live", GEMINI_VOICE_MODEL)
 THINKING_LEVELS = ("low", "medium", "high")
+FEEDBACK_MODES = ("interrupt", "after")
+FEEDBACK_LABELS = {"interrupt": "Coach cuts in at each finding", "after": "One review after Done"}
 # The Gemini API has no voices.list; this is the TTS list the Live native-audio
 # models share (ai.google.dev/gemini-api/docs/speech-generation#voices).
 GEMINI_VOICES = {
@@ -63,15 +65,21 @@ class Spec:
     choices: tuple[str, ...] | None = None  # strict: a value outside is rejected
     suggestions: tuple[str, ...] = ()  # free text with a menu of common values
     labels: Mapping[str, str] | None = None  # a short description per choice, for the menu
+    number: tuple[float, float] | None = None  # strict: must parse as a number inside [lo, hi]
 
 
 SPECS: tuple[Spec, ...] = (
     Spec("OPENAI_API_KEY", "keys", secret=True),
     Spec("GEMINI_API_KEY", "keys", secret=True),
+    Spec("AZURE_SPEECH_KEY", "keys", secret=True),
     Spec("VOICE_PROVIDER", "voice", "openai", choices=("openai", "gemini")),
     Spec("VOICE_MODEL", "voice", suggestions=(OPENAI_VOICE_MODEL, *GEMINI_VOICE_MODELS)),
     Spec("VOICE_THINKING", "voice", "low", choices=THINKING_LEVELS),
     Spec("VOICE_NAME", "voice", "Kore", choices=tuple(GEMINI_VOICES), labels=GEMINI_VOICES),
+    Spec("AZURE_SPEECH_REGION", "assess", "koreacentral"),
+    Spec("ASSESS_FEEDBACK", "assess", "interrupt", choices=FEEDBACK_MODES, labels=FEEDBACK_LABELS),
+    Spec("ASSESS_WORD_SCORE", "assess", "60", number=(0, 100)),
+    Spec("ASSESS_BREAK_CONFIDENCE", "assess", "0.75", number=(0, 1)),
     Spec("CLAUDE_MODEL", "claude", "opus", suggestions=CLAUDE_MODELS),
     Spec("CLAUDE_EFFORT", "claude", "xhigh", choices=EFFORTS),
     Spec("CLAUDE_SKILLS", "claude"),
@@ -89,13 +97,21 @@ class InvalidSetting(ValueError):
 
 
 def validate(values: Mapping[str, str]) -> None:
-    """Rejects unknown keys and values outside a strict choice list."""
+    """Rejects unknown keys, values outside a strict choice list, and numbers out of range."""
     for key, value in values.items():
         spec = SPEC_BY_KEY.get(key)
         if spec is None:
             raise InvalidSetting(f"unknown setting {key}")
         if spec.choices and value not in spec.choices:
             raise InvalidSetting(f"{key} must be one of {', '.join(spec.choices)}")
+        if spec.number:
+            lo, hi = spec.number
+            try:
+                number = float(value)
+            except ValueError:
+                raise InvalidSetting(f"{key} must be a number") from None
+            if not lo <= number <= hi:
+                raise InvalidSetting(f"{key} must be between {lo:g} and {hi:g}")
 
 
 class SettingsStore:
@@ -200,6 +216,26 @@ class Settings:
     @property
     def claude_skills(self) -> tuple[str, ...]:
         return tuple(s.strip() for s in self.get("CLAUDE_SKILLS").split(",") if s.strip())
+
+    @property
+    def azure_speech_key(self) -> str:
+        return self.get("AZURE_SPEECH_KEY")
+
+    @property
+    def azure_speech_region(self) -> str:
+        return self.get("AZURE_SPEECH_REGION")
+
+    @property
+    def assess_feedback(self) -> str:
+        return self.get("ASSESS_FEEDBACK")
+
+    @property
+    def assess_word_score(self) -> int:
+        return int(float(self.get("ASSESS_WORD_SCORE")))
+
+    @property
+    def assess_break_confidence(self) -> float:
+        return float(self.get("ASSESS_BREAK_CONFIDENCE"))
 
 
 def mask(secret: str) -> str:

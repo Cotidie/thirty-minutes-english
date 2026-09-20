@@ -180,3 +180,51 @@ def test_key_test_without_any_key(tmp_path):
     with settings_client(tmp_path, {}) as c:
         assert c.post("/api/settings/test-key", json={"key": "GEMINI_API_KEY"}).json()["ok"] is False
         assert c.post("/api/settings/test-key", json={"key": "NOPE"}).status_code == 422
+
+
+def test_azure_settings_have_defaults_and_typed_accessors(store):
+    settings = Settings.resolve({"AZURE_SPEECH_KEY": "az-key-000012345"}, store)
+    assert settings.azure_speech_key == "az-key-000012345"
+    assert settings.azure_speech_region == "koreacentral"
+    assert settings.assess_word_score == 60
+    assert settings.assess_break_confidence == 0.75
+    assert settings.assess_feedback == "interrupt"
+    store.save({"ASSESS_WORD_SCORE": "50", "ASSESS_BREAK_CONFIDENCE": "0.9", "ASSESS_FEEDBACK": "after"})
+    settings = Settings.resolve({}, store)
+    assert settings.assess_word_score == 50
+    assert settings.assess_break_confidence == 0.9
+    assert settings.assess_feedback == "after"
+
+
+def test_azure_key_is_masked_in_fields(store):
+    fields = {f.key: f for f in Settings.resolve({"AZURE_SPEECH_KEY": "az-key-000012345"}, store).fields()}
+    assert fields["AZURE_SPEECH_KEY"].secret is True
+    assert fields["AZURE_SPEECH_KEY"].value == "…2345"
+    assert fields["AZURE_SPEECH_REGION"].group == "assess"
+
+
+def test_threshold_settings_reject_non_numbers_and_bad_modes(store):
+    with pytest.raises(InvalidSetting):
+        store.save({"ASSESS_WORD_SCORE": "sixty"})
+    with pytest.raises(InvalidSetting):
+        store.save({"ASSESS_BREAK_CONFIDENCE": "1.5"})
+    with pytest.raises(InvalidSetting):
+        store.save({"ASSESS_FEEDBACK": "later"})
+
+
+def test_key_test_for_azure_posts_to_the_region_token_endpoint(tmp_path, monkeypatch):
+    get = FakeGet()
+    monkeypatch.setattr("app.keycheck.urllib.request.urlopen", get)
+    with settings_client(tmp_path, {"AZURE_SPEECH_REGION": "japaneast"}) as c:
+        res = c.post("/api/settings/test-key", json={"key": "AZURE_SPEECH_KEY", "value": "az-typed"})
+    assert res.json() == {"ok": True, "message": "key works"}
+    req = get.requests[0]
+    assert req.full_url == "https://japaneast.api.cognitive.microsoft.com/sts/v1.0/issueToken"
+    assert req.get_method() == "POST"
+    assert req.get_header("Ocp-apim-subscription-key") == "az-typed"
+
+
+def test_key_test_for_azure_needs_a_region():
+    from app.keycheck import check_key
+
+    assert check_key("AZURE_SPEECH_KEY", "az-typed", region=" ").message == "set AZURE_SPEECH_REGION first"

@@ -132,8 +132,9 @@ def create_app(
 
     @app.post("/api/settings/test-key", response_model=KeyTestResult)
     def test_key(body: KeyTestRequest, request: Request) -> KeyTestResult:
-        key = body.value.strip() or current_settings(request).get(body.key)
-        result = check_key(body.key, key)
+        settings = current_settings(request)
+        key = body.value.strip() or settings.get(body.key)
+        result = check_key(body.key, key, region=settings.azure_speech_region)
         return KeyTestResult(ok=result.ok, message=result.message)
 
     @app.get("/api/topics", response_model=TopicListing)

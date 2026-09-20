@@ -268,7 +268,7 @@ class LiveSession(BaseModel):
 
 class SettingField(BaseModel):
     key: str
-    group: Literal["keys", "voice", "claude", "text"]
+    group: Literal["keys", "voice", "assess", "claude", "text"]
     value: str
     secret: bool
     default: str
@@ -288,7 +288,7 @@ class SettingsUpdate(BaseModel):
 class KeyTestRequest(BaseModel):
     """Which key to try. `value` is what is typed in the modal; blank means the saved key."""
 
-    key: Literal["OPENAI_API_KEY", "GEMINI_API_KEY"]
+    key: Literal["OPENAI_API_KEY", "GEMINI_API_KEY", "AZURE_SPEECH_KEY"]
     value: str = ""
 
 
