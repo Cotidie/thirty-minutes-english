@@ -4,9 +4,18 @@
 // element the OpenAI path uses. The backend already minted the one-use token
 // inside the URL and wrote the setup message.
 
+import type { Finding } from '../assessor/judge'
 import type { LiveEvent } from '../liveSession'
 import { audioChunk, decodeServerMessage, fromBase64, textTurn, toBase64, type GeminiServerMessage } from './geminiEvents'
-import { FINISH_INSTRUCTION, sayInstruction, type LiveConnection, type LiveOptions } from './transport'
+import {
+  CONFIRM_INSTRUCTION,
+  FINISH_INSTRUCTION,
+  correctionInstruction,
+  reviewInstruction,
+  sayInstruction,
+  type LiveConnection,
+  type LiveOptions,
+} from './transport'
 
 const CAPTURE_RATE = 16_000
 const PLAYBACK_RATE = 24_000
@@ -157,6 +166,18 @@ class GeminiRound implements LiveConnection {
 
   say(text: string): void {
     this.send(textTurn(sayInstruction(text)))
+  }
+
+  correct(finding: Finding): void {
+    this.send(textTurn(correctionInstruction(finding)))
+  }
+
+  confirm(): void {
+    this.send(textTurn(CONFIRM_INSTRUCTION))
+  }
+
+  review(findings: Finding[]): void {
+    this.send(textTurn(reviewInstruction(findings)))
   }
 
   close(): void {

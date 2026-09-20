@@ -2,7 +2,15 @@
 // events on the "oai-events" data channel. The backend answers our offer.
 
 import type { LiveEvent } from '../liveSession'
-import { FINISH_INSTRUCTION, sayInstruction, type LiveConnection, type LiveOptions } from './transport'
+import {
+  CONFIRM_INSTRUCTION,
+  FINISH_INSTRUCTION,
+  correctionInstruction,
+  reviewInstruction,
+  sayInstruction,
+  type LiveConnection,
+  type LiveOptions,
+} from './transport'
 
 const ICE_TIMEOUT_MS = 10_000
 
@@ -68,6 +76,9 @@ export async function connectOpenAI(opts: LiveOptions): Promise<LiveConnection> 
     microphone,
     finish: () => instruct('finish', FINISH_INSTRUCTION),
     say: (text) => instruct('say', sayInstruction(text)),
+    correct: (finding) => instruct('correct', correctionInstruction(finding)),
+    confirm: () => instruct('confirm', CONFIRM_INSTRUCTION),
+    review: (findings) => instruct('review', reviewInstruction(findings)),
     close: () => send({ type: 'session.close' }),
     dispose,
   }
