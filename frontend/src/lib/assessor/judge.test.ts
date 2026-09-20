@@ -61,6 +61,15 @@ it('tokens keeps punctuation on the word for display', () => {
 
 const PARAGRAPH = 'Researchers verified it twice, as long as it held. They verified it again.'
 
+it('spells a finding the way the paragraph does', () => {
+  const judge = new Judge(T, 'In July 1969, a landing. "Verified" it.')
+  const { findings } = judge.segment([word('in', 90), word('july', 90), word('1969', 92, brokenLong.PronunciationAssessment), word('a', 90), word('landing', 90), berified])
+  expect(findings.map((f) => [f.word, f.heard])).toEqual([
+    ['July 1969', 'July / 1969'],
+    ['Verified', 'b for v'],
+  ])
+})
+
 describe('Judge', () => {
   it('places every finding on the paragraph, one per position', () => {
     const judge = new Judge(T, PARAGRAPH)

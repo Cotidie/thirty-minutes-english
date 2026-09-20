@@ -229,7 +229,7 @@ export function ReadAloud({ paragraph, sessionId, active, onStart, onEnd }: Prop
       {card && (
         <p className="reading-card">
           <b>{card.word}</b>
-          <span className="reading-heard">{card.kind === 'phrasing' ? 'one piece' : card.heard}</span>
+          <span className="reading-heard">{card.kind === 'phrasing' ? 'put them together' : card.heard}</span>
           {card.repeated_ok && <span className="read-aloud-ok">✓</span>}
           {said && <span className="reading-said">{said}</span>}
         </p>

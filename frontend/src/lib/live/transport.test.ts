@@ -13,7 +13,7 @@ describe('correctionInstruction', () => {
 
   it('names the pair and where the pause was', () => {
     expect(correctionInstruction(asLong)).toBe(
-      'Correction: "as long", paused after "as".',
+      'Correction: "as long", paused between "as" and "long".',
     )
   })
 })

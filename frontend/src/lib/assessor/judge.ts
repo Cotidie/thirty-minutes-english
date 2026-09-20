@@ -107,7 +107,9 @@ export class Judge {
   }
 
   segment(words: AzureWord[]): Verdict {
-    const all = findingsIn(words, this.t, this.locate(words)).filter((f) => f.kind !== 'phrasing' || !this.punctuatedBefore(f.at))
+    const all = findingsIn(words, this.t, this.locate(words))
+      .filter((f) => f.kind !== 'phrasing' || !this.punctuatedBefore(f.at))
+      .map((f) => this.spelled(f))
     const confirmed = this.open.filter((p) => readRight(p, words, all))
     this.open = this.open.filter((p) => !confirmed.includes(p))
     const findings = all.filter((f) => !this.open.some((p) => p.at === f.at && p.kind === f.kind))
@@ -134,6 +136,19 @@ export class Judge {
     })
   }
 
+  /** The finding in the paragraph's own spelling (Azure lowercases): "July 1969", not "july 1969". */
+  private spelled(f: Finding): Finding {
+    if (f.at < 0) return f
+    const w = this.word(f.at)
+    if (f.kind === 'pronunciation') return { ...f, word: w }
+    const prev = this.word(f.at - 1)
+    return { ...f, word: `${prev} ${w}`, heard: `${prev} / ${w}` }
+  }
+
+  private word(at: number): string {
+    return this.raw[at].replace(EDGE_PUNCTUATION, '')
+  }
+
   /** A pause after a period or comma is the reader's to take. */
   private punctuatedBefore(at: number): boolean {
     return at > 0 && PUNCTUATED.test(this.raw[at - 1])
@@ -152,6 +167,7 @@ export class Judge {
 /** A segment this short after a finding is a retry, not more of the paragraph. */
 const RETRY_WORDS = 3
 const PUNCTUATED = /[.,;:!?…"”')\]]$/
+const EDGE_PUNCTUATION = /^[^\p{L}\p{N}]+|[^\p{L}\p{N}]+$/gu
 
 function readRight(pending: Finding, words: AzureWord[], findings: Finding[]): boolean {
   const said = words.map((w) => norm(w.Word))

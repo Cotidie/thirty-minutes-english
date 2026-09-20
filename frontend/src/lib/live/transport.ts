@@ -36,7 +36,7 @@ export const sayInstruction = (text: string) => `Now say exactly this, word for 
 export const correctionInstruction = (f: Finding) =>
   f.kind === 'pronunciation'
     ? `Correction: "${f.word}", heard ${f.heard}.`
-    : `Correction: "${f.word}", paused after "${f.word.split(' ')[0]}".`
+    : `Correction: "${f.word}", paused between "${f.word.split(' ')[0]}" and "${f.word.split(' ')[1]}".`
 
 export async function connectLive(opts: LiveOptions): Promise<LiveConnection> {
   const provider = await api.voiceProvider()
