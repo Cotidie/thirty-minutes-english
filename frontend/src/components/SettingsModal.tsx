@@ -10,6 +10,7 @@ interface Props {
 const GROUP_TITLE: Record<SettingGroup, string> = {
   keys: 'API keys',
   voice: 'Voice coach',
+  assess: 'Read aloud assessor',
   claude: 'Claude generation',
   text: 'Summary text model',
 }
@@ -169,7 +170,8 @@ export function SettingsModal({ open, onClose }: Props) {
   )
 }
 
-const isApiKey = (key: string): key is ApiKeyName => key === 'OPENAI_API_KEY' || key === 'GEMINI_API_KEY'
+const isApiKey = (key: string): key is ApiKeyName =>
+  key === 'OPENAI_API_KEY' || key === 'GEMINI_API_KEY' || key === 'AZURE_SPEECH_KEY'
 
 function KeyTest({ state, onTest }: { state: KeyTestResult | 'testing' | undefined; onTest: () => void }) {
   return (

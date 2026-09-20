@@ -95,7 +95,7 @@ export interface GeminiLiveSession {
 export type LiveSession = OpenAILiveSession | GeminiLiveSession
 export type VoiceProvider = LiveSession['provider']
 
-export type SettingGroup = 'keys' | 'voice' | 'claude' | 'text'
+export type SettingGroup = 'keys' | 'voice' | 'assess' | 'claude' | 'text'
 
 /** One runtime setting, its effective value; secrets come masked. */
 export interface SettingField {
@@ -118,11 +118,21 @@ export interface SettingsView {
 
 export type SettingsUpdate = Record<string, string>
 
-export type ApiKeyName = 'OPENAI_API_KEY' | 'GEMINI_API_KEY'
+export type ApiKeyName = 'OPENAI_API_KEY' | 'GEMINI_API_KEY' | 'AZURE_SPEECH_KEY'
 
 export interface KeyTestResult {
   ok: boolean
   message: string
+}
+
+/** A ten-minute Azure token plus how the round judges with it. */
+export interface AssessorSession {
+  token: string
+  region: string
+  word_score: number
+  break_confidence: number
+  /** `interrupt`: the coach cuts in per finding. `after`: one review once the reader presses Done. */
+  feedback: 'interrupt' | 'after'
 }
 
 export interface PhraseCard {

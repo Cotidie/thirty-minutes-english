@@ -4,7 +4,7 @@ import { api } from '../api'
 import type { Ask, Example, Reading, SessionContent, Stars } from '../types'
 import { SummaryTab } from './SummaryTab'
 
-vi.mock('../api', () => ({ api: { askCards: vi.fn(), listExamples: vi.fn(), readingCorrections: vi.fn() } }))
+vi.mock('../api', () => ({ api: { askCards: vi.fn(), listExamples: vi.fn(), listReadings: vi.fn() } }))
 
 const ask: Ask = {
   id: 2,
@@ -63,7 +63,7 @@ const example: Example = {
 beforeEach(() => {
   vi.mocked(api.askCards).mockResolvedValue([ask])
   vi.mocked(api.listExamples).mockResolvedValue([example])
-  vi.mocked(api.readingCorrections).mockResolvedValue([reading])
+  vi.mocked(api.listReadings).mockResolvedValue([reading])
 })
 
 describe('SummaryTab', () => {
@@ -81,7 +81,7 @@ describe('SummaryTab', () => {
     expect(screen.getByText(/got it on the retry/)).toBeInTheDocument()
 
     expect(vi.mocked(api.askCards)).toHaveBeenCalledWith(3)
-    expect(vi.mocked(api.readingCorrections)).toHaveBeenCalledWith(3)
+    expect(vi.mocked(api.listReadings)).toHaveBeenCalledWith(3)
   })
 
   it('counts each section', async () => {
@@ -93,12 +93,12 @@ describe('SummaryTab', () => {
 
   it('tells a clean read apart from never having read aloud', async () => {
     vi.mocked(api.askCards).mockResolvedValue([])
-    vi.mocked(api.readingCorrections).mockResolvedValue([])
+    vi.mocked(api.listReadings).mockResolvedValue([])
     const { unmount } = render(<SummaryTab sessionId={3} content={content} stars={none} />)
     expect(await screen.findByText(/No paragraph read aloud yet/)).toBeInTheDocument()
     unmount()
 
-    vi.mocked(api.readingCorrections).mockResolvedValue([{ ...reading, corrections: [] }])
+    vi.mocked(api.listReadings).mockResolvedValue([{ ...reading, corrections: [] }])
     render(<SummaryTab sessionId={3} content={content} stars={none} />)
     expect(await screen.findByText(/Clean read/)).toBeInTheDocument()
   })

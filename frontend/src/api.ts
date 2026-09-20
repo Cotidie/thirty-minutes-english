@@ -2,6 +2,8 @@ import type { JobStatus } from './lib/progress'
 import type {
   ApiKeyName,
   Ask,
+  AssessorSession,
+  Correction,
   Example,
   ExampleFeedback,
   KeyTestResult,
@@ -56,6 +58,8 @@ export const api = {
   /** `sdp` is the WebRTC offer; only the OpenAI provider takes one. */
   startReadAloud: (paragraph: string, sdp?: string) =>
     request<LiveSession>('/api/read-aloud/sessions', { method: 'POST', body: JSON.stringify({ paragraph, sdp }) }),
+  /** Azure token for the assessor; 503 until AZURE_SPEECH_KEY is set. */
+  assessorToken: () => request<AssessorSession>('/api/assessor/token'),
   startPhrase: (topic: string | null, sdp?: string) =>
     request<LiveSession>('/api/phrase/sessions', { method: 'POST', body: JSON.stringify({ topic, sdp }) }),
   startExample: (target: PracticeTarget, sdp?: string) =>
@@ -84,10 +88,10 @@ export const api = {
     user_text: string
     coach_text: string
     seconds: number
+    corrections: Correction[]
   }) => request<Reading>('/api/readings', { method: 'POST', body: JSON.stringify(reading) }),
-  /** Read-aloud rounds with the words the coach stopped on. */
-  readingCorrections: (sessionId?: number) =>
-    request<Reading[]>(asksPath('/api/readings/corrections', sessionId), { method: 'POST' }),
+  /** Read-aloud rounds with the findings the assessor made, newest first. */
+  listReadings: (sessionId?: number) => request<Reading[]>(asksPath('/api/readings', sessionId)),
 }
 
 function asksPath(base: string, sessionId?: number): string {

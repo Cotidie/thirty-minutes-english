@@ -22,7 +22,7 @@ export function SummaryTab({ sessionId, content, stars }: Props) {
 
   useEffect(() => {
     let live = true
-    Promise.all([api.askCards(sessionId), api.listExamples(sessionId), api.readingCorrections(sessionId)])
+    Promise.all([api.askCards(sessionId), api.listExamples(sessionId), api.listReadings(sessionId)])
       .then(([a, e, r]) => {
         if (!live) return
         setAsks(a)

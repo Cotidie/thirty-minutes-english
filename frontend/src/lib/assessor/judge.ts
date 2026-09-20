@@ -94,11 +94,12 @@ export class Judge {
   private tries = new Map<string, number>()
   /** In `after` mode, repeats only count once the reader has finished. */
   private listening: boolean
+  private readonly t: Thresholds
+  private readonly mode: FeedbackMode
 
-  constructor(
-    private readonly t: Thresholds,
-    private readonly mode: FeedbackMode = 'interrupt',
-  ) {
+  constructor(t: Thresholds, mode: FeedbackMode = 'interrupt') {
+    this.t = t
+    this.mode = mode
     this.listening = mode === 'interrupt'
   }
 
