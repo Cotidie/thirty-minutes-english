@@ -1,8 +1,8 @@
 # english-speaking-claude
 
 - 목표: 친구와 하루 30분 영어 회화 연습. 매 세션 표현 6개 + 짧은 아티클(기술 · 문학 · 세계사 · 최근 세계 이슈) + B2~C1+ 어휘 12개를 Claude가 생성.
-- 상태: 진행 중 (v1 동작)
-- 다음 할 일: 설정 모달에서 provider를 `gemini`로 바꿔 Read aloud · Ask · Practice 세 코치를 실제로 돌려 보고 GPT-Live와 비교
+- 상태: 진행 중 (v1 동작, Read aloud는 Azure 판정기 위에서 돎)
+- 다음 할 일: Read aloud를 실제로 읽어 Azure finding 칩과 코치 반응 확인(`../read-aloud-coach/evals/cases.md` 2번, 7번). `ASSESS_FEEDBACK=after`도 한 번. 임계값 튜닝은 `docs/2026-09-21-assessor-benchmark.md`
 
 ## 실행
 
