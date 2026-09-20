@@ -5,6 +5,7 @@ from pathlib import Path
 
 from fastapi import FastAPI, HTTPException, Request, Response
 
+from app.assessor import AssessorError
 from app.cards import AskReview, ReadingReview
 from app.claude_cli import GenerationError
 from app.daily_topics import DailyTopics
@@ -14,6 +15,7 @@ from app.live import LiveAgent, LiveSessionError
 from app.models import (
     Ask,
     AskRequest,
+    AssessorSession,
     TopicListing,
     Reading,
     ReadingRequest,
@@ -205,6 +207,16 @@ def create_app(
     @app.post("/api/read-aloud/sessions", response_model=LiveSession, status_code=201)
     def start_read_aloud(body: ReadAloudRequest, request: Request) -> dict:
         return start_live(live_agent(request, "read-aloud"), body.sdp, paragraph=body.paragraph)
+
+    @app.get("/api/assessor/token", response_model=AssessorSession)
+    def assessor_token(request: Request) -> dict:
+        assessor = request.app.state.services.assessor
+        if assessor is None:
+            raise HTTPException(status_code=503, detail="Read aloud is off: set AZURE_SPEECH_KEY in Settings")
+        try:
+            return assessor.session()
+        except AssessorError as e:
+            raise HTTPException(status_code=502, detail=f"assessor token failed: {e.message}") from e
 
     @app.post("/api/phrase/sessions", response_model=LiveSession, status_code=201)
     def start_phrase(body: PhraseRequest, request: Request) -> dict:

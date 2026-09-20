@@ -5,6 +5,7 @@ import logging
 from dataclasses import dataclass
 from pathlib import Path
 
+from app.assessor import AzureAssessor
 from app.cards import CorrectionExtractor, Extractor, PhraseCardExtractor
 from app.daily_topics import ClaudeTopicSource, TopicSource
 from app.example_feedback import ExampleCoach
@@ -25,6 +26,7 @@ class Services:
     extractor: Extractor | None = None
     corrections: Extractor | None = None
     example_coach: ExampleCoach | None = None
+    assessor: AzureAssessor | None = None
     voice_key_name: str = "OPENAI_API_KEY"
 
     def __post_init__(self) -> None:
@@ -47,7 +49,22 @@ def build_services(settings: Settings, agent_dirs: dict[str, Path]) -> Services:
             openai_key, agent_dirs["read-aloud"], "feedback.schema.json", settings, CorrectionExtractor
         ),
         example_coach=_example_coach(settings, agent_dirs["example"]),
+        assessor=_assessor(settings),
         voice_key_name=settings.voice_api_key_name,
+    )
+
+
+def _assessor(settings: Settings) -> AzureAssessor | None:
+    """Azure pronunciation assessment, once its key is set."""
+    key = settings.azure_speech_key
+    if not key:
+        return None
+    return AzureAssessor(
+        key,
+        settings.azure_speech_region,
+        settings.assess_word_score,
+        settings.assess_break_confidence,
+        settings.assess_feedback,
     )
 
 

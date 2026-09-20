@@ -266,6 +266,16 @@ class LiveSession(BaseModel):
     provider: Literal["openai", "gemini"]
 
 
+class AssessorSession(BaseModel):
+    """What the browser needs to stream the microphone to Azure and judge the result."""
+
+    token: str
+    region: str
+    word_score: int
+    break_confidence: float
+    feedback: Literal["interrupt", "after"]
+
+
 class SettingField(BaseModel):
     key: str
     group: Literal["keys", "voice", "assess", "claude", "text"]
