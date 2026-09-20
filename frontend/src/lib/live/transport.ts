@@ -40,10 +40,11 @@ export const FINISH_INSTRUCTION = 'The round is over. Say your closing now.'
 export const CONFIRM_INSTRUCTION = 'Repeat OK: the reader repeated it right. Say "Good." and nothing else.'
 export const sayInstruction = (text: string) => `Now say exactly this, word for word, then stop: ${text}`
 
+/** Two beats: the problem as the reader said it, then the right version. */
 export const correctionInstruction = (f: Finding) =>
   f.kind === 'pronunciation'
-    ? `Correction: the reader mispronounced "${f.word}" (heard ${f.heard}). Interrupt now: say what you heard, then the word the right way, one short fix, then "Go on."`
-    : `Correction: the reader paused inside "${f.word}" (${f.heard}). Interrupt now: say "${f.word}" as one piece, then "From '${f.word.split(' ')[0]}'."`
+    ? `Correction: the reader mispronounced "${f.word}" (heard ${f.heard}). Interrupt now, two beats: "You said" the word as they said it, then "It's" the word right, then "Go on."`
+    : `Correction: the reader paused inside "${f.word}" (${f.heard}). Interrupt now, two beats: "You stopped after '${f.word.split(' ')[0]}'", then "${f.word}" as one piece, then "Go on."`
 
 /** One review of everything open; with nothing open the coach just signs off. */
 export const reviewInstruction = (findings: Finding[]) => {
@@ -51,7 +52,7 @@ export const reviewInstruction = (findings: Finding[]) => {
   const items = findings
     .map((f, i) => (f.kind === 'pronunciation' ? `${i + 1}) "${f.word}": heard ${f.heard}.` : `${i + 1}) "${f.word}": paused after "${f.word.split(' ')[0]}".`))
     .join(' ')
-  return `Review: the reader has finished. Go through these in order, each under five seconds: what was heard, the right way, one short fix. ${items} Then say: "Read those back to me." and wait.`
+  return `Review: the reader has finished. Go through these in order, two beats each: what they said, then the right version. ${items} Then say: "Read those back to me." and wait.`
 }
 
 export async function connectLive(opts: LiveOptions): Promise<LiveConnection> {
