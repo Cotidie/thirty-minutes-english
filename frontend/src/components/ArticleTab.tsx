@@ -63,8 +63,8 @@ export function ArticleTab({ article, sessionId }: { article: Article; sessionId
           )
         })}
       </article>
-      <details className="questions" open={active !== null || undefined}>
-        <summary>Discussion questions</summary>
+      <section className="questions">
+        <h3>Discussion questions</h3>
         <ol>
           {article.questions.map((q, i) => (
             <li key={q.text}>
@@ -72,7 +72,7 @@ export function ArticleTab({ article, sessionId }: { article: Article; sessionId
             </li>
           ))}
         </ol>
-      </details>
+      </section>
       {article.sources && article.sources.length > 0 && (
         <details className="sources">
           <summary>Sources</summary>

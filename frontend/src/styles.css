@@ -756,8 +756,9 @@ a {
   padding-top: 1rem;
 }
 
-.questions summary {
-  cursor: pointer;
+.questions h3 {
+  margin: 0;
+  font-size: 1rem;
   font-weight: 600;
   padding: 0.4rem 0;
 }
