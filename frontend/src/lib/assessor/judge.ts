@@ -97,18 +97,21 @@ export class Judge {
   private open: Finding[] = []
   private readonly words: string[]
   private readonly raw: string[]
+  private readonly breaks: number[]
   private cursor = 0
   private readonly t: Thresholds
 
-  constructor(t: Thresholds, paragraph: string) {
+  /** `breaks`: word indices where a pause is expected, so none is a finding there. */
+  constructor(t: Thresholds, paragraph: string, breaks: number[] = []) {
     this.t = t
+    this.breaks = breaks
     this.raw = tokens(paragraph)
     this.words = this.raw.map(norm)
   }
 
   segment(words: AzureWord[]): Verdict {
     const all = findingsIn(words, this.t, this.locate(words))
-      .filter((f) => f.kind !== 'phrasing' || !this.punctuatedBefore(f.at))
+      .filter((f) => f.kind !== 'phrasing' || !(this.punctuatedBefore(f.at) || this.breaks.includes(f.at)))
       .map((f) => this.spelled(f))
     const confirmed = this.open.filter((p) => readRight(p, words, all))
     this.open = this.open.filter((p) => !confirmed.includes(p))

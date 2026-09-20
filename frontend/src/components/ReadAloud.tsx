@@ -8,6 +8,8 @@ import { ReadingText, type Shown } from './ReadingText'
 
 interface Props {
   paragraph: string
+  /** Thought-group breaks to show as slashes; a pause there is not a finding. */
+  breaks?: number[]
   /** Where a finished round is filed, when the reading happens inside a session. */
   sessionId: number | null
   /** Only one paragraph may hold the microphone at a time. */
@@ -52,7 +54,7 @@ interface Call {
  * as the reader goes; the coach is dialled only when a mark is clicked, says
  * its two beats, and hangs up.
  */
-export function ReadAloud({ paragraph, sessionId, active, onStart, onEnd }: Props) {
+export function ReadAloud({ paragraph, breaks = [], sessionId, active, onStart, onEnd }: Props) {
   const [phase, setPhase] = useState<Phase | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [heard, setHeard] = useState('')
@@ -87,7 +89,7 @@ export function ReadAloud({ paragraph, sessionId, active, onStart, onEnd }: Prop
       const round: Round = {
         microphone,
         assessor: null,
-        judge: new Judge({ wordScore: session.word_score, breakConfidence: session.break_confidence }, paragraph),
+        judge: new Judge({ wordScore: session.word_score, breakConfidence: session.break_confidence }, paragraph, breaks),
         findings: [],
         heard: '',
         startedAt: Date.now(),
@@ -223,9 +225,9 @@ export function ReadAloud({ paragraph, sessionId, active, onStart, onEnd }: Prop
   const shown = phase !== null || findings.length > 0
 
   return (
-    <div className={`read-aloud${phase === 'listening' ? ' is-live' : ''}`}>
+    <div className={`read-aloud${phase === 'listening' ? ' is-live' : ''}${shown ? ' is-shown' : ''}`}>
       <audio ref={audioRef} autoPlay />
-      {shown && <ReadingText paragraph={paragraph} findings={findings} open={open} onOpen={ask} />}
+      {shown && <ReadingText paragraph={paragraph} findings={findings} breaks={breaks} open={open} onOpen={ask} />}
       {card && (
         <p className="reading-card">
           <b>{card.word}</b>

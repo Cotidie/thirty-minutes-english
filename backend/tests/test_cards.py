@@ -125,9 +125,3 @@ def test_extractor_sends_rounds_and_reads_the_answer(tmp_path, monkeypatch):
     ]
     assert cards[7].english == "Read the room."
 
-
-def test_reading_rejects_a_round_with_no_coach_line(tmp_path):
-    app = create_app(SessionStore(tmp_path / "s.db"), Services(FakeGenerator()), InlineExecutor())
-    with TestClient(app) as c:
-        body = {"paragraph": "Researchers verified it.", "user_text": "read it", "coach_text": "  "}
-        assert c.post("/api/readings", json=body).status_code == 422

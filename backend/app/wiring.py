@@ -11,6 +11,7 @@ from app.daily_topics import ClaudeTopicSource, TopicSource
 from app.example_feedback import ExampleCoach
 from app.generator import ClaudeCliGenerator, Generator
 from app.live import AgentDefinition, GeminiVoice, LiveAgent, OpenAIVoice, VoiceProvider
+from app.phrasing import PhrasingMarker
 from app.settings import Settings
 
 log = logging.getLogger(__name__)
@@ -25,6 +26,7 @@ class Services:
     agents: dict[str, LiveAgent] | None = None
     extractor: Extractor | None = None
     example_coach: ExampleCoach | None = None
+    phrasing: PhrasingMarker | None = None
     assessor: AzureAssessor | None = None
     voice_key_name: str = "OPENAI_API_KEY"
 
@@ -45,6 +47,7 @@ def build_services(settings: Settings, agent_dirs: dict[str, Path]) -> Services:
         agents=_live_agents(settings, agent_dirs),
         extractor=_extractor(openai_key, agent_dirs["phrase"], "cards.schema.json", settings, PhraseCardExtractor),
         example_coach=_example_coach(settings, agent_dirs["example"]),
+        phrasing=_phrasing(settings, agent_dirs["read-aloud"]),
         assessor=_assessor(settings),
         voice_key_name=settings.voice_api_key_name,
     )
@@ -92,6 +95,14 @@ def _extractor(api_key: str, agent_dir: Path, schema: str, settings: Settings, b
     if not api_key or not (agent_dir / schema).is_file():
         return None
     return build(api_key, agent_dir, settings.get("SUMMARY_MODEL"))
+
+
+def _phrasing(settings: Settings, agent_dir: Path) -> PhrasingMarker | None:
+    """Thought-group marking, once the read-aloud folder carries the phrasing prompt."""
+    if not (agent_dir / "prompts" / "phrasing.md").is_file():
+        log.warning("read-aloud phrasing prompt not found: %s", agent_dir)
+        return None
+    return PhrasingMarker.with_cli(agent_dir, settings.get("EXAMPLE_MODEL"), settings.get("EXAMPLE_EFFORT"))
 
 
 def _example_coach(settings: Settings, agent_dir: Path) -> ExampleCoach | None:

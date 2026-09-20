@@ -81,6 +81,8 @@ Article 탭의 문단마다 `Read aloud` 버튼이 있다. 누르면 마이크�
 | 다시 읽어 맞음 | 표시가 초록 ✓ (Azure가 확인) | |
 | `Done` | 마이크와 Azure를 놓는다. 표시는 남아 그 뒤에도, `Close` 뒤에도 클릭할 수 있다. `Read again`으로 새 라운드 | |
 
+문단마다 `Phrasing` 버튼이 있다. 처음 누르면 `POST /api/phrasing`이 `claude` CLI(`EXAMPLE_MODEL`/`EXAMPLE_EFFORT`, 도구 없음)에 `../read-aloud-coach/prompts/phrasing.md`를 넣어 thought group 경계에 ` / `가 들어간 문단을 받고, 단어열이 원문과 같은지 확인한 뒤 경계 인덱스를 `phrasings` 테이블에 캐시한다(문단당 한 번, 약 5~10초). 화면에는 파란 슬래시로 보이고 다시 누르면 숨는다. 켜 둔 채 Read aloud를 하면 슬래시 자리에서 멈춘 것은 끊어읽기 오류로 표시하지 않는다.
+
 라운드가 끝나면 `POST /api/readings`에 `corrections`로 함께 저장된다. Summary 탭은 `GET /api/readings`로 그 목록을 읽는다. 텍스트 모델로 transcript를 정리하던 단계는 없앴다.
 
 Azure 키는 backend에만 있다. `GET /api/assessor/token`이 10분짜리 토큰과 임계값·피드백 시점을 내주고, 브라우저는 `microsoft-cognitiveservices-speech-sdk`로 직접 스트리밍한다(구간 무음 400 ms, en-US, IPA, prosody on). 무료 F0 리소스는 월 5시간, 동시 1세션. 문단 하나 약 1~2분. 에이전트 정의(프롬프트, 세션 설정, 검증 시나리오)는 `../read-aloud-coach/`에 있고 backend는 그 폴더를 읽기만 한다.

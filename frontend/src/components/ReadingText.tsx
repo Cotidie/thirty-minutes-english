@@ -8,17 +8,20 @@ export interface Shown extends Finding {
 interface Props {
   paragraph: string
   findings: Shown[]
+  /** Word indices a fluent reader starts a new thought group on: a slash goes before each. */
+  breaks?: number[]
   /** Index into `findings` of the one whose card is open. */
   open: number | null
   onOpen: (index: number) => void
 }
 
 /**
- * The paragraph while it is being read. A mispronounced word is underlined,
- * a pause inside a phrase shows as a bar between the two words; both are
- * buttons that open the finding. Green once the word came out right.
+ * The paragraph word by word. A slash marks where a fluent reader pauses. A
+ * mispronounced word is underlined, a pause inside a phrase shows as a bar
+ * between the two words; both are buttons that open the finding. Green once
+ * the word came out right.
  */
-export function ReadingText({ paragraph, findings, open, onOpen }: Props) {
+export function ReadingText({ paragraph, findings, breaks = [], open, onOpen }: Props) {
   const words = tokens(paragraph)
   const at = (kind: Finding['kind'], i: number) => findings.findIndex((f) => f.kind === kind && f.at === i)
   return (
@@ -29,6 +32,8 @@ export function ReadingText({ paragraph, findings, open, onOpen }: Props) {
         return (
           <span key={i}>
             {i > 0 && ' '}
+            {breaks.includes(i) && <span className="reading-break" aria-label="pause">/</span>}
+            {breaks.includes(i) && ' '}
             {pause >= 0 && <Hit finding={findings[pause]} open={open === pause} onClick={() => onOpen(pause)} label="|" />}
             {pause >= 0 && ' '}
             {said >= 0 ? <Hit finding={findings[said]} open={open === said} onClick={() => onOpen(said)} label={w} /> : w}

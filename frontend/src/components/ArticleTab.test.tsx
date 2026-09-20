@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from '@testing-library/react'
+import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, expect, it, vi } from 'vitest'
 import { ArticleTab } from './ArticleTab'
@@ -6,6 +6,7 @@ import { ArticleTab } from './ArticleTab'
 vi.mock('../api', () => ({
   api: {
     addReading: vi.fn(async () => ({})),
+    phrasing: vi.fn(async () => ({ breaks: [3] })),
     assessorToken: vi.fn(async () => ({ token: 't', region: 'koreacentral', word_score: 60, break_confidence: 0.75 })),
   },
 }))
@@ -69,6 +70,30 @@ describe('ArticleTab', () => {
     await userEvent.click(buttons[0])
     expect(screen.getByRole('status')).toHaveTextContent(/Connecting|Listening/)
     expect(screen.getByRole('button', { name: 'Read aloud' })).toBeDisabled()
+  })
+})
+
+describe('ArticleTab phrasing', () => {
+  it('marks thought-group breaks with slashes on toggle, and hides them on the next click', async () => {
+    render(<ArticleTab article={article} sessionId={3} />)
+    const [toggle] = screen.getAllByRole('button', { name: 'Phrasing' })
+    await userEvent.click(toggle)
+    await waitFor(() => expect(screen.getAllByLabelText('pause')).toHaveLength(1))
+    expect(screen.getByLabelText('Reading')).toHaveTextContent('Ambition is cheap. / Upkeep is what actually pays.')
+    expect(toggle).toHaveAttribute('aria-pressed', 'true')
+
+    await userEvent.click(toggle)
+    expect(screen.queryByLabelText('pause')).not.toBeInTheDocument()
+    expect(screen.queryByLabelText('Reading')).not.toBeInTheDocument()
+  })
+
+  it('shows the backend error and stays off when marking fails', async () => {
+    const { api } = await import('../api')
+    vi.mocked(api.phrasing).mockRejectedValueOnce(new Error('phrasing failed: claude timed out'))
+    render(<ArticleTab article={article} sessionId={3} />)
+    await userEvent.click(screen.getAllByRole('button', { name: 'Phrasing' })[0])
+    expect(await screen.findByText('phrasing failed: claude timed out')).toBeInTheDocument()
+    expect(screen.queryByLabelText('pause')).not.toBeInTheDocument()
   })
 })
 

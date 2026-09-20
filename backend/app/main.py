@@ -30,6 +30,8 @@ from app.models import (
     KeyTestResult,
     LiveSession,
     PhraseRequest,
+    Phrasing,
+    PhrasingRequest,
     ReadAloudRequest,
     Session,
     SessionSummary,
@@ -239,6 +241,23 @@ def create_app(
             return coach.feedback(body.expression, body.meaning, body.usage_note, body.user_text)
         except GenerationError as e:
             raise HTTPException(status_code=502, detail=f"feedback failed: {e}") from e
+
+    @app.post("/api/phrasing", response_model=Phrasing)
+    def phrasing(body: PhrasingRequest, request: Request) -> Phrasing:
+        """Where a fluent reader pauses in the paragraph; marked once, cached after."""
+        store: SessionStore = request.app.state.store
+        cached = store.get_phrasing(body.paragraph)
+        if cached is not None:
+            return Phrasing(breaks=cached)
+        marker = request.app.state.services.phrasing
+        if marker is None:
+            raise HTTPException(status_code=503, detail="phrasing is off: the read-aloud-coach folder has no phrasing prompt")
+        try:
+            breaks = marker.mark(body.paragraph)
+        except GenerationError as e:
+            raise HTTPException(status_code=502, detail=f"phrasing failed: {e}") from e
+        store.set_phrasing(body.paragraph, breaks)
+        return Phrasing(breaks=breaks)
 
     @app.post("/api/examples", response_model=Example, status_code=201)
     def add_example(body: ExampleRequest, request: Request) -> Example:

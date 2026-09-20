@@ -222,7 +222,19 @@ class ReadingRequest(BaseModel):
     seconds: float = 0
     corrections: list[Correction] = []
 
-    _check = field_validator("paragraph", "coach_text")(_not_blank)
+    _check = field_validator("paragraph")(_not_blank)
+
+
+class PhrasingRequest(BaseModel):
+    paragraph: str
+
+    _check = field_validator("paragraph")(_not_blank)
+
+
+class Phrasing(BaseModel):
+    """Indices of the words a fluent reader starts a new thought group on."""
+
+    breaks: list[int]
 
 
 class Reading(BaseModel):

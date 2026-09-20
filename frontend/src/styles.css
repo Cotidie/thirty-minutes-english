@@ -1732,6 +1732,53 @@ button.question.is-active {
   line-height: 1.7;
 }
 
+.reading-break {
+  color: #2f5580;
+  font-weight: 600;
+  margin: 0 0.05em;
+}
+
+.paragraph-tools {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: 0.4rem 0.5rem;
+  margin-top: 0.35rem;
+}
+
+.paragraph-tools .read-aloud {
+  margin-top: 0;
+}
+
+.read-aloud.is-shown {
+  flex-basis: 100%;
+}
+
+.phrasing-toggle {
+  border: 1px solid var(--line);
+  background: transparent;
+  border-radius: 999px;
+  padding: 0.15rem 0.7rem;
+  margin-right: 0.4rem;
+  cursor: pointer;
+  color: var(--muted);
+  font-family: var(--sans);
+  font-size: 0.86rem;
+}
+
+.phrasing-toggle:hover:not(:disabled),
+.phrasing-toggle.is-on {
+  border-color: #2f5580;
+  color: #2f5580;
+}
+
+.phrasing-error {
+  font-family: var(--sans);
+  font-size: 0.86rem;
+  color: #8f3a2a;
+  margin-right: 0.4rem;
+}
+
 .reading-hit {
   all: unset;
   cursor: pointer;

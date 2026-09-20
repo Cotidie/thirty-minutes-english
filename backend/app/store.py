@@ -81,6 +81,14 @@ class SessionStore:
                 )
                 """
             )
+            conn.execute(
+                """
+                CREATE TABLE IF NOT EXISTS phrasings (
+                    paragraph TEXT PRIMARY KEY,
+                    breaks_json TEXT NOT NULL
+                )
+                """
+            )
 
     @property
     def path(self) -> Path:
@@ -297,6 +305,21 @@ class SessionStore:
                 "INSERT INTO topic_days (day, topics_json) VALUES (?, ?)"
                 " ON CONFLICT(day) DO UPDATE SET topics_json = excluded.topics_json",
                 (day, json.dumps(topics, ensure_ascii=False)),
+            )
+
+    # --- phrasings: where a fluent reader pauses in a paragraph, once marked --
+
+    def get_phrasing(self, paragraph: str) -> list[int] | None:
+        with self._connect() as conn:
+            row = conn.execute("SELECT breaks_json FROM phrasings WHERE paragraph = ?", (paragraph,)).fetchone()
+        return json.loads(row["breaks_json"]) if row else None
+
+    def set_phrasing(self, paragraph: str, breaks: list[int]) -> None:
+        with self._connect() as conn:
+            conn.execute(
+                "INSERT INTO phrasings (paragraph, breaks_json) VALUES (?, ?)"
+                " ON CONFLICT(paragraph) DO UPDATE SET breaks_json = excluded.breaks_json",
+                (paragraph, json.dumps(breaks)),
             )
 
 
