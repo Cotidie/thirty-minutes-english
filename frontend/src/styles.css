@@ -556,24 +556,21 @@ a {
   border-top: 1px solid var(--line);
 }
 
+/* Phrase, chip and star share one centre line; the row carries the gap below. */
 .expression-head {
   display: flex;
-  align-items: flex-start;
+  align-items: center;
   gap: 1rem;
+  margin-bottom: 0.4rem;
 }
 
 .expression-head .expression-phrase {
   flex: 1;
-}
-
-/* Chip and star sit on the centre line of the phrase's first line (1.85rem × 1.15 ≈ 2.13rem). */
-.expression-head .korean-chip {
-  margin-top: 0.12rem;
+  margin: 0;
 }
 
 .expression-head .star {
   margin-left: auto;
-  margin-top: 0.27rem;
 }
 
 .expression-head .korean-chip + .star {
