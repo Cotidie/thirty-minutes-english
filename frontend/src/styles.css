@@ -566,12 +566,14 @@ a {
   flex: 1;
 }
 
+/* Chip and star sit on the centre line of the phrase's first line (1.85rem × 1.15 ≈ 2.13rem). */
 .expression-head .korean-chip {
-  margin-top: 0.35rem;
+  margin-top: 0.12rem;
 }
 
 .expression-head .star {
   margin-left: auto;
+  margin-top: 0.27rem;
 }
 
 .expression-head .korean-chip + .star {
