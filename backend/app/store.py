@@ -4,7 +4,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 
 from app.exclusions import Exclusions
-from app.models import Ask, Correction, Example, PhraseCard, Reading, Session, SessionContent, SessionSummary, Stars
+from app.models import Ask, Correction, Example, PhraseCard, Reading, Session, SessionContent, SessionSummary, Stars, VocabularyItem
 
 
 class SessionStore:
@@ -110,9 +110,22 @@ class SessionStore:
         assert session_id is not None
         return Session(id=session_id, created_at=created_at, topic=content.topic, content=content)
 
-    def update_content(self, session_id: int, content: SessionContent) -> None:
+    def replace_vocabulary_item(self, session_id: int, index: int, item: VocabularyItem) -> VocabularyItem | None:
+        """The item that was stored at `index`, now replaced by `item`; None when there is no such word.
+        Read and write share one write lock, so two redraws finishing at once do not undo each other."""
         with self._connect() as conn:
+            conn.execute("BEGIN IMMEDIATE")
+            row = conn.execute("SELECT content_json FROM sessions WHERE id = ?", (session_id,)).fetchone()
+            if row is None:
+                return None
+            content = SessionContent.model_validate_json(row["content_json"])
+            if not 0 <= index < len(content.vocabulary):
+                return None
+            vocabulary = list(content.vocabulary)
+            previous, vocabulary[index] = vocabulary[index], item
+            content = content.model_copy(update={"vocabulary": vocabulary})
             conn.execute("UPDATE sessions SET content_json = ? WHERE id = ?", (content.model_dump_json(), session_id))
+        return previous
 
     def list_all(self) -> list[SessionSummary]:
         with self._connect() as conn:

@@ -159,10 +159,14 @@ class RedrawingIllustrator(FakeIllustrator):
     def __init__(self):
         super().__init__()
         self.styles: list[str] = []
+        self.discarded: list[str | None] = []
 
     def redraw(self, session_id, index, item, scene, style=""):
         self.styles.append(style)
         return item.model_copy(update={"scene": scene, "image": f"{session_id}-{index}-new.png"})
+
+    def discard(self, image):
+        self.discarded.append(image)
 
 
 def test_a_word_can_be_redrawn_in_a_chosen_style_and_the_session_keeps_it(tmp_path):
@@ -178,6 +182,7 @@ def test_a_word_can_be_redrawn_in_a_chosen_style_and_the_session_keeps_it(tmp_pa
         assert c.get(f"/api/sessions/{sid}").json()["content"]["vocabulary"][1]["image"] == f"{sid}-1-new.png"
         assert c.post(f"/api/sessions/{sid}/pictures/99", json={}).status_code == 404
     assert illustrator.styles == ["comic"]
+    assert illustrator.discarded == [f"{illustrator.job_ids[0]}-1.png"]  # the picture it replaced
 
 
 def test_redraw_is_503_while_pictures_are_off(client):

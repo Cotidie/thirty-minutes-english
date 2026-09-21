@@ -108,3 +108,15 @@ def test_stars_replace_as_a_set_and_go_with_the_session(store):
 
     store.delete(session.id)
     assert store.get_stars(session.id) == Stars()
+
+
+def test_replacing_one_word_keeps_what_another_redraw_stored_meanwhile(store):
+    session = store.create(sample_content())
+    first = session.content.vocabulary[1].model_copy(update={"image": "1-new.png"})
+    second = session.content.vocabulary[4].model_copy(update={"image": "4-new.png", "korean": "넷"})
+    assert store.replace_vocabulary_item(session.id, 1, first).image is None
+    assert store.replace_vocabulary_item(session.id, 4, second).word == "word4"
+    words = store.get(session.id).content.vocabulary
+    assert (words[1].image, words[4].image, words[4].korean) == ("1-new.png", "4-new.png", "넷")
+    assert store.replace_vocabulary_item(session.id, 99, first) is None
+    assert store.replace_vocabulary_item(999, 1, first) is None

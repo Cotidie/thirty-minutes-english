@@ -213,9 +213,11 @@ def create_app(
             drawn = services.illustrator.redraw(session_id, index, item, services.scene_writer.write(item), body.style)
         except GenerationError as e:
             raise HTTPException(status_code=502, detail=f"could not redraw: {e}") from e
-        vocabulary = list(session.content.vocabulary)
-        vocabulary[index] = drawn
-        store.update_content(session_id, session.content.model_copy(update={"vocabulary": vocabulary}))
+        previous = store.replace_vocabulary_item(session_id, index, drawn)
+        if previous is None:
+            raise HTTPException(status_code=404, detail="the session went away while drawing")
+        if previous.image != drawn.image:
+            services.illustrator.discard(previous.image)
         return drawn
 
     @app.get("/api/sessions/{session_id}/stars", response_model=Stars)

@@ -174,7 +174,7 @@ def test_fetch_retries_a_flaky_link(monkeypatch):
         fetch_url("https://img/2", attempts=2)
 
 
-def test_redraw_draws_the_new_scene_in_the_asked_style_under_a_new_name_and_drops_the_old_file(tmp_path):
+def test_redraw_draws_the_new_scene_in_the_asked_style_under_a_new_name_and_discard_drops_a_file(tmp_path):
     content = sample_content()
     old = content.vocabulary[2].model_copy(update={"image": "old.png"})
     (tmp_path / "old.png").write_bytes(b"OLD")
@@ -185,6 +185,9 @@ def test_redraw_draws_the_new_scene_in_the_asked_style_under_a_new_name_and_drop
     assert drawn.scene == "a fresh scene"
     assert drawn.image.startswith("7-2-") and drawn.image.endswith(".png")
     assert (tmp_path / drawn.image).read_bytes() == b"PNG0"
+    assert (tmp_path / "old.png").exists()  # dropped only once the new name is stored
+    Illustrator(painter, tmp_path).discard("old.png")
+    Illustrator(painter, tmp_path).discard(None)
     assert not (tmp_path / "old.png").exists()
 
     with pytest.raises(GenerationError):

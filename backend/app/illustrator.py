@@ -270,14 +270,17 @@ class Illustrator:
         return content.model_copy(update={"vocabulary": vocabulary})
 
     def redraw(self, session_id: int, index: int, item: VocabularyItem, scene: str, style: str = "") -> VocabularyItem:
-        """The item with `scene` drawn in `style` under a new file name; the old picture file is
-        dropped. Raises GenerationError when no picture came back."""
+        """The item with `scene` drawn in `style` under a new file name. The old file stays until
+        the caller has stored the new name and calls `discard` on whatever name it replaced.
+        Raises GenerationError when no picture came back."""
         [png] = self._painter.paint([self.prompt(scene, style)])
         if png is None:
             raise GenerationError("no picture came back")
         self._dir.mkdir(parents=True, exist_ok=True)
         name = f"{session_id}-{index}-{uuid.uuid4().hex[:8]}.png"
         (self._dir / name).write_bytes(png)
-        if item.image:
-            (self._dir / item.image).unlink(missing_ok=True)
         return item.model_copy(update={"scene": scene, "image": name})
+
+    def discard(self, image: str | None) -> None:
+        if image:
+            (self._dir / image).unlink(missing_ok=True)
