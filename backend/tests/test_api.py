@@ -1,7 +1,7 @@
 import pytest
 from fastapi.testclient import TestClient
 
-from app.generator import GenerationError
+from app.generator import EXPRESSION_COUNT, VOCABULARY_COUNT, GenerationError
 from app.main import create_app
 from app.wiring import Services
 from app.progress import Progress, Stage
@@ -120,8 +120,8 @@ def test_second_generation_receives_items_from_the_first(client):
     create(client, "B")
     first, second = client.generator.excluded
     assert not first
-    assert set(second.expressions) <= {f"phrase {i}" for i in range(6)}
-    assert set(second.words) <= {f"word{i}" for i in range(12)}
+    assert set(second.expressions) <= {f"phrase {i}" for i in range(EXPRESSION_COUNT)}
+    assert set(second.words) <= {f"word{i}" for i in range(VOCABULARY_COUNT)}
 
 
 def test_ask_is_saved_and_listed(client):

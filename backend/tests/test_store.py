@@ -1,5 +1,6 @@
 import pytest
 
+from app.generator import EXPRESSION_COUNT, VOCABULARY_COUNT
 from app.models import PhraseCard, Stars
 from app.store import SessionStore
 from tests.conftest import sample_content
@@ -56,8 +57,8 @@ def test_used_items_collects_distinct_phrases_and_words_newest_first(tmp_path):
     store.create(sample_content(topic="A"))
     store.create(sample_content(topic="B"))
     used = store.used_items()
-    assert used.expressions == tuple(f"phrase {i}" for i in range(6))
-    assert used.words == tuple(f"word{i}" for i in range(12))
+    assert used.expressions == tuple(f"phrase {i}" for i in range(EXPRESSION_COUNT))
+    assert used.words == tuple(f"word{i}" for i in range(VOCABULARY_COUNT))
 
 
 def test_used_items_is_empty_on_fresh_store(tmp_path):

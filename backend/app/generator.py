@@ -22,8 +22,8 @@ class Generator(Protocol):
     ) -> SessionContent: ...
 
 
-EXPRESSION_COUNT = 6
-VOCABULARY_COUNT = 12
+EXPRESSION_COUNT = 5
+VOCABULARY_COUNT = 10
 
 SESSION_SCHEMA: dict = {
     "type": "object",

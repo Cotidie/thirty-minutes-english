@@ -11,7 +11,7 @@ def test_parse_result_returns_content():
     payload = sample_content().model_dump()
     parsed = ClaudeCliGenerator.parse_result({"is_error": False, "structured_output": payload})
     assert parsed.article.title == "Twins at Work"
-    assert len(parsed.vocabulary) == 12
+    assert len(parsed.vocabulary) == 10
 
 
 def test_parse_result_raises_on_error_envelope():
@@ -34,8 +34,8 @@ def test_build_command_includes_model_effort_and_schema():
     assert "--verbose" in cmd
     schema = json.loads(cmd[cmd.index("--json-schema") + 1])
     assert set(schema["required"]) == {"topic", "expressions", "article", "vocabulary"}
-    assert schema["properties"]["expressions"]["minItems"] == 6
-    assert schema["properties"]["vocabulary"]["maxItems"] == 12
+    assert schema["properties"]["expressions"]["minItems"] == 5
+    assert schema["properties"]["vocabulary"]["maxItems"] == 10
 
 
 def test_default_effort_is_xhigh():
@@ -45,8 +45,8 @@ def test_default_effort_is_xhigh():
 
 def test_prompt_states_counts_and_relaxed_vocabulary_rule():
     prompt = ClaudeCliGenerator(model="sonnet").build_prompt("x")
-    assert "6 general-purpose expressions" in prompt
-    assert "12 words at B2 to C1+" in prompt
+    assert "5 general-purpose expressions" in prompt
+    assert "10 words at B2 to C1+" in prompt
     assert "even if they do not appear in the article" in prompt
 
 
