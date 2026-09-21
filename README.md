@@ -53,14 +53,14 @@ docker compose up -d --build
 
 ## Vocabulary 그림
 
-세션 생성 마지막 단계(`illustrating`, 진행 바의 "Drawing a picture for each word")에서 단어마다 그 단어가 어울리는 상황을 그린 그림을 한 장씩 만든다. 장면 문장(`scene`)은 세션 생성 프롬프트가 단어와 함께 쓴다(글자가 들어갈 필요 없는 구체적인 상황). 이미지 프롬프트는 `IMAGE_STYLE`의 스타일 문장 + 글자 금지 문장 + 장면 문장이다. `backend/app/illustrator.py`가 그 장면들을 `IMAGE_PROVIDER`의 MCP 서버에 보낸다. MCP 호출은 `backend/app/mcp_client.py`(JSON-RPC over HTTP)가 하고, 인증은 OAuth 로그인 대신 그 provider의 API 키를 bearer 토큰으로 보낸다(OAuth 토큰은 몇 시간에서 7일이면 만료되므로). `claude` 실행은 없다.
+세션 생성 마지막 단계(`illustrating`, 진행 바의 "Drawing a picture for each word")에서 단어마다 그 단어가 어울리는 상황을 그린 그림을 한 장씩 만든다. 장면(`scene`)은 세션 생성 프롬프트가 단어와 함께 쓴다: 두세 문장으로 장소, 사람과 행동, 가리킬 수 있는 세부 서너 가지(사물·날씨·시간대·배경)를 담고, 글자가 필요 없는 구체적인 상황이며 단어끼리 장소와 시간이 겹치지 않게 한다(규칙 문장은 `illustrator.SCENE_RULES` 하나를 두 프롬프트가 같이 쓴다). 이미지 프롬프트는 `IMAGE_STYLE`의 스타일 문장 + 디테일·글자 금지 문장(`IMAGE_RULES`) + 장면이다. `backend/app/illustrator.py`가 그 장면들을 `IMAGE_PROVIDER`의 MCP 서버에 보낸다. MCP 호출은 `backend/app/mcp_client.py`(JSON-RPC over HTTP)가 하고, 인증은 OAuth 로그인 대신 그 provider의 API 키를 bearer 토큰으로 보낸다(OAuth 토큰은 몇 시간에서 7일이면 만료되므로). `claude` 실행은 없다.
 
 | provider | MCP | 호출 | 기본 모델 |
 |---|---|---|---|
 | `openrouter` | `https://mcp.openrouter.ai/mcp` | 단어마다 `generate-image`를 열 개 동시에, 응답의 inline image 블록(base64) | `google/gemini-3-pro-image` |
 | `comfy` | `https://cloud.comfy.org/mcp` | `submit_batch`(한 배치, `confirm: true`; comfy가 열 장을 동시에 그린다) → `wait_for_batch` → `get_batch_output`의 서명 URL을 열 개 동시에 내려받음 | `vertexai/nano-banana-pro` |
 
-OpenAI 모델은 OpenRouter 표기(`openai/gpt-image-2.5-flare`)로 적으면 comfy에서도 통한다(`openai/images-generations` + `params.model`로 바꿔 보낸다). 그림은 `backend/data/images/{job}-{n}.png`에 두고 `/api/images/`로 서빙하며, 세션 content의 각 단어에 `scene`과 `image`가 붙는다. 그림 하나가 실패하면 그 단어만 그림 없이, 전체가 실패하면 경고만 남기고 세션은 그림 없이 저장된다. 카드의 그림 왼쪽 위 `↻`를 누르면 스타일 메뉴가 열리고, 고르면 `POST /api/sessions/{id}/pictures/{index}`(`{style}`)가 텍스트 모델(`EXAMPLE_MODEL`, `illustrator.SceneWriter`)에 이전 장면과 다른 새 장면을 쓰게 한 뒤 그 스타일로 다시 그려 세션 content에 저장한다(새 파일명, 옛 파일 삭제). 별표와 `↻`는 그림 모서리 위에 반투명 원으로 얹혀 있다. 설정 모달의 `Test`가 키를 확인한다(OpenRouter는 `/api/v1/key`, comfy는 MCP initialize). comfy-cloud 구독이 끝나면 `IMAGE_PROVIDER`를 `openrouter`로 둔다. 비용은 각 대시보드에서 확인한다(Nano Banana Pro 기준 장당 $0.1~0.2).
+OpenAI 모델은 OpenRouter 표기(`openai/gpt-image-2.5-flare`)로 적으면 comfy에서도 통한다(`openai/images-generations` + `params.model`로 바꿔 보낸다). 그림은 `backend/data/images/{job}-{n}.png`에 두고 `/api/images/`로 서빙하며, 세션 content의 각 단어에 `scene`과 `image`가 붙는다. 그림 하나가 실패하면 그 단어만 그림 없이, 전체가 실패하면 경고만 남기고 세션은 그림 없이 저장된다. 카드의 그림 왼쪽 위 `↻`를 누르면 스타일 메뉴가 열리고, 고르면 `POST /api/sessions/{id}/pictures/{index}`(`{style}`)가 텍스트 모델(`EXAMPLE_MODEL`, `illustrator.SceneWriter`)에 새 장면을 쓰게 한 뒤 그 스타일로 다시 그려 세션 content에 저장한다(새 파일명, 옛 파일 삭제). 같은 프롬프트를 반복하면 비슷한 그림만 나오므로, 매번 무작위 `Spark`(장소 30·순간 12·반전 12 가지 중 하나씩)를 출발점으로 주고 이전 장면과 다르게 쓰라고 한다. 기다리는 동안 그림 위에 도는 링과 경과 초가 뜬다(요청 하나라 진짜 진행률은 없고 링은 60초를 향해 차오르다 95%에서 멈춘다). 별표와 `↻`는 그림 모서리 위에 반투명 원으로 얹혀 있다. 설정 모달의 `Test`가 키를 확인한다(OpenRouter는 `/api/v1/key`, comfy는 MCP initialize). comfy-cloud 구독이 끝나면 `IMAGE_PROVIDER`를 `openrouter`로 둔다. 비용은 각 대시보드에서 확인한다(Nano Banana Pro 기준 장당 $0.1~0.2).
 
 ## Article 한국어 번역
 

@@ -1,11 +1,40 @@
-import { useEffect, useState } from 'react'
+import React, { useEffect, useState } from 'react'
 import { api } from '../api'
 import { practiceWord, type Example, type PictureStyles, type VocabularyItem } from '../types'
 import { Practice } from './Practice'
 import { StarButton } from './StarButton'
 
+/** A redraw is one request (new scene, then the picture), so there is no true progress:
+ * the ring creeps toward a typical wait and holds short of full. */
+const REDRAW_SECONDS = 60
+
+function useElapsed(active: boolean): number {
+  const [seconds, setSeconds] = useState(0)
+  useEffect(() => {
+    if (!active) return
+    setSeconds(0)
+    const start = Date.now()
+    const timer = setInterval(() => setSeconds(Math.floor((Date.now() - start) / 1000)), 500)
+    return () => clearInterval(timer)
+  }, [active])
+  return active ? seconds : 0
+}
+
+function Drawing({ seconds }: { seconds: number }) {
+  const fill = Math.min(0.95, seconds / REDRAW_SECONDS)
+  return (
+    <span className="vocab-drawing" role="status" aria-live="polite">
+      <span className="vocab-drawing-ring" style={{ '--fill': fill } as React.CSSProperties} aria-hidden="true" />
+      <span className="vocab-drawing-text">
+        Drawing… <b>{seconds}s</b>
+      </span>
+    </span>
+  )
+}
+
 function VocabCard({ item, drawing }: { item: VocabularyItem; drawing: boolean }) {
   const [revealed, setRevealed] = useState(false)
+  const seconds = useElapsed(drawing)
   return (
     <button
       type="button"
@@ -14,7 +43,10 @@ function VocabCard({ item, drawing }: { item: VocabularyItem; drawing: boolean }
       onClick={() => setRevealed((r) => !r)}
     >
       {item.image && (
-        <img className={`vocab-picture${drawing ? ' is-drawing' : ''}`} src={`/api/images/${item.image}`} alt={item.scene ?? item.word} />
+        <span className="vocab-picture-frame">
+          <img className={`vocab-picture${drawing ? ' is-drawing' : ''}`} src={`/api/images/${item.image}`} alt={item.scene ?? item.word} />
+          {drawing && <Drawing seconds={seconds} />}
+        </span>
       )}
       <span className="vocab-word">
         <span className="vocab-word-text">{item.word}</span> <em className="vocab-pos">{item.pos}</em>

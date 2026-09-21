@@ -7,7 +7,7 @@ import pytest
 
 import app.illustrator as mod
 from app.claude_cli import GenerationError
-from app.illustrator import NO_TEXT, STYLES, ComfyPainter, Illustrator, OpenRouterPainter, SceneWriter, fetch_url, painter_for
+from app.illustrator import IMAGE_RULES, STYLES, Spark, ComfyPainter, Illustrator, OpenRouterPainter, SceneWriter, fetch_url, painter_for
 from app.mcp_client import McpError
 from tests.conftest import sample_content
 
@@ -27,14 +27,14 @@ def test_every_word_with_a_scene_gets_its_picture_file(tmp_path):
     painter = FakePainter()
     done = Illustrator(painter, tmp_path / "images").illustrate("job1", content)
 
-    assert painter.prompts[0] == f"{STYLES['photo']} {NO_TEXT} scene 0"
+    assert painter.prompts[0] == f"{STYLES['photo']} {IMAGE_RULES} scene 0"
     assert [v.image for v in done.vocabulary] == [f"job1-{i}.png" for i in range(len(content.vocabulary))]
     assert (tmp_path / "images" / "job1-2.png").read_bytes() == b"PNG2"
     assert content.vocabulary[0].image is None  # the input is untouched
 
 
 def test_the_chosen_style_leads_the_prompt_and_an_unknown_one_falls_back_to_photo(tmp_path):
-    assert Illustrator(FakePainter(), tmp_path, "comic").prompt("a dog") == f"{STYLES['comic']} {NO_TEXT} a dog"
+    assert Illustrator(FakePainter(), tmp_path, "comic").prompt("a dog") == f"{STYLES['comic']} {IMAGE_RULES} a dog"
     assert Illustrator(FakePainter(), tmp_path, "nope").prompt("a dog").startswith(STYLES["photo"])
 
 
@@ -181,7 +181,7 @@ def test_redraw_draws_the_new_scene_in_the_asked_style_under_a_new_name_and_drop
     painter = FakePainter()
     drawn = Illustrator(painter, tmp_path, "photo").redraw(7, 2, old, "a fresh scene", "comic")
 
-    assert painter.prompts == [f"{STYLES['comic']} {NO_TEXT} a fresh scene"]
+    assert painter.prompts == [f"{STYLES['comic']} {IMAGE_RULES} a fresh scene"]
     assert drawn.scene == "a fresh scene"
     assert drawn.image.startswith("7-2-") and drawn.image.endswith(".png")
     assert (tmp_path / drawn.image).read_bytes() == b"PNG0"
@@ -201,10 +201,15 @@ class FakeCli:
         return {"structured_output": {"scene": self.scene}}
 
 
-def test_scene_writer_names_the_word_and_the_scene_to_avoid():
+def test_scene_writer_names_the_word_the_scene_to_avoid_and_a_rolled_spark():
+    import random
+
     item = sample_content().vocabulary[0].model_copy(update={"scene": "the old scene"})
     cli = FakeCli("  a new scene ")
-    assert SceneWriter(cli).write(item) == "a new scene"
+    assert SceneWriter(cli, random.Random(3)).write(item) == "a new scene"
     assert "Word: word0 (noun)" in cli.prompt and "the old scene" in cli.prompt
+    spark = Spark.roll(random.Random(3))
+    assert str(spark) in cli.prompt and spark.place in str(spark)
+    assert Spark.roll(random.Random(1)) != Spark.roll(random.Random(2))
     with pytest.raises(GenerationError):
         SceneWriter(FakeCli("")).write(item)

@@ -1,7 +1,7 @@
-import { render, screen } from '@testing-library/react'
+import { act, render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, expect, it, vi } from 'vitest'
-import type { Example } from '../types'
+import type { Example, VocabularyItem } from '../types'
 import { VocabularyTab } from './VocabularyTab'
 import { api } from '../api'
 
@@ -37,6 +37,22 @@ describe('VocabularyTab', () => {
     expect(api.redrawPicture).toHaveBeenCalledWith(3, 0, 'comic')
     expect(onPicture).toHaveBeenCalledWith(0, fresh)
     expect(screen.queryByRole('menu')).not.toBeInTheDocument()
+  })
+
+  it('counts the seconds over the picture while a redraw is on its way', async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true })
+    const drawn = [{ ...items[0], scene: 'phones on a train', image: 'a.png' }, items[1]]
+    let finish: (item: VocabularyItem) => void = () => undefined
+    vi.mocked(api.redrawPicture).mockReturnValue(new Promise((resolve) => (finish = resolve)))
+    render(<VocabularyTab items={drawn} sessionId={3} onPicture={vi.fn()} starred={[]} onToggleStar={vi.fn()} examples={none} onExample={vi.fn()} />)
+    await userEvent.click(screen.getByRole('button', { name: 'New picture for ubiquitous' }))
+    await userEvent.click(screen.getByRole('menuitem', { name: /comic/ }))
+    expect(screen.getByRole('status')).toHaveTextContent('Drawing… 0s')
+    await act(() => vi.advanceTimersByTimeAsync(2100))
+    expect(screen.getByRole('status')).toHaveTextContent('Drawing… 2s')
+    await act(async () => finish({ ...drawn[0], image: 'b.png' }))
+    expect(screen.queryByRole('status')).not.toBeInTheDocument()
+    vi.useRealTimers()
   })
 
   it('shows the picture drawn for a word, and nothing where there is none', () => {

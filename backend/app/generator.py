@@ -5,6 +5,7 @@ from pydantic import ValidationError
 
 from app.claude_cli import FIRECRAWL, ClaudeCli, GenerationError, McpServer, structured_output
 from app.exclusions import Exclusions
+from app.illustrator import SCENE_RULES
 from app.models import SessionContent
 from app.progress import Progress, StreamTracker
 
@@ -154,10 +155,8 @@ article body where it offers strong candidates, and fill the rest with words a w
 use when discussing this subject even if they do not appear in the article. Prefer words useful across \
 academic and professional English over topic-specific jargon; no proper nouns. \
 For each give the word, part of speech, a concise learner-dictionary definition, one example \
-sentence different from the article, and a scene: one sentence naming a concrete, drawable situation, \
-place, or object where a fluent speaker would reach for this word, so that a learner shown a picture \
-of it would describe it with the word. Physical and specific ("a single toll booth open on a wide \
-highway, cars backed up behind it"), never abstract, and nothing that needs written words in the picture.
+sentence different from the article, and a scene: {scene_rules}. Vary the scenes across the words: \
+different places, times of day, and kinds of people, so no two look alike.
 
 Set topic to the article topic. Use American English. Return only the structured output."""
 
@@ -190,7 +189,7 @@ class ClaudeCliGenerator:
 
     def build_prompt(self, topic: str, exclude: Exclusions | None = None) -> str:
         prompt = PROMPT_TEMPLATE.format(
-            topic=topic, expression_count=EXPRESSION_COUNT, vocabulary_count=VOCABULARY_COUNT
+            topic=topic, expression_count=EXPRESSION_COUNT, vocabulary_count=VOCABULARY_COUNT, scene_rules=SCENE_RULES
         )
         if self._skills:
             prompt = SKILLS_PREAMBLE.format(skills=", ".join(self._skills)) + prompt

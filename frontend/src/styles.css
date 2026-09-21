@@ -1033,6 +1033,50 @@ button.question.is-active {
   opacity: 0.4;
 }
 
+.vocab-picture-frame {
+  position: relative;
+  display: block;
+}
+
+/* While a new picture is on its way: a ring that creeps round, and the seconds so far. */
+.vocab-drawing {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-content: center;
+  justify-items: center;
+  gap: 0.5rem;
+  color: var(--ink);
+  font-size: 0.85rem;
+}
+
+.vocab-drawing-ring {
+  width: 2.6rem;
+  height: 2.6rem;
+  border-radius: 50%;
+  background:
+    radial-gradient(circle, rgb(255 255 255 / 85%) 58%, transparent 60%),
+    conic-gradient(var(--ink) calc(var(--fill) * 360deg), rgb(0 0 0 / 12%) 0);
+  animation: topic-spin 1.6s linear infinite;
+}
+
+.vocab-drawing-text {
+  padding: 0.15rem 0.55rem;
+  border-radius: 999px;
+  background: rgb(255 255 255 / 80%);
+  backdrop-filter: blur(2px);
+}
+
+.vocab-drawing-text b {
+  font-variant-numeric: tabular-nums;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .vocab-drawing-ring {
+    animation: none;
+  }
+}
+
 /* The style menu under the redraw button. */
 .vocab-styles {
   position: absolute;
