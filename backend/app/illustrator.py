@@ -1,16 +1,54 @@
 """A picture per vocabulary word: the scene the generator wrote for it, drawn by
-the configured painter and kept in the images folder. The learner describes the
-picture with the word in Practice."""
+OpenRouter's MCP server (`generate-image`, signed in with the API key) and kept
+in the images folder. The learner describes the picture with the word in Practice."""
 
+import base64
 import logging
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
+from typing import Protocol
 
-from app.models import SessionContent, VocabularyItem
-from app.painters import Painter
+from app.mcp_client import McpClient, McpError
+from app.models import SessionContent
 
 log = logging.getLogger(__name__)
 
 STYLE = "Flat vector illustration, soft colours, simple shapes, one clear scene. No text, letters, numbers, or signs anywhere."
+OPENROUTER_MCP = "https://mcp.openrouter.ai/mcp"
+# Pictures drawn at once; the session has ten words.
+PARALLEL = 10
+
+
+class Painter(Protocol):
+    def paint(self, prompts: list[str]) -> list[bytes | None]: ...
+
+
+class OpenRouterPainter:
+    """One generate-image call per picture, all in flight at once; the PNG comes back inline as base64."""
+
+    def __init__(self, client: McpClient, model: str) -> None:
+        self._client = client
+        self._model = model
+
+    @classmethod
+    def with_key(cls, api_key: str, model: str) -> "OpenRouterPainter":
+        return cls(McpClient(OPENROUTER_MCP, api_key), model)
+
+    def paint(self, prompts: list[str]) -> list[bytes | None]:
+        with ThreadPoolExecutor(max_workers=PARALLEL) as pool:
+            return list(pool.map(self._one, prompts))
+
+    def _one(self, prompt: str) -> bytes | None:
+        try:
+            result = self._client.call("generate-image", {"prompt": prompt, "model": self._model})
+        except McpError as e:
+            log.warning("openrouter could not draw a picture: %s", e)
+            return None
+        for block in result.get("content", []):
+            if block.get("type") == "image" and block.get("data"):
+                return base64.b64decode(block["data"])
+        log.warning("openrouter returned no image block")
+        return None
 
 
 class Illustrator:

@@ -14,19 +14,15 @@ Group = Literal["keys", "voice", "assess", "claude", "text", "images"]
 
 EFFORTS = ("low", "medium", "high", "xhigh", "max")
 CLAUDE_MODELS = ("opus", "sonnet")
-IMAGE_PROVIDERS = ("comfy", "openrouter", "off")
-# Image models as each MCP names them; blank takes the provider's default (Nano Banana Pro).
-# OpenAI ids are spelled OpenRouter's way and translated for comfy.
+# OpenRouter image models for the vocabulary pictures.
 IMAGE_MODELS = (
-    "vertexai/nano-banana-pro",  # comfy
-    "vertexai/nano-banana-2",
-    "vertexai/nano-banana-2-lite",
-    "google/gemini-3-pro-image",  # openrouter
+    "google/gemini-3-pro-image",
     "google/gemini-3.1-flash-image",
     "google/gemini-3.1-flash-lite-image",
-    "openai/gpt-image-2.5-flare",  # both
+    "openai/gpt-image-2.5-flare",
     "openai/gpt-image-2.5-sunburst",
     "openai/gpt-image-2",
+    "bytedance-seed/seedream-4.5",
 )
 OPENAI_VOICE_MODEL = "gpt-live-1"
 GEMINI_VOICE_MODEL = "gemini-3.8-live-extended-thinking"
@@ -84,6 +80,7 @@ SPECS: tuple[Spec, ...] = (
     Spec("OPENAI_API_KEY", "keys", secret=True),
     Spec("GEMINI_API_KEY", "keys", secret=True),
     Spec("AZURE_SPEECH_KEY", "keys", secret=True),
+    Spec("OPENROUTER_API_KEY", "keys", secret=True),
     Spec("VOICE_PROVIDER", "voice", "openai", choices=("openai", "gemini")),
     Spec("VOICE_MODEL", "voice", suggestions=(OPENAI_VOICE_MODEL, *GEMINI_VOICE_MODELS)),
     Spec("VOICE_THINKING", "voice", "low", choices=THINKING_LEVELS),
@@ -98,8 +95,7 @@ SPECS: tuple[Spec, ...] = (
     Spec("TOPICS_EFFORT", "claude", "medium", choices=EFFORTS),
     Spec("EXAMPLE_MODEL", "claude", "opus", suggestions=CLAUDE_MODELS),
     Spec("EXAMPLE_EFFORT", "claude", "low", choices=EFFORTS),
-    Spec("IMAGE_PROVIDER", "images", "comfy", choices=IMAGE_PROVIDERS),
-    Spec("IMAGE_MODEL", "images", suggestions=IMAGE_MODELS),
+    Spec("IMAGE_MODEL", "images", "google/gemini-3-pro-image", suggestions=IMAGE_MODELS),
     Spec("SUMMARY_MODEL", "text", "gpt-5.6-luna"),
 )
 SPEC_BY_KEY = {spec.key: spec for spec in SPECS}

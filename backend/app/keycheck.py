@@ -29,10 +29,15 @@ def _azure(key: str, region: str) -> urllib.request.Request:
     )
 
 
+def _openrouter(key: str, region: str) -> urllib.request.Request:
+    return urllib.request.Request("https://openrouter.ai/api/v1/key", headers={"Authorization": f"Bearer {key}"})
+
+
 CHECKS: dict[str, Callable[[str, str], urllib.request.Request]] = {
     "OPENAI_API_KEY": _openai,
     "GEMINI_API_KEY": _gemini,
     "AZURE_SPEECH_KEY": _azure,
+    "OPENROUTER_API_KEY": _openrouter,
 }
 
 

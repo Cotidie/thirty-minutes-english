@@ -141,7 +141,7 @@ def test_pictures_are_drawn_after_the_text_and_saved_with_the_session(tmp_path):
 
 
 def test_a_session_still_goes_out_when_the_pictures_fail(tmp_path):
-    services = Services(FakeGenerator(), illustrator=FakeIllustrator(GenerationError("comfy down")))
+    services = Services(FakeGenerator(), illustrator=FakeIllustrator(GenerationError("openrouter down")))
     app = create_app(SessionStore(tmp_path / "s.db"), services, InlineExecutor())
     with TestClient(app) as c:
         job = c.post("/api/sessions", json={"topic": "X"}).json()

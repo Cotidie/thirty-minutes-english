@@ -1,20 +1,14 @@
-import json
-
-from app.mcp_client import oauth_token, payload
-
-
-def test_oauth_token_finds_the_login_by_server_url(tmp_path):
-    creds = tmp_path / "c.json"
-    creds.write_text(json.dumps({"mcpOAuth": {
-        "comfy-cloud|abc": {"serverUrl": "https://cloud.comfy.org/mcp", "accessToken": "tok-comfy"},
-        "notion|def": {"serverUrl": "https://mcp.notion.com/mcp", "accessToken": "tok-notion"},
-    }}))
-    assert oauth_token("https://cloud.comfy.org/mcp", creds) == "tok-comfy"
-    assert oauth_token("https://mcp.openrouter.ai/mcp", creds) is None
-    assert oauth_token("https://cloud.comfy.org/mcp", tmp_path / "missing.json") is None
+from app.mcp_client import Response, _message, payload
 
 
 def test_payload_prefers_structured_content_then_parses_the_text():
     assert payload({"structuredContent": {"a": 1}, "content": []}) == {"a": 1}
     assert payload({"content": [{"type": "text", "text": "{\"b\": 2}"}]}) == {"b": 2}
     assert payload({"content": [{"type": "text", "text": "plain"}]}) == "plain"
+
+
+def test_message_reads_plain_json_or_the_last_sse_event():
+    assert _message(Response("application/json", None, '{"result": {"x": 1}}')) == {"result": {"x": 1}}
+    sse = 'event: message\ndata: {"result": {"x": 1}}\n\ndata: {"result": {"x": 2}}\n'
+    assert _message(Response("text/event-stream", "s1", sse)) == {"result": {"x": 2}}
+    assert _message(Response("application/json", None, "")) == {}

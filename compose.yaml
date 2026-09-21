@@ -27,8 +27,8 @@ services:
       SUMMARY_MODEL: ${SUMMARY_MODEL:-gpt-5.6-luna}
       TOPICS_MODEL: ${TOPICS_MODEL:-sonnet}
       TOPICS_EFFORT: ${TOPICS_EFFORT:-medium}
-      IMAGE_PROVIDER: ${IMAGE_PROVIDER:-comfy}
-      IMAGE_MODEL: ${IMAGE_MODEL:-}
+      OPENROUTER_API_KEY: ${OPENROUTER_API_KEY:-}
+      IMAGE_MODEL: ${IMAGE_MODEL:-google/gemini-3-pro-image}
       EXAMPLE_MODEL: ${EXAMPLE_MODEL:-opus}
       EXAMPLE_EFFORT: ${EXAMPLE_EFFORT:-low}
     volumes:

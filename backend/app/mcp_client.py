@@ -1,12 +1,12 @@
-"""A small client for an HTTP MCP server, signed in with the OAuth token the
-claude CLI keeps in ~/.claude/.credentials.json (copied into the container).
-One session per client: initialize, then tools/call as needed."""
+"""A small client for an HTTP MCP server, signed in with a bearer token (an API
+key). One session per client: initialize, then tools/call as needed, from any thread."""
 
 import json
-from pathlib import Path
+import urllib.error
+import urllib.request
+from dataclasses import dataclass
+from threading import Lock
 from typing import Any
-
-import httpx2 as httpx
 
 PROTOCOL = "2025-06-18"
 
@@ -15,76 +15,82 @@ class McpError(Exception):
     pass
 
 
-def oauth_token(server_url: str, credentials: Path | None = None) -> str | None:
-    """The saved access token for `server_url`, or None when nobody has logged in to it."""
-    path = credentials or Path.home() / ".claude" / ".credentials.json"
-    try:
-        entries = json.loads(path.read_text()).get("mcpOAuth", {})
-    except (OSError, ValueError):
-        return None
-    for entry in entries.values():
-        if entry.get("serverUrl") == server_url and entry.get("accessToken"):
-            return entry["accessToken"]
-    return None
+@dataclass(frozen=True)
+class Response:
+    content_type: str
+    session_id: str | None
+    text: str
 
 
 class McpClient:
-    def __init__(self, url: str, token: str, timeout_s: float = 120) -> None:
+    def __init__(self, url: str, token: str, timeout_s: float = 180) -> None:
         self._url = url
-        self._http = httpx.Client(
-            headers={"Authorization": f"Bearer {token}", "Accept": "application/json, text/event-stream"},
-            timeout=timeout_s,
-        )
+        self._token = token
+        self._timeout_s = timeout_s
         self._session: str | None = None
         self._next_id = 0
+        self._lock = Lock()
 
     def call(self, tool: str, arguments: dict) -> dict:
         """The tool's result object (`content`, and `structuredContent` when the server gives one).
         Raises McpError on a transport failure or a tool error."""
-        if self._session is None:
-            self._initialize()
+        with self._lock:
+            if self._session is None:
+                self._initialize()
         result = self._request("tools/call", {"name": tool, "arguments": arguments})
         if result.get("isError"):
             raise McpError(f"{tool}: {_text(result)}")
         return result
 
-    def close(self) -> None:
-        self._http.close()
+    def tools(self) -> list[dict]:
+        """The server's tool list, with input schemas."""
+        with self._lock:
+            if self._session is None:
+                self._initialize()
+        return self._request("tools/list", {}).get("tools", [])
 
     def _initialize(self) -> None:
         params = {"protocolVersion": PROTOCOL, "capabilities": {}, "clientInfo": {"name": "english-speaking-claude", "version": "1"}}
-        self._request("initialize", params)
-        self._notify("notifications/initialized")
+        response = self._post({"jsonrpc": "2.0", "id": 0, "method": "initialize", "params": params})
+        self._session = response.session_id
+        _check(_message(response), "initialize")
+        self._post({"jsonrpc": "2.0", "method": "notifications/initialized"})
 
     def _request(self, method: str, params: dict) -> dict:
-        self._next_id += 1
-        response = self._post({"jsonrpc": "2.0", "id": self._next_id, "method": method, "params": params})
-        if method == "initialize":
-            self._session = response.headers.get("mcp-session-id")
-        message = _message(response)
-        if "error" in message:
-            raise McpError(f"{method}: {message['error'].get('message', message['error'])}")
-        return message.get("result", {})
+        with self._lock:
+            self._next_id += 1
+            request_id = self._next_id
+        response = self._post({"jsonrpc": "2.0", "id": request_id, "method": method, "params": params})
+        return _check(_message(response), method)
 
-    def _notify(self, method: str) -> None:
-        self._post({"jsonrpc": "2.0", "method": method})
-
-    def _post(self, body: dict) -> httpx.Response:
-        headers = {"MCP-Protocol-Version": PROTOCOL}
+    def _post(self, body: dict) -> Response:
+        headers = {
+            "Authorization": f"Bearer {self._token}",
+            "Accept": "application/json, text/event-stream",
+            "Content-Type": "application/json",
+            "MCP-Protocol-Version": PROTOCOL,
+        }
         if self._session:
             headers["Mcp-Session-Id"] = self._session
+        request = urllib.request.Request(self._url, data=json.dumps(body).encode(), headers=headers, method="POST")
         try:
-            response = self._http.post(self._url, json=body, headers=headers)
-        except httpx.HTTPError as e:
+            with urllib.request.urlopen(request, timeout=self._timeout_s) as raw:
+                return Response(raw.headers.get("content-type", ""), raw.headers.get("mcp-session-id"), raw.read().decode())
+        except urllib.error.HTTPError as e:
+            raise McpError(f"{self._url}: HTTP {e.code} {e.read()[:200]!r}") from e
+        except (urllib.error.URLError, OSError) as e:
             raise McpError(f"{self._url}: {e}") from e
-        if response.status_code >= 400:
-            raise McpError(f"{self._url}: HTTP {response.status_code} {response.text[:200]}")
-        return response
 
 
-def _message(response: httpx.Response) -> dict:
+def _check(message: dict, method: str) -> dict:
+    if "error" in message:
+        raise McpError(f"{method}: {message['error'].get('message', message['error'])}")
+    return message.get("result", {})
+
+
+def _message(response: Response) -> dict:
     """The JSON-RPC message in a plain JSON body, or the last `data:` event of an SSE body."""
-    if response.headers.get("content-type", "").startswith("text/event-stream"):
+    if response.content_type.startswith("text/event-stream"):
         message: dict = {}
         for line in response.text.splitlines():
             if line.startswith("data:"):
@@ -93,9 +99,7 @@ def _message(response: httpx.Response) -> dict:
                 except ValueError:
                     continue
         return message
-    if not response.content:
-        return {}
-    return response.json()
+    return json.loads(response.text) if response.text.strip() else {}
 
 
 def _text(result: dict) -> str:

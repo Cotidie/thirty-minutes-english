@@ -1,4 +1,8 @@
-from app.illustrator import STYLE, Illustrator
+import base64
+import threading
+
+from app.illustrator import STYLE, Illustrator, OpenRouterPainter
+from app.mcp_client import McpError
 from tests.conftest import sample_content
 
 
@@ -37,3 +41,34 @@ def test_a_word_without_a_scene_is_skipped_and_a_failed_picture_stays_bare(tmp_p
     assert done.vocabulary[2].image == "j-2.png"
     assert done.vocabulary[3].image is None
     assert not (tmp_path / "j-3.png").exists()
+
+
+class FakeMcp:
+    """Answers generate-image per prompt; the calls come in side by side."""
+
+    def __init__(self, answers: dict[str, object]):
+        self.answers = answers
+        self.calls: list[tuple[str, dict]] = []
+        self.lock = threading.Lock()
+
+    def call(self, tool: str, arguments: dict) -> dict:
+        with self.lock:
+            self.calls.append((tool, arguments))
+        answer = self.answers[arguments["prompt"]]
+        if isinstance(answer, Exception):
+            raise answer
+        return answer
+
+
+def test_openrouter_draws_every_prompt_at_once_and_shrugs_off_a_failed_one():
+    png = base64.b64encode(b"PNG-a").decode()
+    mcp = FakeMcp({
+        "a": {"content": [{"type": "text", "text": "here"}, {"type": "image", "data": png, "mimeType": "image/png"}]},
+        "b": McpError("generate-image: over budget"),
+        "c": {"content": [{"type": "text", "text": "nothing"}]},
+    })
+    pictures = OpenRouterPainter(mcp, "google/gemini-3-pro-image").paint(["a", "b", "c"])
+
+    assert pictures == [b"PNG-a", None, None]
+    assert sorted(c[1]["prompt"] for c in mcp.calls) == ["a", "b", "c"]
+    assert mcp.calls[0] == ("generate-image", {"prompt": mcp.calls[0][1]["prompt"], "model": "google/gemini-3-pro-image"})

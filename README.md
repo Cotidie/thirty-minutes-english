@@ -45,21 +45,12 @@ docker compose up -d --build
 | `TOPICS_EFFORT` | `medium` | 그 호출의 reasoning effort |
 | `EXAMPLE_MODEL` | `opus` | Your turn / Practice 피드백을 쓰는 `claude` 모델 |
 | `EXAMPLE_EFFORT` | `low` | 그 호출의 reasoning effort |
-| `IMAGE_PROVIDER` | `comfy` | Vocabulary 그림을 그리는 MCP: `comfy`(comfy-cloud) · `openrouter` · `off` |
-| `IMAGE_MODEL` | 비움 | 이미지 모델. 비우면 provider 기본값(Nano Banana Pro). 설정 모달 메뉴에 GPT-Image 2.5, Nano Banana 2 등이 있다 |
+| `OPENROUTER_API_KEY` | 비움 | Vocabulary 그림. OpenRouter MCP 서버의 bearer 토큰으로 쓴다. 비어 있으면 그림 없이 생성 |
+| `IMAGE_MODEL` | `google/gemini-3-pro-image` | 이미지 모델(OpenRouter id). 설정 모달 메뉴에 GPT-Image 2.5, Nano Banana 2 등이 있다 |
 
 ## Vocabulary 그림
 
-세션 생성 마지막 단계(`illustrating`, 진행 바의 "Drawing a picture for each word")에서 단어마다 그 단어가 어울리는 상황을 그린 그림을 한 장씩 만든다. 장면 문장(`scene`)은 세션 생성 프롬프트가 단어와 함께 쓴다(글자가 들어갈 필요 없는 구체적인 상황). `backend/app/illustrator.py`가 그 장면들을 painter(`backend/app/painters.py`)에 넘기고, painter는 호스트가 로그인해 둔 MCP 서버를 `backend/app/mcp_client.py`로 직접 호출한다(JSON-RPC over HTTP, 토큰은 컨테이너가 복사한 `~/.claude/.credentials.json`의 `mcpOAuth`). `claude` 실행은 없다.
-
-| provider | MCP | 호출 | 기본 모델 |
-|---|---|---|---|
-| `comfy` | `https://cloud.comfy.org/mcp` | `submit_batch`(한 배치, `confirm: true`) → `wait_for_batch` → `get_batch_output`의 서명 URL을 내려받음 | `vertexai/nano-banana-pro` |
-| `openrouter` | `https://mcp.openrouter.ai/mcp` | 단어마다 `generate-image`, 응답의 inline image 블록(base64) | `google/gemini-3-pro-image` |
-
-OpenAI 모델은 OpenRouter 표기(`openai/gpt-image-2.5-flare`)로 적으면 comfy에서도 통한다(`openai/images-generations` + `params.model`로 바꿔 보낸다). 그림은 `backend/data/images/{job}-{n}.png`에 두고 `/api/images/`로 서빙하며, 세션 content의 각 단어에 `scene`과 `image`가 붙는다. 그림 하나가 실패하면 그 단어만 그림 없이, 전체가 실패하면 경고만 남기고 세션은 그림 없이 저장된다.
-
-로그인은 호스트에서 한 번: `claude mcp add --transport http comfy-cloud https://cloud.comfy.org/mcp` 또는 `claude mcp add --transport http openrouter https://mcp.openrouter.ai/mcp` 뒤 `claude mcp login <이름>`. 컨테이너는 시작할 때 자격증명을 복사하므로 로그인 뒤 `docker compose restart backend`. comfy-cloud 구독은 곧 끝나므로 그 뒤에는 `IMAGE_PROVIDER=openrouter`로 바꾼다. OpenRouter의 MCP 로그인은 7일짜리 키(기본 $10 한도)를 발급하므로 만료되면 다시 `claude mcp login openrouter`. 비용은 각 대시보드에서 확인한다.
+세션 생성 마지막 단계(`illustrating`, 진행 바의 "Drawing a picture for each word")에서 단어마다 그 단어가 어울리는 상황을 그린 그림을 한 장씩 만든다. 장면 문장(`scene`)은 세션 생성 프롬프트가 단어와 함께 쓴다(글자가 들어갈 필요 없는 구체적인 상황). `backend/app/illustrator.py`가 그 장면들을 OpenRouter의 MCP 서버(`https://mcp.openrouter.ai/mcp`)에 `generate-image`로 열 개 동시에 보내고, 응답의 inline image 블록(base64)을 `backend/data/images/{job}-{n}.png`로 두고 `/api/images/`로 서빙한다. MCP 호출은 `backend/app/mcp_client.py`(JSON-RPC over HTTP)가 하고, 인증은 OAuth 로그인 대신 `OPENROUTER_API_KEY`를 bearer 토큰으로 보낸다(OAuth 로그인은 7일마다 만료되므로). `claude` 실행은 없다. 세션 content의 각 단어에 `scene`과 `image`가 붙는다. 그림 하나가 실패하면 그 단어만 그림 없이, 전체가 실패하면 경고만 남기고 세션은 그림 없이 저장된다. 설정 모달의 `Test`가 키를 OpenRouter의 `/api/v1/key`로 확인한다. 비용은 OpenRouter 대시보드에서 확인한다(Nano Banana Pro 기준 장당 $0.1~0.2).
 
 ## Article 한국어 번역
 
