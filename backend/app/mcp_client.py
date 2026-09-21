@@ -69,6 +69,7 @@ class McpClient:
             "Accept": "application/json, text/event-stream",
             "Content-Type": "application/json",
             "MCP-Protocol-Version": PROTOCOL,
+            "User-Agent": "english-speaking-claude/1",  # Cloudflare turns the urllib default away
         }
         if self._session:
             headers["Mcp-Session-Id"] = self._session
