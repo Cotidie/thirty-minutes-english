@@ -76,7 +76,7 @@ def test_fetch_retries_a_flaky_link(monkeypatch):
 
     def urlopen(url, timeout):
         calls.append(url)
-        if len(calls) < 3:
+        if calls.count(url) < 3:
             raise OSError("wrong version number")
         return Response()
 
