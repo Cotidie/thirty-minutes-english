@@ -51,9 +51,9 @@ docker compose up -d --build
 | `IMAGE_MODEL` | 비움 | 이미지 모델. 비우면 provider 기본값(Nano Banana Pro). 설정 모달 메뉴에 GPT-Image 2.5, Nano Banana 2 등이 있다 |
 | `IMAGE_STYLE` | `photo` | 그림 스타일: `photo`(사진, 묘사할 거리가 가장 많다) · `cinematic` · `storybook` · `comic` · `sketch` · `flat`. 프롬프트는 `illustrator.STYLES` |
 
-## Vocabulary 한국어 칩
+## 한국어 칩
 
-단어마다 세션 생성 프롬프트가 `korean`(그 뜻의 한국어 한두 단어)을 함께 쓴다. 카드의 단어 행 오른쪽에 점선 빈 칩이 있고, 누르면 노란 바탕에 한국어가 뒤집혀 나오며 다시 누르면 숨는다. 칩을 눌러도 뜻은 열리지 않는다(카드는 div, 뜻 줄이 버튼). `korean`이 없는 예전 세션은 칩이 없다. 17번 세션에는 손으로 채워 넣었다.
+표현과 단어마다 세션 생성 프롬프트가 `korean`(표현은 자연스러운 한국어 표현, 단어는 그 뜻의 한두 단어)을 함께 쓴다. 표현의 제목 행과 단어 카드의 단어 행 오른쪽에 점선 빈 칩(`components/KoreanChip.tsx`)이 있고, 누르면 노란 바탕에 한국어가 뒤집혀 나오며 다시 누르면 숨는다. 칩을 눌러도 뜻은 열리지 않는다(카드는 div, 뜻 줄이 버튼). `korean`이 없는 예전 세션은 칩이 없다. 17번 세션에는 손으로 채워 넣었다.
 
 ## Vocabulary 그림
 

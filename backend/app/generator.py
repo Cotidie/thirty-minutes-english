@@ -39,12 +39,13 @@ SESSION_SCHEMA: dict = {
             "items": {
                 "type": "object",
                 "additionalProperties": False,
-                "required": ["phrase", "meaning", "usage_note", "examples"],
+                "required": ["phrase", "meaning", "usage_note", "examples", "korean"],
                 "properties": {
                     "phrase": {"type": "string"},
                     "meaning": {"type": "string"},
                     "usage_note": {"type": "string"},
                     "examples": {"type": "array", "minItems": 2, "maxItems": 2, "items": {"type": "string"}},
+                    "korean": {"type": "string"},
                 },
             },
         },
@@ -128,7 +129,8 @@ Target CEFR B2 to C1+: common enough that a native speaker uses them weekly, yet
 would not produce on their own. Avoid topic-specific jargon, dated idioms, and slang that ages fast. \
 The expressions need not relate to the article topic. Mix registers (casual, workplace, discussion). \
 For each give the phrase, a plain-English meaning, a usage note of at most 20 words (register and the \
-one thing learners get wrong; no full sentences needed), and 2 example sentences that sound like real speech.
+one thing learners get wrong; no full sentences needed), 2 example sentences that sound like real speech, \
+and korean: the natural Korean equivalent of the expression, a short phrase, no explanation.
 
 2. article: a short article of 250 to 350 words on the topic, written for a smart general reader. \
 Run at most 3 searches, with firecrawl_search when it is offered and WebSearch when it is missing or \

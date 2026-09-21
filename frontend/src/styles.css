@@ -559,8 +559,23 @@ a {
 .expression-head {
   display: flex;
   align-items: flex-start;
-  justify-content: space-between;
   gap: 1rem;
+}
+
+.expression-head .expression-phrase {
+  flex: 1;
+}
+
+.expression-head .korean-chip {
+  margin-top: 0.35rem;
+}
+
+.expression-head .star {
+  margin-left: auto;
+}
+
+.expression-head .korean-chip + .star {
+  margin-left: 0;
 }
 
 .star {
@@ -1153,8 +1168,8 @@ button.question.is-active {
   line-height: 1.1;
 }
 
-/* The Korean word waits at the right of the word row as a blank pill; a tap turns it over. */
-.vocab-korean {
+/* The Korean waits at the right of the word or phrase row as a blank pill; a tap turns it over. */
+.korean-chip {
   margin-left: auto;
   align-self: center;
   display: inline-flex;
@@ -1174,12 +1189,12 @@ button.question.is-active {
   transition: background 0.15s, border-color 0.15s, color 0.15s;
 }
 
-.vocab-korean:hover {
+.korean-chip:hover {
   border-color: var(--muted);
   color: var(--muted);
 }
 
-.vocab-korean.is-shown {
+.korean-chip.is-shown {
   border: 1px solid transparent;
   background: var(--marker-soft);
   color: var(--ink);

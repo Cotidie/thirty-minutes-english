@@ -31,6 +31,8 @@ class Expression(BaseModel):
     meaning: str
     usage_note: str
     examples: list[str]
+    """The Korean equivalent, hidden behind a chip until tapped."""
+    korean: str | None = None
 
 
 class Question(BaseModel):

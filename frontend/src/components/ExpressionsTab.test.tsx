@@ -19,6 +19,14 @@ const items = [
 ]
 
 describe('ExpressionsTab', () => {
+  it('keeps the Korean behind a chip beside the phrase until tapped', async () => {
+    const withKorean = [{ ...items[0], korean: '일부러 반대 입장을 취하다' }, ...items.slice(1)]
+    render(<ExpressionsTab items={withKorean} sessionId={1} starred={[]} onToggleStar={vi.fn()} examples={[]} onExample={vi.fn()} />)
+    expect(screen.queryByText('일부러 반대 입장을 취하다')).not.toBeInTheDocument()
+    await userEvent.click(screen.getByRole('button', { name: `Korean for ${items[0].phrase}` }))
+    expect(screen.getByRole('button', { name: `Hide the Korean for ${items[0].phrase}` })).toHaveTextContent('일부러 반대 입장을 취하다')
+  })
+
   it('clamps the usage note until it is clicked', async () => {
     render(<ExpressionsTab items={items} sessionId={3} starred={[]} onToggleStar={vi.fn()} examples={none} onExample={vi.fn()} />)
     const note = screen.getByRole('button', { name: /Neutral to workplace register/ })

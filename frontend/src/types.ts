@@ -3,6 +3,8 @@ export interface Expression {
   meaning: string
   usage_note: string
   examples: string[]
+  /** The Korean equivalent, hidden behind a chip until tapped. */
+  korean?: string | null
 }
 
 export interface Question {

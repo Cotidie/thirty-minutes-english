@@ -3,6 +3,7 @@ import { api } from '../api'
 import { practiceWord, type Example, type PictureStyles, type VocabularyItem } from '../types'
 import { Practice } from './Practice'
 import { StarButton } from './StarButton'
+import { KoreanChip } from './KoreanChip'
 
 /** A redraw is one request (new scene, then the picture), so there is no true progress:
  * the ring creeps toward a typical wait and holds short of full. */
@@ -34,7 +35,6 @@ function Drawing({ seconds }: { seconds: number }) {
 
 function VocabCard({ item, drawing }: { item: VocabularyItem; drawing: boolean }) {
   const [revealed, setRevealed] = useState(false)
-  const [korean, setKorean] = useState(false)
   const seconds = useElapsed(drawing)
   return (
     <div className={`vocab-card${revealed ? ' is-revealed' : ''}`} onClick={() => setRevealed((r) => !r)}>
@@ -46,21 +46,7 @@ function VocabCard({ item, drawing }: { item: VocabularyItem; drawing: boolean }
       )}
       <span className="vocab-word">
         <span className="vocab-word-text">{item.word}</span> <em className="vocab-pos">{item.pos}</em>
-        {item.korean && (
-          <button
-            type="button"
-            className={`vocab-korean${korean ? ' is-shown' : ''}`}
-            aria-pressed={korean}
-            aria-label={korean ? `Hide the Korean for ${item.word}` : `Korean for ${item.word}`}
-            title={korean ? 'Hide' : 'Korean'}
-            onClick={(e) => {
-              e.stopPropagation()
-              setKorean((k) => !k)
-            }}
-          >
-            {korean ? item.korean : '한'}
-          </button>
-        )}
+        {item.korean && <KoreanChip korean={item.korean} of={item.word} />}
       </span>
       <span className="vocab-example">{item.example}</span>
       <button

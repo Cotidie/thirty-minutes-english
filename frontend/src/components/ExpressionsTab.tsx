@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { practiceExpression, type Example, type Expression } from '../types'
 import { Practice } from './Practice'
 import { StarButton } from './StarButton'
+import { KoreanChip } from './KoreanChip'
 
 interface Props {
   items: Expression[]
@@ -25,6 +26,7 @@ export function ExpressionsTab({ items, sessionId, starred, onToggleStar, exampl
           <li key={item.phrase} className="expression">
             <div className="expression-head">
               <h3 className="expression-phrase">{item.phrase}</h3>
+              {item.korean && <KoreanChip korean={item.korean} of={item.phrase} />}
               <StarButton
                 label={item.phrase}
                 on={starred.includes(item.phrase)}
