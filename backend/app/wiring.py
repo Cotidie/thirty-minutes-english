@@ -10,7 +10,7 @@ from app.cards import Extractor, PhraseCardExtractor
 from app.daily_topics import ClaudeTopicSource, TopicSource
 from app.example_feedback import TEMPLATES, ExampleCoach
 from app.generator import ClaudeCliGenerator, Generator
-from app.illustrator import Illustrator, painter_for
+from app.illustrator import Illustrator, SceneWriter, painter_for
 from app.live import AgentDefinition, GeminiVoice, LiveAgent, OpenAIVoice, VoiceProvider
 from app.phrasing import PhrasingMarker
 from app.settings import Settings
@@ -28,6 +28,7 @@ class Services:
     extractor: Extractor | None = None
     example_coach: ExampleCoach | None = None
     illustrator: Illustrator | None = None
+    scene_writer: SceneWriter | None = None
     phrasing: PhrasingMarker | None = None
     assessor: AzureAssessor | None = None
     voice_key_name: str = "OPENAI_API_KEY"
@@ -51,6 +52,7 @@ def build_services(settings: Settings, agent_dirs: dict[str, Path], image_dir: P
         extractor=_extractor(openai_key, agent_dirs["phrase"], "cards.schema.json", settings, PhraseCardExtractor),
         example_coach=_example_coach(settings, agent_dirs["example"]),
         illustrator=_illustrator(settings, image_dir),
+        scene_writer=SceneWriter.with_cli(settings.get("EXAMPLE_MODEL")),
         phrasing=_phrasing(settings, agent_dirs["read-aloud"]),
         assessor=_assessor(settings),
         voice_key_name=settings.voice_api_key_name,

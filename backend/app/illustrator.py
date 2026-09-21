@@ -7,12 +7,14 @@ import base64
 import logging
 import time
 import urllib.request
+import uuid
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from typing import Protocol
 
+from app.claude_cli import ClaudeCli, GenerationError, structured_output
 from app.mcp_client import McpClient, McpError, payload
-from app.models import SessionContent
+from app.models import SessionContent, VocabularyItem
 
 log = logging.getLogger(__name__)
 
@@ -142,14 +144,56 @@ def fetch_url(url: str, attempts: int = 3) -> bytes:
     raise AssertionError("unreachable")
 
 
+SCENE_SCHEMA: dict = {"type": "object", "additionalProperties": False, "required": ["scene"], "properties": {"scene": {"type": "string"}}}
+
+SCENE_PROMPT = """A learner will be shown a picture and asked to describe it in one sentence using this word:
+
+Word: {word} ({pos})
+Meaning: {definition}
+Example: {example}
+
+Write a new scene for the picture: one sentence naming a concrete, drawable situation, place, or object \
+where a fluent speaker would reach for this word, so that the word is the natural way to describe what \
+is shown. Physical and specific, never abstract, and nothing that needs written words in the picture. \
+It must differ clearly from this earlier scene, which the learner has already seen: {previous}
+
+Return only the structured output."""
+
+
+class Runner(Protocol):
+    def run(self, prompt: str, schema: dict, on_event=None) -> dict: ...
+
+
+class SceneWriter:
+    """A fresh scene for one word, from a short text run of the claude CLI."""
+
+    def __init__(self, cli: Runner) -> None:
+        self._cli = cli
+
+    @classmethod
+    def with_cli(cls, model: str) -> "SceneWriter":
+        return cls(ClaudeCli(model=model, effort="low", tools=(), mcp=None, timeout_s=60))
+
+    def build_prompt(self, item: VocabularyItem) -> str:
+        return SCENE_PROMPT.format(word=item.word, pos=item.pos, definition=item.definition, example=item.example, previous=item.scene or "none")
+
+    def write(self, item: VocabularyItem) -> str:
+        """Raises GenerationError when the run fails or comes back blank."""
+        scene = str(structured_output(self._cli.run(self.build_prompt(item), SCENE_SCHEMA)).get("scene", "")).strip()
+        if not scene:
+            raise GenerationError("the model wrote no scene")
+        return scene
+
+
 class Illustrator:
     def __init__(self, painter: Painter, image_dir: Path, style: str = "photo") -> None:
         self._painter = painter
         self._dir = image_dir
         self._style = STYLES.get(style, STYLES["photo"])
 
-    def prompt(self, scene: str) -> str:
-        return f"{self._style} {NO_TEXT} {scene}"
+    def prompt(self, scene: str, style: str = "") -> str:
+        """`style` is a STYLES key to draw this one in; blank means the configured style."""
+        return f"{STYLES.get(style, self._style)} {NO_TEXT} {scene}"
 
     def illustrate(self, job_id: str, content: SessionContent) -> SessionContent:
         """The content with a picture on every word whose scene got drawn. A word
@@ -166,3 +210,16 @@ class Illustrator:
             (self._dir / name).write_bytes(png)
             vocabulary[i] = item.model_copy(update={"image": name})
         return content.model_copy(update={"vocabulary": vocabulary})
+
+    def redraw(self, session_id: int, index: int, item: VocabularyItem, scene: str, style: str = "") -> VocabularyItem:
+        """The item with `scene` drawn in `style` under a new file name; the old picture file is
+        dropped. Raises GenerationError when no picture came back."""
+        [png] = self._painter.paint([self.prompt(scene, style)])
+        if png is None:
+            raise GenerationError("no picture came back")
+        self._dir.mkdir(parents=True, exist_ok=True)
+        name = f"{session_id}-{index}-{uuid.uuid4().hex[:8]}.png"
+        (self._dir / name).write_bytes(png)
+        if item.image:
+            (self._dir / item.image).unlink(missing_ok=True)
+        return item.model_copy(update={"scene": scene, "image": name})

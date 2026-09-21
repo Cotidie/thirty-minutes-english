@@ -60,7 +60,7 @@ docker compose up -d --build
 | `openrouter` | `https://mcp.openrouter.ai/mcp` | 단어마다 `generate-image`를 열 개 동시에, 응답의 inline image 블록(base64) | `google/gemini-3-pro-image` |
 | `comfy` | `https://cloud.comfy.org/mcp` | `submit_batch`(한 배치, `confirm: true`; comfy가 열 장을 동시에 그린다) → `wait_for_batch` → `get_batch_output`의 서명 URL을 열 개 동시에 내려받음 | `vertexai/nano-banana-pro` |
 
-OpenAI 모델은 OpenRouter 표기(`openai/gpt-image-2.5-flare`)로 적으면 comfy에서도 통한다(`openai/images-generations` + `params.model`로 바꿔 보낸다). 그림은 `backend/data/images/{job}-{n}.png`에 두고 `/api/images/`로 서빙하며, 세션 content의 각 단어에 `scene`과 `image`가 붙는다. 그림 하나가 실패하면 그 단어만 그림 없이, 전체가 실패하면 경고만 남기고 세션은 그림 없이 저장된다. 설정 모달의 `Test`가 키를 확인한다(OpenRouter는 `/api/v1/key`, comfy는 MCP initialize). comfy-cloud 구독이 끝나면 `IMAGE_PROVIDER`를 `openrouter`로 둔다. 비용은 각 대시보드에서 확인한다(Nano Banana Pro 기준 장당 $0.1~0.2).
+OpenAI 모델은 OpenRouter 표기(`openai/gpt-image-2.5-flare`)로 적으면 comfy에서도 통한다(`openai/images-generations` + `params.model`로 바꿔 보낸다). 그림은 `backend/data/images/{job}-{n}.png`에 두고 `/api/images/`로 서빙하며, 세션 content의 각 단어에 `scene`과 `image`가 붙는다. 그림 하나가 실패하면 그 단어만 그림 없이, 전체가 실패하면 경고만 남기고 세션은 그림 없이 저장된다. 카드의 그림 왼쪽 위 `↻`를 누르면 스타일 메뉴가 열리고, 고르면 `POST /api/sessions/{id}/pictures/{index}`(`{style}`)가 텍스트 모델(`EXAMPLE_MODEL`, `illustrator.SceneWriter`)에 이전 장면과 다른 새 장면을 쓰게 한 뒤 그 스타일로 다시 그려 세션 content에 저장한다(새 파일명, 옛 파일 삭제). 별표와 `↻`는 그림 모서리 위에 반투명 원으로 얹혀 있다. 설정 모달의 `Test`가 키를 확인한다(OpenRouter는 `/api/v1/key`, comfy는 MCP initialize). comfy-cloud 구독이 끝나면 `IMAGE_PROVIDER`를 `openrouter`로 둔다. 비용은 각 대시보드에서 확인한다(Nano Banana Pro 기준 장당 $0.1~0.2).
 
 ## Article 한국어 번역
 

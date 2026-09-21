@@ -6,7 +6,8 @@ import json
 import pytest
 
 import app.illustrator as mod
-from app.illustrator import NO_TEXT, STYLES, ComfyPainter, Illustrator, OpenRouterPainter, fetch_url, painter_for
+from app.claude_cli import GenerationError
+from app.illustrator import NO_TEXT, STYLES, ComfyPainter, Illustrator, OpenRouterPainter, SceneWriter, fetch_url, painter_for
 from app.mcp_client import McpError
 from tests.conftest import sample_content
 
@@ -171,3 +172,39 @@ def test_fetch_retries_a_flaky_link(monkeypatch):
     assert calls == ["https://img/1"] * 3
     with pytest.raises(OSError):
         fetch_url("https://img/2", attempts=2)
+
+
+def test_redraw_draws_the_new_scene_in_the_asked_style_under_a_new_name_and_drops_the_old_file(tmp_path):
+    content = sample_content()
+    old = content.vocabulary[2].model_copy(update={"image": "old.png"})
+    (tmp_path / "old.png").write_bytes(b"OLD")
+    painter = FakePainter()
+    drawn = Illustrator(painter, tmp_path, "photo").redraw(7, 2, old, "a fresh scene", "comic")
+
+    assert painter.prompts == [f"{STYLES['comic']} {NO_TEXT} a fresh scene"]
+    assert drawn.scene == "a fresh scene"
+    assert drawn.image.startswith("7-2-") and drawn.image.endswith(".png")
+    assert (tmp_path / drawn.image).read_bytes() == b"PNG0"
+    assert not (tmp_path / "old.png").exists()
+
+    with pytest.raises(GenerationError):
+        Illustrator(FakePainter(blank={0}), tmp_path).redraw(7, 2, drawn, "another", "")
+
+
+class FakeCli:
+    def __init__(self, scene: str):
+        self.scene = scene
+        self.prompt = ""
+
+    def run(self, prompt: str, schema: dict, on_event=None) -> dict:
+        self.prompt = prompt
+        return {"structured_output": {"scene": self.scene}}
+
+
+def test_scene_writer_names_the_word_and_the_scene_to_avoid():
+    item = sample_content().vocabulary[0].model_copy(update={"scene": "the old scene"})
+    cli = FakeCli("  a new scene ")
+    assert SceneWriter(cli).write(item) == "a new scene"
+    assert "Word: word0 (noun)" in cli.prompt and "the old scene" in cli.prompt
+    with pytest.raises(GenerationError):
+        SceneWriter(FakeCli("")).write(item)

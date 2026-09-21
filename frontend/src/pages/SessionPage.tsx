@@ -90,6 +90,11 @@ export function SessionPage() {
           <VocabularyTab
             items={content.vocabulary}
             sessionId={session.id}
+            onPicture={(index, item) =>
+              setSession((s) =>
+                s && { ...s, content: { ...s.content, vocabulary: s.content.vocabulary.map((v, i) => (i === index ? item : v)) } },
+              )
+            }
             starred={stars.words}
             onToggleStar={(word) => toggle('words', word)}
             examples={examples}

@@ -8,6 +8,7 @@ import type {
   ExampleFeedback,
   KeyTestResult,
   LiveSession,
+  PictureStyles,
   PracticeTarget,
   Reading,
   Session,
@@ -16,6 +17,7 @@ import type {
   SettingsView,
   Stars,
   TopicListing,
+  VocabularyItem,
   VoiceProvider,
 } from './types'
 
@@ -41,6 +43,15 @@ export const api = {
   /** Generations still running on the server, oldest first. */
   listJobs: () => request<JobStatus[]>('/api/jobs'),
   deleteSession: (id: number) => request<void>(`/api/sessions/${id}`, { method: 'DELETE' }),
+  /** A fresh scene for one word, drawn in `style` (blank: the configured one) and saved; the item as it now is. */
+  redrawPicture: (sessionId: number, index: number, style = '') =>
+    request<VocabularyItem>(`/api/sessions/${sessionId}/pictures/${index}`, { method: 'POST', body: JSON.stringify({ style }) }),
+  /** The picture styles on offer and the configured one, from the IMAGE_STYLE setting. */
+  pictureStyles: async (): Promise<PictureStyles> => {
+    const { fields } = await request<SettingsView>('/api/settings')
+    const f = fields.find((x) => x.key === 'IMAGE_STYLE')
+    return { current: f?.value || f?.default || '', choices: f?.choices ?? [], labels: f?.labels ?? {} }
+  },
   getStars: (id: number) => request<Stars>(`/api/sessions/${id}/stars`),
   setStars: (id: number, stars: Stars) =>
     request<Stars>(`/api/sessions/${id}/stars`, { method: 'PUT', body: JSON.stringify(stars) }),

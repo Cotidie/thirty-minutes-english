@@ -110,6 +110,10 @@ class SessionStore:
         assert session_id is not None
         return Session(id=session_id, created_at=created_at, topic=content.topic, content=content)
 
+    def update_content(self, session_id: int, content: SessionContent) -> None:
+        with self._connect() as conn:
+            conn.execute("UPDATE sessions SET content_json = ? WHERE id = ?", (content.model_dump_json(), session_id))
+
     def list_all(self) -> list[SessionSummary]:
         with self._connect() as conn:
             rows = conn.execute(

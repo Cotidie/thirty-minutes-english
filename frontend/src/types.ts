@@ -116,6 +116,13 @@ export interface SettingField {
   labels: Record<string, string>
 }
 
+/** What the redraw menu shows: style keys with their labels, and the one Settings holds. */
+export interface PictureStyles {
+  current: string
+  choices: string[]
+  labels: Record<string, string>
+}
+
 export interface SettingsView {
   fields: SettingField[]
 }

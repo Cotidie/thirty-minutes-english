@@ -14,6 +14,8 @@ from app.jobs import Executor, Job, JobRunner
 from app.keycheck import check_key
 from app.live import LiveAgent, LiveSessionError
 from app.models import (
+    RedrawRequest,
+    VocabularyItem,
     Ask,
     AskRequest,
     AssessorSession,
@@ -195,6 +197,26 @@ def create_app(
         if not request.app.state.store.delete(session_id):
             raise HTTPException(status_code=404, detail="session not found")
         return Response(status_code=204)
+
+    @app.post("/api/sessions/{session_id}/pictures/{index}", response_model=VocabularyItem)
+    def redraw_picture(session_id: int, index: int, body: RedrawRequest, request: Request) -> VocabularyItem:
+        """A fresh scene for one word, drawn and saved in place of the old picture."""
+        store: SessionStore = request.app.state.store
+        services: Services = request.app.state.services
+        session = store.get(session_id)
+        if session is None or not 0 <= index < len(session.content.vocabulary):
+            raise HTTPException(status_code=404, detail="no such word")
+        if services.illustrator is None or services.scene_writer is None:
+            raise HTTPException(status_code=503, detail="pictures are off: set IMAGE_PROVIDER and its key in Settings")
+        item = session.content.vocabulary[index]
+        try:
+            drawn = services.illustrator.redraw(session_id, index, item, services.scene_writer.write(item), body.style)
+        except GenerationError as e:
+            raise HTTPException(status_code=502, detail=f"could not redraw: {e}") from e
+        vocabulary = list(session.content.vocabulary)
+        vocabulary[index] = drawn
+        store.update_content(session_id, session.content.model_copy(update={"vocabulary": vocabulary}))
+        return drawn
 
     @app.get("/api/sessions/{session_id}/stars", response_model=Stars)
     def get_stars(session_id: int, request: Request) -> Stars:

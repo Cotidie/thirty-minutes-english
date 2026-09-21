@@ -150,6 +150,41 @@ def test_a_session_still_goes_out_when_the_pictures_fail(tmp_path):
     assert session["content"]["vocabulary"][0]["image"] is None
 
 
+class FakeSceneWriter:
+    def write(self, item):
+        return f"another scene for {item.word}"
+
+
+class RedrawingIllustrator(FakeIllustrator):
+    def __init__(self):
+        super().__init__()
+        self.styles: list[str] = []
+
+    def redraw(self, session_id, index, item, scene, style=""):
+        self.styles.append(style)
+        return item.model_copy(update={"scene": scene, "image": f"{session_id}-{index}-new.png"})
+
+
+def test_a_word_can_be_redrawn_in_a_chosen_style_and_the_session_keeps_it(tmp_path):
+    illustrator = RedrawingIllustrator()
+    services = Services(FakeGenerator(), illustrator=illustrator, scene_writer=FakeSceneWriter())
+    app = create_app(SessionStore(tmp_path / "s.db"), services, InlineExecutor())
+    with TestClient(app) as c:
+        sid = c.post("/api/sessions", json={"topic": "X"}).json()["session_id"]
+        res = c.post(f"/api/sessions/{sid}/pictures/1", json={"style": "comic"})
+        assert res.status_code == 200
+        assert res.json()["scene"] == "another scene for word1"
+        assert res.json()["image"] == f"{sid}-1-new.png"
+        assert c.get(f"/api/sessions/{sid}").json()["content"]["vocabulary"][1]["image"] == f"{sid}-1-new.png"
+        assert c.post(f"/api/sessions/{sid}/pictures/99", json={}).status_code == 404
+    assert illustrator.styles == ["comic"]
+
+
+def test_redraw_is_503_while_pictures_are_off(client):
+    sid = create(client, "X")["session_id"]
+    assert client.post(f"/api/sessions/{sid}/pictures/0", json={}).status_code == 503
+
+
 def test_second_generation_receives_items_from_the_first(client):
     create(client, "A")
     create(client, "B")

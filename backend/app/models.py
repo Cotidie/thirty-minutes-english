@@ -241,6 +241,12 @@ class PhrasingRequest(BaseModel):
     _check = field_validator("paragraph")(_not_blank)
 
 
+class RedrawRequest(BaseModel):
+    """Which style to draw this one picture in; blank means the configured IMAGE_STYLE."""
+
+    style: str = ""
+
+
 class Phrasing(BaseModel):
     """Indices of the words a fluent reader starts a new thought group on."""
 
