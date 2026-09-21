@@ -320,7 +320,7 @@ class SettingsUpdate(BaseModel):
 class KeyTestRequest(BaseModel):
     """Which key to try. `value` is what is typed in the modal; blank means the saved key."""
 
-    key: Literal["OPENAI_API_KEY", "GEMINI_API_KEY", "AZURE_SPEECH_KEY", "OPENROUTER_API_KEY"]
+    key: Literal["OPENAI_API_KEY", "GEMINI_API_KEY", "AZURE_SPEECH_KEY", "OPENROUTER_API_KEY", "COMFY_API_KEY"]
     value: str = ""
 
 

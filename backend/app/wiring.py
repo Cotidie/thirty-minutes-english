@@ -10,7 +10,7 @@ from app.cards import Extractor, PhraseCardExtractor
 from app.daily_topics import ClaudeTopicSource, TopicSource
 from app.example_feedback import TEMPLATES, ExampleCoach
 from app.generator import ClaudeCliGenerator, Generator
-from app.illustrator import Illustrator, OpenRouterPainter
+from app.illustrator import Illustrator, painter_for
 from app.live import AgentDefinition, GeminiVoice, LiveAgent, OpenAIVoice, VoiceProvider
 from app.phrasing import PhrasingMarker
 from app.settings import Settings
@@ -118,8 +118,11 @@ def _example_coach(settings: Settings, agent_dir: Path) -> ExampleCoach | None:
 
 
 def _illustrator(settings: Settings, image_dir: Path | None) -> Illustrator | None:
-    """Pictures for the words, once an OpenRouter key is set and there is a folder for them."""
-    key = settings.get("OPENROUTER_API_KEY")
-    if not key or image_dir is None:
+    """Pictures for the words, once a provider is chosen, its key is set, and there is a folder for them."""
+    if image_dir is None:
         return None
-    return Illustrator(OpenRouterPainter.with_key(key, settings.get("IMAGE_MODEL")), image_dir)
+    keys = {"openrouter": settings.get("OPENROUTER_API_KEY"), "comfy": settings.get("COMFY_API_KEY")}
+    painter = painter_for(settings.get("IMAGE_PROVIDER"), settings.get("IMAGE_MODEL"), keys)
+    if painter is None and settings.get("IMAGE_PROVIDER") != "off":
+        log.warning("pictures are off: no key for IMAGE_PROVIDER=%s", settings.get("IMAGE_PROVIDER"))
+    return Illustrator(painter, image_dir) if painter else None

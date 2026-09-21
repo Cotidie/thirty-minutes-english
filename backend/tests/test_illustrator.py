@@ -1,7 +1,12 @@
 import base64
 import threading
 
-from app.illustrator import STYLE, Illustrator, OpenRouterPainter
+import json
+
+import pytest
+
+import app.illustrator as mod
+from app.illustrator import STYLE, ComfyPainter, Illustrator, OpenRouterPainter, fetch_url, painter_for
 from app.mcp_client import McpError
 from tests.conftest import sample_content
 
@@ -72,3 +77,92 @@ def test_openrouter_draws_every_prompt_at_once_and_shrugs_off_a_failed_one():
     assert pictures == [b"PNG-a", None, None]
     assert sorted(c[1]["prompt"] for c in mcp.calls) == ["a", "b", "c"]
     assert mcp.calls[0] == ("generate-image", {"prompt": mcp.calls[0][1]["prompt"], "model": "google/gemini-3-pro-image"})
+
+
+class FakeComfy:
+    """Answers per tool in order."""
+
+    def __init__(self, results: dict[str, list]):
+        self.results = {tool: list(rs) for tool, rs in results.items()}
+        self.calls: list[tuple[str, dict]] = []
+
+    def call(self, tool: str, arguments: dict) -> dict:
+        self.calls.append((tool, arguments))
+        result = self.results[tool].pop(0)
+        if isinstance(result, Exception):
+            raise result
+        return result
+
+
+def text(data) -> dict:
+    return {"content": [{"type": "text", "text": json.dumps(data)}]}
+
+
+def test_comfy_submits_one_batch_waits_and_fetches_each_job_in_order():
+    mcp = FakeComfy({
+        "submit_batch": [text({"batch_id": "b1", "job_ids": ["j0", "j1", "j2"]})],
+        "wait_for_batch": [text({"timed_out": True}), text({"timed_out": False})],
+        "get_batch_output": [text({"outputs": [{"job_id": "j2", "url": "https://x/2"}, {"job_id": "j0", "url": "https://x/0"}]})],
+    })
+    fetched = []
+    lock = threading.Lock()
+
+    def fetch(url):
+        with lock:
+            fetched.append(url)
+        if url.endswith("/2"):
+            raise OSError("gone")
+        return b"PNG" + url[-1].encode()
+
+    pictures = ComfyPainter(mcp, "vertexai/nano-banana-pro", fetch=fetch).paint(["a", "b", "c"])
+
+    assert pictures == [b"PNG0", None, None]
+    submit = mcp.calls[0][1]
+    assert submit["confirm"] is True
+    assert [i["prompt"] for i in submit["items"]] == ["a", "b", "c"]
+    assert submit["items"][0]["model"] == "vertexai/nano-banana-pro"
+    assert [c[0] for c in mcp.calls] == ["submit_batch", "wait_for_batch", "wait_for_batch", "get_batch_output"]
+    assert sorted(fetched) == ["https://x/0", "https://x/2"]
+
+
+def test_comfy_spells_an_openai_model_as_the_partner_slug_plus_variant_and_survives_a_refused_batch():
+    mcp = FakeComfy({"submit_batch": [McpError("submit_batch: no credits")]})
+    assert ComfyPainter(mcp, "openai/gpt-image-2.5-flare").paint(["a", "b"]) == [None, None]
+    item = mcp.calls[0][1]["items"][0]
+    assert item["model"] == "openai/images-generations"
+    assert item["params"] == {"model": "gpt-image-2.5-flare"}
+
+
+def test_painter_for_picks_the_provider_and_needs_its_key():
+    keys = {"openrouter": "sk-or", "comfy": ""}
+    assert isinstance(painter_for("openrouter", "", keys), OpenRouterPainter)
+    assert painter_for("comfy", "", keys) is None
+    assert isinstance(painter_for("comfy", "", {"comfy": "comfyui-1"}), ComfyPainter)
+    assert painter_for("off", "", keys) is None
+
+
+def test_fetch_retries_a_flaky_link(monkeypatch):
+    calls = []
+
+    class Response:
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *a):
+            return False
+
+        def read(self):
+            return b"PNG"
+
+    def urlopen(url, timeout):
+        calls.append(url)
+        if calls.count(url) < 3:
+            raise OSError("wrong version number")
+        return Response()
+
+    monkeypatch.setattr(mod.urllib.request, "urlopen", urlopen)
+    monkeypatch.setattr(mod.time, "sleep", lambda s: None)
+    assert fetch_url("https://img/1") == b"PNG"
+    assert calls == ["https://img/1"] * 3
+    with pytest.raises(OSError):
+        fetch_url("https://img/2", attempts=2)

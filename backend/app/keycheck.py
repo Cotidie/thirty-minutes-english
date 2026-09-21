@@ -33,11 +33,28 @@ def _openrouter(key: str, region: str) -> urllib.request.Request:
     return urllib.request.Request("https://openrouter.ai/api/v1/key", headers={"Authorization": f"Bearer {key}"})
 
 
+def _comfy(key: str, region: str) -> urllib.request.Request:
+    """comfy-cloud has no REST key endpoint we know of; an MCP initialize answers 401 to a bad key."""
+    body = {"jsonrpc": "2.0", "id": 0, "method": "initialize", "params": {"protocolVersion": "2025-06-18", "capabilities": {}, "clientInfo": {"name": "english-speaking-claude", "version": "1"}}}
+    return urllib.request.Request(
+        "https://cloud.comfy.org/mcp",
+        data=json.dumps(body).encode(),
+        method="POST",
+        headers={
+            "Authorization": f"Bearer {key}",
+            "Content-Type": "application/json",
+            "Accept": "application/json, text/event-stream",
+            "User-Agent": "english-speaking-claude/1",
+        },
+    )
+
+
 CHECKS: dict[str, Callable[[str, str], urllib.request.Request]] = {
     "OPENAI_API_KEY": _openai,
     "GEMINI_API_KEY": _gemini,
     "AZURE_SPEECH_KEY": _azure,
     "OPENROUTER_API_KEY": _openrouter,
+    "COMFY_API_KEY": _comfy,
 }
 
 
