@@ -1831,12 +1831,13 @@ button.question.is-active {
 
 .reading-ipa {
   font-family: var(--serif);
-  color: var(--muted);
+  font-size: 1.02rem;
+  letter-spacing: 0.06em;
 }
 
-.reading-score {
-  color: var(--muted);
-  font-size: 0.82rem;
+.reading-ipa .is-weak {
+  color: #8f3a2a;
+  font-weight: 700;
 }
 
 .reading-card .read-aloud-ok {
@@ -1844,42 +1845,13 @@ button.question.is-active {
   font-size: 0.82rem;
 }
 
-.reading-sounds {
-  display: grid;
-  grid-template-columns: max-content 1fr;
-  gap: 0.15rem 0.7rem;
-  margin: 0.45rem 0 0;
-}
-
-.reading-sounds dt {
-  color: var(--muted);
-  font-size: 0.82rem;
-}
-
-.reading-sounds dd {
-  margin: 0;
-  font-family: var(--serif);
-  font-size: 1.05rem;
-  letter-spacing: 0.25em;
-}
-
-.reading-sounds .is-weak {
-  color: #8f3a2a;
-  font-weight: 700;
-  border-bottom: 2px solid #8f3a2a;
-}
-
-.reading-tips {
-  margin: 0.5rem 0 0;
-  padding-left: 1.1rem;
+.reading-note {
+  margin: 0.3rem 0 0;
   line-height: 1.5;
 }
 
-.reading-tips li + li {
-  margin-top: 0.25rem;
-}
-
-.reading-note {
-  margin: 0.4rem 0 0;
+.reading-tip {
+  margin: 0.2rem 0 0;
+  color: var(--muted);
   line-height: 1.5;
 }

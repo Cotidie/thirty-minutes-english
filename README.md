@@ -77,7 +77,7 @@ Article 탭의 문단마다 `Read aloud` 버튼이 있다. 누르면 마이크�
 | 시점 | 화면 | 코치 |
 |---|---|---|
 | 읽는 동안 | 문단이 단어 단위로 바뀌고, 틀린 단어에 붉은 밑줄, 구 안 멈춤은 두 단어 사이 붉은 `\|` | 꺼져 있음 |
-| 표시 클릭 | 아래에 카드가 바로 뜬다. 발음: 단어 · IPA · 점수, `Target`/`You` 두 줄로 음소마다 목표와 들린 소리(틀린 자리는 붉게), 틀린 소리마다 "æ as in cAt: you said ɪ as in sIt." + 입 모양 설명(`lib/assessor/sounds.ts` 표). 끊어읽기: 멈춘 길이(초)와 한 호흡으로 읽으라는 설명 | 세션 하나를 열어 두 박자 "You said berify. It's verify. Try it."(`Correction:`)만 말하고, 2초 조용하면 끊는다. 코치 마이크는 꺼 둔다 |
+| 표시 클릭 | 아래에 카드가 바로 뜬다. 발음: "You said /dɪzs…/. It's /hɪst…/." (틀린 소리는 붉게) + 가장 나쁜 소리 하나의 입 모양 한 문장("h as in Hat: Breathe out.", `lib/assessor/sounds.ts` 표). 끊어읽기: "You paused between \"July\" and \"1969\". It's \"July 1969\" in one breath." | 세션 하나를 열어 두 박자 "You said berify. It's verify. Try it."(`Correction:`)만 말하고, 2초 조용하면 끊는다. 코치 마이크는 꺼 둔다 |
 | 다시 읽어 맞음 | 표시가 초록 ✓ (Azure가 확인) | |
 | `Done` | 마이크와 Azure를 놓는다. 표시는 남아 그 뒤에도, `Close` 뒤에도 클릭할 수 있다. `Read again`으로 새 라운드 | |
 

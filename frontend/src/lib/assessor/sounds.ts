@@ -52,6 +52,7 @@ const GUIDE: Record<string, SoundGuide> = {
   ŋ: { like: 'siNG', how: 'Back of the tongue up, hum through the nose. No g after it.' },
   l: { like: 'Light', how: 'Tongue tip touches the ridge; air flows around the sides.' },
   r: { like: 'Red', how: 'Tongue curls back and touches nothing. Lips slightly rounded.' },
+  ɹ: { like: 'Red', how: 'Tongue curls back and touches nothing. Lips slightly rounded.' },
   w: { like: 'We', how: 'Lips tight and round, then open.' },
   j: { like: 'Yes', how: 'Tongue high like "ee", then move to the vowel.' },
   ɾ: { like: 'waTer', how: 'Quick tap of the tongue tip. Sounds like a soft d.' },
