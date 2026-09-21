@@ -134,7 +134,7 @@ describe('ReadAloud round', () => {
     expect(screen.getByRole('button', { name: 'Read again' })).toBeInTheDocument()
     await userEvent.click(screen.getByRole('button', { name: 'verified: b for v' }))
     await waitFor(() => expect(connect).toHaveBeenCalled())
-    expect(screen.getByText('You said "b" for "v".')).toBeInTheDocument()
+    expect(screen.getByRole('note', { name: 'verified' })).toHaveTextContent('v as in Van: you said b as in Bat')
   })
 
   it('fails before touching the microphone when the assessor is off', async () => {
@@ -175,7 +175,9 @@ describe('ReadAloud marks', () => {
       await userEvent.click(screen.getByRole('button', { name: 'verified: b for v' }))
       await waitFor(() => expect(connect).toHaveBeenCalledWith('Researchers verified it.', expect.anything()))
       expect(coachTrack.enabled).toBe(false)
-      expect(screen.getByText('You said "b" for "v".')).toBeInTheDocument()
+      const card = screen.getByRole('note', { name: 'verified' })
+      expect(card).toHaveTextContent('41 / 100')
+      expect(card).toHaveTextContent('v as in Van: you said b as in Bat. Top teeth on the lower lip, voice on.')
 
       act(() => emit({ type: 'session.started' }))
       expect(connection.correct).toHaveBeenCalledWith(expect.objectContaining({ word: 'verified', at: 1 }))

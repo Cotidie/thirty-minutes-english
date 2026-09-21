@@ -3,6 +3,7 @@ import { api } from '../api'
 import { startAzureAssessor, type Assessor } from '../lib/assessor/azure'
 import { Judge, type AzureWord } from '../lib/assessor/judge'
 import { connectReadAloud, type LiveConnection } from '../lib/liveClient'
+import { FindingCard } from './FindingCard'
 import { ReadingText, type Shown } from './ReadingText'
 
 interface Props {
@@ -25,16 +26,6 @@ const STATUS_LABEL: Record<Phase, string> = {
   listening: 'Listening. Read the paragraph aloud; click a mark to hear it.',
   done: 'Round over. The marks stay: click one to hear it.',
   failed: 'Could not start.',
-}
-
-/** The two beats the coach says, in text, so the card needs no transcript. */
-function correctionText(f: Shown): string {
-  if (f.kind === 'phrasing') {
-    const [a, b] = f.word.split(' ')
-    return `You paused between "${a}" and "${b}". Put them together.`
-  }
-  const [heard, , right] = f.heard.split(' ')
-  return right ? `You said "${heard}" for "${right}".` : `Heard ${f.heard}.`
 }
 
 /** The coach stays on this long after its last word, then hangs up. */
@@ -60,8 +51,8 @@ interface Call {
 
 /**
  * Read aloud with the assessor as the only listener. Azure marks the paragraph
- * as the reader goes; the coach is dialled only when a mark is clicked, says
- * its two beats, and hangs up.
+ * as the reader goes; a clicked mark opens the full account in text, and the
+ * coach is dialled to say its two beats and hang up.
  */
 export function ReadAloud({ paragraph, breaks = [], sessionId, active, onStart, onEnd }: Props) {
   const [phase, setPhase] = useState<Phase | null>(null)
@@ -229,13 +220,7 @@ export function ReadAloud({ paragraph, breaks = [], sessionId, active, onStart, 
     <div className={`read-aloud${phase === 'listening' ? ' is-live' : ''}${shown ? ' is-shown' : ''}`}>
       <audio ref={audioRef} autoPlay />
       {shown && <ReadingText paragraph={paragraph} findings={findings} breaks={breaks} open={open} onOpen={ask} />}
-      {card && (
-        <p className="reading-card">
-          <b>{card.word}</b>
-          <span className="reading-heard">{correctionText(card)}</span>
-          {card.repeated_ok && <span className="read-aloud-ok">✓</span>}
-        </p>
-      )}
+      {card && <FindingCard finding={card} />}
       {phase === null ? (
         <button type="button" className="read-aloud-start" onClick={start} disabled={active}>
           {shown ? 'Read again' : 'Read aloud'}

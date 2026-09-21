@@ -1810,22 +1810,76 @@ button.question.is-active {
 
 .reading-card {
   margin: 0.5rem 0 0;
-  padding: 0.4rem 0.7rem;
+  padding: 0.5rem 0.8rem 0.6rem;
   border: 1px solid var(--line);
   border-radius: 6px;
   background: var(--paper);
   font-size: 0.9rem;
 }
 
-.reading-card b {
-  margin-right: 0.4rem;
+.reading-card-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.5rem;
+  margin: 0;
 }
 
-.reading-heard {
+.reading-card-head b {
+  font-size: 1rem;
+}
+
+.reading-ipa {
+  font-family: var(--serif);
   color: var(--muted);
 }
 
+.reading-score {
+  color: var(--muted);
+  font-size: 0.82rem;
+}
+
 .reading-card .read-aloud-ok {
-  margin-left: 0.4rem;
   color: #35633c;
+  font-size: 0.82rem;
+}
+
+.reading-sounds {
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  gap: 0.15rem 0.7rem;
+  margin: 0.45rem 0 0;
+}
+
+.reading-sounds dt {
+  color: var(--muted);
+  font-size: 0.82rem;
+}
+
+.reading-sounds dd {
+  margin: 0;
+  font-family: var(--serif);
+  font-size: 1.05rem;
+  letter-spacing: 0.25em;
+}
+
+.reading-sounds .is-weak {
+  color: #8f3a2a;
+  font-weight: 700;
+  border-bottom: 2px solid #8f3a2a;
+}
+
+.reading-tips {
+  margin: 0.5rem 0 0;
+  padding-left: 1.1rem;
+  line-height: 1.5;
+}
+
+.reading-tips li + li {
+  margin-top: 0.25rem;
+}
+
+.reading-note {
+  margin: 0.4rem 0 0;
+  line-height: 1.5;
 }

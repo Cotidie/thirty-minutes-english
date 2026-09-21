@@ -31,12 +31,32 @@ const brokenLong = word('long', 95, {
 describe('findingsIn', () => {
   it('reports a low word score as a pronunciation finding with the heard sound', () => {
     const [f] = findingsIn([word('researchers', 92), berified], T)
-    expect(f).toEqual({ kind: 'pronunciation', word: 'verified', heard: 'b for v', fix: 'vɛr', at: -1 })
+    expect(f).toEqual({
+      kind: 'pronunciation',
+      word: 'verified',
+      heard: 'b for v',
+      fix: 'vɛr',
+      at: -1,
+      score: 41,
+      sounds: [
+        { phoneme: 'v', score: 8, weak: true, heard: 'b' },
+        { phoneme: 'ɛ', score: 90, weak: false },
+        { phoneme: 'r', score: 88, weak: false },
+      ],
+    })
   })
 
-  it('reports an unexpected break before a word as a phrasing finding on the pair', () => {
+  it('calls a weak sound with no better fit unclear', () => {
+    const muffled = word('think', 30, {}, [{ Phoneme: 'θ', PronunciationAssessment: { AccuracyScore: 20 } }])
+    const [f] = findingsIn([muffled], T)
+    expect(f.heard).toBe('θ unclear')
+    expect(f.sounds).toEqual([{ phoneme: 'θ', score: 20, weak: true }])
+    expect(findingsIn([word('think', 30)], T)[0].heard).toBe('unclear')
+  })
+
+  it('reports an unexpected break before a word as a phrasing finding on the pair, with the pause in ms', () => {
     const [f] = findingsIn([word('twice', 90), word('as', 88), brokenLong], T, [0, 1, 2])
-    expect(f).toEqual({ kind: 'phrasing', word: 'as long', heard: 'as / long', fix: 'keep it together', at: 2 })
+    expect(f).toEqual({ kind: 'phrasing', word: 'as long', heard: 'as / long', fix: 'keep it together', at: 2, score: 600, sounds: [] })
   })
 
   it('ignores omissions, insertions, breaks under the threshold, and a break on the first word', () => {
