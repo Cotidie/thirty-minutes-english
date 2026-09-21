@@ -21,6 +21,7 @@ vi.mock('../lib/liveClient', () => ({
 vi.mock('../api', () => ({ api: { addExample: vi.fn(), exampleFeedback: vi.fn() } }))
 
 const target: PracticeTarget = {
+  kind: 'expression',
   text: 'read too much into something',
   meaning: 'to find a meaning that probably is not there',
   note: "takes 'into', not 'in'",

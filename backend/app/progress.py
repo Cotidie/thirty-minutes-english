@@ -11,6 +11,7 @@ class Stage(StrEnum):
     SEARCHING = "searching"
     WRITING = "writing"
     FINALIZING = "finalizing"
+    ILLUSTRATING = "illustrating"  # pictures for the words, after the text is done
 
 
 @dataclass(frozen=True)

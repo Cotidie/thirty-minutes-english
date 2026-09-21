@@ -45,6 +45,14 @@ docker compose up -d --build
 | `TOPICS_EFFORT` | `medium` | 그 호출의 reasoning effort |
 | `EXAMPLE_MODEL` | `opus` | Your turn / Practice 피드백을 쓰는 `claude` 모델 |
 | `EXAMPLE_EFFORT` | `low` | 그 호출의 reasoning effort |
+| `IMAGE_MODEL` | `vertexai/nano-banana-2-lite` | Vocabulary 단어마다 그림 한 장을 그리는 comfy-cloud partner 모델 슬러그. 비우면 그림 없이 생성 |
+| `IMAGES_MODEL` | `sonnet` | 그 그림을 주문하는 `claude` 실행의 모델 |
+
+## Vocabulary 그림
+
+세션 생성 마지막 단계(`illustrating`, 진행 바의 "Drawing a picture for each word")에서 단어마다 그 단어가 어울리는 상황을 그린 그림을 한 장씩 만든다. `backend/app/illustrator.py`가 `claude` CLI(`IMAGES_MODEL`, effort low, 도구는 comfy-cloud MCP의 `submit_batch` · `wait_for_batch` · `get_batch_output`만)를 한 번 돌려 단어별 장면 문장(`scene`)을 쓰게 하고, 그 장면을 `IMAGE_MODEL`로 한 배치에 그리게 한 뒤 URL을 받아 온다. 그림에는 글자가 들어가지 않도록 지시한다(학습자가 단어를 직접 말해야 하므로). backend가 URL을 바로 내려받아 `backend/data/images/{job}-{n}.png`로 두고 `/api/images/`로 서빙하며, 세션 content의 각 단어에 `scene`과 `image`가 붙는다. 그림 생성이 실패하면 경고만 남기고 세션은 그림 없이 저장된다. 한 세션에 약 1분이 더 걸린다.
+
+comfy-cloud MCP는 firecrawl과 같은 방식이다: 호스트에서 `claude mcp add --transport http comfy-cloud https://cloud.comfy.org/mcp` 후 한 번 OAuth 로그인해 두면 컨테이너가 시작할 때 자격증명을 복사한다. `submit_batch`는 `confirm: true`로 부르므로 `IMAGE_MODEL`을 켜 둔 것이 크레딧 사용 동의다. 세션당 비용은 comfy-cloud의 `get_billing_activity`로 확인한다.
 
 ## Article 한국어 번역
 
@@ -100,6 +108,8 @@ Azure 키는 backend에만 있다. `GET /api/assessor/token`이 10분짜리 토�
 ## Your turn / Practice (GPT-Live + claude CLI)
 
 Expressions 탭의 표현마다 노란 `Your turn: one sentence each.` 라벨이, Vocabulary 탭의 카드마다 `Practice` 버튼이 있다. 둘 다 같은 `Practice` 컴포넌트다. 누르면 마이크가 붙고 참가자가 그 표현이나 단어로 문장 하나를 말한다. GPT-Live는 듣기와 읽어 주기만 맡는다: 문장이 끝나면 "Got it." 한마디, 그 첫 발화를 신호로 프론트가 사용자 transcript를 `POST /api/example/feedback`에 보낸다. backend는 `claude` CLI(`EXAMPLE_MODEL`, 기본 opus, `EXAMPLE_EFFORT` 기본 low, 도구 없음)에 `../example-coach/prompts/feedback.md`를 넣어 `paraphrase`(원어민이 말하는 대로 바꿔 말한 문장, 고칠 곳은 모두 고침)와 `feedback`(고친 곳마다 짧은 문장 하나씩의 목록) 두 필드를 받는다. 쪽지에서는 목록을 불릿으로 보여 준다. 답이 오는 동안 쪽지에 `Writing the native version…`이 뜨고 라운드는 닫히지 않는다(약 10초). 답이 오면 화면에 두 줄로 보이고, 같은 문장을 `session.instructions.append`로 넘겨 코치가 그대로 소리 내어 읽는다. 코치가 5초간 조용하면 라운드가 끝나고 `Keep`으로 그 표현 아래에 쌓인다. 쪽지 위의 `↻`는 처음부터 다시, `✕`는 듣는 중이든 끝난 뒤든 버린다. 텍스트 모델이 실패하면 오류가 쪽지에 그대로 뜨고 Keep은 잠긴다.
+
+Vocabulary 카드의 Practice는 판단 프롬프트가 `../example-coach/prompts/feedback-word.md`로 바뀐다(`kind: "word"`, 그림 설명 `scene`을 함께 보낸다). 사용자는 카드의 그림을 보며 그 단어로 한 문장을 말하고, `paraphrase`는 가벼운 교정이 아니라 원어민이 그 그림을 그 단어로 묘사하는 문장(자유로운 의역)이며, `feedback`의 첫 줄은 언제나 단어 사용에 대한 것이다. 그림이 없는 예전 세션에서는 문장만 보고 판단한다.
 
 쌓인 문장은 `examples` 테이블에 세션·표현별로 남고, 새로고침해도 그 자리에 다시 나온다. 코치 줄은 Live transcript가 아니라 텍스트 모델의 두 필드를 `paraphrase`와 `feedback` 항목들을 공백으로 이은 한 줄로 저장한다. 첫 문장이 예문, 나머지가 피드백이라는 형식은 그대로다.
 

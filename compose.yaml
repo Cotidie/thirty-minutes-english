@@ -27,6 +27,8 @@ services:
       SUMMARY_MODEL: ${SUMMARY_MODEL:-gpt-5.6-luna}
       TOPICS_MODEL: ${TOPICS_MODEL:-sonnet}
       TOPICS_EFFORT: ${TOPICS_EFFORT:-medium}
+      IMAGES_MODEL: ${IMAGES_MODEL:-sonnet}
+      IMAGE_MODEL: ${IMAGE_MODEL:-vertexai/nano-banana-2-lite}
       EXAMPLE_MODEL: ${EXAMPLE_MODEL:-opus}
       EXAMPLE_EFFORT: ${EXAMPLE_EFFORT:-low}
     volumes:

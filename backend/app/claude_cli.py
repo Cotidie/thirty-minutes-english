@@ -1,7 +1,8 @@
 """Running the local `claude` CLI as a subprocess and reading its stream-json.
 
-Both the session generator and the daily topic fetcher go through here, so the
-command shape, the timeout and the error wording live in one place.
+Every text run (session generator, topic fetcher, phrasing, feedback, pictures)
+goes through here, so the command shape, the timeout and the error wording live
+in one place.
 """
 
 import json
@@ -9,14 +10,35 @@ import os
 import subprocess
 import threading
 from collections.abc import Callable
+from dataclasses import dataclass
 
-FIRECRAWL_MCP: dict = {
-    "mcpServers": {"firecrawl": {"type": "http", "url": "https://mcp.firecrawl.dev/v2/mcp-oauth"}}
-}
+
+@dataclass(frozen=True)
+class McpServer:
+    """One HTTP MCP server a run may call, with the tools it is allowed on it. OAuth
+    comes from the host's ~/.claude/.credentials.json copied into the container."""
+
+    name: str
+    url: str
+    tools: tuple[str, ...]
+
+    def config(self) -> dict:
+        return {"mcpServers": {self.name: {"type": "http", "url": self.url}}}
+
+
+FIRECRAWL = McpServer(
+    "firecrawl",
+    "https://mcp.firecrawl.dev/v2/mcp-oauth",
+    ("mcp__firecrawl__firecrawl_search", "mcp__firecrawl__firecrawl_scrape"),
+)
+COMFY = McpServer(
+    "comfy-cloud",
+    "https://cloud.comfy.org/mcp",
+    ("mcp__comfy-cloud__submit_batch", "mcp__comfy-cloud__wait_for_batch", "mcp__comfy-cloud__get_batch_output"),
+)
 # WebSearch and WebFetch are the fallback when the firecrawl MCP is missing or
 # its OAuth token has lapsed; the prompts say to try firecrawl first.
 BUILTIN_TOOLS = ("Skill", "Read", "WebSearch", "WebFetch")
-FIRECRAWL_TOOLS = ("mcp__firecrawl__firecrawl_search", "mcp__firecrawl__firecrawl_scrape")
 
 OnEvent = Callable[[dict], None]
 
@@ -30,19 +52,19 @@ class ClaudeCli:
         self,
         model: str = "opus",
         effort: str = "xhigh",
-        mcp_config: dict | None = FIRECRAWL_MCP,
+        mcp: McpServer | None = FIRECRAWL,
         timeout_s: float = 300,
         tools: tuple[str, ...] = BUILTIN_TOOLS,
     ) -> None:
         self.model = model
         self.effort = effort
-        self.mcp_config = mcp_config
+        self.mcp = mcp
         self.timeout_s = timeout_s
         self.tools = tools
 
     def build_command(self, schema: dict) -> list[str]:
-        """`--tools ""` runs with no tools at all; without an MCP config no server is loaded either."""
-        allowed = self.tools + (FIRECRAWL_TOOLS if self.mcp_config else ())
+        """`--tools ""` runs with no tools at all; without an MCP server none is loaded either."""
+        allowed = self.tools + (self.mcp.tools if self.mcp else ())
         cmd = [
             "claude",
             "-p",
@@ -61,8 +83,8 @@ class ClaudeCli:
         if allowed:
             cmd += ["--allowedTools", ",".join(allowed)]
         cmd += ["--setting-sources", "user", "--strict-mcp-config"]
-        if self.mcp_config:
-            cmd += ["--mcp-config", json.dumps(self.mcp_config)]
+        if self.mcp:
+            cmd += ["--mcp-config", json.dumps(self.mcp.config())]
         cmd.append("--no-session-persistence")
         return cmd
 

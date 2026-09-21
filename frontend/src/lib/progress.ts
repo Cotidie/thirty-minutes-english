@@ -1,4 +1,4 @@
-export type Stage = 'starting' | 'skills' | 'searching' | 'writing' | 'finalizing'
+export type Stage = 'starting' | 'skills' | 'searching' | 'writing' | 'finalizing' | 'illustrating'
 
 export interface JobStatus {
   id: string
@@ -18,8 +18,9 @@ const STAGES: Record<Stage, { floor: number; share: number }> = {
   starting: { floor: 3, share: 0.1 },
   skills: { floor: 8, share: 0.05 },
   searching: { floor: 15, share: 0.1 },
-  writing: { floor: 45, share: 0.6 },
-  finalizing: { floor: 96, share: 0.05 },
+  writing: { floor: 45, share: 0.5 },
+  finalizing: { floor: 80, share: 0.05 },
+  illustrating: { floor: 84, share: 0.3 },
 }
 const SEARCH_STEP = 10
 const MAX_SEARCHES = 3
@@ -39,6 +40,8 @@ function ceilingOf(job: JobStatus): number {
     case 'writing':
       return STAGES.finalizing.floor
     case 'finalizing':
+      return STAGES.illustrating.floor
+    case 'illustrating':
       return 100
   }
 }
@@ -69,5 +72,7 @@ export function labelFor(job: JobStatus): string {
       return 'Writing the article, expressions, and words'
     case 'finalizing':
       return 'Checking the structure'
+    case 'illustrating':
+      return 'Drawing a picture for each word'
   }
 }

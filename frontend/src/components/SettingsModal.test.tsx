@@ -63,7 +63,7 @@ describe('SettingsModal', () => {
     expect(key.placeholder).toBe('…1234')
     expect((screen.getByLabelText(/CLAUDE_MODEL/) as HTMLInputElement).value).toBe('sonnet')
     const legends = Array.from(document.querySelectorAll('legend')).map((l) => l.textContent)
-    expect(legends).toEqual(['API keys', 'Voice coach', 'Read aloud assessor', 'Claude generation', 'Summary text model'])
+    expect(legends).toEqual(['API keys', 'Voice coach', 'Read aloud assessor', 'Claude generation', 'Summary text model', 'Vocabulary pictures'])
   })
 
   it('hides the Gemini-only fields under OpenAI and shows them once the provider flips', async () => {

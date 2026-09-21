@@ -10,10 +10,12 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Literal
 
-Group = Literal["keys", "voice", "assess", "claude", "text"]
+Group = Literal["keys", "voice", "assess", "claude", "text", "images"]
 
 EFFORTS = ("low", "medium", "high", "xhigh", "max")
 CLAUDE_MODELS = ("opus", "sonnet")
+# comfy-cloud partner slugs for the vocabulary pictures; blank turns them off.
+IMAGE_MODELS = ("vertexai/nano-banana-2-lite", "vertexai/nano-banana-2", "bfl/flux-2-pro", "openai/images-generations")
 OPENAI_VOICE_MODEL = "gpt-live-1"
 GEMINI_VOICE_MODEL = "gemini-3.8-live-extended-thinking"
 GEMINI_VOICE_MODELS = ("gemini-3.8-live", GEMINI_VOICE_MODEL)
@@ -84,6 +86,8 @@ SPECS: tuple[Spec, ...] = (
     Spec("TOPICS_EFFORT", "claude", "medium", choices=EFFORTS),
     Spec("EXAMPLE_MODEL", "claude", "opus", suggestions=CLAUDE_MODELS),
     Spec("EXAMPLE_EFFORT", "claude", "low", choices=EFFORTS),
+    Spec("IMAGES_MODEL", "claude", "sonnet", suggestions=CLAUDE_MODELS),
+    Spec("IMAGE_MODEL", "images", "vertexai/nano-banana-2-lite", suggestions=IMAGE_MODELS),
     Spec("SUMMARY_MODEL", "text", "gpt-5.6-luna"),
 )
 SPEC_BY_KEY = {spec.key: spec for spec in SPECS}

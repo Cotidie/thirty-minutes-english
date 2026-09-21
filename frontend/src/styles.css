@@ -1012,6 +1012,15 @@ button.question.is-active {
   background: #fff;
 }
 
+/* The word's situation, drawn: the learner describes it with the word. */
+.vocab-picture {
+  width: 100%;
+  aspect-ratio: 4 / 3;
+  object-fit: cover;
+  border-radius: 6px;
+  background: var(--line);
+}
+
 .vocab-word {
   font-family: var(--serif);
   font-weight: 500;

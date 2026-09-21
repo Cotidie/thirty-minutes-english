@@ -34,8 +34,13 @@ describe('percentFor', () => {
   })
 
   it('creeps through writing by elapsed time against the expected budget', () => {
-    expect(percentFor(job({ stage: 'writing', stage_elapsed_seconds: 30 }))).toBe(71)
-    expect(percentFor(job({ stage: 'writing', stage_elapsed_seconds: 600 }))).toBe(93)
+    expect(percentFor(job({ stage: 'writing', stage_elapsed_seconds: 30 }))).toBe(66)
+    expect(percentFor(job({ stage: 'writing', stage_elapsed_seconds: 600 }))).toBe(78)
+  })
+
+  it('draws the pictures last, creeping toward the end', () => {
+    expect(percentFor(job({ stage: 'illustrating', stage_elapsed_seconds: 15 }))).toBe(92)
+    expect(percentFor(job({ stage: 'illustrating', stage_elapsed_seconds: 600 }))).toBe(99)
   })
 
   it('is 100 when done and frozen when failed', () => {

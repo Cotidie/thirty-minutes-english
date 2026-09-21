@@ -15,6 +15,14 @@ const items = [
 ]
 
 describe('VocabularyTab', () => {
+  it('shows the picture drawn for a word, and nothing where there is none', () => {
+    const drawn = [{ ...items[0], scene: 'a phone in every hand on a train', image: 'job-0.png' }, items[1]]
+    render(<VocabularyTab items={drawn} sessionId={3} starred={[]} onToggleStar={vi.fn()} examples={none} onExample={vi.fn()} />)
+    const picture = screen.getByRole('img', { name: 'a phone in every hand on a train' })
+    expect(picture).toHaveAttribute('src', '/api/images/job-0.png')
+    expect(screen.getAllByRole('img')).toHaveLength(1)
+  })
+
   it('shows the word and example but hides the definition until clicked', async () => {
     render(<VocabularyTab items={items} sessionId={3} starred={[]} onToggleStar={vi.fn()} examples={none} onExample={vi.fn()} />)
     expect(screen.getByText('ubiquitous')).toBeInTheDocument()

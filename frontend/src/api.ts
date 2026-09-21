@@ -73,7 +73,14 @@ export const api = {
   exampleFeedback: (target: PracticeTarget, userText: string) =>
     request<ExampleFeedback>('/api/example/feedback', {
       method: 'POST',
-      body: JSON.stringify({ expression: target.text, meaning: target.meaning, usage_note: target.note, user_text: userText }),
+      body: JSON.stringify({
+        expression: target.text,
+        meaning: target.meaning,
+        usage_note: target.note,
+        user_text: userText,
+        kind: target.kind,
+        scene: target.scene ?? '',
+      }),
     }),
   addExample: (example: { session_id: number; expression: string; user_text: string; coach_text: string; seconds: number }) =>
     request<Example>('/api/examples', { method: 'POST', body: JSON.stringify(example) }),

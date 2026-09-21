@@ -115,6 +115,41 @@ def test_job_reports_failure_when_generator_fails(tmp_path):
     assert job["session_id"] is None
 
 
+class FakeIllustrator:
+    def __init__(self, error: Exception | None = None):
+        self.error = error
+        self.job_ids: list[str] = []
+
+    def illustrate(self, job_id: str, content):
+        self.job_ids.append(job_id)
+        if self.error:
+            raise self.error
+        words = [v.model_copy(update={"scene": f"a scene for {v.word}", "image": f"{job_id}-{i}.png"}) for i, v in enumerate(content.vocabulary)]
+        return content.model_copy(update={"vocabulary": words})
+
+
+def test_pictures_are_drawn_after_the_text_and_saved_with_the_session(tmp_path):
+    illustrator = FakeIllustrator()
+    app = create_app(SessionStore(tmp_path / "s.db"), Services(FakeGenerator(), illustrator=illustrator), InlineExecutor())
+    with TestClient(app) as c:
+        job = c.post("/api/sessions", json={"topic": "X"}).json()
+        session = c.get(f"/api/sessions/{job['session_id']}").json()
+    assert illustrator.job_ids == [job["id"]]
+    assert job["stage"] == "illustrating"
+    assert session["content"]["vocabulary"][0]["image"] == f"{job['id']}-0.png"
+    assert session["content"]["vocabulary"][0]["scene"] == "a scene for word0"
+
+
+def test_a_session_still_goes_out_when_the_pictures_fail(tmp_path):
+    services = Services(FakeGenerator(), illustrator=FakeIllustrator(GenerationError("comfy down")))
+    app = create_app(SessionStore(tmp_path / "s.db"), services, InlineExecutor())
+    with TestClient(app) as c:
+        job = c.post("/api/sessions", json={"topic": "X"}).json()
+        session = c.get(f"/api/sessions/{job['session_id']}").json()
+    assert job["status"] == "done"
+    assert session["content"]["vocabulary"][0]["image"] is None
+
+
 def test_second_generation_receives_items_from_the_first(client):
     create(client, "A")
     create(client, "B")

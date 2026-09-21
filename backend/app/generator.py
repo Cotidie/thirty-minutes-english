@@ -3,7 +3,7 @@ from typing import Protocol
 
 from pydantic import ValidationError
 
-from app.claude_cli import FIRECRAWL_MCP, ClaudeCli, GenerationError, structured_output
+from app.claude_cli import FIRECRAWL, ClaudeCli, GenerationError, McpServer, structured_output
 from app.exclusions import Exclusions
 from app.models import SessionContent
 from app.progress import Progress, StreamTracker
@@ -178,11 +178,11 @@ class ClaudeCliGenerator:
         model: str = "opus",
         effort: str = "xhigh",
         skills: tuple[str, ...] = (),
-        mcp_config: dict = FIRECRAWL_MCP,
+        mcp: McpServer | None = FIRECRAWL,
         timeout_s: float = 300,
     ) -> None:
         self._skills = skills
-        self._cli = ClaudeCli(model=model, effort=effort, mcp_config=mcp_config, timeout_s=timeout_s)
+        self._cli = ClaudeCli(model=model, effort=effort, mcp=mcp, timeout_s=timeout_s)
 
     def build_prompt(self, topic: str, exclude: Exclusions | None = None) -> str:
         prompt = PROMPT_TEMPLATE.format(

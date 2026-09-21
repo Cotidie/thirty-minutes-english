@@ -13,6 +13,7 @@ from typing import Literal, Protocol
 
 from app.generator import GenerationError, Generator
 from app.progress import Progress, Stage
+from app.models import SessionContent
 from app.store import SessionStore
 
 Status = Literal["running", "done", "failed"]
@@ -50,14 +51,23 @@ class Executor(Protocol):
     def submit(self, fn, /, *args): ...
 
 
+class Illustrator(Protocol):
+    def illustrate(self, job_id: str, content: SessionContent) -> SessionContent: ...
+
+
 class JobRunner:
     DEFAULT_EXPECTED_SECONDS = 150.0
     REPEAT_ALLOWANCE = 0.1  # each past item escapes the exclusion list with this probability
 
     def __init__(
-        self, generator: Generator, store: SessionStore, executor: Executor | None = None
+        self,
+        generator: Generator,
+        store: SessionStore,
+        executor: Executor | None = None,
+        illustrator: Illustrator | None = None,
     ) -> None:
         self.generator = generator
+        self.illustrator = illustrator
         self._store = store
         self.executor = executor or ThreadPoolExecutor(max_workers=2)
         self._jobs: dict[str, Job] = {}
@@ -101,6 +111,12 @@ class JobRunner:
         )
         if leaked:
             log.warning("job %s: %d banned items came back anyway: %s", job.id, len(leaked), leaked)
+        if self.illustrator:
+            job.apply(Progress(Stage.ILLUSTRATING, job.searches))
+            try:
+                content = self.illustrator.illustrate(job.id, content)
+            except GenerationError as e:
+                log.warning("job %s: the session goes out without pictures: %s", job.id, e)
         session = self._store.create(content)
         with self._lock:
             self._durations.append(job.elapsed_seconds)

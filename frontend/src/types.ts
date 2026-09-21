@@ -34,6 +34,10 @@ export interface VocabularyItem {
   pos: string
   definition: string
   example: string
+  /** A situation the word fits, drawn for the card; the learner describes it with the word. */
+  scene?: string | null
+  /** File name under /api/images/. */
+  image?: string | null
 }
 
 export interface SessionContent {
@@ -95,7 +99,7 @@ export interface GeminiLiveSession {
 export type LiveSession = OpenAILiveSession | GeminiLiveSession
 export type VoiceProvider = LiveSession['provider']
 
-export type SettingGroup = 'keys' | 'voice' | 'assess' | 'claude' | 'text'
+export type SettingGroup = 'keys' | 'voice' | 'assess' | 'claude' | 'text' | 'images'
 
 /** One runtime setting, its effective value; secrets come masked. */
 export interface SettingField {
@@ -164,14 +168,18 @@ export interface PracticeTarget {
   text: string
   meaning: string
   note: string
+  /** An expression gets the light native fix; a word gets a free rewording that uses it well. */
+  kind: 'expression' | 'word'
+  /** For a word: what its picture shows. */
+  scene?: string
 }
 
 export function practiceExpression(e: Expression): PracticeTarget {
-  return { text: e.phrase, meaning: e.meaning, note: e.usage_note }
+  return { text: e.phrase, meaning: e.meaning, note: e.usage_note, kind: 'expression' }
 }
 
 export function practiceWord(v: VocabularyItem): PracticeTarget {
-  return { text: v.word, meaning: v.definition, note: `part of speech: ${v.pos}` }
+  return { text: v.word, meaning: v.definition, note: `part of speech: ${v.pos}`, kind: 'word', scene: v.scene ?? undefined }
 }
 
 /** One sentence made with an expression or word, and the coach's echo of it. */

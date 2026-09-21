@@ -12,6 +12,7 @@ function VocabCard({ item }: { item: VocabularyItem }) {
       aria-expanded={revealed}
       onClick={() => setRevealed((r) => !r)}
     >
+      {item.image && <img className="vocab-picture" src={`/api/images/${item.image}`} alt={item.scene ?? item.word} />}
       <span className="vocab-word">
         <span className="vocab-word-text">{item.word}</span> <em className="vocab-pos">{item.pos}</em>
       </span>

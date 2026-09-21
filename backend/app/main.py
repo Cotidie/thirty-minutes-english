@@ -4,6 +4,7 @@ from collections.abc import Callable
 from pathlib import Path
 
 from fastapi import FastAPI, HTTPException, Request, Response
+from fastapi.staticfiles import StaticFiles
 
 from app.assessor import AssessorError
 from app.cards import AskReview
@@ -64,6 +65,7 @@ def create_app(
     settings_store: SettingsStore | None = None,
     rebuild: Rebuild | None = None,
     env: dict[str, str] | None = None,
+    image_dir: Path | None = None,
 ) -> FastAPI:
     """`rebuild` turns saved settings into fresh services; without it a settings
     change is stored but the running services stay as they are (tests)."""
@@ -72,10 +74,13 @@ def create_app(
     app.state.settings_store = settings_store or SettingsStore(store.path)
     app.state.env = os.environ if env is None else env
     app.state.rebuild = rebuild
-    app.state.jobs = JobRunner(services.generator, store, executor)
+    app.state.jobs = JobRunner(services.generator, store, executor, services.illustrator)
     app.state.topics = DailyTopics(store, services.topic_source, app.state.jobs.executor)
     app.state.asks = AskReview(store, services.extractor)
     app.state.services = services
+    if image_dir is not None:
+        image_dir.mkdir(parents=True, exist_ok=True)
+        app.mount("/api/images", StaticFiles(directory=image_dir), name="images")
 
     def current_settings(request: Request) -> Settings:
         return Settings.resolve(request.app.state.env, request.app.state.settings_store)
@@ -84,6 +89,7 @@ def create_app(
         state = request.app.state
         state.services = services
         state.jobs.generator = services.generator
+        state.jobs.illustrator = services.illustrator
         state.topics.source = services.topic_source
         state.asks.extractor = services.extractor
 
@@ -238,7 +244,7 @@ def create_app(
         if coach is None:
             raise HTTPException(status_code=503, detail="example coach is off: the example-coach folder is missing")
         try:
-            return coach.feedback(body.expression, body.meaning, body.usage_note, body.user_text)
+            return coach.feedback(body.expression, body.meaning, body.usage_note, body.user_text, body.kind, body.scene)
         except GenerationError as e:
             raise HTTPException(status_code=502, detail=f"feedback failed: {e}") from e
 
@@ -310,11 +316,13 @@ def default_app() -> FastAPI:
     store = SessionStore(os.environ.get("DB_PATH", ROOT / "data" / "sessions.db"))
     settings_store = SettingsStore(store.path)
     dirs = agent_dirs()
+    image_dir = store.path.parent / "images"
     return create_app(
         store,
-        build_services(Settings.resolve(os.environ, settings_store), dirs),
+        build_services(Settings.resolve(os.environ, settings_store), dirs, image_dir),
         settings_store=settings_store,
-        rebuild=lambda settings: build_services(settings, dirs),
+        rebuild=lambda settings: build_services(settings, dirs, image_dir),
+        image_dir=image_dir,
     )
 
 

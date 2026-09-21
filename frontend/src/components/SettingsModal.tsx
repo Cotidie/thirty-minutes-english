@@ -13,6 +13,7 @@ const GROUP_TITLE: Record<SettingGroup, string> = {
   assess: 'Read aloud assessor',
   claude: 'Claude generation',
   text: 'Summary text model',
+  images: 'Vocabulary pictures',
 }
 
 const PROVIDER_MODEL_DEFAULT: Record<string, string> = {
@@ -111,7 +112,7 @@ export function SettingsModal({ open, onClose }: Props) {
     return f.suggestions.filter((m) => (provider === 'gemini' ? m.startsWith('gemini') : !m.startsWith('gemini')))
   }
 
-  const groups = (['keys', 'voice', 'assess', 'claude', 'text'] as const).map((g) => ({
+  const groups = (['keys', 'voice', 'assess', 'claude', 'text', 'images'] as const).map((g) => ({
     group: g,
     fields: (fields ?? []).filter((f) => f.group === g && visible(f)),
   }))

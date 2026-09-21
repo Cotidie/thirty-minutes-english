@@ -8,8 +8,9 @@ from pathlib import Path
 from app.assessor import AzureAssessor
 from app.cards import Extractor, PhraseCardExtractor
 from app.daily_topics import ClaudeTopicSource, TopicSource
-from app.example_feedback import ExampleCoach
+from app.example_feedback import TEMPLATES, ExampleCoach
 from app.generator import ClaudeCliGenerator, Generator
+from app.illustrator import Illustrator
 from app.live import AgentDefinition, GeminiVoice, LiveAgent, OpenAIVoice, VoiceProvider
 from app.phrasing import PhrasingMarker
 from app.settings import Settings
@@ -26,6 +27,7 @@ class Services:
     agents: dict[str, LiveAgent] | None = None
     extractor: Extractor | None = None
     example_coach: ExampleCoach | None = None
+    illustrator: Illustrator | None = None
     phrasing: PhrasingMarker | None = None
     assessor: AzureAssessor | None = None
     voice_key_name: str = "OPENAI_API_KEY"
@@ -34,8 +36,9 @@ class Services:
         self.agents = self.agents or {}
 
 
-def build_services(settings: Settings, agent_dirs: dict[str, Path]) -> Services:
-    """`agent_dirs` maps read-aloud / phrase / example to their folders."""
+def build_services(settings: Settings, agent_dirs: dict[str, Path], image_dir: Path | None = None) -> Services:
+    """`agent_dirs` maps read-aloud / phrase / example to their folders; `image_dir` is
+    where the vocabulary pictures land (none: no pictures)."""
     openai_key = settings.get("OPENAI_API_KEY")
     return Services(
         generator=ClaudeCliGenerator(
@@ -47,6 +50,7 @@ def build_services(settings: Settings, agent_dirs: dict[str, Path]) -> Services:
         agents=_live_agents(settings, agent_dirs),
         extractor=_extractor(openai_key, agent_dirs["phrase"], "cards.schema.json", settings, PhraseCardExtractor),
         example_coach=_example_coach(settings, agent_dirs["example"]),
+        illustrator=_illustrator(settings, image_dir),
         phrasing=_phrasing(settings, agent_dirs["read-aloud"]),
         assessor=_assessor(settings),
         voice_key_name=settings.voice_api_key_name,
@@ -107,7 +111,15 @@ def _phrasing(settings: Settings, agent_dir: Path) -> PhrasingMarker | None:
 
 def _example_coach(settings: Settings, agent_dir: Path) -> ExampleCoach | None:
     """The text half of the example coach, once its folder carries the feedback prompt."""
-    if not (agent_dir / "prompts" / "feedback.md").is_file():
-        log.warning("example-coach feedback prompt not found: %s", agent_dir)
+    if not all((agent_dir / "prompts" / name).is_file() for name in TEMPLATES.values()):
+        log.warning("example-coach feedback prompts not found: %s", agent_dir)
         return None
     return ExampleCoach.with_cli(agent_dir, settings.get("EXAMPLE_MODEL"), settings.get("EXAMPLE_EFFORT"))
+
+
+def _illustrator(settings: Settings, image_dir: Path | None) -> Illustrator | None:
+    """Pictures for the words, once an image model is named and there is a folder for them."""
+    image_model = settings.get("IMAGE_MODEL")
+    if not image_model or image_dir is None:
+        return None
+    return Illustrator.with_cli(image_dir, image_model, settings.get("IMAGES_MODEL"))

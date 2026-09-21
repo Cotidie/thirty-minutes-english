@@ -76,6 +76,10 @@ class VocabularyItem(BaseModel):
     pos: str
     definition: str
     example: str
+    """A situation the word fits, drawn for the card; the learner describes it with the word."""
+    scene: str | None = None
+    """File name under the images folder, served at /api/images/{image}."""
+    image: str | None = None
 
 
 class SessionContent(BaseModel):
@@ -122,7 +126,7 @@ class JobStatus(BaseModel):
     id: str
     topic: str
     status: Literal["running", "done", "failed"]
-    stage: Literal["starting", "skills", "searching", "writing", "finalizing"]
+    stage: Literal["starting", "skills", "searching", "writing", "finalizing", "illustrating"]
     searches: int
     elapsed_seconds: float
     stage_elapsed_seconds: float
@@ -167,6 +171,10 @@ class ExampleFeedbackRequest(BaseModel):
     meaning: str
     usage_note: str = ""
     user_text: str
+    """An expression gets the light native fix; a word gets a free rewording that uses it well."""
+    kind: Literal["expression", "word"] = "expression"
+    """For a word: the picture's scene, so the rewording can describe it."""
+    scene: str = ""
 
     _check = field_validator("expression", "meaning", "user_text")(_not_blank)
 
@@ -292,7 +300,7 @@ class AssessorSession(BaseModel):
 
 class SettingField(BaseModel):
     key: str
-    group: Literal["keys", "voice", "assess", "claude", "text"]
+    group: Literal["keys", "voice", "assess", "claude", "text", "images"]
     value: str
     secret: bool
     default: str

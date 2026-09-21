@@ -29,7 +29,7 @@ class PhrasingMarker:
 
     @classmethod
     def with_cli(cls, agent_dir: Path, model: str, effort: str = "low") -> "PhrasingMarker":
-        return cls(ClaudeCli(model=model, effort=effort, tools=(), mcp_config=None, timeout_s=90), agent_dir)
+        return cls(ClaudeCli(model=model, effort=effort, tools=(), mcp=None, timeout_s=90), agent_dir)
 
     def build_prompt(self, paragraph: str) -> str:
         return self._template.replace("{{paragraph}}", paragraph)
