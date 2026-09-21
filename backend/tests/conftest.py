@@ -22,7 +22,7 @@ def sample_content(topic: str = "Digital twins", title: str = "Twins at Work") -
             questions=["q1", "q2", "q3"],
         ),
         vocabulary=[
-            VocabularyItem(word=f"word{i}", pos="noun", definition=f"def {i}", example=f"ex {i}")
+            VocabularyItem(word=f"word{i}", pos="noun", definition=f"def {i}", example=f"ex {i}", scene=f"scene {i}")
             for i in range(VOCABULARY_COUNT)
         ],
     )

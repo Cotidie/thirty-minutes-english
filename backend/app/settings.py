@@ -14,8 +14,20 @@ Group = Literal["keys", "voice", "assess", "claude", "text", "images"]
 
 EFFORTS = ("low", "medium", "high", "xhigh", "max")
 CLAUDE_MODELS = ("opus", "sonnet")
-# comfy-cloud partner slugs for the vocabulary pictures; blank turns them off.
-IMAGE_MODELS = ("vertexai/nano-banana-2-lite", "vertexai/nano-banana-2", "bfl/flux-2-pro", "openai/images-generations")
+IMAGE_PROVIDERS = ("comfy", "openrouter", "off")
+# Image models as each MCP names them; blank takes the provider's default (Nano Banana Pro).
+# OpenAI ids are spelled OpenRouter's way and translated for comfy.
+IMAGE_MODELS = (
+    "vertexai/nano-banana-pro",  # comfy
+    "vertexai/nano-banana-2",
+    "vertexai/nano-banana-2-lite",
+    "google/gemini-3-pro-image",  # openrouter
+    "google/gemini-3.1-flash-image",
+    "google/gemini-3.1-flash-lite-image",
+    "openai/gpt-image-2.5-flare",  # both
+    "openai/gpt-image-2.5-sunburst",
+    "openai/gpt-image-2",
+)
 OPENAI_VOICE_MODEL = "gpt-live-1"
 GEMINI_VOICE_MODEL = "gemini-3.8-live-extended-thinking"
 GEMINI_VOICE_MODELS = ("gemini-3.8-live", GEMINI_VOICE_MODEL)
@@ -86,8 +98,8 @@ SPECS: tuple[Spec, ...] = (
     Spec("TOPICS_EFFORT", "claude", "medium", choices=EFFORTS),
     Spec("EXAMPLE_MODEL", "claude", "opus", suggestions=CLAUDE_MODELS),
     Spec("EXAMPLE_EFFORT", "claude", "low", choices=EFFORTS),
-    Spec("IMAGES_MODEL", "claude", "sonnet", suggestions=CLAUDE_MODELS),
-    Spec("IMAGE_MODEL", "images", "vertexai/nano-banana-2-lite", suggestions=IMAGE_MODELS),
+    Spec("IMAGE_PROVIDER", "images", "comfy", choices=IMAGE_PROVIDERS),
+    Spec("IMAGE_MODEL", "images", suggestions=IMAGE_MODELS),
     Spec("SUMMARY_MODEL", "text", "gpt-5.6-luna"),
 )
 SPEC_BY_KEY = {spec.key: spec for spec in SPECS}

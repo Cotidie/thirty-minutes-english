@@ -45,14 +45,21 @@ docker compose up -d --build
 | `TOPICS_EFFORT` | `medium` | 그 호출의 reasoning effort |
 | `EXAMPLE_MODEL` | `opus` | Your turn / Practice 피드백을 쓰는 `claude` 모델 |
 | `EXAMPLE_EFFORT` | `low` | 그 호출의 reasoning effort |
-| `IMAGE_MODEL` | `vertexai/nano-banana-2-lite` | Vocabulary 단어마다 그림 한 장을 그리는 comfy-cloud partner 모델 슬러그. 비우면 그림 없이 생성 |
-| `IMAGES_MODEL` | `sonnet` | 그 그림을 주문하는 `claude` 실행의 모델 |
+| `IMAGE_PROVIDER` | `comfy` | Vocabulary 그림을 그리는 MCP: `comfy`(comfy-cloud) · `openrouter` · `off` |
+| `IMAGE_MODEL` | 비움 | 이미지 모델. 비우면 provider 기본값(Nano Banana Pro). 설정 모달 메뉴에 GPT-Image 2.5, Nano Banana 2 등이 있다 |
 
 ## Vocabulary 그림
 
-세션 생성 마지막 단계(`illustrating`, 진행 바의 "Drawing a picture for each word")에서 단어마다 그 단어가 어울리는 상황을 그린 그림을 한 장씩 만든다. `backend/app/illustrator.py`가 `claude` CLI(`IMAGES_MODEL`, effort low, 도구는 comfy-cloud MCP의 `submit_batch` · `wait_for_batch` · `get_batch_output`만)를 한 번 돌려 단어별 장면 문장(`scene`)을 쓰게 하고, 그 장면을 `IMAGE_MODEL`로 한 배치에 그리게 한 뒤 URL을 받아 온다. 그림에는 글자가 들어가지 않도록 지시한다(학습자가 단어를 직접 말해야 하므로). backend가 URL을 바로 내려받아 `backend/data/images/{job}-{n}.png`로 두고 `/api/images/`로 서빙하며, 세션 content의 각 단어에 `scene`과 `image`가 붙는다. 그림 생성이 실패하면 경고만 남기고 세션은 그림 없이 저장된다. 한 세션에 약 1분이 더 걸린다.
+세션 생성 마지막 단계(`illustrating`, 진행 바의 "Drawing a picture for each word")에서 단어마다 그 단어가 어울리는 상황을 그린 그림을 한 장씩 만든다. 장면 문장(`scene`)은 세션 생성 프롬프트가 단어와 함께 쓴다(글자가 들어갈 필요 없는 구체적인 상황). `backend/app/illustrator.py`가 그 장면들을 painter(`backend/app/painters.py`)에 넘기고, painter는 호스트가 로그인해 둔 MCP 서버를 `backend/app/mcp_client.py`로 직접 호출한다(JSON-RPC over HTTP, 토큰은 컨테이너가 복사한 `~/.claude/.credentials.json`의 `mcpOAuth`). `claude` 실행은 없다.
 
-comfy-cloud MCP는 firecrawl과 같은 방식이다: 호스트에서 `claude mcp add --transport http comfy-cloud https://cloud.comfy.org/mcp` 후 한 번 OAuth 로그인해 두면 컨테이너가 시작할 때 자격증명을 복사한다. `submit_batch`는 `confirm: true`로 부르므로 `IMAGE_MODEL`을 켜 둔 것이 크레딧 사용 동의다. 세션당 비용은 comfy-cloud의 `get_billing_activity`로 확인한다.
+| provider | MCP | 호출 | 기본 모델 |
+|---|---|---|---|
+| `comfy` | `https://cloud.comfy.org/mcp` | `submit_batch`(한 배치, `confirm: true`) → `wait_for_batch` → `get_batch_output`의 서명 URL을 내려받음 | `vertexai/nano-banana-pro` |
+| `openrouter` | `https://mcp.openrouter.ai/mcp` | 단어마다 `generate-image`, 응답의 inline image 블록(base64) | `google/gemini-3-pro-image` |
+
+OpenAI 모델은 OpenRouter 표기(`openai/gpt-image-2.5-flare`)로 적으면 comfy에서도 통한다(`openai/images-generations` + `params.model`로 바꿔 보낸다). 그림은 `backend/data/images/{job}-{n}.png`에 두고 `/api/images/`로 서빙하며, 세션 content의 각 단어에 `scene`과 `image`가 붙는다. 그림 하나가 실패하면 그 단어만 그림 없이, 전체가 실패하면 경고만 남기고 세션은 그림 없이 저장된다.
+
+로그인은 호스트에서 한 번: `claude mcp add --transport http comfy-cloud https://cloud.comfy.org/mcp` 또는 `claude mcp add --transport http openrouter https://mcp.openrouter.ai/mcp` 뒤 `claude mcp login <이름>`. 컨테이너는 시작할 때 자격증명을 복사하므로 로그인 뒤 `docker compose restart backend`. comfy-cloud 구독은 곧 끝나므로 그 뒤에는 `IMAGE_PROVIDER=openrouter`로 바꾼다. OpenRouter의 MCP 로그인은 7일짜리 키(기본 $10 한도)를 발급하므로 만료되면 다시 `claude mcp login openrouter`. 비용은 각 대시보드에서 확인한다.
 
 ## Article 한국어 번역
 

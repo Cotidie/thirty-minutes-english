@@ -76,7 +76,7 @@ class VocabularyItem(BaseModel):
     pos: str
     definition: str
     example: str
-    """A situation the word fits, drawn for the card; the learner describes it with the word."""
+    """A drawable situation the word fits, written with the session; drawn for the card."""
     scene: str | None = None
     """File name under the images folder, served at /api/images/{image}."""
     image: str | None = None

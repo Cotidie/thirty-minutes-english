@@ -20,6 +20,18 @@ const PROVIDER_MODEL_DEFAULT: Record<string, string> = {
   openai: 'gpt-live-1',
   gemini: 'gemini-3.8-live-extended-thinking',
 }
+const IMAGE_MODEL_DEFAULT: Record<string, string> = {
+  comfy: 'vertexai/nano-banana-pro',
+  openrouter: 'google/gemini-3-pro-image',
+  off: '',
+}
+
+/** A model field shows its provider's default; a secret shows its masked value. */
+function placeholderFor(f: SettingField, voiceProvider: string, imageProvider: string): string {
+  if (f.key === 'VOICE_MODEL') return PROVIDER_MODEL_DEFAULT[voiceProvider] ?? ''
+  if (f.key === 'IMAGE_MODEL') return IMAGE_MODEL_DEFAULT[imageProvider] ?? ''
+  return f.secret ? f.value || 'not set' : f.default
+}
 
 /**
  * Every runtime setting on one card. What is saved here is kept in the
@@ -146,7 +158,7 @@ export function SettingsModal({ open, onClose }: Props) {
                     field={f}
                     value={draft[f.key] ?? ''}
                     suggestions={suggestionsFor(f)}
-                    placeholder={f.key === 'VOICE_MODEL' ? PROVIDER_MODEL_DEFAULT[provider] : f.secret ? f.value || 'not set' : f.default}
+                    placeholder={placeholderFor(f, provider, draft.IMAGE_PROVIDER ?? 'comfy')}
                     onChange={(v) => edit(f.key, v)}
                   />
                   {isApiKey(f.key) && (

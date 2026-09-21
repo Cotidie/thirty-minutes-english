@@ -1,6 +1,6 @@
 """Running the local `claude` CLI as a subprocess and reading its stream-json.
 
-Every text run (session generator, topic fetcher, phrasing, feedback, pictures)
+Every text run (session generator, topic fetcher, phrasing, feedback)
 goes through here, so the command shape, the timeout and the error wording live
 in one place.
 """
@@ -30,11 +30,6 @@ FIRECRAWL = McpServer(
     "firecrawl",
     "https://mcp.firecrawl.dev/v2/mcp-oauth",
     ("mcp__firecrawl__firecrawl_search", "mcp__firecrawl__firecrawl_scrape"),
-)
-COMFY = McpServer(
-    "comfy-cloud",
-    "https://cloud.comfy.org/mcp",
-    ("mcp__comfy-cloud__submit_batch", "mcp__comfy-cloud__wait_for_batch", "mcp__comfy-cloud__get_batch_output"),
 )
 # WebSearch and WebFetch are the fallback when the firecrawl MCP is missing or
 # its OAuth token has lapsed; the prompts say to try firecrawl first.

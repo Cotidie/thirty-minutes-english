@@ -98,12 +98,13 @@ SESSION_SCHEMA: dict = {
             "items": {
                 "type": "object",
                 "additionalProperties": False,
-                "required": ["word", "pos", "definition", "example"],
+                "required": ["word", "pos", "definition", "example", "scene"],
                 "properties": {
                     "word": {"type": "string"},
                     "pos": {"type": "string"},
                     "definition": {"type": "string"},
                     "example": {"type": "string"},
+                    "scene": {"type": "string"},
                 },
             },
         },
@@ -152,8 +153,11 @@ with its neighbors in mind so the Korean reads well in sequence; keep names, fig
 article body where it offers strong candidates, and fill the rest with words a well-read speaker would \
 use when discussing this subject even if they do not appear in the article. Prefer words useful across \
 academic and professional English over topic-specific jargon; no proper nouns. \
-For each give the word, part of speech, a concise learner-dictionary definition, and one example \
-sentence different from the article.
+For each give the word, part of speech, a concise learner-dictionary definition, one example \
+sentence different from the article, and a scene: one sentence naming a concrete, drawable situation, \
+place, or object where a fluent speaker would reach for this word, so that a learner shown a picture \
+of it would describe it with the word. Physical and specific ("a single toll booth open on a wide \
+highway, cars backed up behind it"), never abstract, and nothing that needs written words in the picture.
 
 Set topic to the article topic. Use American English. Return only the structured output."""
 

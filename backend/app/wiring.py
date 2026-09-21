@@ -11,6 +11,7 @@ from app.daily_topics import ClaudeTopicSource, TopicSource
 from app.example_feedback import TEMPLATES, ExampleCoach
 from app.generator import ClaudeCliGenerator, Generator
 from app.illustrator import Illustrator
+from app.painters import painter_for
 from app.live import AgentDefinition, GeminiVoice, LiveAgent, OpenAIVoice, VoiceProvider
 from app.phrasing import PhrasingMarker
 from app.settings import Settings
@@ -118,8 +119,8 @@ def _example_coach(settings: Settings, agent_dir: Path) -> ExampleCoach | None:
 
 
 def _illustrator(settings: Settings, image_dir: Path | None) -> Illustrator | None:
-    """Pictures for the words, once an image model is named and there is a folder for them."""
-    image_model = settings.get("IMAGE_MODEL")
-    if not image_model or image_dir is None:
+    """Pictures for the words, once a provider is chosen, the host is logged in to it, and there is a folder."""
+    if image_dir is None:
         return None
-    return Illustrator.with_cli(image_dir, image_model, settings.get("IMAGES_MODEL"))
+    painter = painter_for(settings.get("IMAGE_PROVIDER"), settings.get("IMAGE_MODEL"))
+    return Illustrator(painter, image_dir) if painter else None
