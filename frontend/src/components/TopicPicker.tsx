@@ -15,7 +15,9 @@ interface Props {
 /** Colour carries the category, so the key names what each colour means. */
 const CATEGORY_LABELS: Record<Category, string> = {
   news: 'In the news',
-  tech: 'Technology',
+  cs: 'Computer science',
+  ie: 'Industrial engineering',
+  ai: 'AI',
   literature: 'Literature',
   history: 'History',
   world: 'World',
@@ -23,7 +25,7 @@ const CATEGORY_LABELS: Record<Category, string> = {
   research: 'Research',
 }
 
-const CATEGORY_ORDER: Category[] = ['news', 'korea', 'research', 'tech', 'literature', 'history', 'world']
+const CATEGORY_ORDER: Category[] = ['news', 'korea', 'research', 'cs', 'ie', 'ai', 'literature', 'history', 'world']
 
 export function TopicPicker({ suggestions, pending, error, busy, onGenerate, onRefresh }: Props) {
   const [topic, setTopic] = useState('')

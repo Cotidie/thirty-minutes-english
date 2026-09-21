@@ -1,15 +1,20 @@
 import random
+from datetime import date
 
 from app.models import Category
 from app.topics import (
+    AI_TOPICS,
+    CS_TOPICS,
     HISTORY_TOPICS,
+    IE_TOPICS,
     KOREA_TOPICS,
     LITERATURE_TOPICS,
+    POOLS,
     RESEARCH_TOPICS,
-    TECH_TOPICS,
     TOPICS,
     WORLD_TOPICS,
     pick_topic,
+    pool_for_day,
 )
 
 TEXTS = tuple(t.text for t in TOPICS)
@@ -29,16 +34,25 @@ def test_pick_topic_is_random_among_unused():
     assert len(picks) > 1
 
 
-def test_topics_span_six_domains():
-    pools = (TECH_TOPICS, LITERATURE_TOPICS, HISTORY_TOPICS, WORLD_TOPICS, KOREA_TOPICS, RESEARCH_TOPICS)
-    assert set(TOPICS) == set().union(*(set(p) for p in pools))
-    assert min(len(p) for p in pools) >= 10
+def test_topics_span_eight_domains():
+    assert len(POOLS) == 8
+    assert set(TOPICS) == set().union(*(set(p) for p in POOLS))
+    assert min(len(p) for p in POOLS) >= 40
     assert len(set(TEXTS)) == len(TEXTS)
+
+
+def test_a_day_shows_every_domain_before_repeating_one():
+    dealt = pool_for_day(date(2026, 9, 21), 9)
+    categories = [t.category for t in dealt]
+    assert set(categories[:8]) == {p[0].category for p in POOLS}
+    assert len(dealt) == 9
 
 
 def test_every_topic_carries_its_own_category():
     expected = {
-        Category.TECH: TECH_TOPICS,
+        Category.CS: CS_TOPICS,
+        Category.IE: IE_TOPICS,
+        Category.AI: AI_TOPICS,
         Category.LITERATURE: LITERATURE_TOPICS,
         Category.HISTORY: HISTORY_TOPICS,
         Category.WORLD: WORLD_TOPICS,

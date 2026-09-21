@@ -214,3 +214,11 @@ def test_endpoint_reports_the_failure_until_a_fetch_succeeds(tmp_path):
         assert c.get("/api/topics").json()["error"] == "claude exited 1: no such tool"
         source.error = None
         assert c.post("/api/topics/refresh").json()["error"] is None
+
+
+def test_a_day_saved_with_more_news_than_today_allows_is_cut_down(store):
+    day = DailyTopics(store, None).today().isoformat()
+    store.set_daily_topics(day, [f"old news {i}" for i in range(FRESH_COUNT * 2)])
+    topics = DailyTopics(store, None).listing().topics
+    assert len([t for t in topics if t.category == Category.NEWS]) == FRESH_COUNT
+    assert len(topics) == FRESH_COUNT + POOL_COUNT

@@ -1,5 +1,5 @@
-"""The topics offered on the home page: half from the curated pool, half pulled
-from the day's news. The news half is fetched once a day in the background and
+"""The topics offered on the home page: three from the day's news, the rest from
+the curated pool. The news half is fetched once a day in the background and
 kept, so the list is stable while you use it and different tomorrow."""
 
 import logging
@@ -13,9 +13,9 @@ from app.topics import pool_for_day
 
 log = logging.getLogger(__name__)
 
-FRESH_COUNT = 6
-KOREA_COUNT = 2  # of the news half, stories from Korea
-POOL_COUNT = 6
+FRESH_COUNT = 3
+KOREA_COUNT = 1  # of the news three, stories from Korea
+POOL_COUNT = 9
 
 TOPICS_SCHEMA: dict = {
     "type": "object",
@@ -41,9 +41,9 @@ Two independent major outlets covering it prominently is the bar. If you cannot 
 cleared it, drop it and take the next one. Leave out trade-press items, single-company product news, \
 and local stories with no wider consequence.
 
-{korea_count} of the {count} must be Korean stories: ones leading the English-language Korean outlets \
+{korea_count} of the {count} must come from Korea: stories leading the English-language Korean outlets \
 (Yonhap, The Korea Herald, Korea JoongAng Daily, The Korea Times) this week, judged by the same bar. \
-Put them first. The rest come from the world at large.
+Put those first. The rest come from the world at large.
 
 Each topic is one line: a noun phrase of at most 7 words, shaped like a chapter heading, naming the \
 subject of the dispute. "Blame for the Java Sea ferry disaster" or "BRICS as a trade alternative", \
@@ -77,7 +77,7 @@ class ClaudeTopicSource:
 
 
 class DailyTopics:
-    """Today's list, and the background refresh that fills its news half."""
+    """Today's list, and the background refresh that fills its news slots."""
 
     def __init__(self, store: SessionStore, source: TopicSource | None, executor=None):
         self.store = store
@@ -96,7 +96,8 @@ class DailyTopics:
     def listing(self) -> TopicListing:
         """The day's topics, whether a fetch is still on its way, and the last failure."""
         day = self.today()
-        fresh = self.store.get_daily_topics(day.isoformat()) or []
+        # A day saved under an older, larger FRESH_COUNT is cut down rather than shown whole.
+        fresh = (self.store.get_daily_topics(day.isoformat()) or [])[:FRESH_COUNT]
         pool = pool_for_day(day, POOL_COUNT + FRESH_COUNT - len(fresh), exclude=fresh, salt=self._salt)
         news = [Topic(text=t, category=Category.NEWS) for t in fresh]
         return TopicListing(topics=news + pool, pending=self._inflight == day.isoformat(), error=self._error)
@@ -109,7 +110,7 @@ class DailyTopics:
         self._start(day)
 
     def refresh(self) -> None:
-        """Deals a new pool half now and fetches the news half again in the background."""
+        """Deals a new pool slice now and fetches the news again in the background."""
         day = self.today().isoformat()
         self._salt += 1
         if self.source is None or self._inflight == day:

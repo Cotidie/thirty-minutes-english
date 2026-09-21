@@ -8,7 +8,9 @@ from pydantic import BaseModel, ConfigDict, field_validator, model_validator
 class Category(StrEnum):
     """Where a suggested topic comes from. Drives the chip colour on the home page."""
 
-    TECH = "tech"
+    CS = "cs"
+    IE = "ie"
+    AI = "ai"
     LITERATURE = "literature"
     HISTORY = "history"
     WORLD = "world"

@@ -3,21 +3,112 @@ from datetime import date
 
 from app.models import Category, Topic
 
-_TECH: tuple[str, ...] = (
-    "Digital twins in manufacturing",
-    "Reinforcement learning for vehicle dispatching",
+# Three pools for the two fields the learners work in, and the one that sits
+# between them. Each is an argument a smart outsider can join, not a lecture.
+_CS: tuple[str, ...] = (
+    "Why software estimates are always wrong",
+    "Open source and who pays the maintainers",
+    "Rust, C, and the fight over memory safety",
+    "Why databases still run the world",
+    "The cloud bill and the return to on-premises",
+    "Technical debt and the code nobody dares touch",
+    "Type systems: safety net or straitjacket",
+    "Distributed systems and the lie of the reliable network",
+    "Compilers and the code you never see",
+    "Cryptography and the end of the secret",
+    "Quantum computing: hype, hope, or both",
+    "The end of the programmer as a job",
+    "Git and the art of working together on code",
+    "Testing culture: who writes the tests",
+    "Latency, throughput, and what users notice",
+    "Legacy COBOL and the systems too old to replace",
+    "Vibe coding and the software it leaves behind",
+    "Code review as teaching and as gatekeeping",
+    "Ransomware and the hospitals that paid",
+    "Zero-day exploits and the market for them",
+    "Operating systems and why there are only three",
+    "The browser as the new operating system",
+    "Programming languages that died and why",
+    "Algorithms in interviews versus algorithms at work",
+    "Computer science degrees and self-taught coders",
+    "Big O notation and when it stops mattering",
+    "Concurrency and the bugs that appear once a year",
+    "Software licences and the companies that changed them",
+    "Edge computing for real-time control",
+    "Energy-aware computing in data centers",
+    "Accessibility and the web built for some people",
+    "Floating point and the arithmetic computers get wrong",
+    "Search engines and the index of everything",
+    "P versus NP explained over coffee",
+    "Turing, Church, and what a computer can never do",
+    "The Y2K bug and the crisis that never came",
+    "GPUs: from games to science",
+    "Functional programming and its slow victory",
+    "Microservices and the monolith that came back",
+    "Abstraction and the leaks that come with it",
+    "Software bugs that cost lives",
+    "Passwords, passkeys, and the end of remembering",
+    "The limits of Moore's law",
+    "Caching and the two hard problems",
+    "Privacy engineering and the data you never collect",
+)
+
+_IE: tuple[str, ...] = (
+    "Queueing theory and factory variability",
+    "Scheduling under uncertainty",
+    "Supply chain resilience after disruptions",
+    "Lean manufacturing meets machine learning",
     "Automated material handling in semiconductor fabs",
+    "Autonomous mobile robots versus fixed conveyors",
+    "Digital twins in manufacturing",
+    "Predictive maintenance with sensor data",
+    "Anomaly detection in production lines",
+    "Smart factories and the workers who run them",
+    "Optimization solvers versus learned heuristics",
+    "The Toyota Production System and its imitators",
+    "Little's law and why the queue is always long",
+    "Bottlenecks and the theory of constraints",
+    "Inventory: how much to hold and where",
+    "Just-in-time and the pandemic that broke it",
+    "Six Sigma and the cult of the defect rate",
+    "Warehouse robots and the humans between them",
+    "Simulation before building the factory",
+    "Ergonomics and the design of a workstation",
+    "Linear programming: the workhorse nobody sees",
+    "The bullwhip effect in supply chains",
+    "Semiconductor fabs and the cost of a wafer",
+    "Reshoring and the factories coming home",
+    "Forecasting demand and being wrong on purpose",
+    "Overall equipment effectiveness and what it hides",
+    "The traveling salesman and routes at scale",
+    "Human factors and the accidents blamed on operators",
+    "Quality control from Deming to today",
+    "Airport operations as a queueing problem",
+    "Hospital operations and the waiting room",
+    "Last-mile delivery and the cost of free shipping",
+    "Ports, containers, and the box that shrank the world",
+    "Assembly lines from Ford to Tesla",
+    "Batch size and the case for making one at a time",
+    "Maintenance: fix it now or fix it later",
+    "Facility layout and the walk nobody measured",
+    "Safety stock and the price of never running out",
+    "Flexible manufacturing and mass customization",
+    "Energy costs and the factory schedule",
+    "Robots per worker: Korea leads the world",
+    "Lights-out factories and whether anyone wants them",
+    "Amazon's warehouses and the pace of picking",
+    "Overhead hoist transport and the fab's traffic jam",
+    "Cycle time, WIP, and factory physics",
+)
+
+_AI: tuple[str, ...] = (
+    "Reinforcement learning for vehicle dispatching",
     "Large language models as coding assistants",
     "Transformer attention explained for engineers",
-    "Queueing theory and factory variability",
-    "Predictive maintenance with sensor data",
     "Humanoid robots on the factory floor",
     "Vision-language-action models for robot manipulation",
     "Imitation learning from human demonstrations",
     "Simulation-to-real transfer in robotics",
-    "Scheduling under uncertainty",
-    "Supply chain resilience after disruptions",
-    "Edge computing for real-time control",
     "Data quality and label noise in machine learning",
     "Federated learning and privacy",
     "Graph neural networks for logistics networks",
@@ -25,25 +116,41 @@ _TECH: tuple[str, ...] = (
     "AI agents that use tools",
     "Evaluating LLMs: benchmarks and their limits",
     "Explainable AI for operations decisions",
-    "Energy-aware computing in data centers",
     "Human-AI collaboration in engineering work",
     "The economics of automation and jobs",
     "Open-source versus proprietary AI models",
-    "Anomaly detection in production lines",
-    "Lean manufacturing meets machine learning",
-    "Robot safety standards and certification",
     "Synthetic data for training perception models",
-    "Optimization solvers versus learned heuristics",
-    "Autonomous mobile robots versus fixed conveyors",
     "Why self-driving cars keep missing their deadlines",
-    "Quantum computing: hype, hope, or both",
-    "The right to repair your own devices",
-    "Smart factories and the workers who run them",
     "Recommendation algorithms and what they do to taste",
-    "Battery chemistry and the race past lithium",
-    "Software bugs that cost lives",
-    "Passwords, passkeys, and the end of remembering",
-    "The limits of Moore's law",
+    "Robot safety standards and certification",
+    "Scaling laws and whether bigger keeps winning",
+    "Hallucination and the confident wrong answer",
+    "Reward hacking and the agent that games the score",
+    "AlphaGo and the ten years since",
+    "Prompt engineering as a skill or a fad",
+    "AI alignment and who decides the values",
+    "Foundation models for time series",
+    "Model distillation and the small models that catch up",
+    "The GPU shortage and who gets the chips",
+    "Retrieval-augmented generation and the memory problem",
+    "Multi-agent systems and emergent behaviour",
+    "Overfitting and the model that memorized the exam",
+    "Reinforcement learning from human feedback",
+    "AI in the classroom: tutor or cheat",
+    "Deepfakes and the end of seeing is believing",
+    "Computer vision on the production line",
+    "Neural networks and the brain they were named after",
+    "Bias in training data and the decisions it shapes",
+    "AI winters and the boom that might bust",
+    "Copyright and the data models trained on",
+    "World models and learning by imagining",
+    "Interpretability: looking inside the black box",
+    "Chain-of-thought and whether models really reason",
+    "Edge AI and models that run on the device",
+    "AI for drug discovery and protein folding",
+    "The energy cost of training one model",
+    "Autonomous agents doing office work",
+    "Gradient descent explained over coffee",
 )
 
 _LITERATURE: tuple[str, ...] = (
@@ -175,6 +282,8 @@ _WORLD: tuple[str, ...] = (
     "Ultra-processed food and the limits of personal choice",
     "Free speech and moderation on private platforms",
     "Wealth taxes and the billionaires who leave",
+    "The right to repair your own devices",
+    "Battery chemistry and the race past lithium",
 )
 
 # Home ground for a pair of Korean learners: the arguments Koreans have among
@@ -274,24 +383,44 @@ def _pool(texts: tuple[str, ...], category: Category) -> tuple[Topic, ...]:
     return tuple(Topic(text=t, category=category) for t in texts)
 
 
-TECH_TOPICS = _pool(_TECH, Category.TECH)
+CS_TOPICS = _pool(_CS, Category.CS)
+IE_TOPICS = _pool(_IE, Category.IE)
+AI_TOPICS = _pool(_AI, Category.AI)
 LITERATURE_TOPICS = _pool(_LITERATURE, Category.LITERATURE)
 HISTORY_TOPICS = _pool(_HISTORY, Category.HISTORY)
 WORLD_TOPICS = _pool(_WORLD, Category.WORLD)
 KOREA_TOPICS = _pool(_KOREA, Category.KOREA)
 RESEARCH_TOPICS = _pool(_RESEARCH, Category.RESEARCH)
 
-TOPICS: tuple[Topic, ...] = TECH_TOPICS + LITERATURE_TOPICS + HISTORY_TOPICS + WORLD_TOPICS + KOREA_TOPICS + RESEARCH_TOPICS
+POOLS: tuple[tuple[Topic, ...], ...] = (
+    CS_TOPICS,
+    IE_TOPICS,
+    AI_TOPICS,
+    LITERATURE_TOPICS,
+    HISTORY_TOPICS,
+    WORLD_TOPICS,
+    KOREA_TOPICS,
+    RESEARCH_TOPICS,
+)
+TOPICS: tuple[Topic, ...] = tuple(t for pool in POOLS for t in pool)
 
 
 def pool_for_day(day: date, count: int, exclude: list[str] | None = None, salt: int = 0) -> list[Topic]:
     """The same slice all day, a different one tomorrow. Seeded by the date, plus a
-    salt so a manual refresh can deal a fresh slice within the day."""
+    salt so a manual refresh can deal a fresh slice within the day. Dealt one
+    category at a time, so every pool shows up before any repeats."""
     taken = set(exclude or ())
-    available = [t for t in TOPICS if t.text not in taken]
     rng = random.Random(day.toordinal() * 1000 + salt)
-    rng.shuffle(available)
-    return available[: max(0, count)]
+    hands = [[t for t in pool if t.text not in taken] for pool in POOLS]
+    for hand in hands:
+        rng.shuffle(hand)
+    rng.shuffle(hands)
+    dealt: list[Topic] = []
+    while len(dealt) < count and any(hands):
+        for hand in hands:
+            if hand and len(dealt) < count:
+                dealt.append(hand.pop())
+    return dealt
 
 
 def pick_topic(recent: list[str], rng: random.Random | None = None) -> str:

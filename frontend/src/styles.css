@@ -244,10 +244,22 @@ a {
   --cat-ink: #8f3a2a;
 }
 
-[data-category='tech'] {
+[data-category='cs'] {
   --cat-line: #a8bdd8;
   --cat-fill: #eaf1f9;
   --cat-ink: #2f5580;
+}
+
+[data-category='ie'] {
+  --cat-line: #efb27f;
+  --cat-fill: #fdf0e4;
+  --cat-ink: #9a4d0b;
+}
+
+[data-category='ai'] {
+  --cat-line: #a9b0e6;
+  --cat-fill: #eceefb;
+  --cat-ink: #363f9a;
 }
 
 [data-category='literature'] {

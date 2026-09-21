@@ -6,7 +6,7 @@ import type { Topic } from '../types'
 
 const suggestions: Topic[] = [
   { text: 'Who pays when the grid runs short', category: 'news' },
-  { text: 'Digital twins in manufacturing', category: 'tech' },
+  { text: 'Digital twins in manufacturing', category: 'ie' },
   { text: "Korea's birth rate and what could reverse it", category: 'korea' },
   { text: 'How to read a paper in an hour', category: 'research' },
   { text: 'The Cold War space race', category: 'history' },
@@ -26,7 +26,7 @@ describe('TopicPicker', () => {
     expect(key).toHaveTextContent('In the news')
     expect(key).toHaveTextContent('Korea')
     expect(key).toHaveTextContent('Research')
-    expect(key).toHaveTextContent('Technology')
+    expect(key).toHaveTextContent('Industrial engineering')
     expect(key).toHaveTextContent('History')
     expect(key).not.toHaveTextContent('Literature')
   })
