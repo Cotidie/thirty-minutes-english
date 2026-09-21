@@ -1825,12 +1825,6 @@ button.question.is-active {
   color: var(--muted);
 }
 
-.reading-said {
-  display: block;
-  margin-top: 0.25rem;
-  font-style: italic;
-}
-
 .reading-card .read-aloud-ok {
   margin-left: 0.4rem;
   color: #35633c;

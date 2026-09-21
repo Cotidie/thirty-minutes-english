@@ -3,7 +3,6 @@ import { api } from '../api'
 import { startAzureAssessor, type Assessor } from '../lib/assessor/azure'
 import { Judge, type AzureWord } from '../lib/assessor/judge'
 import { connectReadAloud, type LiveConnection } from '../lib/liveClient'
-import { spoken } from '../lib/liveSession'
 import { ReadingText, type Shown } from './ReadingText'
 
 interface Props {
@@ -26,6 +25,16 @@ const STATUS_LABEL: Record<Phase, string> = {
   listening: 'Listening. Read the paragraph aloud; click a mark to hear it.',
   done: 'Round over. The marks stay: click one to hear it.',
   failed: 'Could not start.',
+}
+
+/** The two beats the coach says, in text, so the card needs no transcript. */
+function correctionText(f: Shown): string {
+  if (f.kind === 'phrasing') {
+    const [a, b] = f.word.split(' ')
+    return `You paused between "${a}" and "${b}". Put them together.`
+  }
+  const [heard, , right] = f.heard.split(' ')
+  return right ? `You said "${heard}" for "${right}".` : `Heard ${f.heard}.`
 }
 
 /** The coach stays on this long after its last word, then hangs up. */
@@ -61,7 +70,6 @@ export function ReadAloud({ paragraph, breaks = [], sessionId, active, onStart, 
   const [seconds, setSeconds] = useState(0)
   const [findings, setFindings] = useState<Shown[]>([])
   const [open, setOpen] = useState<number | null>(null)
-  const [said, setSaid] = useState('')
   const audioRef = useRef<HTMLAudioElement>(null)
   const roundRef = useRef<Round | null>(null)
   const callRef = useRef<Call | null>(null)
@@ -82,7 +90,6 @@ export function ReadAloud({ paragraph, breaks = [], sessionId, active, onStart, 
     setSeconds(0)
     setFindings([])
     setOpen(null)
-    setSaid('')
     try {
       const session = await api.assessorToken()
       const microphone = await navigator.mediaDevices.getUserMedia({ audio: true })
@@ -142,8 +149,6 @@ export function ReadAloud({ paragraph, breaks = [], sessionId, active, onStart, 
 
   const speak = async (finding: Shown) => {
     hangUp()
-    setSaid('')
-    let text = ''
     // Gemini reports session.started while connecting, before `coach` exists.
     let coach: LiveConnection | null = null
     let started = false
@@ -155,11 +160,7 @@ export function ReadAloud({ paragraph, breaks = [], sessionId, active, onStart, 
             started = true
             coach?.correct(finding)
           }
-          if (event.type === 'session.output_transcript.delta') {
-            text = spoken(text + (event.delta ?? ''))
-            setSaid(text)
-            linger(COACH_SILENCE_MS)
-          }
+          if (event.type === 'session.output_transcript.delta') linger(COACH_SILENCE_MS)
           if (event.type === 'session.closed') hangUp()
         },
         onDisconnect: hangUp,
@@ -231,9 +232,8 @@ export function ReadAloud({ paragraph, breaks = [], sessionId, active, onStart, 
       {card && (
         <p className="reading-card">
           <b>{card.word}</b>
-          <span className="reading-heard">{card.kind === 'phrasing' ? 'put them together' : card.heard}</span>
+          <span className="reading-heard">{correctionText(card)}</span>
           {card.repeated_ok && <span className="read-aloud-ok">✓</span>}
-          {said && <span className="reading-said">{said}</span>}
         </p>
       )}
       {phase === null ? (

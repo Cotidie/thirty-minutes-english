@@ -134,7 +134,7 @@ describe('ReadAloud round', () => {
     expect(screen.getByRole('button', { name: 'Read again' })).toBeInTheDocument()
     await userEvent.click(screen.getByRole('button', { name: 'verified: b for v' }))
     await waitFor(() => expect(connect).toHaveBeenCalled())
-    expect(screen.getByText('b for v')).toBeInTheDocument()
+    expect(screen.getByText('You said "b" for "v".')).toBeInTheDocument()
   })
 
   it('fails before touching the microphone when the assessor is off', async () => {
@@ -175,14 +175,13 @@ describe('ReadAloud marks', () => {
       await userEvent.click(screen.getByRole('button', { name: 'verified: b for v' }))
       await waitFor(() => expect(connect).toHaveBeenCalledWith('Researchers verified it.', expect.anything()))
       expect(coachTrack.enabled).toBe(false)
-      expect(screen.getByText('b for v')).toBeInTheDocument()
+      expect(screen.getByText('You said "b" for "v".')).toBeInTheDocument()
 
       act(() => emit({ type: 'session.started' }))
       expect(connection.correct).toHaveBeenCalledWith(expect.objectContaining({ word: 'verified', at: 1 }))
 
-      act(() => emit({ type: 'session.output_transcript.delta', delta: '<no speech>You said berify. ' }))
+      act(() => emit({ type: 'session.output_transcript.delta', delta: 'You said berify. ' }))
       act(() => emit({ type: 'session.output_transcript.delta', delta: "It's verify." }))
-      expect(screen.getByText("You said berify. It's verify.")).toBeInTheDocument()
       expect(connection.close).not.toHaveBeenCalled()
 
       await act(async () => {

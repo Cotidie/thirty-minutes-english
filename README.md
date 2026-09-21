@@ -77,7 +77,7 @@ Article 탭의 문단마다 `Read aloud` 버튼이 있다. 누르면 마이크�
 | 시점 | 화면 | 코치 |
 |---|---|---|
 | 읽는 동안 | 문단이 단어 단위로 바뀌고, 틀린 단어에 붉은 밑줄, 구 안 멈춤은 두 단어 사이 붉은 `\|` | 꺼져 있음 |
-| 표시 클릭 | 아래에 카드("heard b for v: say v")와 코치가 한 말 | 세션 하나를 열어 두 박자 "You said berify. It's verify. Try it."(`Correction:`)를 말하고, 2초 조용하면 끊는다. 코치 마이크는 꺼 둔다 |
+| 표시 클릭 | 아래에 카드가 바로 뜬다("You said \"b\" for \"v\"." / "You paused between \"July\" and \"1969\". Put them together.") | 세션 하나를 열어 두 박자 "You said berify. It's verify. Try it."(`Correction:`)를 말하고, 2초 조용하면 끊는다. 코치 마이크는 꺼 둔다 |
 | 다시 읽어 맞음 | 표시가 초록 ✓ (Azure가 확인) | |
 | `Done` | 마이크와 Azure를 놓는다. 표시는 남아 그 뒤에도, `Close` 뒤에도 클릭할 수 있다. `Read again`으로 새 라운드 | |
 
