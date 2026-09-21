@@ -99,12 +99,13 @@ SESSION_SCHEMA: dict = {
             "items": {
                 "type": "object",
                 "additionalProperties": False,
-                "required": ["word", "pos", "definition", "example", "scene"],
+                "required": ["word", "pos", "definition", "example", "korean", "scene"],
                 "properties": {
                     "word": {"type": "string"},
                     "pos": {"type": "string"},
                     "definition": {"type": "string"},
                     "example": {"type": "string"},
+                    "korean": {"type": "string"},
                     "scene": {"type": "string"},
                 },
             },
@@ -155,7 +156,8 @@ article body where it offers strong candidates, and fill the rest with words a w
 use when discussing this subject even if they do not appear in the article. Prefer words useful across \
 academic and professional English over topic-specific jargon; no proper nouns. \
 For each give the word, part of speech, a concise learner-dictionary definition, one example \
-sentence different from the article, and a scene: {scene_rules}. Vary the scenes across the words: \
+sentence different from the article, korean (the Korean equivalent in the sense used here, one or two \
+words, no explanation), and a scene: {scene_rules}. Vary the scenes across the words: \
 different places, times of day, and kinds of people, so no two look alike.
 
 Set topic to the article topic. Use American English. Return only the structured output."""

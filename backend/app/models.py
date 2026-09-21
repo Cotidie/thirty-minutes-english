@@ -76,6 +76,8 @@ class VocabularyItem(BaseModel):
     pos: str
     definition: str
     example: str
+    """The Korean equivalent in the sense used here; hidden on the card until tapped."""
+    korean: str | None = None
     """A drawable situation the word fits, written with the session; drawn for the card."""
     scene: str | None = None
     """File name under the images folder, served at /api/images/{image}."""

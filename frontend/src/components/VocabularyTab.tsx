@@ -34,14 +34,10 @@ function Drawing({ seconds }: { seconds: number }) {
 
 function VocabCard({ item, drawing }: { item: VocabularyItem; drawing: boolean }) {
   const [revealed, setRevealed] = useState(false)
+  const [korean, setKorean] = useState(false)
   const seconds = useElapsed(drawing)
   return (
-    <button
-      type="button"
-      className={`vocab-card${revealed ? ' is-revealed' : ''}`}
-      aria-expanded={revealed}
-      onClick={() => setRevealed((r) => !r)}
-    >
+    <div className={`vocab-card${revealed ? ' is-revealed' : ''}`} onClick={() => setRevealed((r) => !r)}>
       {item.image && (
         <span className="vocab-picture-frame">
           <img className={`vocab-picture${drawing ? ' is-drawing' : ''}`} src={`/api/images/${item.image}`} alt={item.scene ?? item.word} />
@@ -50,12 +46,35 @@ function VocabCard({ item, drawing }: { item: VocabularyItem; drawing: boolean }
       )}
       <span className="vocab-word">
         <span className="vocab-word-text">{item.word}</span> <em className="vocab-pos">{item.pos}</em>
+        {item.korean && (
+          <button
+            type="button"
+            className={`vocab-korean${korean ? ' is-shown' : ''}`}
+            aria-pressed={korean}
+            aria-label={korean ? `Hide the Korean for ${item.word}` : `Korean for ${item.word}`}
+            title={korean ? 'Hide' : 'Korean'}
+            onClick={(e) => {
+              e.stopPropagation()
+              setKorean((k) => !k)
+            }}
+          >
+            {korean ? item.korean : '한'}
+          </button>
+        )}
       </span>
       <span className="vocab-example">{item.example}</span>
-      <span className="vocab-definition" aria-hidden={!revealed}>
+      <button
+        type="button"
+        className="vocab-definition"
+        aria-expanded={revealed}
+        onClick={(e) => {
+          e.stopPropagation()
+          setRevealed((r) => !r)
+        }}
+      >
         {revealed ? item.definition : 'Tap to check the meaning'}
-      </span>
-    </button>
+      </button>
+    </div>
   )
 }
 

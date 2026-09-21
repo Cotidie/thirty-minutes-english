@@ -55,6 +55,18 @@ describe('VocabularyTab', () => {
     vi.useRealTimers()
   })
 
+  it('keeps the Korean word hidden behind a pill until it is tapped, without opening the meaning', async () => {
+    const withKorean = [{ ...items[0], korean: '어디에나 있는' }, items[1]]
+    render(<VocabularyTab items={withKorean} sessionId={3} onPicture={vi.fn()} starred={[]} onToggleStar={vi.fn()} examples={none} onExample={vi.fn()} />)
+    expect(screen.queryByText('어디에나 있는')).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Korean for mitigate' })).not.toBeInTheDocument()
+    await userEvent.click(screen.getByRole('button', { name: 'Korean for ubiquitous' }))
+    expect(screen.getByRole('button', { name: 'Hide the Korean for ubiquitous' })).toHaveTextContent('어디에나 있는')
+    expect(screen.getAllByText('Tap to check the meaning')).toHaveLength(2)
+    await userEvent.click(screen.getByRole('button', { name: 'Hide the Korean for ubiquitous' }))
+    expect(screen.queryByText('어디에나 있는')).not.toBeInTheDocument()
+  })
+
   it('shows the picture drawn for a word, and nothing where there is none', () => {
     const drawn = [{ ...items[0], scene: 'a phone in every hand on a train', image: 'job-0.png' }, items[1]]
     render(<VocabularyTab items={drawn} sessionId={3} onPicture={vi.fn()} starred={[]} onToggleStar={vi.fn()} examples={none} onExample={vi.fn()} />)
@@ -69,14 +81,14 @@ describe('VocabularyTab', () => {
     expect(screen.getByText('Phones are ubiquitous.')).toBeInTheDocument()
     expect(screen.queryByText('present everywhere')).not.toBeInTheDocument()
 
-    await userEvent.click(screen.getByRole('button', { name: /^ubiquitous/ }))
+    await userEvent.click(screen.getByText('ubiquitous'))
     expect(screen.getByText('present everywhere')).toBeInTheDocument()
     expect(screen.queryByText('make less severe')).not.toBeInTheDocument()
   })
 
   it('hides the definition again on a second click', async () => {
     render(<VocabularyTab items={items} sessionId={3} onPicture={vi.fn()} starred={[]} onToggleStar={vi.fn()} examples={none} onExample={vi.fn()} />)
-    const card = screen.getByRole('button', { name: /^mitigate/ })
+    const card = screen.getByText('mitigate')
     await userEvent.click(card)
     expect(screen.getByText('make less severe')).toBeInTheDocument()
     await userEvent.click(card)

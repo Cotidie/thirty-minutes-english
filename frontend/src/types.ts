@@ -34,6 +34,8 @@ export interface VocabularyItem {
   pos: string
   definition: string
   example: string
+  /** The Korean equivalent, hidden on the card until tapped. */
+  korean?: string | null
   /** A situation the word fits, drawn for the card; the learner describes it with the word. */
   scene?: string | null
   /** File name under /api/images/. */
