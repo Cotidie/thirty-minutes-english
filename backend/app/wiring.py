@@ -125,4 +125,4 @@ def _illustrator(settings: Settings, image_dir: Path | None) -> Illustrator | No
     painter = painter_for(settings.get("IMAGE_PROVIDER"), settings.get("IMAGE_MODEL"), keys)
     if painter is None and settings.get("IMAGE_PROVIDER") != "off":
         log.warning("pictures are off: no key for IMAGE_PROVIDER=%s", settings.get("IMAGE_PROVIDER"))
-    return Illustrator(painter, image_dir) if painter else None
+    return Illustrator(painter, image_dir, settings.get("IMAGE_STYLE")) if painter else None

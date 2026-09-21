@@ -16,7 +16,26 @@ from app.models import SessionContent
 
 log = logging.getLogger(__name__)
 
-STYLE = "Flat vector illustration, soft colours, simple shapes, one clear scene. No text, letters, numbers, or signs anywhere."
+# Picture styles the learner can pick in Settings; the key is the setting value.
+# A realistic photo gives the most to describe; flat vector was too bare for a sentence.
+STYLES: dict[str, str] = {
+    "photo": "A realistic photograph, natural light, everyday detail, eye-level view.",
+    "cinematic": "A cinematic film still, dramatic lighting, shallow depth of field, rich detail.",
+    "storybook": "A warm children's storybook illustration, watercolour and ink, gentle detail.",
+    "comic": "A single comic-book panel, bold ink lines, expressive characters, no speech bubbles.",
+    "sketch": "A pencil sketch with light shading, loose but clear lines.",
+    "flat": "Flat vector illustration, soft colours, simple shapes.",
+}
+STYLE_LABELS: dict[str, str] = {
+    "photo": "realistic photo, the most detail to describe",
+    "cinematic": "film still, dramatic light",
+    "storybook": "watercolour storybook",
+    "comic": "one comic panel",
+    "sketch": "pencil sketch",
+    "flat": "flat vector, simple shapes",
+}
+# On every style: the learner has to supply the word, so the picture must not.
+NO_TEXT = "One clear scene. No text, letters, numbers, signs, or captions anywhere in the image."
 OPENROUTER_MCP = "https://mcp.openrouter.ai/mcp"
 COMFY_MCP = "https://cloud.comfy.org/mcp"
 # Provider -> default image model, Nano Banana Pro on both.
@@ -124,15 +143,19 @@ def fetch_url(url: str, attempts: int = 3) -> bytes:
 
 
 class Illustrator:
-    def __init__(self, painter: Painter, image_dir: Path) -> None:
+    def __init__(self, painter: Painter, image_dir: Path, style: str = "photo") -> None:
         self._painter = painter
         self._dir = image_dir
+        self._style = STYLES.get(style, STYLES["photo"])
+
+    def prompt(self, scene: str) -> str:
+        return f"{self._style} {NO_TEXT} {scene}"
 
     def illustrate(self, job_id: str, content: SessionContent) -> SessionContent:
         """The content with a picture on every word whose scene got drawn. A word
         without a scene, or whose picture failed, stays as it is."""
         drawable = [(i, item) for i, item in enumerate(content.vocabulary) if item.scene]
-        pictures = self._painter.paint([f"{STYLE} {item.scene}" for _, item in drawable])
+        pictures = self._painter.paint([self.prompt(item.scene or "") for _, item in drawable])
         self._dir.mkdir(parents=True, exist_ok=True)
         vocabulary = list(content.vocabulary)
         for (i, item), png in zip(drawable, pictures):

@@ -49,10 +49,11 @@ docker compose up -d --build
 | `OPENROUTER_API_KEY` | 비움 | OpenRouter MCP의 bearer 토큰. provider가 `openrouter`인데 비어 있으면 그림 없이 생성 |
 | `COMFY_API_KEY` | 비움 | comfy-cloud MCP의 bearer 토큰. provider가 `comfy`일 때 |
 | `IMAGE_MODEL` | 비움 | 이미지 모델. 비우면 provider 기본값(Nano Banana Pro). 설정 모달 메뉴에 GPT-Image 2.5, Nano Banana 2 등이 있다 |
+| `IMAGE_STYLE` | `photo` | 그림 스타일: `photo`(사진, 묘사할 거리가 가장 많다) · `cinematic` · `storybook` · `comic` · `sketch` · `flat`. 프롬프트는 `illustrator.STYLES` |
 
 ## Vocabulary 그림
 
-세션 생성 마지막 단계(`illustrating`, 진행 바의 "Drawing a picture for each word")에서 단어마다 그 단어가 어울리는 상황을 그린 그림을 한 장씩 만든다. 장면 문장(`scene`)은 세션 생성 프롬프트가 단어와 함께 쓴다(글자가 들어갈 필요 없는 구체적인 상황). `backend/app/illustrator.py`가 그 장면들을 `IMAGE_PROVIDER`의 MCP 서버에 보낸다. MCP 호출은 `backend/app/mcp_client.py`(JSON-RPC over HTTP)가 하고, 인증은 OAuth 로그인 대신 그 provider의 API 키를 bearer 토큰으로 보낸다(OAuth 토큰은 몇 시간에서 7일이면 만료되므로). `claude` 실행은 없다.
+세션 생성 마지막 단계(`illustrating`, 진행 바의 "Drawing a picture for each word")에서 단어마다 그 단어가 어울리는 상황을 그린 그림을 한 장씩 만든다. 장면 문장(`scene`)은 세션 생성 프롬프트가 단어와 함께 쓴다(글자가 들어갈 필요 없는 구체적인 상황). 이미지 프롬프트는 `IMAGE_STYLE`의 스타일 문장 + 글자 금지 문장 + 장면 문장이다. `backend/app/illustrator.py`가 그 장면들을 `IMAGE_PROVIDER`의 MCP 서버에 보낸다. MCP 호출은 `backend/app/mcp_client.py`(JSON-RPC over HTTP)가 하고, 인증은 OAuth 로그인 대신 그 provider의 API 키를 bearer 토큰으로 보낸다(OAuth 토큰은 몇 시간에서 7일이면 만료되므로). `claude` 실행은 없다.
 
 | provider | MCP | 호출 | 기본 모델 |
 |---|---|---|---|

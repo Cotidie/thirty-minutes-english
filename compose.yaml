@@ -31,6 +31,7 @@ services:
       COMFY_API_KEY: ${COMFY_API_KEY:-}
       IMAGE_PROVIDER: ${IMAGE_PROVIDER:-openrouter}
       IMAGE_MODEL: ${IMAGE_MODEL:-}
+      IMAGE_STYLE: ${IMAGE_STYLE:-photo}
       EXAMPLE_MODEL: ${EXAMPLE_MODEL:-opus}
       EXAMPLE_EFFORT: ${EXAMPLE_EFFORT:-low}
     volumes:

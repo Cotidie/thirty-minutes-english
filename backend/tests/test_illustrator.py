@@ -6,7 +6,7 @@ import json
 import pytest
 
 import app.illustrator as mod
-from app.illustrator import STYLE, ComfyPainter, Illustrator, OpenRouterPainter, fetch_url, painter_for
+from app.illustrator import NO_TEXT, STYLES, ComfyPainter, Illustrator, OpenRouterPainter, fetch_url, painter_for
 from app.mcp_client import McpError
 from tests.conftest import sample_content
 
@@ -26,10 +26,15 @@ def test_every_word_with_a_scene_gets_its_picture_file(tmp_path):
     painter = FakePainter()
     done = Illustrator(painter, tmp_path / "images").illustrate("job1", content)
 
-    assert painter.prompts[0] == f"{STYLE} scene 0"
+    assert painter.prompts[0] == f"{STYLES['photo']} {NO_TEXT} scene 0"
     assert [v.image for v in done.vocabulary] == [f"job1-{i}.png" for i in range(len(content.vocabulary))]
     assert (tmp_path / "images" / "job1-2.png").read_bytes() == b"PNG2"
     assert content.vocabulary[0].image is None  # the input is untouched
+
+
+def test_the_chosen_style_leads_the_prompt_and_an_unknown_one_falls_back_to_photo(tmp_path):
+    assert Illustrator(FakePainter(), tmp_path, "comic").prompt("a dog") == f"{STYLES['comic']} {NO_TEXT} a dog"
+    assert Illustrator(FakePainter(), tmp_path, "nope").prompt("a dog").startswith(STYLES["photo"])
 
 
 def test_a_word_without_a_scene_is_skipped_and_a_failed_picture_stays_bare(tmp_path):

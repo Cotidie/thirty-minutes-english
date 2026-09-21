@@ -10,6 +10,8 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Literal
 
+from app.illustrator import STYLE_LABELS, STYLES
+
 Group = Literal["keys", "voice", "assess", "claude", "text", "images"]
 
 EFFORTS = ("low", "medium", "high", "xhigh", "max")
@@ -102,6 +104,7 @@ SPECS: tuple[Spec, ...] = (
     Spec("EXAMPLE_EFFORT", "claude", "low", choices=EFFORTS),
     Spec("IMAGE_PROVIDER", "images", "openrouter", choices=IMAGE_PROVIDERS),
     Spec("IMAGE_MODEL", "images", suggestions=IMAGE_MODELS),
+    Spec("IMAGE_STYLE", "images", "photo", choices=tuple(STYLES), labels=STYLE_LABELS),
     Spec("SUMMARY_MODEL", "text", "gpt-5.6-luna"),
 )
 SPEC_BY_KEY = {spec.key: spec for spec in SPECS}
