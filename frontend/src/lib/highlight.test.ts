@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest'
-import { highlightSegments } from './highlight'
+import { markedSpans, segmentsIn } from './highlight'
+
+const highlightSegments = (text: string, evidence: string[]) => segmentsIn(text, markedSpans(text, evidence))
 
 const text = 'The trouble starts the day after go-live. A real factory changes constantly.'
 
@@ -27,8 +29,7 @@ describe('highlightSegments', () => {
 })
 
 describe('segmentsIn', () => {
-  it('marks one passage across two pieces of the same paragraph', async () => {
-    const { markedSpans, segmentsIn } = await import('./highlight')
+  it('marks one passage across two pieces of the same paragraph', () => {
     const paragraph = 'Reverence is weak. Being unfinished is strong.'
     const spans = markedSpans(paragraph, ['is weak. Being unfinished'])
     expect(segmentsIn('Reverence is weak.', spans, 0)).toEqual([

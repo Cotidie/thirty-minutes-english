@@ -1,25 +1,40 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState, type RefObject } from 'react'
 import { api } from '../api'
 import { startAzureAssessor, type Assessor } from '../lib/assessor/azure'
-import { Judge, type AzureWord } from '../lib/assessor/judge'
+import { Judge, type AzureWord, type Shown } from '../lib/assessor/judge'
 import { connectReadAloud, type LiveConnection } from '../lib/liveClient'
 import { FindingCard } from './FindingCard'
-import { ReadingText, type Shown } from './ReadingText'
 
-interface Props {
+interface Options {
   paragraph: string
-  /** Thought-group breaks to show as slashes; a pause there is not a finding. */
-  breaks?: number[]
+  /** Thought-group breaks; a pause there is not a finding. */
+  breaks: number[]
   /** Where a finished round is filed, when the reading happens inside a session. */
   sessionId: number | null
-  /** Only one paragraph may hold the microphone at a time. */
-  active: boolean
   onStart: () => void
-  /** The microphone is free. `kept` when the marks stay on the page for clicking. */
-  onEnd: (kept: boolean) => void
+  /** The microphone is free. */
+  onEnd: () => void
 }
 
 type Phase = 'connecting' | 'listening' | 'done' | 'failed'
+
+/** A paragraph's read-aloud round as the page sees it. */
+export interface ReadAloudRound {
+  phase: Phase | null
+  error: string | null
+  heard: string
+  seconds: number
+  findings: Shown[]
+  /** Index into `findings` of the one whose card is open. */
+  open: number | null
+  audioRef: RefObject<HTMLAudioElement | null>
+  start: () => void
+  done: () => void
+  /** Close: the marks stay for clicking. */
+  reset: () => void
+  /** The reader clicked a mark: show its card and have the coach say it. */
+  ask: (index: number) => void
+}
 
 const STATUS_LABEL: Record<Phase, string> = {
   connecting: 'Connecting…',
@@ -54,7 +69,7 @@ interface Call {
  * as the reader goes; a clicked mark opens the full account in text, and the
  * coach is dialled to say its two beats and hang up.
  */
-export function ReadAloud({ paragraph, breaks = [], sessionId, active, onStart, onEnd }: Props) {
+export function useReadAloud({ paragraph, breaks, sessionId, onStart, onEnd }: Options): ReadAloudRound {
   const [phase, setPhase] = useState<Phase | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [heard, setHeard] = useState('')
@@ -203,26 +218,29 @@ export function ReadAloud({ paragraph, breaks = [], sessionId, active, onStart, 
       .catch(() => undefined)
   }
 
-  /** Close: the marks stay for clicking; a round with none is gone. */
+  /** Close: the marks stay for clicking. */
   const reset = () => {
     hangUp()
     void endRound()
     roundRef.current = null
     setPhase(null)
-    if (findings.length === 0) setHeard('')
-    onEnd(findings.length > 0)
+    onEnd()
   }
 
+  return { phase, error, heard, seconds, findings, open, audioRef, start: () => void start(), done: () => void done(), reset, ask }
+}
+
+/** The round's controls: the button, the status bar, the open card, and what was heard. */
+export function ReadAloudBar({ round, active }: { round: ReadAloudRound; active: boolean }) {
+  const { phase, error, heard, seconds, findings, open } = round
   const card = open === null ? null : findings[open]
   const shown = phase !== null || findings.length > 0
-
   return (
     <div className={`read-aloud${phase === 'listening' ? ' is-live' : ''}${shown ? ' is-shown' : ''}`}>
-      <audio ref={audioRef} autoPlay />
-      {shown && <ReadingText paragraph={paragraph} findings={findings} breaks={breaks} open={open} onOpen={ask} />}
+      <audio ref={round.audioRef} autoPlay />
       {card && <FindingCard finding={card} />}
       {phase === null ? (
-        <button type="button" className="read-aloud-start" onClick={start} disabled={active}>
+        <button type="button" className="read-aloud-start" onClick={round.start} disabled={active}>
           {shown ? 'Read again' : 'Read aloud'}
         </button>
       ) : (
@@ -233,12 +251,12 @@ export function ReadAloud({ paragraph, breaks = [], sessionId, active, onStart, 
             </span>
             {seconds > 0 && <span className="read-aloud-seconds">{seconds}s</span>}
             {phase === 'listening' && (
-              <button type="button" onClick={() => void done()}>
+              <button type="button" onClick={round.done}>
                 Done
               </button>
             )}
             {(phase === 'done' || phase === 'failed') && (
-              <button type="button" onClick={reset}>
+              <button type="button" onClick={round.reset}>
                 Close
               </button>
             )}

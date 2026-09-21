@@ -72,7 +72,7 @@ Gemini 세션은 오디오만일 때 15분 상한이며 코치 라운드는 그�
 
 ## Read aloud
 
-Article 탭의 문단마다 `Read aloud` 버튼이 있다. 누르면 마이크가 Azure Pronunciation Assessment로만 간다. 음성 코치(GPT-Live 또는 Gemini Live)는 읽는 동안 켜지지 않는다. 판정은 Azure가 한다: 문단을 참조 텍스트로 두고 인식된 구간마다 단어·음소 점수와 단어 앞 휴지 확신도를 돌려준다. 브라우저의 `lib/assessor/judge.ts`가 finding(단어 점수 < `ASSESS_WORD_SCORE`, 또는 UnexpectedBreak > `ASSESS_BREAK_CONFIDENCE`)을 고르고 문단의 그 자리에 표시한다. 코치는 지시를 받았을 때만 말한다. 스스로 판정하지 않는다. 오디오 LLM에게 판정을 맡겼을 때 놓치던 v/b, th, 구 안 멈춤이 이 구조의 이유다(`docs/2026-09-21-pronunciation-coach-research.md`).
+Article 탭의 문단마다 `Read aloud` 버튼이 있다. 누르면 마이크가 Azure Pronunciation Assessment로만 간다. 음성 코치(GPT-Live 또는 Gemini Live)는 읽는 동안 켜지지 않는다. 판정은 Azure가 한다: 문단을 참조 텍스트로 두고 인식된 구간마다 단어·음소 점수와 단어 앞 휴지 확신도를 돌려준다. 브라우저의 `lib/assessor/judge.ts`가 finding(단어 점수 < `ASSESS_WORD_SCORE`, 또는 UnexpectedBreak > `ASSESS_BREAK_CONFIDENCE`)을 고르고 문단의 그 자리에 표시한다. 표시(단어 밑줄, 구 안 휴지 막대, Phrasing 슬래시)는 문단의 원래 서식 위에 그대로 얹힌다(`components/Sentence.tsx`). 라운드 중이든 끝난 뒤든 문장을 클릭하면 한국어로 바뀌고, 그 문장의 표시는 영어로 돌아올 때까지 숨는다. 코치는 지시를 받았을 때만 말한다. 스스로 판정하지 않는다. 오디오 LLM에게 판정을 맡겼을 때 놓치던 v/b, th, 구 안 멈춤이 이 구조의 이유다(`docs/2026-09-21-pronunciation-coach-research.md`).
 
 | 시점 | 화면 | 코치 |
 |---|---|---|

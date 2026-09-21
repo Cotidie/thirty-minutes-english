@@ -1736,14 +1736,7 @@ button.question.is-active {
   }
 }
 
-/* The paragraph as it is read: findings sit on the words, a click opens one. */
-.reading-text {
-  margin: 0;
-  font-family: var(--serif);
-  font-size: 1.08rem;
-  line-height: 1.7;
-}
-
+/* Drawn on the paragraph's words: a slash where a fluent reader pauses, a finding on its word. */
 .reading-break {
   color: #2f5580;
   font-weight: 600;

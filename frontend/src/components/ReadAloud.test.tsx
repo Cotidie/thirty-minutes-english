@@ -1,4 +1,4 @@
-import { act, render, screen, waitFor } from '@testing-library/react'
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { LiveEvent } from '../lib/liveSession'
@@ -6,7 +6,9 @@ import type { LiveConnection, LiveOptions } from '../lib/liveClient'
 import type { AzureWord } from '../lib/assessor/judge'
 import type { AssessorOptions } from '../lib/assessor/azure'
 import { api } from '../api'
-import { COACH_SILENCE_MS, ReadAloud } from './ReadAloud'
+import { pairSentences } from '../lib/sentences'
+import { COACH_SILENCE_MS } from './ReadAloud'
+import { Paragraph } from './Paragraph'
 
 const session = { token: 'eyJ.t', region: 'koreacentral', word_score: 60, break_confidence: 0.75 }
 vi.mock('../api', () => ({
@@ -55,10 +57,23 @@ const berified: AzureWord = {
 }
 const verified: AzureWord = { Word: 'verified', Offset: 0, Duration: 1, PronunciationAssessment: { AccuracyScore: 88, ErrorType: 'None' } }
 
+const paragraph = 'Researchers verified it.'
+
+/** The paragraph on the page, idle: marks land on its words in place. */
 function renderIdle(active = false) {
   const onStart = vi.fn()
   const onEnd = vi.fn()
-  render(<ReadAloud paragraph="Researchers verified it." sessionId={3} active={active} onStart={onStart} onEnd={onEnd} />)
+  render(
+    <Paragraph
+      paragraph={paragraph}
+      pieces={pairSentences([paragraph], [{ en: paragraph, ko: '연구자들이 확인했다.' }])[0]}
+      spans={[]}
+      sessionId={3}
+      active={active}
+      onStart={onStart}
+      onEnd={onEnd}
+    />,
+  )
   return { onStart, onEnd }
 }
 
@@ -117,7 +132,7 @@ describe('ReadAloud round', () => {
     expect(vi.mocked(api.addReading)).not.toHaveBeenCalled()
 
     await userEvent.click(screen.getByRole('button', { name: 'Close' }))
-    expect(onEnd).toHaveBeenCalledWith(false)
+    expect(onEnd).toHaveBeenCalled()
     expect(screen.getByRole('button', { name: 'Read aloud' })).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: /b for v/ })).not.toBeInTheDocument()
   })
@@ -129,12 +144,25 @@ describe('ReadAloud round', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Done' }))
     await waitFor(() => expect(assessor.stop).toHaveBeenCalled())
     await userEvent.click(screen.getByRole('button', { name: 'Close' }))
-    expect(onEnd).toHaveBeenCalledWith(true)
+    expect(onEnd).toHaveBeenCalled()
 
     expect(screen.getByRole('button', { name: 'Read again' })).toBeInTheDocument()
     await userEvent.click(screen.getByRole('button', { name: 'verified: b for v' }))
     await waitFor(() => expect(connect).toHaveBeenCalled())
     expect(screen.getByRole('note', { name: 'verified' })).toHaveTextContent("You said /b/. It's /v/.")
+  })
+
+  it('keeps the sentence in the article, marks and all, so it still flips to its Korean', async () => {
+    renderIdle()
+    await startRound()
+    act(() => segment([berified], 'berified'))
+    const sentence = screen.getByRole('button', { name: paragraph })
+    expect(sentence).toContainElement(screen.getByRole('button', { name: 'verified: b for v' }))
+
+    await userEvent.click(sentence)
+    fireEvent.animationEnd(sentence)
+    expect(sentence).toHaveTextContent('연구자들이 확인했다.')
+    expect(screen.queryByRole('button', { name: 'verified: b for v' })).not.toBeInTheDocument()
   })
 
   it('fails before touching the microphone when the assessor is off', async () => {

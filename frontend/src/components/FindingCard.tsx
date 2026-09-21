@@ -1,6 +1,5 @@
-import type { Sound } from '../lib/assessor/judge'
+import type { Shown, Sound } from '../lib/assessor/judge'
 import { nameSound, soundGuide } from '../lib/assessor/sounds'
-import type { Shown } from './ReadingText'
 
 /**
  * One clicked mark, in text: what was said, what it should be, and at most

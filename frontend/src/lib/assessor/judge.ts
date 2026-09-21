@@ -60,6 +60,12 @@ export interface Finding {
   sounds: Sound[]
 }
 
+/** A finding as the page shows it. */
+export interface Shown extends Finding {
+  /** The reader has since read it right. */
+  repeated_ok: boolean
+}
+
 export interface Verdict {
   /** New findings, one per paragraph position. */
   findings: Finding[]

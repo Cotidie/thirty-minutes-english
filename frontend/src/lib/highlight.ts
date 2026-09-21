@@ -40,7 +40,3 @@ export function segmentsIn(text: string, spans: Span[], offset = 0): Segment[] {
   if (cursor < text.length || segments.length === 0) segments.push({ text: text.slice(cursor), marked: false })
   return segments
 }
-
-export function highlightSegments(text: string, evidence: string[]): Segment[] {
-  return segmentsIn(text, markedSpans(text, evidence))
-}

@@ -28,13 +28,16 @@ const article = {
   ],
 }
 
+/** The evidence as marked on the page, word by word. */
+const markedText = () => [...document.querySelectorAll('mark')].map((m) => m.textContent).join('')
+
 describe('ArticleTab', () => {
   it('marks the evidence in the body when a question is clicked, and clears it on a second click', async () => {
     render(<ArticleTab article={article} sessionId={3} />)
     expect(document.querySelector('mark')).toBeNull()
 
     await userEvent.click(screen.getByRole('button', { name: 'What pays?' }))
-    expect(document.querySelector('mark')).toHaveTextContent('Upkeep is what actually pays.')
+    expect(markedText()).toBe('Upkeep is what actually pays.')
 
     await userEvent.click(screen.getByRole('button', { name: 'What pays?' }))
     expect(document.querySelector('mark')).toBeNull()
@@ -79,12 +82,13 @@ describe('ArticleTab phrasing', () => {
     const [toggle] = screen.getAllByRole('button', { name: 'Phrasing' })
     await userEvent.click(toggle)
     await waitFor(() => expect(screen.getAllByLabelText('pause')).toHaveLength(1))
-    expect(screen.getByLabelText('Reading')).toHaveTextContent('Ambition is cheap. / Upkeep is what actually pays.')
+    const [paragraph] = document.querySelectorAll('.paragraph > p')
+    expect(paragraph).toHaveTextContent('Ambition is cheap. / Upkeep is what actually pays.')
     expect(toggle).toHaveAttribute('aria-pressed', 'true')
 
     await userEvent.click(toggle)
     expect(screen.queryByLabelText('pause')).not.toBeInTheDocument()
-    expect(screen.queryByLabelText('Reading')).not.toBeInTheDocument()
+    expect(paragraph).toHaveTextContent('Ambition is cheap. Upkeep is what actually pays.')
   })
 
   it('shows the backend error and stays off when marking fails', async () => {
@@ -156,7 +160,6 @@ describe('ArticleTab open question', () => {
     }
     render(<ArticleTab article={translated} sessionId={3} />)
     await userEvent.click(screen.getByRole('button', { name: 'Both?' }))
-    const marks = [...document.querySelectorAll('mark')].map((m) => m.textContent)
-    expect(marks).toEqual(['cheap.', ' ', 'Upkeep is what'])
+    expect(markedText()).toBe('cheap. Upkeep is what')
   })
 })
