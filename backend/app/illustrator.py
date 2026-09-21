@@ -29,12 +29,12 @@ STYLES: dict[str, str] = {
     "flat": "Flat vector illustration, soft colours, simple shapes.",
 }
 STYLE_LABELS: dict[str, str] = {
-    "photo": "realistic photo, the most detail to describe",
-    "cinematic": "film still, dramatic light",
+    "photo": "realistic photo",
+    "cinematic": "film still",
     "storybook": "watercolour storybook",
-    "comic": "one comic panel",
+    "comic": "comic panel",
     "sketch": "pencil sketch",
-    "flat": "flat vector, simple shapes",
+    "flat": "flat vector",
 }
 # On every style: the learner has to supply the word, so the picture must not.
 NO_TEXT = "One clear scene. No text, letters, numbers, signs, or captions anywhere in the image."

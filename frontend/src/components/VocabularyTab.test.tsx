@@ -9,7 +9,7 @@ vi.mock('../api', () => ({
   api: {
     addExample: vi.fn(),
     redrawPicture: vi.fn(),
-    pictureStyles: vi.fn(async () => ({ current: 'photo', choices: ['photo', 'comic'], labels: { comic: 'one comic panel' } })),
+    pictureStyles: vi.fn(async () => ({ current: 'photo', choices: ['photo', 'comic'], labels: { comic: 'comic panel' } })),
   },
 }))
 vi.mock('../lib/liveClient', () => ({ connectExample: vi.fn() }))
@@ -33,7 +33,7 @@ describe('VocabularyTab', () => {
     await userEvent.click(screen.getByRole('button', { name: 'New picture for ubiquitous' }))
     const menu = await screen.findByRole('menu', { name: 'Picture style for ubiquitous' })
     expect(menu).toHaveTextContent('photo (current)')
-    await userEvent.click(screen.getByRole('menuitem', { name: 'comic · one comic panel' }))
+    await userEvent.click(screen.getByRole('menuitem', { name: 'comic · comic panel' }))
     expect(api.redrawPicture).toHaveBeenCalledWith(3, 0, 'comic')
     expect(onPicture).toHaveBeenCalledWith(0, fresh)
     expect(screen.queryByRole('menu')).not.toBeInTheDocument()
