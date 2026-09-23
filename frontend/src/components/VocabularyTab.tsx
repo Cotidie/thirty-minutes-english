@@ -86,7 +86,7 @@ function VocabCard({ item, drawing }: { item: VocabularyItem; drawing: boolean }
   return (
     <div className={`vocab-card${revealed ? ' is-revealed' : ''}`} onClick={() => setRevealed((r) => !r)}>
       {item.image && (
-        <span className="vocab-picture-frame" style={{ '--picture': `url(/api/images/${item.image})` } as React.CSSProperties}>
+        <span className="vocab-picture-frame">
           <img className={`vocab-picture${drawing ? ' is-drawing' : ''}`} src={`/api/images/${item.image}`} alt={item.scene ?? item.word} />
           {drawing ? <Drawing seconds={seconds} /> : item.caption && <SceneCaption key={item.image} caption={item.caption} word={item.word} />}
         </span>

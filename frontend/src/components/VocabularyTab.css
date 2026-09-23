@@ -86,21 +86,9 @@
   opacity: 0.4;
 }
 
-/* The whole picture shows, whatever shape the provider drew it in; a blurred copy fills the 4:3 frame around it. */
 .vocab-picture-frame {
   position: relative;
   display: block;
-  isolation: isolate;
-}
-
-.vocab-picture-frame::before {
-  content: '';
-  position: absolute;
-  inset: 0;
-  z-index: -1;
-  background: var(--picture) center / cover;
-  filter: blur(18px) saturate(0.8);
-  transform: scale(1.15);
 }
 
 /* Why the picture is the word: the picture blurs and the caption rises over it. */
@@ -113,7 +101,6 @@
 .vocab-picture-frame {
   overflow: hidden;
   border-radius: 6px;
-  background: var(--line);
 }
 
 .vocab-picture-frame:has(.vocab-caption.is-shown) .vocab-picture {
@@ -306,8 +293,9 @@
   display: block; /* inline, it would leave a descender gap under the picture */
   width: 100%;
   aspect-ratio: 4 / 3;
-  object-fit: contain;
+  object-fit: cover; /* fills the 4:3 frame; a picture of another shape loses its edges */
   border-radius: 6px;
+  background: var(--line);
 }
 
 .vocab-word {
