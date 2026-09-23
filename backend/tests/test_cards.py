@@ -1,4 +1,5 @@
 import json
+from types import SimpleNamespace
 
 import pytest
 from fastapi.testclient import TestClient
@@ -6,7 +7,7 @@ from fastapi.testclient import TestClient
 from app.coaching.cards import PhraseCardExtractor, cards_for
 from app.db import Database
 from app.main import create_app
-from app.models import PhraseCard
+from app.models import Ask, PhraseCard
 from app.wiring import Services
 from tests.test_api import FakeGenerator, InlineExecutor
 
@@ -80,26 +81,32 @@ def test_cards_endpoint_narrows_to_one_session(tmp_path):
         assert len(c.post("/api/asks/cards").json()) == 2
 
 
-def test_extractor_sends_rounds_and_reads_the_answer(tmp_path, http):
+class FakeOpenAI:
+    """Stands in for the OpenAI client: records the Responses call and answers with one output_text."""
+
+    def __init__(self, output_text: str):
+        self.calls: list[dict] = []
+        self.responses = self
+        self._output_text = output_text
+
+    def create(self, **kwargs):
+        self.calls.append(kwargs)
+        return SimpleNamespace(output_text=self._output_text)
+
+
+def test_extractor_sends_the_rounds_with_the_folder_schema_and_reads_the_cards(tmp_path):
     agent_dir = tmp_path / "phrase"
     (agent_dir / "prompts").mkdir(parents=True)
     (agent_dir / "prompts" / "summarize.md").write_text("Turn rounds into cards.")
     (agent_dir / "cards.schema.json").write_text(json.dumps({"title": "PhraseCards", "type": "object"}))
-    extractor = PhraseCardExtractor("sk-test", agent_dir, "gpt-5.6-luna")
-
     card = {"id": 7, "asked": "눈치", "english": "Read the room.", "alternatives": [], "note": "n"}
-    http.json = {"output": [{"content": [{"type": "output_text", "text": json.dumps({"cards": [card]})}]}]}
+    client = FakeOpenAI(json.dumps({"cards": [card]}))
+    ask = Ask(id=7, created_at="2026-09-24T00:00:00Z", session_id=None, user_text="눈치 좀 챙겨", coach_text="Read the room.", seconds=11)
 
-    store = Database(tmp_path / "s.db")
-    ask = store.records.add_ask(None, "눈치 좀 챙겨", "Read the room.", 11)
-    object.__setattr__(ask, "id", 7)
+    cards = PhraseCardExtractor("sk-test", agent_dir, "gpt-5.6-luna", client).extract([ask])
 
-    cards = extractor.extract([ask])
-
-    assert http.requests[0].headers["Authorization"] == "Bearer sk-test"
-    assert http.sent()["model"] == "gpt-5.6-luna"
-    assert json.loads(http.sent()["input"][1]["content"]) == [
-        {"id": 7, "user": "눈치 좀 챙겨", "coach": "Read the room."}
-    ]
     assert cards[7].english == "Read the room."
-
+    sent = client.calls[0]
+    assert sent["model"] == "gpt-5.6-luna"
+    assert sent["text"]["format"]["name"] == "PhraseCards"
+    assert json.loads(sent["input"][1]["content"]) == [{"id": 7, "user": "눈치 좀 챙겨", "coach": "Read the room."}]

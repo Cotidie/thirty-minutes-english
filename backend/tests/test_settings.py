@@ -125,8 +125,8 @@ def test_key_test_uses_the_typed_value_with_the_provider_header(tmp_path, http):
 
 def test_key_test_falls_back_to_the_saved_key_and_reports_failures(tmp_path, http):
     http.status, http.json = 401, {"error": {"message": "Incorrect API key provided"}}
-    with settings_client(tmp_path, {"OPENAI_API_KEY": "sk-saved"}) as c:
-        res = c.post("/api/settings/test-key", json={"key": "OPENAI_API_KEY"})
+    with settings_client(tmp_path, {"OPENROUTER_API_KEY": "sk-saved"}) as c:
+        res = c.post("/api/settings/test-key", json={"key": "OPENROUTER_API_KEY"})
     assert res.json() == {"ok": False, "message": "401: Incorrect API key provided"}
     assert http.requests[0].headers["Authorization"] == "Bearer sk-saved"
 

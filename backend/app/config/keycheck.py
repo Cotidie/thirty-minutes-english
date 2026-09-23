@@ -3,19 +3,20 @@ say whether a key works before a round depends on it."""
 
 from dataclasses import dataclass
 
+from openai import APIConnectionError, APIStatusError, OpenAI
+
 from app.mcp_client import McpError, McpHttp
 from app.net import HttpError, request
 from app.pictures.painters import COMFY_MCP
 from app.voice.assessor import issue_token
 
 GETS = {
-    "OPENAI_API_KEY": ("https://api.openai.com/v1/models?limit=1", "Authorization", "Bearer "),
     "GEMINI_API_KEY": ("https://generativelanguage.googleapis.com/v1beta/models?pageSize=1", "x-goog-api-key", ""),
     "OPENROUTER_API_KEY": ("https://openrouter.ai/api/v1/key", "Authorization", "Bearer "),
     # The search MCP answers any key (it falls back to keyless), so the REST API is the one that says no.
     "FIRECRAWL_API_KEY": ("https://api.firecrawl.dev/v2/team/credit-usage", "Authorization", "Bearer "),
 }
-KEYS = (*GETS, "AZURE_SPEECH_KEY", "COMFY_API_KEY")
+KEYS = (*GETS, "OPENAI_API_KEY", "AZURE_SPEECH_KEY", "COMFY_API_KEY")
 
 
 @dataclass(frozen=True)
@@ -37,6 +38,8 @@ def check_key(name: str, key: str, region: str = "") -> KeyCheck:
         if name == "COMFY_API_KEY":
             # comfy-cloud has no REST key endpoint; its MCP server turns a bad key away at connect.
             McpHttp(COMFY_MCP, key, read_timeout_s=15).check()
+        elif name == "OPENAI_API_KEY":
+            OpenAI(api_key=key, timeout=15, max_retries=0).models.list()
         elif name == "AZURE_SPEECH_KEY":
             issue_token(key, region)
         else:
@@ -46,6 +49,10 @@ def check_key(name: str, key: str, region: str = "") -> KeyCheck:
         if e.status == 502:
             return KeyCheck(False, f"could not reach the provider: {e.message}")
         return KeyCheck(False, str(e))
+    except APIStatusError as e:
+        return KeyCheck(False, f"{e.status_code}: {e.body.get('message') if isinstance(e.body, dict) else e.message}")
+    except APIConnectionError as e:
+        return KeyCheck(False, f"could not reach the provider: {e}")
     except McpError as e:
         return KeyCheck(False, str(e))
     return KeyCheck(True, "key works")
