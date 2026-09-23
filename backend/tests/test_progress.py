@@ -84,3 +84,15 @@ def test_tokens_count_each_turn_once_and_stream_deltas_live():
 def test_pictures_move_the_stage_to_illustrating_and_keep_the_tokens():
     p = with_pictures(Progress(Stage.FINALIZING, 3, "x", 100, 50), 2, 8)
     assert p == Progress(Stage.ILLUSTRATING, 3, "", 100, 50, 2, 8)
+
+
+def test_a_block_that_starts_streaming_updates_the_label_at_once():
+    t = StreamTracker(lambda _: None)
+    t.feed(assistant(tool_use("mcp__session__check_items")))
+    assert t.progress.activity == "Checking picks against past sessions"
+    t.feed(stream({"type": "content_block_start", "content_block": {"type": "thinking"}}))
+    assert (t.progress.stage, t.progress.activity) == (Stage.WRITING, "Thinking")
+    t.feed(stream({"type": "content_block_start", "content_block": {"type": "tool_use", "name": "StructuredOutput"}}))
+    assert t.progress.activity == "Writing out the session"
+    t.feed(assistant(tool_use("StructuredOutput")))
+    assert (t.progress.stage, t.progress.activity) == (Stage.FINALIZING, "")

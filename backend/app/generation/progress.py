@@ -114,12 +114,24 @@ class StreamTracker:
         before = self.progress
         if isinstance(message, StreamEvent):
             self._tokens.event(message.event)
+            if message.event.get("type") == "content_block_start":
+                self._start(message.event.get("content_block") or {})
         elif isinstance(message, AssistantMessage):
             self._tokens.message(message)
             for block in message.content:
                 self._apply(block)
         if self.progress != before:
             self._on_progress(self.progress)
+
+    def _start(self, block: dict) -> None:
+        """A block just began streaming: say so now, not when it ends minutes later."""
+        kind = block.get("type")
+        if kind in ("thinking", "redacted_thinking", "text") and self._stage != Stage.FINALIZING:
+            self._stage = Stage.WRITING
+            self._activity = "Thinking" if kind != "text" else ""
+        elif kind == "tool_use" and block.get("name") == "StructuredOutput":
+            self._stage = Stage.WRITING
+            self._activity = "Writing out the session"
 
     def _apply(self, block) -> None:
         if isinstance(block, ToolUseBlock):
