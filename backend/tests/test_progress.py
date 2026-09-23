@@ -46,3 +46,9 @@ def test_builtin_web_search_counts_as_a_search():
     t.feed(assistant(tool_use("WebSearch")))
     t.feed(assistant(tool_use("WebFetch")))
     assert seen == [Progress(Stage.SEARCHING, 1), Progress(Stage.SEARCHING, 2)]
+
+
+def test_a_firecrawl_search_counts_as_a_search():
+    seen: list[Progress] = []
+    StreamTracker(seen.append).feed(assistant(tool_use("mcp__firecrawl__firecrawl_search")))
+    assert seen == [Progress(Stage.SEARCHING, 1)]

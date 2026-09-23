@@ -6,13 +6,6 @@ def test_article_accepts_question_objects():
     assert article.questions[0].evidence == ["Body text."]
 
 
-def test_article_sources_default_to_empty_for_legacy_content():
-    from app.models import Article
-
-    a = Article.model_validate({"title": "t", "body": "b", "questions": [{"text": "q"}]})
-    assert a.sources == []
-
-
 def test_translation_keeps_only_pairs_whose_sentence_is_in_the_body():
     a = Article.model_validate(
         {

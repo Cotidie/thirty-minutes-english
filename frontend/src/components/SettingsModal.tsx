@@ -184,8 +184,16 @@ export function SettingsModal({ open, onClose }: Props) {
   )
 }
 
-const isApiKey = (key: string): key is ApiKeyName =>
-  key === 'OPENAI_API_KEY' || key === 'GEMINI_API_KEY' || key === 'AZURE_SPEECH_KEY' || key === 'OPENROUTER_API_KEY' || key === 'COMFY_API_KEY'
+const API_KEYS: readonly string[] = [
+  'OPENAI_API_KEY',
+  'GEMINI_API_KEY',
+  'AZURE_SPEECH_KEY',
+  'OPENROUTER_API_KEY',
+  'COMFY_API_KEY',
+  'FIRECRAWL_API_KEY',
+] satisfies ApiKeyName[]
+
+const isApiKey = (key: string): key is ApiKeyName => API_KEYS.includes(key)
 
 function KeyTest({ state, onTest }: { state: KeyTestResult | 'testing' | undefined; onTest: () => void }) {
   return (

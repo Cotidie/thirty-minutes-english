@@ -12,7 +12,7 @@ from claude_agent_sdk import (
     ToolUseBlock,
 )
 
-from app.llm import WEB_TOOLS
+from app.llm import FIRECRAWL_TOOLS, WEB_TOOLS
 
 
 class Stage(StrEnum):
@@ -55,7 +55,7 @@ class StreamTracker:
         if isinstance(block, ToolUseBlock):
             if block.name == "Skill":
                 self._stage = Stage.SKILLS
-            elif block.name in WEB_TOOLS:
+            elif block.name in WEB_TOOLS or block.name in FIRECRAWL_TOOLS:
                 self._searches += 1
                 self._stage = Stage.SEARCHING
             elif block.name == "StructuredOutput":

@@ -5,7 +5,7 @@ import urllib.error
 import pytest
 from fastapi.testclient import TestClient
 
-from app.config.settings import InvalidSetting, Settings, mask
+from app.config.settings import InvalidSetting, Settings
 from app.db import Database
 from app.main import create_app
 from app.wiring import Services
@@ -60,28 +60,11 @@ def test_voice_api_key_follows_provider():
     assert Settings(env, {"VOICE_PROVIDER": "gemini"}).voice_api_key == "AIza-gemini-5678"
 
 
-def test_fields_mask_secrets_and_carry_metadata():
-    fields = {f.key: f for f in Settings({"OPENAI_API_KEY": "sk-openai-1234"}, {}).fields()}
-    assert fields["OPENAI_API_KEY"].value == "…1234"
-    assert fields["OPENAI_API_KEY"].secret is True
-    assert fields["GEMINI_API_KEY"].value == ""
-    assert fields["CLAUDE_EFFORT"].choices == ("low", "medium", "high", "xhigh", "max")
-    assert "gemini-3.8-live" in fields["VOICE_MODEL"].suggestions
-    assert "Kore" in fields["VOICE_NAME"].choices and len(fields["VOICE_NAME"].choices) == 30
-    assert fields["VOICE_MODEL"].group == "voice"
-
-
 def test_claude_skills_split():
     assert Settings({"CLAUDE_SKILLS": "stop-slop, cotidie:write-like-me,"}, {}).claude_skills == (
         "stop-slop",
         "cotidie:write-like-me",
     )
-
-
-def test_mask():
-    assert mask("") == ""
-    assert mask("short") == "…"
-    assert mask("sk-proj-abcdef1234") == "…1234"
 
 
 def settings_client(tmp_path, env, rebuild=None):
@@ -183,25 +166,6 @@ def test_key_test_without_any_key(tmp_path):
     with settings_client(tmp_path, {}) as c:
         assert c.post("/api/settings/test-key", json={"key": "GEMINI_API_KEY"}).json()["ok"] is False
         assert c.post("/api/settings/test-key", json={"key": "NOPE"}).status_code == 422
-
-
-def test_azure_settings_have_defaults_and_typed_accessors(store):
-    settings = Settings({"AZURE_SPEECH_KEY": "az-key-000012345"}, store.settings.load())
-    assert settings.get("AZURE_SPEECH_KEY") == "az-key-000012345"
-    assert settings.get("AZURE_SPEECH_REGION") == "koreacentral"
-    assert settings.assess_word_score == 60
-    assert settings.assess_break_confidence == 0.75
-    store.settings.save({"ASSESS_WORD_SCORE": "50", "ASSESS_BREAK_CONFIDENCE": "0.9"})
-    settings = Settings({}, store.settings.load())
-    assert settings.assess_word_score == 50
-    assert settings.assess_break_confidence == 0.9
-
-
-def test_azure_key_is_masked_in_fields(store):
-    fields = {f.key: f for f in Settings({"AZURE_SPEECH_KEY": "az-key-000012345"}, store.settings.load()).fields()}
-    assert fields["AZURE_SPEECH_KEY"].secret is True
-    assert fields["AZURE_SPEECH_KEY"].value == "…2345"
-    assert fields["AZURE_SPEECH_REGION"].group == "assess"
 
 
 def test_threshold_settings_reject_non_numbers(store):

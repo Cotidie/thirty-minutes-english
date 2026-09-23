@@ -86,6 +86,7 @@ SPECS: tuple[Spec, ...] = (
     Spec("AZURE_SPEECH_KEY", "keys", secret=True),
     Spec("OPENROUTER_API_KEY", "keys", secret=True),
     Spec("COMFY_API_KEY", "keys", secret=True),
+    Spec("FIRECRAWL_API_KEY", "keys", secret=True),  # optional: search works keyless, rate limited
     Spec("VOICE_PROVIDER", "voice", "openai", choices=("openai", "gemini")),
     Spec("VOICE_MODEL", "voice", suggestions=(OPENAI_VOICE_MODEL, *GEMINI_VOICE_MODELS)),
     Spec("VOICE_THINKING", "voice", "low", choices=THINKING_LEVELS),

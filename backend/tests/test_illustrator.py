@@ -1,10 +1,12 @@
+import asyncio
 import base64
 import json
-import threading
+from contextlib import asynccontextmanager
 
+import httpx2
 import pytest
+from mcp.types import CallToolResult, ImageContent, TextContent
 
-import app.pictures.painters as mod
 from app.llm import GenerationError
 from app.mcp_client import McpError
 from app.pictures.illustrator import IMAGE_RULES, STYLES, Illustrator
@@ -60,87 +62,84 @@ def test_a_word_without_a_scene_is_skipped_and_a_failed_picture_stays_bare(tmp_p
     assert not (tmp_path / "j-3.png").exists()
 
 
-class FakeMcp:
-    """Answers generate-image per prompt; the calls come in side by side."""
+class FakeServer:
+    """Stands in for McpHttp: one session whose calls answer per tool (a list, in order) or per prompt (a dict)."""
 
-    def __init__(self, answers: dict[str, object]):
-        self.answers = answers
+    def __init__(self, answers: dict):
+        self.answers = {tool: list(a) if isinstance(a, list) else a for tool, a in answers.items()}
         self.calls: list[tuple[str, dict]] = []
-        self.lock = threading.Lock()
 
-    def call(self, tool: str, arguments: dict) -> dict:
-        with self.lock:
-            self.calls.append((tool, arguments))
-        answer = self.answers[arguments["prompt"]]
+    @asynccontextmanager
+    async def session(self):
+        yield self
+
+    async def call(self, tool: str, arguments: dict) -> CallToolResult:
+        self.calls.append((tool, arguments))
+        answers = self.answers[tool]
+        answer = answers.pop(0) if isinstance(answers, list) else answers[arguments["prompt"]]
         if isinstance(answer, Exception):
             raise answer
         return answer
 
 
-def test_openrouter_draws_every_prompt_at_once_and_shrugs_off_a_failed_one():
+class RefusedServer:
+    @asynccontextmanager
+    async def session(self):
+        raise McpError("https://mcp: HTTP 401")
+        yield
+
+
+def text(data) -> CallToolResult:
+    return CallToolResult(content=[TextContent(type="text", text=json.dumps(data))])
+
+
+def test_openrouter_draws_every_prompt_on_one_session_and_shrugs_off_a_failed_one():
     png = base64.b64encode(b"PNG-a").decode()
-    mcp = FakeMcp({
-        "a": {"content": [{"type": "text", "text": "here"}, {"type": "image", "data": png, "mimeType": "image/png"}]},
+    server = FakeServer({"generate-image": {
+        "a": CallToolResult(content=[TextContent(type="text", text="here"), ImageContent(type="image", data=png, mime_type="image/png")]),
         "b": McpError("generate-image: over budget"),
-        "c": {"content": [{"type": "text", "text": "nothing"}]},
-    })
-    pictures = OpenRouterPainter(mcp, "google/gemini-3-pro-image").paint(["a", "b", "c"])
+        "c": CallToolResult(content=[TextContent(type="text", text="nothing")]),
+    }})
+    pictures = OpenRouterPainter(server, "google/gemini-3-pro-image").paint(["a", "b", "c"])
 
     assert pictures == [b"PNG-a", None, None]
-    assert sorted(c[1]["prompt"] for c in mcp.calls) == ["a", "b", "c"]
-    assert mcp.calls[0] == ("generate-image", {"prompt": mcp.calls[0][1]["prompt"], "model": "google/gemini-3-pro-image"})
+    assert [c[1] for c in server.calls] == [{"prompt": p, "model": "google/gemini-3-pro-image"} for p in "abc"]
 
 
-class FakeComfy:
-    """Answers per tool in order."""
-
-    def __init__(self, results: dict[str, list]):
-        self.results = {tool: list(rs) for tool, rs in results.items()}
-        self.calls: list[tuple[str, dict]] = []
-
-    def call(self, tool: str, arguments: dict) -> dict:
-        self.calls.append((tool, arguments))
-        result = self.results[tool].pop(0)
-        if isinstance(result, Exception):
-            raise result
-        return result
-
-
-def text(data) -> dict:
-    return {"content": [{"type": "text", "text": json.dumps(data)}]}
+def test_a_refused_key_leaves_every_picture_blank():
+    assert OpenRouterPainter(RefusedServer(), "m").paint(["a", "b"]) == [None, None]
+    assert ComfyPainter(RefusedServer(), "m").paint(["a"]) == [None]
 
 
 def test_comfy_submits_one_batch_waits_and_fetches_each_job_in_order():
-    mcp = FakeComfy({
+    server = FakeServer({
         "submit_batch": [text({"batch_id": "b1", "job_ids": ["j0", "j1", "j2"]})],
         "wait_for_batch": [text({"timed_out": True}), text({"timed_out": False})],
         "get_batch_output": [text({"outputs": [{"job_id": "j2", "url": "https://x/2"}, {"job_id": "j0", "url": "https://x/0"}]})],
     })
     fetched = []
-    lock = threading.Lock()
 
-    def fetch(url):
-        with lock:
-            fetched.append(url)
+    async def fetch(url):
+        fetched.append(url)
         if url.endswith("/2"):
-            raise OSError("gone")
+            raise httpx2.ConnectError("gone")
         return b"PNG" + url[-1].encode()
 
-    pictures = ComfyPainter(mcp, "vertexai/nano-banana-pro", fetch=fetch).paint(["a", "b", "c"])
+    pictures = ComfyPainter(server, "vertexai/nano-banana-pro", fetch=fetch).paint(["a", "b", "c"])
 
     assert pictures == [b"PNG0", None, None]
-    submit = mcp.calls[0][1]
+    submit = server.calls[0][1]
     assert submit["confirm"] is True
     assert [i["prompt"] for i in submit["items"]] == ["a", "b", "c"]
     assert submit["items"][0]["model"] == "vertexai/nano-banana-pro"
-    assert [c[0] for c in mcp.calls] == ["submit_batch", "wait_for_batch", "wait_for_batch", "get_batch_output"]
+    assert [c[0] for c in server.calls] == ["submit_batch", "wait_for_batch", "wait_for_batch", "get_batch_output"]
     assert sorted(fetched) == ["https://x/0", "https://x/2"]
 
 
 def test_comfy_spells_an_openai_model_as_the_partner_slug_plus_variant_and_survives_a_refused_batch():
-    mcp = FakeComfy({"submit_batch": [McpError("submit_batch: no credits")]})
-    assert ComfyPainter(mcp, "openai/gpt-image-2.5-flare").paint(["a", "b"]) == [None, None]
-    item = mcp.calls[0][1]["items"][0]
+    server = FakeServer({"submit_batch": [McpError("submit_batch: no credits")]})
+    assert ComfyPainter(server, "openai/gpt-image-2.5-flare").paint(["a", "b"]) == [None, None]
+    item = server.calls[0][1]["items"][0]
     assert item["model"] == "openai/images-generations"
     assert item["params"] == {"model": "gpt-image-2.5-flare"}
 
@@ -153,31 +152,20 @@ def test_painter_for_picks_the_provider_and_needs_its_key():
     assert painter_for("off", "", keys) is None
 
 
-def test_fetch_retries_a_flaky_link(monkeypatch):
+def test_fetch_retries_a_flaky_link():
     calls = []
 
-    class Response:
-        def __enter__(self):
-            return self
+    def answer(request):
+        calls.append(str(request.url))
+        if calls.count(str(request.url)) < 3:
+            return httpx2.Response(502)
+        return httpx2.Response(200, content=b"PNG")
 
-        def __exit__(self, *a):
-            return False
-
-        def read(self):
-            return b"PNG"
-
-    def urlopen(url, timeout):
-        calls.append(url)
-        if calls.count(url) < 3:
-            raise OSError("wrong version number")
-        return Response()
-
-    monkeypatch.setattr(mod.urllib.request, "urlopen", urlopen)
-    monkeypatch.setattr(mod.time, "sleep", lambda s: None)
-    assert fetch_url("https://img/1") == b"PNG"
+    transport = httpx2.MockTransport(answer)
+    assert asyncio.run(fetch_url("https://img/1", wait_s=0, transport=transport)) == b"PNG"
     assert calls == ["https://img/1"] * 3
-    with pytest.raises(OSError):
-        fetch_url("https://img/2", attempts=2)
+    with pytest.raises(httpx2.HTTPError):
+        asyncio.run(fetch_url("https://img/2", attempts=2, wait_s=0, transport=transport))
 
 
 def test_redraw_draws_the_new_scene_in_the_asked_style_under_a_new_name_and_discard_drops_a_file(tmp_path):

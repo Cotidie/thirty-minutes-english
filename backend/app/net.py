@@ -36,8 +36,9 @@ def post_json(url: str, body: dict, headers: dict[str, str], timeout: float = 30
 
 
 def error_message(raw: bytes) -> str:
-    """The provider's `error.message`, else the start of the body."""
+    """The provider's `error.message` (or a bare `error` string), else the start of the body."""
     try:
-        return json.loads(raw)["error"]["message"]
+        error = json.loads(raw)["error"]
+        return error["message"] if isinstance(error, dict) else str(error)
     except (ValueError, KeyError, TypeError):
         return raw.decode(errors="replace")[:300]

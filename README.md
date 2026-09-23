@@ -19,7 +19,7 @@ docker compose up -d --build
 
 뉴스 3개는 그날 처음 `/api/topics`를 호출할 때 백그라운드로 Claude(Agent SDK)를 한 번 돌려 받아 `topic_days` 테이블에 저장한다(하루 1회). 주요 외신 1면·톱 수준으로 크게 다뤄진 기사만 받는다(독립된 주요 매체 2곳 이상이 비중 있게 다룬 것이 기준). 3개 중 1개는 한국 기사로, 영문 국내 매체(연합뉴스, 코리아헤럴드, 중앙데일리, 코리아타임스) 톱 기준으로 고른다(`KOREA_COUNT`). 칩 문구는 다른 풀과 맞춰 7단어 이하 명사구로 받고, 의문사로 시작하는 문장은 금지한다. 웹 검색이 막혔거나 기준을 넘은 기사가 없으면 빈 목록을 돌려받고, 그날치를 저장하지 않아 다음 요청에서 다시 시도한다. 도착 전이나 실패했을 때는 12개 전부 고정 풀에서 채우므로 화면이 비지 않는다. `pending`은 백그라운드 fetch가 실제로 도는 동안만 참이다(실패하면 바로 거짓, 다음 페이지 로드에서 재시도). 프론트는 `pending`이 참인 동안 15초 간격으로 최대 3분간 다시 물어보고, 그 뒤엔 새로고침 버튼을 다시 연다. fetch가 실패하면 `error`에 이유(SDK 오류 메시지, 또는 검색 결과 없음)가 실려 오고, 홈 화면의 Today's topic 아래에 그대로 표시된다. 표현 5개는 주제와 무관한 B2~C1+ 범용 표현이고, 어휘 10개는 주제 연관 단어로 아티클 밖에서도 고른다. 최근 40세션에서 이미 나온 표현·단어는 프롬프트에 넣지 않고, 생성 중에 모델이 부르는 in-process 도구 `check_items`(`generation/generator.py`)가 들고 있다. 모델은 고른 항목을 이 도구로 확인하고 이미 나온 것(관사·대명사만 다른 변형 포함, `generation/exclusions.py`의 `key`)을 바꾼다. 각 항목은 10% 확률로 목록에서 빠져 가끔 다시 나올 수 있다(`generation/jobs.py`의 `JobRunner.REPEAT_ALLOWANCE`).
 
-생성은 `claude-agent-sdk`의 `query()`로 돌린다(`app/llm.py`의 `Claude.run`, 구조화 출력은 `output_format`의 JSON Schema). SDK가 Claude Code CLI를 동봉하므로 컨테이너에 따로 설치하지 않는다. `POST /api/sessions`는 202로 작업 ID를 돌려주고, 프론트가 `GET /api/jobs/{id}`를 1초마다 폴링해 단계(스킬 로드 → 웹 검색 n회 → 작성 → 구조 확인)와 진행 바를 보여준다. 단계는 SDK가 흘려보내는 메시지의 도구 호출로 판단한다(`generation/progress.py`). 작업은 서버 메모리에 살아 있으므로 홈에 다시 들어오면 `GET /api/jobs`(진행 중인 작업 목록)로 찾아 같은 진행 바를 이어서 보여준다. 퍼센트는 단계 하한 + 경과 시간(최근 5회 중앙값 기준) 추정이다. API 키 불필요, `CLAUDE_CODE_OAUTH_TOKEN`으로 Claude 구독에서 처리한다. 1회 생성 약 1~2분(opus 기준). 세션 생성에 열린 도구는 내장 `WebSearch`/`WebFetch`, `Read`, `check_items`이고, `CLAUDE_SKILLS`가 있으면 `Skill`도 열린다. 아티클은 최대 3회 웹 검색으로 사실을 확인하고 최근 이슈를 각도로 잡는다. 실행마다 걸린 시간·턴 수·환산 비용이 backend 로그에 한 줄 남는다.
+생성은 `claude-agent-sdk`의 `query()`로 돌린다(`app/llm.py`의 `Claude.run`, 구조화 출력은 `output_format`의 JSON Schema). SDK가 Claude Code CLI를 동봉하므로 컨테이너에 따로 설치하지 않는다. `POST /api/sessions`는 202로 작업 ID를 돌려주고, 프론트가 `GET /api/jobs/{id}`를 1초마다 폴링해 단계(스킬 로드 → 웹 검색 n회 → 작성 → 구조 확인)와 진행 바를 보여준다. 단계는 SDK가 흘려보내는 메시지의 도구 호출로 판단한다(`generation/progress.py`). 작업은 서버 메모리에 살아 있으므로 홈에 다시 들어오면 `GET /api/jobs`(진행 중인 작업 목록)로 찾아 같은 진행 바를 이어서 보여준다. 퍼센트는 단계 하한 + 경과 시간(최근 5회 중앙값 기준) 추정이다. API 키 불필요, `CLAUDE_CODE_OAUTH_TOKEN`으로 Claude 구독에서 처리한다. 1회 생성 약 1~2분(opus 기준). 세션 생성과 뉴스 주제에는 firecrawl 검색 MCP(`https://mcp.firecrawl.dev/v2/mcp`, `firecrawl_search`·`firecrawl_scrape`)가 붙고, 프롬프트가 이것을 먼저 쓰고 실패하거나 쓸 만한 결과가 없을 때만 내장 `WebSearch`/`WebFetch`로 넘어가라고 한다. firecrawl은 키 없이도 답하고(속도 제한), `FIRECRAWL_API_KEY`를 넣으면 bearer 헤더로 보내 제한이 풀린다. 세션 생성에는 `Read`, `check_items`도 열리고, `CLAUDE_SKILLS`가 있으면 `Skill`도 열린다. 아티클은 최대 3회 웹 검색으로 사실을 확인하고 최근 이슈를 각도로 잡는다. 실행마다 걸린 시간·턴 수·환산 비용이 backend 로그에 한 줄 남는다.
 
 | 환경변수 | 기본값 | 용도 |
 |---|---|---|
@@ -48,6 +48,7 @@ docker compose up -d --build
 | `IMAGE_PROVIDER` | `openrouter` | Vocabulary 그림을 그리는 MCP: `openrouter` · `comfy` · `off` |
 | `OPENROUTER_API_KEY` | 비움 | OpenRouter MCP의 bearer 토큰. provider가 `openrouter`인데 비어 있으면 그림 없이 생성 |
 | `COMFY_API_KEY` | 비움 | comfy-cloud MCP의 bearer 토큰. provider가 `comfy`일 때 |
+| `FIRECRAWL_API_KEY` | 비움 | firecrawl 검색 MCP의 bearer 토큰. 비워 두면 키 없이 속도 제한 안에서 쓴다 |
 | `IMAGE_MODEL` | 비움 | 이미지 모델. 비우면 provider 기본값(Nano Banana Pro). 설정 모달 메뉴에 GPT-Image 2.5, Nano Banana 2 등이 있다 |
 | `IMAGE_STYLE` | `photo` | 그림 스타일: `photo`(사진, 묘사할 거리가 가장 많다) · `cinematic` · `storybook` · `comic` · `sketch` · `flat`. 프롬프트는 `pictures/illustrator.py`의 `STYLES` |
 
@@ -57,11 +58,11 @@ docker compose up -d --build
 
 ## Vocabulary 그림
 
-세션 생성 마지막 단계(`illustrating`, 진행 바의 "Drawing a picture for each word")에서 단어마다 그 단어가 어울리는 상황을 그린 그림을 한 장씩 만든다. 장면(`scene`)은 세션 생성 프롬프트가 단어와 함께 쓴다: 두세 문장으로 장소, 사람과 행동, 가리킬 수 있는 세부 서너 가지(사물·날씨·시간대·배경)를 담고, 글자가 필요 없는 구체적인 상황이며 단어끼리 장소와 시간이 겹치지 않게 한다(규칙 문장은 `pictures/scenes.py`의 `SCENE_RULES` 하나를 두 프롬프트가 같이 쓴다). 이미지 프롬프트는 `IMAGE_STYLE`의 스타일 문장 + 디테일·글자 금지 문장(`IMAGE_RULES`) + 장면이다. `backend/app/pictures/`(`illustrator.py`, `painters.py`)가 그 장면들을 `IMAGE_PROVIDER`의 MCP 서버에 보낸다. MCP 호출은 `backend/app/mcp_client.py`(JSON-RPC over HTTP)가 하고, 인증은 OAuth 로그인 대신 그 provider의 API 키를 bearer 토큰으로 보낸다(OAuth 토큰은 몇 시간에서 7일이면 만료되므로). `claude` 실행은 없다.
+세션 생성 마지막 단계(`illustrating`, 진행 바의 "Drawing a picture for each word")에서 단어마다 그 단어가 어울리는 상황을 그린 그림을 한 장씩 만든다. 장면(`scene`)은 세션 생성 프롬프트가 단어와 함께 쓴다: 두세 문장으로 장소, 사람과 행동, 가리킬 수 있는 세부 서너 가지(사물·날씨·시간대·배경)를 담고, 글자가 필요 없는 구체적인 상황이며 단어끼리 장소와 시간이 겹치지 않게 한다(규칙 문장은 `pictures/scenes.py`의 `SCENE_RULES` 하나를 두 프롬프트가 같이 쓴다). 이미지 프롬프트는 `IMAGE_STYLE`의 스타일 문장 + 디테일·글자 금지 문장(`IMAGE_RULES`) + 장면이다. `backend/app/pictures/`(`illustrator.py`, `painters.py`)가 그 장면들을 `IMAGE_PROVIDER`의 MCP 서버에 보낸다. MCP 호출은 공식 `mcp` SDK의 `Client`(Streamable HTTP, `backend/app/mcp_client.py`의 `McpHttp`)가 하고, 인증은 OAuth 로그인 대신 그 provider의 API 키를 bearer 토큰으로 보낸다(OAuth 토큰은 몇 시간에서 7일이면 만료되므로). `claude` 실행은 없다.
 
 | provider | MCP | 호출 | 기본 모델 |
 |---|---|---|---|
-| `openrouter` | `https://mcp.openrouter.ai/mcp` | 단어마다 `generate-image`를 열 개 동시에, 응답의 inline image 블록(base64) | `google/gemini-3-pro-image` |
+| `openrouter` | `https://mcp.openrouter.ai/mcp` | 세션 하나에서 단어마다 `generate-image`를 열 개 동시에(`asyncio.gather`), 응답의 inline image 블록(base64) | `google/gemini-3-pro-image` |
 | `comfy` | `https://cloud.comfy.org/mcp` | `submit_batch`(한 배치, `confirm: true`; comfy가 열 장을 동시에 그린다) → `wait_for_batch` → `get_batch_output`의 서명 URL을 열 개 동시에 내려받음 | `vertexai/nano-banana-pro` |
 
 OpenAI 모델은 OpenRouter 표기(`openai/gpt-image-2.5-flare`)로 적으면 comfy에서도 통한다(`openai/images-generations` + `params.model`로 바꿔 보낸다). 그림은 `backend/data/images/{job}-{n}.png`에 두고 `/api/images/`로 서빙하며, 세션 content의 각 단어에 `scene`과 `image`가 붙는다. 그림 하나가 실패하면 그 단어만 그림 없이, 전체가 실패하면 경고만 남기고 세션은 그림 없이 저장된다. 카드의 그림 왼쪽 위 `↻`를 누르면 스타일 메뉴가 열리고, 고르면 `POST /api/sessions/{id}/pictures/{index}`(`{style}`)가 텍스트 모델(`EXAMPLE_MODEL`, `pictures/scenes.py`의 `SceneWriter`)에 새 장면을 쓰게 한 뒤 그 스타일로 다시 그려 저장한다: 새 파일을 쓰고, `db/sessions.py`의 `replace_vocabulary_item`이 한 트랜잭션(`BEGIN IMMEDIATE`) 안에서 그 단어 하나만 바꾸고 이전 항목을 돌려주면, 그때 이전 파일을 지운다(`Illustrator.discard`). 세션 전체를 읽었다 다시 쓰면 동시에 진행 중인 다른 단어의 redraw가 서로 덮어써 삭제된 파일명이 남았기 때문이다. 같은 프롬프트를 반복하면 비슷한 그림만 나오므로, 매번 무작위 `Spark`(장소 30·순간 12·반전 12 가지 중 하나씩)를 출발점으로 주고 이전 장면과 다르게 쓰라고 한다. 기다리는 동안 그림 위에 도는 링과 경과 초가 뜬다(요청 하나라 진짜 진행률은 없고 링은 60초를 향해 차오르다 95%에서 멈춘다). 별표와 `↻`는 그림 모서리 위에 반투명 원으로 얹혀 있다. 설정 모달의 `Test`가 키를 확인한다(OpenRouter는 `/api/v1/key`, comfy는 MCP initialize). comfy-cloud 구독이 끝나면 `IMAGE_PROVIDER`를 `openrouter`로 둔다. 비용은 각 대시보드에서 확인한다(Nano Banana Pro 기준 장당 $0.1~0.2).
@@ -162,7 +163,7 @@ Read aloud 라운드는 코치가 한마디라도 했으면 끝날 때 자동으
 | `app/coaching/` | Your turn 피드백, Phrasing, Ask 카드 |
 | `app/topics/` | 고정 풀, 하루 뉴스 주제 |
 | `app/config/` | 설정 목록과 키 확인 |
-| `app/net.py`, `llm.py`, `mcp_client.py`, `templates.py` | 공용: HTTP, Claude(Agent SDK), 이미지 MCP, `{{name}}` 채우기 |
+| `app/net.py`, `llm.py`, `mcp_client.py`, `templates.py` | 공용: HTTP, Claude(Agent SDK), HTTP MCP(`mcp` SDK), `{{name}}` 채우기 |
 
 ## Docker
 

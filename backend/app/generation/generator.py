@@ -6,7 +6,7 @@ from pydantic import ValidationError
 
 from app.generation.exclusions import Exclusions
 from app.generation.progress import Progress, StreamTracker
-from app.llm import WEB_TOOLS, Claude, GenerationError, McpServer
+from app.llm import WEB_TOOLS, Claude, GenerationError, McpServer, firecrawl
 from app.models import SessionContent
 from app.pictures.scenes import SCENE_RULES
 
@@ -131,7 +131,8 @@ one thing learners get wrong; no full sentences needed), 2 example sentences tha
 and korean: the natural Korean equivalent of the expression, a short phrase, no explanation.
 
 2. article: a short article of 250 to 350 words on the topic, written for a smart general reader. \
-Run at most 3 web searches to ground the article in accurate, current facts (dates, names, figures) and prefer a recent development or debate as the angle; never invent \
+Run at most 3 web searches, with firecrawl_search first and WebSearch only when firecrawl_search \
+fails or finds nothing usable, to ground the article in accurate, current facts (dates, names, figures) and prefer a recent development or debate as the angle; never invent \
 specifics you did not verify. In sources, list only the web pages you actually drew on (page title \
 and exact URL from the search results); leave it empty if you used none. \
 Use 3 to 5 paragraphs separated by blank lines. Take a clear angle so there is something to discuss. \
@@ -190,9 +191,11 @@ def check_items_server(exclude: Exclusions) -> McpServer:
 
 
 class ClaudeGenerator:
-    def __init__(self, model: str = "opus", effort: str = "xhigh", skills: tuple[str, ...] = (), timeout_s: float = 300) -> None:
+    def __init__(
+        self, model: str = "opus", effort: str = "xhigh", skills: tuple[str, ...] = (), firecrawl_key: str = "", timeout_s: float = 300
+    ) -> None:
         self._skills = skills
-        self.claude = Claude(model, effort, timeout_s, tools=("Read", *WEB_TOOLS), skills=skills)
+        self.claude = Claude(model, effort, timeout_s, tools=("Read", *WEB_TOOLS), mcp=(firecrawl(firecrawl_key),), skills=skills)
 
     def build_prompt(self, topic: str, exclude: Exclusions | None = None) -> str:
         prompt = PROMPT_TEMPLATE.format(

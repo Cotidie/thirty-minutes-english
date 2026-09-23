@@ -1,7 +1,15 @@
 import pytest
 
 from app.generation.generator import EXPRESSION_COUNT, VOCABULARY_COUNT
-from app.models import Article, Expression, Question, SentencePair, SessionContent, Source, VocabularyItem
+from app.models import (
+    Article,
+    Expression,
+    Question,
+    SentencePair,
+    SessionContent,
+    Source,
+    VocabularyItem,
+)
 
 
 def sample_content(topic: str = "Digital twins", title: str = "Twins at Work") -> SessionContent:

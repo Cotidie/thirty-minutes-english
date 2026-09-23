@@ -28,14 +28,24 @@ class GenerationError(Exception):
 
 @dataclass(frozen=True)
 class McpServer:
-    """One MCP server a run may call (an in-process SDK server here) and the tools allowed on it."""
+    """One MCP server a run may call (HTTP, or an in-process SDK server) and the tools allowed on it."""
 
     name: str
     config: Any
     tools: tuple[str, ...]
 
 
+def firecrawl(key: str = "") -> McpServer:
+    """Firecrawl's search MCP. Without a key it still answers, rate limited; a key lifts the limits."""
+    config: dict = {"type": "http", "url": FIRECRAWL_URL}
+    if key:
+        config["headers"] = {"Authorization": f"Bearer {key}"}
+    return McpServer("firecrawl", config, FIRECRAWL_TOOLS)
+
+
 WEB_TOOLS = ("WebSearch", "WebFetch")
+FIRECRAWL_URL = "https://mcp.firecrawl.dev/v2/mcp"
+FIRECRAWL_TOOLS = ("mcp__firecrawl__firecrawl_search", "mcp__firecrawl__firecrawl_scrape")
 
 
 class Runner(Protocol):

@@ -133,7 +133,13 @@ export interface SettingsView {
 
 export type SettingsUpdate = Record<string, string>
 
-export type ApiKeyName = 'OPENAI_API_KEY' | 'GEMINI_API_KEY' | 'AZURE_SPEECH_KEY' | 'OPENROUTER_API_KEY' | 'COMFY_API_KEY'
+export type ApiKeyName =
+  | 'OPENAI_API_KEY'
+  | 'GEMINI_API_KEY'
+  | 'AZURE_SPEECH_KEY'
+  | 'OPENROUTER_API_KEY'
+  | 'COMFY_API_KEY'
+  | 'FIRECRAWL_API_KEY'
 
 export interface KeyTestResult {
   ok: boolean
