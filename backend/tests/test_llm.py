@@ -33,3 +33,21 @@ def test_sdk_errors_and_timeouts_become_generation_errors():
         Claude("sonnet", query=FakeQuery(error=CLINotFoundError("no cli"))).run("p", {})
     with pytest.raises(GenerationError, match="timed out"):
         Claude("sonnet", timeout_s=0.05, query=FakeQuery(hang=True)).run("p", {})
+
+
+def test_an_error_from_the_message_callback_stops_the_run_and_closes_the_stream():
+    closed = []
+
+    async def stream(*, prompt, options):
+        try:
+            yield assistant(text())
+            yield assistant(text())
+        finally:
+            closed.append(True)
+
+    def stop(_):
+        raise KeyError("cancelled")
+
+    with pytest.raises(KeyError):
+        Claude("sonnet", query=stream).run("hi", {"type": "object"}, stop)
+    assert closed == [True]

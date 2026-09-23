@@ -33,10 +33,12 @@ class Counter:
         self.done = 0
 
     def tick(self) -> None:
-        self.done += 1
-        self._on_drawn(self.done)
+        self.reach(self.done + 1)
 
-    def report(self) -> None:
+    def reach(self, done: int) -> None:
+        """Reports `done` finished, never fewer than before; called again with the same count it
+        still reports, so a cancel gets through while nothing new finishes."""
+        self.done = max(self.done, done)
         self._on_drawn(self.done)
 
 
@@ -111,7 +113,7 @@ class ComfyPainter:
                 batch_id, job_ids = submitted["batch_id"], submitted["job_ids"]
                 for _ in range(self.WAIT_ROUNDS):
                     waited = payload(await session.call("wait_for_batch", {"batch_id": batch_id}))
-                    counter.report()  # the batch reports no per-picture count; this still lets a cancel through
+                    counter.reach(finished(waited))
                     if not waited.get("timed_out"):
                         break
                 outputs = payload(await session.call("get_batch_output", {"batch_id": batch_id, "client_os": "linux"}))
@@ -119,12 +121,7 @@ class ComfyPainter:
             log.warning("comfy could not draw the pictures: %s", e)
             return [None] * len(prompts)
         url_of = {o["job_id"]: o["url"] for o in outputs.get("outputs", []) if o.get("url")}
-        async def one(url: str | None) -> bytes | None:
-            png = await self._fetch_or_none(url)
-            counter.tick()
-            return png
-
-        return list(await asyncio.gather(*(one(url_of.get(job)) for job in job_ids)))
+        return list(await asyncio.gather(*(self._fetch_or_none(url_of.get(job)) for job in job_ids)))
 
     def _model_fields(self) -> dict:
         """comfy names every OpenAI image model `openai/images-generations` and takes the variant
@@ -141,6 +138,14 @@ class ComfyPainter:
         except httpx2.HTTPError as e:
             log.warning("could not fetch a picture from %s: %s", url, e)
             return None
+
+
+def finished(batch: dict) -> int:
+    """Pictures of a comfy batch that are ready or failed, from wait_for_batch's per-job states."""
+    summary = batch.get("summary") or {}
+    if summary:
+        return (summary.get("ready") or 0) + (summary.get("failed") or 0)
+    return sum(1 for job in batch.get("jobs") or [] if job.get("state") in ("ready", "failed"))
 
 
 async def fetch_url(url: str, attempts: int = 3, wait_s: float = 2, transport: httpx2.AsyncBaseTransport | None = None) -> bytes:

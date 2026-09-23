@@ -14,6 +14,7 @@ from app.pictures.painters import (
     ComfyPainter,
     OpenRouterPainter,
     fetch_url,
+    finished,
     painter_for,
 )
 from app.pictures.scenes import SceneWriter, Spark
@@ -117,10 +118,14 @@ def test_a_refused_key_leaves_every_picture_blank():
 def test_comfy_submits_one_batch_waits_and_fetches_each_job_in_order():
     server = FakeServer({
         "submit_batch": [text({"batch_id": "b1", "job_ids": ["j0", "j1", "j2"]})],
-        "wait_for_batch": [text({"timed_out": True}), text({"timed_out": False})],
+        "wait_for_batch": [
+            text({"timed_out": True, "summary": {"pending": 2, "ready": 1, "failed": 0}}),
+            text({"timed_out": False, "summary": {"pending": 0, "ready": 2, "failed": 1}}),
+        ],
         "get_batch_output": [text({"outputs": [{"job_id": "j2", "url": "https://x/2"}, {"job_id": "j0", "url": "https://x/0"}]})],
     })
     fetched = []
+    counts: list[int] = []
 
     async def fetch(url):
         fetched.append(url)
@@ -128,9 +133,10 @@ def test_comfy_submits_one_batch_waits_and_fetches_each_job_in_order():
             raise httpx2.ConnectError("gone")
         return b"PNG" + url[-1].encode()
 
-    pictures = ComfyPainter(server, "vertexai/nano-banana-pro", fetch=fetch).paint(["a", "b", "c"])
+    pictures = ComfyPainter(server, "vertexai/nano-banana-pro", fetch=fetch).paint(["a", "b", "c"], counts.append)
 
     assert pictures == [b"PNG0", None, None]
+    assert counts == [1, 3]  # each wait round reports the batch's finished pictures
     submit = server.calls[0][1]
     assert submit["confirm"] is True
     assert [i["prompt"] for i in submit["items"]] == ["a", "b", "c"]
@@ -220,3 +226,8 @@ def test_the_illustrator_reports_each_finished_picture(tmp_path):
     content = sample_content()
     Illustrator(FakePainter(), tmp_path / "images").illustrate("job1", content, counts.append)
     assert counts == list(range(1, len(content.vocabulary) + 1))
+
+
+def test_a_batch_without_a_summary_is_counted_from_its_jobs():
+    assert finished({"jobs": [{"state": "ready"}, {"state": "pending"}, {"state": "failed"}]}) == 2
+    assert finished({"timed_out": True}) == 0

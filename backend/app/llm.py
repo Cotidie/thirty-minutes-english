@@ -5,6 +5,7 @@ fetcher, feedback, phrasing, scenes) goes through `Claude.run`."""
 
 import asyncio
 import logging
+from contextlib import aclosing
 from collections.abc import Callable
 from dataclasses import dataclass, field
 from typing import Any, Protocol
@@ -101,11 +102,20 @@ class Claude:
         return result.structured_output
 
     async def _run(self, prompt: str, options: ClaudeAgentOptions, on_message: OnMessage | None) -> ResultMessage | None:
+        """An error from `on_message` (a cancel) leaves the loop and closes the stream before it
+        rises; raised inside the loop, it made the SDK's cleanup fail on a generator still running."""
         result = None
-        async with asyncio.timeout(self.timeout_s):
-            async for message in self.query(prompt=prompt, options=options):
+        stopped: Exception | None = None
+        async with asyncio.timeout(self.timeout_s), aclosing(self.query(prompt=prompt, options=options)) as stream:
+            async for message in stream:
                 if isinstance(message, ResultMessage):
                     result = message
-                if on_message:
-                    on_message(message)
+                try:
+                    if on_message:
+                        on_message(message)
+                except Exception as e:
+                    stopped = e
+                    break
+        if stopped:
+            raise stopped
         return result
