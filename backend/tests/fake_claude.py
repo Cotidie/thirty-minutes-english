@@ -1,6 +1,6 @@
 """A stand-in for claude_agent_sdk.query that replays messages."""
 
-from claude_agent_sdk import AssistantMessage, ResultMessage, TextBlock, ToolUseBlock
+from claude_agent_sdk import AssistantMessage, ResultMessage, StreamEvent, TextBlock, ToolUseBlock
 
 
 def result(structured_output=None, is_error=False, text=None) -> ResultMessage:
@@ -17,12 +17,16 @@ def result(structured_output=None, is_error=False, text=None) -> ResultMessage:
     )
 
 
-def assistant(*blocks) -> AssistantMessage:
-    return AssistantMessage(content=list(blocks), model="opus")
+def assistant(*blocks, usage: dict | None = None, message_id: str | None = None) -> AssistantMessage:
+    return AssistantMessage(content=list(blocks), model="opus", usage=usage, message_id=message_id)
 
 
-def tool_use(name: str) -> ToolUseBlock:
-    return ToolUseBlock(id=name, name=name, input={})
+def tool_use(name: str, **args) -> ToolUseBlock:
+    return ToolUseBlock(id=name, name=name, input=args)
+
+
+def stream(event: dict) -> StreamEvent:
+    return StreamEvent(uuid="u", session_id="s", event=event)
 
 
 def text(value: str = "...") -> TextBlock:

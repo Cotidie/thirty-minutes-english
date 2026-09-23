@@ -195,7 +195,9 @@ class ClaudeGenerator:
         self, model: str = "opus", effort: str = "xhigh", skills: tuple[str, ...] = (), firecrawl_key: str = "", timeout_s: float = 300
     ) -> None:
         self._skills = skills
-        self.claude = Claude(model, effort, timeout_s, tools=("Read", *WEB_TOOLS), mcp=(firecrawl(firecrawl_key),), skills=skills)
+        self.claude = Claude(
+            model, effort, timeout_s, tools=("Read", *WEB_TOOLS), mcp=(firecrawl(firecrawl_key),), skills=skills, partial=True
+        )
 
     def build_prompt(self, topic: str, exclude: Exclusions | None = None) -> str:
         prompt = PROMPT_TEMPLATE.format(

@@ -33,7 +33,7 @@ export function useGenerationJob(onDone: (sessionId: number) => void) {
       api
         .getJob(job.id)
         .then((next) => {
-          setJob(next)
+          setJob(next.status === 'cancelled' ? null : next)
           if (next.status === 'done' && next.session_id !== null) onDone(next.session_id)
           if (next.status === 'failed') setError(next.error ?? 'generation failed')
         })
@@ -55,5 +55,15 @@ export function useGenerationJob(onDone: (sessionId: number) => void) {
     }
   }
 
-  return { job, running, error, start }
+  async function cancel() {
+    if (!job) return
+    setJob(null)
+    try {
+      await api.cancelJob(job.id)
+    } catch (e) {
+      setError((e as Error).message)
+    }
+  }
+
+  return { job, running, error, start, cancel }
 }

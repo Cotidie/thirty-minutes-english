@@ -8,7 +8,7 @@ from pathlib import Path
 
 from app.llm import GenerationError
 from app.models import SessionContent, VocabularyItem
-from app.pictures.painters import Painter
+from app.pictures.painters import OnDrawn, Painter
 
 log = logging.getLogger(__name__)
 
@@ -48,11 +48,11 @@ class Illustrator:
         """`style` is a STYLES key to draw this one in; blank means the configured style."""
         return f"{STYLES.get(style, self._style)} {IMAGE_RULES} {scene}"
 
-    def illustrate(self, job_id: str, content: SessionContent) -> SessionContent:
+    def illustrate(self, job_id: str, content: SessionContent, on_drawn: OnDrawn | None = None) -> SessionContent:
         """The content with a picture on every word whose scene got drawn. A word
         without a scene, or whose picture failed, stays as it is."""
         drawable = [(i, item) for i, item in enumerate(content.vocabulary) if item.scene]
-        pictures = self._painter.paint([self.prompt(item.scene or "") for _, item in drawable])
+        pictures = self._painter.paint([self.prompt(item.scene or "") for _, item in drawable], on_drawn)
         self._dir.mkdir(parents=True, exist_ok=True)
         vocabulary = list(content.vocabulary)
         for (i, item), png in zip(drawable, pictures):

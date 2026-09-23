@@ -19,8 +19,14 @@ class JobStatus(BaseModel):
     status: Status
     stage: Stage
     searches: int
+    activity: str
+    input_tokens: int
+    output_tokens: int
+    pictures_done: int
+    pictures_total: int
     elapsed_seconds: float
     stage_elapsed_seconds: float
+    stage_expected_seconds: float
     expected_seconds: float
     session_id: int | None = None
     error: str | None = None

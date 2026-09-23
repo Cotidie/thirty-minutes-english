@@ -14,10 +14,21 @@
 
 .gen-label {
   font-weight: 500;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .gen-time {
+  white-space: nowrap;
   color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.gen-meta {
+  color: var(--muted);
+  font-size: 0.85rem;
   font-variant-numeric: tabular-nums;
 }
 

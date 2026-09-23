@@ -1,13 +1,14 @@
 import { useEffect, useState } from 'react'
 import { formatClock } from '../lib/phases'
-import { labelFor, percentFor, type JobStatus } from '../lib/progress'
+import { labelFor, metaFor, percentFor, type JobStatus } from '../lib/progress'
 import './GenerationProgress.css'
 
 interface Props {
   job: JobStatus
+  onCancel: () => void
 }
 
-export function GenerationProgress({ job }: Props) {
+export function GenerationProgress({ job, onCancel }: Props) {
   const [percent, setPercent] = useState(() => percentFor(job))
   useEffect(() => setPercent((prev) => percentFor(job, prev)), [job])
 
@@ -28,6 +29,14 @@ export function GenerationProgress({ job }: Props) {
         aria-label="Generation progress"
       >
         <div className="gen-fill" style={{ width: `${percent}%` }} />
+      </div>
+      <div className="gen-row">
+        <span className="gen-meta">{metaFor(job)}</span>
+        {job.status === 'running' && (
+          <button type="button" className="btn btn-link" onClick={onCancel}>
+            Cancel
+          </button>
+        )}
       </div>
       <p className="gen-topic">{job.topic}</p>
     </section>

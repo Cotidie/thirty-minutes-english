@@ -62,6 +62,7 @@ class Claude:
     tools: tuple[str, ...] = ()  # built-in tools; none by default
     mcp: tuple[McpServer, ...] = ()
     skills: tuple[str, ...] = ()
+    partial: bool = False  # stream token deltas too, for live progress
     query: Callable = field(default=query, repr=False)
 
     def options(self, schema: dict, extra: tuple[McpServer, ...] = ()) -> ClaudeAgentOptions:
@@ -75,6 +76,7 @@ class Claude:
             strict_mcp_config=True,
             skills=list(self.skills) or None,
             output_format={"type": "json_schema", "schema": schema},
+            include_partial_messages=self.partial,
         )
 
     def run(

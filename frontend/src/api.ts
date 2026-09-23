@@ -41,6 +41,8 @@ export const api = {
   getJob: (id: string) => request<JobStatus>(`/api/jobs/${id}`),
   /** Generations still running on the server, oldest first. */
   listJobs: () => request<JobStatus[]>('/api/jobs'),
+  /** Stops a running generation; nothing from it is saved. */
+  cancelJob: (id: string) => request<JobStatus>(`/api/jobs/${id}`, { method: 'DELETE' }),
   deleteSession: (id: number) => request<void>(`/api/sessions/${id}`, { method: 'DELETE' }),
   /** A fresh scene for one word, drawn in `style` (blank: the configured one) and saved; the item as it now is. */
   redrawPicture: (sessionId: number, index: number, style = '') =>

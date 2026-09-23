@@ -1,3 +1,5 @@
+from dataclasses import asdict
+
 from fastapi import APIRouter, HTTPException, Response
 
 from app.api.deps import Db, Jobs, Svc, failed, off, require_session
@@ -17,11 +19,11 @@ def status_of(job: Job, runner: JobRunner) -> JobStatus:
         id=job.id,
         topic=job.topic,
         status=job.status,
-        stage=job.stage,
-        searches=job.searches,
+        **asdict(job.progress),
         elapsed_seconds=job.elapsed_seconds,
         stage_elapsed_seconds=job.stage_elapsed_seconds,
-        expected_seconds=runner.expected_seconds(),
+        stage_expected_seconds=runner.stage_expected_seconds(job.stage),
+        expected_seconds=runner.expected_seconds(job),
         session_id=job.session_id,
         error=job.error,
     )
@@ -47,6 +49,15 @@ def list_running_jobs(jobs: Jobs) -> list[JobStatus]:
 @router.get("/jobs/{job_id}", response_model=JobStatus)
 def get_job(job_id: str, jobs: Jobs) -> JobStatus:
     job = jobs.get(job_id)
+    if job is None:
+        raise HTTPException(status_code=404, detail="job not found")
+    return status_of(job, jobs)
+
+
+@router.delete("/jobs/{job_id}", response_model=JobStatus)
+def cancel_job(job_id: str, jobs: Jobs) -> JobStatus:
+    """Stops a running job; the worker quits at its next progress report and saves nothing."""
+    job = jobs.cancel(job_id)
     if job is None:
         raise HTTPException(status_code=404, detail="job not found")
     return status_of(job, jobs)

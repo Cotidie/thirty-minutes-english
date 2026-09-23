@@ -1,8 +1,12 @@
+from collections import deque
+from threading import Lock
+
 import pytest
 from fastapi.testclient import TestClient
 
 from app.db import Database
 from app.generation.generator import EXPRESSION_COUNT, VOCABULARY_COUNT
+from app.generation.jobs import DEFAULT_STAGE_SECONDS, Job, JobRunner
 from app.generation.progress import Progress, Stage
 from app.llm import GenerationError
 from app.main import create_app
@@ -121,8 +125,10 @@ class FakeIllustrator:
         self.error = error
         self.job_ids: list[str] = []
 
-    def illustrate(self, job_id: str, content):
+    def illustrate(self, job_id: str, content, on_drawn=None):
         self.job_ids.append(job_id)
+        if on_drawn:
+            on_drawn(len(content.vocabulary))
         if self.error:
             raise self.error
         words = [v.model_copy(update={"scene": f"a scene for {v.word}", "image": f"{job_id}-{i}.png"}) for i, v in enumerate(content.vocabulary)]
@@ -137,6 +143,7 @@ def test_pictures_are_drawn_after_the_text_and_saved_with_the_session(tmp_path):
         session = c.get(f"/api/sessions/{job['session_id']}").json()
     assert illustrator.job_ids == [job["id"]]
     assert job["stage"] == "illustrating"
+    assert job["pictures_done"] == 10  # the fake reports every word drawn
     assert session["content"]["vocabulary"][0]["image"] == f"{job['id']}-0.png"
     assert session["content"]["vocabulary"][0]["scene"] == "a scene for word0"
 
@@ -318,3 +325,61 @@ def test_readings_keep_their_corrections_and_list_per_session(client):
 def test_a_reading_without_corrections_is_a_clean_read(client):
     body = {"paragraph": "Researchers verified it.", "user_text": "researchers verified it", "coach_text": "Goodbye."}
     assert client.post("/api/readings", json=body).json()["corrections"] == []
+
+
+class DeferredExecutor:
+    """Holds the job until the test runs it, so the test can act on a running job."""
+
+    def __init__(self):
+        self.pending: list = []
+
+    def submit(self, fn, /, *args):
+        self.pending.append((fn, args))
+
+    def run(self):
+        for fn, args in self.pending:
+            fn(*args)
+
+
+def test_a_cancelled_job_stops_and_saves_nothing(tmp_path):
+    executor = DeferredExecutor()
+    app = create_app(Database(tmp_path / "s.db"), Services(FakeGenerator()), executor)
+    with TestClient(app) as c:
+        job = c.post("/api/sessions", json={"topic": "X"}).json()
+        cancelled = c.delete(f"/api/jobs/{job['id']}").json()
+        executor.run()
+        after = c.get(f"/api/jobs/{job['id']}").json()
+        assert c.get("/api/sessions").json() == []
+        assert c.get("/api/jobs").json() == []
+        assert c.delete("/api/jobs/nope").status_code == 404
+    assert cancelled["status"] == after["status"] == "cancelled"
+    assert after["session_id"] is None
+
+
+def test_a_fresh_job_expects_the_default_time_of_every_stage(tmp_path):
+    app = create_app(Database(tmp_path / "s.db"), Services(FakeGenerator()), DeferredExecutor())
+    with TestClient(app) as c:
+        job = c.post("/api/sessions", json={"topic": "X"}).json()
+    assert job["expected_seconds"] == sum(DEFAULT_STAGE_SECONDS.values())
+    assert job["stage_expected_seconds"] == DEFAULT_STAGE_SECONDS[Stage.STARTING]
+
+
+def test_stage_times_of_a_finished_run_become_the_next_estimate():
+    runner = JobRunner.__new__(JobRunner)
+    runner._stage_history = {stage: deque([4.0]) for stage in Stage}
+    runner._lock = Lock()
+    job = Job(id="j", topic="t")
+    job.stage_seconds = {Stage.STARTING: 2.0}
+    job.progress = Progress(Stage.SEARCHING, 1)
+    # starting as it took (2), searching at least its median (4), the four after it at 4 each
+    assert runner.expected_seconds(job) == 2 + 4 + 4 * 3
+
+
+def test_a_brief_detour_into_a_later_stage_does_not_shrink_the_estimate():
+    runner = JobRunner.__new__(JobRunner)
+    runner._stage_history = {stage: deque([4.0]) for stage in Stage}
+    runner._lock = Lock()
+    job = Job(id="j", topic="t")
+    job.stage_seconds = {Stage.STARTING: 2.0, Stage.WRITING: 0.5}  # thought once between searches
+    job.progress = Progress(Stage.SEARCHING, 2)
+    assert runner.expected_seconds(job) == 2 + 4 + 4 * 3
