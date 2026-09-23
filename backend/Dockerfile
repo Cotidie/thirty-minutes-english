@@ -14,6 +14,7 @@ WORKDIR /app
 COPY --chown=app pyproject.toml uv.lock ./
 RUN uv sync --frozen --no-dev
 COPY --chown=app app ./app
+COPY --chown=app plugin ./plugin
 
 ENV DB_PATH=/data/sessions.db
 EXPOSE 8765

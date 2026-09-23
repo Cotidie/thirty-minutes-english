@@ -1,4 +1,5 @@
 from collections.abc import Callable
+from pathlib import Path
 from typing import Protocol
 
 from claude_agent_sdk import create_sdk_mcp_server, tool
@@ -190,21 +191,34 @@ def check_items_server(exclude: Exclusions) -> McpServer:
     return McpServer("session", create_sdk_mcp_server("session", tools=[check_items]), ("mcp__session__check_items",))
 
 
+# The app's own writing rules, a local plugin beside the app package (backend/plugin, /app/plugin in the image).
+PLUGIN_DIR = Path(__file__).resolve().parents[2] / "plugin"
+APP_SKILL = "english-session:session-writing"
+
+
 class ClaudeGenerator:
+    """`skills` are host skills to load on top of the app's own, which always runs."""
+
     def __init__(
         self, model: str = "opus", effort: str = "xhigh", skills: tuple[str, ...] = (), firecrawl_key: str = "", timeout_s: float = 300
     ) -> None:
-        self._skills = skills
+        self._skills = (APP_SKILL, *skills)
         self.claude = Claude(
-            model, effort, timeout_s, tools=("Read", *WEB_TOOLS), mcp=(firecrawl(firecrawl_key),), skills=skills, partial=True
+            model,
+            effort,
+            timeout_s,
+            tools=("Read", *WEB_TOOLS),
+            mcp=(firecrawl(firecrawl_key),),
+            skills=self._skills,
+            plugins=(str(PLUGIN_DIR),),
+            partial=True,
         )
 
     def build_prompt(self, topic: str, exclude: Exclusions | None = None) -> str:
         prompt = PROMPT_TEMPLATE.format(
             topic=topic, expression_count=EXPRESSION_COUNT, vocabulary_count=VOCABULARY_COUNT, scene_rules=SCENE_RULES
         )
-        if self._skills:
-            prompt = SKILLS_PREAMBLE.format(skills=", ".join(self._skills)) + prompt
+        prompt = SKILLS_PREAMBLE.format(skills=", ".join(self._skills)) + prompt
         if exclude:
             prompt += CHECK_ITEMS_RULE
         return prompt

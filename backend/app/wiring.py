@@ -10,6 +10,7 @@ from app.coaching.cards import SCHEMA_FILE, Extractor, PhraseCardExtractor
 from app.coaching.example_feedback import TEMPLATES, ExampleCoach
 from app.coaching.phrasing import PhrasingMarker
 from app.config.settings import Settings
+from app.config.skills import host_skills
 from app.generation.generator import ClaudeGenerator, Generator
 from app.pictures.illustrator import Illustrator
 from app.pictures.painters import painter_for
@@ -59,7 +60,7 @@ def build_services(settings: Settings, agent_dirs: dict[str, Path], image_dir: P
         generator=ClaudeGenerator(
             model=settings.get("CLAUDE_MODEL"),
             effort=settings.get("CLAUDE_EFFORT"),
-            skills=settings.claude_skills,
+            skills=tuple(s for s in settings.claude_skills if s in host_skills()),  # a vanished skill would fail the run
             firecrawl_key=settings.get("FIRECRAWL_API_KEY"),
         ),
         topic_source=ClaudeTopicSource(settings.get("TOPICS_MODEL"), settings.get("TOPICS_EFFORT"), settings.get("FIRECRAWL_API_KEY")),

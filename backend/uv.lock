@@ -214,6 +214,7 @@ dependencies = [
     { name = "claude-agent-sdk" },
     { name = "fastapi" },
     { name = "openai" },
+    { name = "pyyaml" },
     { name = "uvicorn", extra = ["standard"] },
 ]
 
@@ -228,6 +229,7 @@ requires-dist = [
     { name = "claude-agent-sdk", specifier = ">=0.2.158" },
     { name = "fastapi", specifier = ">=0.141.1" },
     { name = "openai", specifier = ">=3.19.0" },
+    { name = "pyyaml", specifier = ">=6.0.3" },
     { name = "uvicorn", extras = ["standard"], specifier = ">=0.52.4" },
 ]
 

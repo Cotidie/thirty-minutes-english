@@ -3,6 +3,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 from app.config.settings import InvalidSetting, Settings
+from app.config.skills import host_skills
 from app.db import Database
 from app.main import create_app
 from app.wiring import Services
@@ -146,3 +147,30 @@ def test_key_test_for_azure_needs_a_region():
     from app.config.keycheck import check_key
 
     assert check_key("AZURE_SPEECH_KEY", "az-typed", region=" ").message == "set AZURE_SPEECH_REGION first"
+
+
+def skill(root, folder: str, head: str) -> None:
+    (root / folder).mkdir(parents=True)
+    (root / folder / "SKILL.md").write_text(f"---\n{head}\n---\n\n# Body\n")
+
+
+def test_host_skills_read_name_and_description_from_the_frontmatter(tmp_path):
+    skill(tmp_path, "stop-slop", "name: stop-slop\ndescription: Remove AI writing patterns.")
+    skill(tmp_path, "humanizer", "name: humanizer\ndescription: |\n  Remove signs\n  of AI writing.")
+    (tmp_path / "broken").mkdir()  # no SKILL.md: a broken symlink looks like this
+    assert host_skills(tmp_path) == {"humanizer": "Remove signs of AI writing.", "stop-slop": "Remove AI writing patterns."}
+    assert host_skills(tmp_path / "missing") == {}
+
+
+def test_skills_are_ticked_from_the_host_list_and_unknown_names_are_refused(tmp_path, monkeypatch):
+    monkeypatch.setattr("app.api.settings.host_skills", lambda: {"stop-slop": "Remove AI writing patterns."})
+    with settings_client(tmp_path, {"CLAUDE_SKILLS": "gone-skill"}) as c:
+        field = {f["key"]: f for f in c.get("/api/settings").json()["fields"]}["CLAUDE_SKILLS"]
+        assert field["multi"] is True
+        assert field["choices"] == ["stop-slop", "gone-skill"]
+        assert field["labels"]["stop-slop"] == "Remove AI writing patterns."
+        assert "Not found" in field["labels"]["gone-skill"]
+
+        refused = c.put("/api/settings", json={"values": {"CLAUDE_SKILLS": "stop-slop,typo-skill"}})
+        assert refused.status_code == 400 and "typo-skill" in refused.json()["detail"]
+        assert c.put("/api/settings", json={"values": {"CLAUDE_SKILLS": "stop-slop"}}).status_code == 200

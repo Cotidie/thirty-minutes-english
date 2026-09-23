@@ -268,6 +268,79 @@
   cursor: progress;
 }
 
+/* Host skills: ticked from a filtered list, each with its description. */
+.settings-multi {
+  flex: 1;
+  min-width: 0;
+  display: grid;
+  gap: 0.4rem;
+}
+
+.settings-multi-bar {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.settings-multi-count {
+  flex: none;
+  color: var(--muted);
+  font-size: 0.85rem;
+}
+
+.settings-multi-list {
+  max-height: 17rem;
+  margin: 0;
+  padding: 0.25rem 0;
+  overflow-y: auto;
+  list-style: none;
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  background: #fff;
+}
+
+.settings-multi-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.6rem;
+  min-height: 2.75rem;
+  box-sizing: border-box;
+  padding: 0.45rem 0.75rem;
+  cursor: pointer;
+}
+
+.settings-multi-item:hover {
+  background: var(--ground);
+}
+
+.settings-row .settings-multi-item input {
+  flex: none;
+  width: 1rem;
+  min-height: 0;
+  height: 1rem;
+  margin: 0.2rem 0 0;
+  padding: 0;
+}
+
+.settings-multi-name {
+  display: block;
+  font-weight: 600;
+}
+
+.settings-multi-desc {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  color: var(--muted);
+  font-size: 0.82rem;
+}
+
+.settings-multi-empty {
+  padding: 0.6rem 0.75rem;
+  color: var(--muted);
+}
+
 /* Key status on the name line, so a result never changes the row's height. */
 .settings-chip {
   flex: none;

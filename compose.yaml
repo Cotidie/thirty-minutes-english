@@ -21,6 +21,8 @@ services:
       - ../phrase-coach:/agents/phrase-coach:ro
       - ../example-coach:/agents/example-coach:ro
       - ${HOME}/.claude/skills:${HOME}/.claude/skills:ro
+      # Skill managers link ~/.claude/skills/<name> to ../../.agents/skills/<name>; mount the target so the links resolve.
+      - ${HOME}/.agents/skills:${HOME}/.agents/skills:ro
 
   frontend:
     restart: unless-stopped

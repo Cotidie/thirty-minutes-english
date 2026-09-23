@@ -321,6 +321,7 @@ interface ControlProps {
 
 function Control({ field, value, suggestions, placeholder, onChange }: ControlProps) {
   const id = `setting-${field.key}`
+  if (field.multi) return <MultiPick id={id} field={field} value={value} onChange={onChange} />
   if (field.choices) {
     return (
       <select id={id} value={value} onChange={(e) => onChange(e.target.value)}>
@@ -352,6 +353,47 @@ function Control({ field, value, suggestions, placeholder, onChange }: ControlPr
         </datalist>
       )}
     </>
+  )
+}
+
+/** A comma list ticked from `choices`, each shown with its description; a filter narrows a long list. */
+function MultiPick({ id, field, value, onChange }: { id: string; field: SettingField; value: string; onChange: (value: string) => void }) {
+  const [filter, setFilter] = useState('')
+  const picked = value.split(',').map((s) => s.trim()).filter(Boolean)
+  const choices = field.choices ?? []
+  const needle = filter.trim().toLowerCase()
+  const shown = choices.filter((c) => !needle || `${c} ${field.labels[c] ?? ''}`.toLowerCase().includes(needle))
+  const toggle = (name: string) =>
+    onChange(choices.filter((c) => (c === name ? !picked.includes(c) : picked.includes(c))).join(','))
+
+  return (
+    <div className="settings-multi">
+      <div className="settings-multi-bar">
+        <input
+          id={id}
+          type="search"
+          autoComplete="off"
+          placeholder={`Filter ${choices.length} skills`}
+          value={filter}
+          onChange={(e) => setFilter(e.target.value)}
+        />
+        <span className="settings-multi-count">{picked.length === 0 ? 'None ticked' : `${picked.length} ticked`}</span>
+      </div>
+      <ul className="settings-multi-list" aria-label={`${field.key} choices`}>
+        {shown.map((name) => (
+          <li key={name}>
+            <label className="settings-multi-item">
+              <input type="checkbox" checked={picked.includes(name)} onChange={() => toggle(name)} />
+              <span>
+                <span className="settings-multi-name">{name}</span>
+                {field.labels[name] && <span className="settings-multi-desc">{field.labels[name]}</span>}
+              </span>
+            </label>
+          </li>
+        ))}
+        {shown.length === 0 && <li className="settings-multi-empty">No skill matches “{filter}”.</li>}
+      </ul>
+    </div>
   )
 }
 

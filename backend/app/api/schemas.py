@@ -164,6 +164,7 @@ class SettingField(BaseModel):
     shown_when: tuple[str, str] | None = None  # (key, value): hidden otherwise
     used_when: tuple[str, str] | None = None  # (key, value): the key sits idle otherwise
     help: str = ""  # what the setting does, for the info tooltip
+    multi: bool = False  # `choices` are ticked, not picked; the value is a comma list
 
 
 class SettingGroup(BaseModel):

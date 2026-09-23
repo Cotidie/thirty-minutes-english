@@ -6,6 +6,7 @@ dependencies = [
     "claude-agent-sdk>=0.2.158",
     "fastapi>=0.141.1",
     "openai>=3.19.0",
+    "pyyaml>=6.0.3",
     "uvicorn[standard]>=0.52.4",
 ]
 

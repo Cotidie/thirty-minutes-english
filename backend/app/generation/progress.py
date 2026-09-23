@@ -44,7 +44,8 @@ DELTA_TEXT = {"text_delta": "text", "input_json_delta": "partial_json", "thinkin
 def describe(block: ToolUseBlock) -> str:
     args = block.input or {}
     if block.name == "Skill":
-        return f"Loading the {args.get('skill') or args.get('command') or ''} skill".replace("the  skill", "a skill")
+        name = str(args.get("skill") or args.get("command") or "").split(":")[-1]  # plugin skills come as plugin:skill
+        return f"Loading the {name} skill" if name else "Loading a skill"
     if "query" in args:
         return f'Searching "{args["query"]}"'
     if "url" in args:

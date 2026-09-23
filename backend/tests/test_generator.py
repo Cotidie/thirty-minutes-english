@@ -3,7 +3,9 @@ import pytest
 
 from app.generation.exclusions import Exclusions
 from app.generation.generator import (
+    APP_SKILL,
     CHECK_ITEMS_RULE,
+    PLUGIN_DIR,
     SESSION_SCHEMA,
     ClaudeGenerator,
     check_items_reply,
@@ -58,3 +60,13 @@ def test_check_items_names_close_variants_of_taught_items():
 
 def test_a_full_session_fits_the_schema_the_model_answers_in():
     jsonschema.validate(sample_content().model_dump(exclude={"vocabulary": {"__all__": {"image"}}}), SESSION_SCHEMA)
+
+
+def test_the_app_skill_always_runs_and_host_skills_come_after_it():
+    fake = FakeQuery(result(sample_content().model_dump()))
+    generator_with(fake, skills=("stop-slop",)).generate("x")
+    prompt, options = fake.calls[0]
+    assert options.skills == [APP_SKILL, "stop-slop"]
+    assert options.plugins == [{"type": "local", "path": str(PLUGIN_DIR)}]
+    assert f"{APP_SKILL}, stop-slop" in prompt
+    assert (PLUGIN_DIR / "skills" / "session-writing" / "SKILL.md").is_file()

@@ -63,6 +63,7 @@ class Claude:
     tools: tuple[str, ...] = ()  # built-in tools; none by default
     mcp: tuple[McpServer, ...] = ()
     skills: tuple[str, ...] = ()
+    plugins: tuple[str, ...] = ()  # local plugin folders, e.g. the app's own skills
     partial: bool = False  # stream token deltas too, for live progress
     query: Callable = field(default=query, repr=False)
 
@@ -76,6 +77,7 @@ class Claude:
             mcp_servers={s.name: s.config for s in servers},
             strict_mcp_config=True,
             skills=list(self.skills) or None,
+            plugins=[{"type": "local", "path": p} for p in self.plugins],
             output_format={"type": "json_schema", "schema": schema},
             include_partial_messages=self.partial,
         )

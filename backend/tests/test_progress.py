@@ -55,8 +55,8 @@ def test_builtin_web_tools_and_firecrawl_count_as_searches():
 
 def test_activity_names_the_query_the_page_and_the_skill():
     t = StreamTracker(lambda _: None)
-    t.feed(assistant(tool_use("Skill", skill="stop-slop")))
-    assert t.progress.activity == "Loading the stop-slop skill"
+    t.feed(assistant(tool_use("Skill", skill="english-session:session-writing")))
+    assert t.progress.activity == "Loading the session-writing skill"
     t.feed(assistant(tool_use("mcp__firecrawl__firecrawl_search", query="preprint peer review")))
     assert t.progress.activity == 'Searching "preprint peer review"'
     t.feed(assistant(tool_use("WebFetch", url="https://www.nature.com/articles/x")))
