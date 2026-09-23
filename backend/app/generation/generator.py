@@ -3,16 +3,19 @@ from typing import Protocol
 
 from pydantic import ValidationError
 
-from app.claude_cli import FIRECRAWL, ClaudeCli, GenerationError, McpServer, structured_output
-from app.exclusions import Exclusions
-from app.illustrator import SCENE_RULES
+from app.claude_cli import (
+    FIRECRAWL,
+    ClaudeCli,
+    GenerationError,
+    McpServer,
+    structured_output,
+)
+from app.generation.exclusions import Exclusions
+from app.generation.progress import Progress, StreamTracker
 from app.models import SessionContent
-from app.progress import Progress, StreamTracker
+from app.pictures.scenes import SCENE_RULES
 
 OnProgress = Callable[[Progress], None]
-
-__all__ = ["SESSION_SCHEMA", "ClaudeCliGenerator", "GenerationError", "Generator", "OnProgress"]
-
 
 class Generator(Protocol):
     def generate(
@@ -189,7 +192,7 @@ class ClaudeCliGenerator:
         timeout_s: float = 300,
     ) -> None:
         self._skills = skills
-        self._cli = ClaudeCli(model=model, effort=effort, mcp=mcp, timeout_s=timeout_s)
+        self.cli = ClaudeCli(model=model, effort=effort, mcp=mcp, timeout_s=timeout_s)
 
     def build_prompt(self, topic: str, exclude: Exclusions | None = None) -> str:
         prompt = PROMPT_TEMPLATE.format(
@@ -204,9 +207,6 @@ class ClaudeCliGenerator:
             )
         return prompt
 
-    def build_command(self) -> list[str]:
-        return self._cli.build_command(SESSION_SCHEMA)
-
     def generate(
         self,
         topic: str,
@@ -214,7 +214,7 @@ class ClaudeCliGenerator:
         exclude: Exclusions | None = None,
     ) -> SessionContent:
         tracker = StreamTracker(on_progress or (lambda _: None))
-        envelope = self._cli.run(self.build_prompt(topic, exclude), SESSION_SCHEMA, tracker.feed)
+        envelope = self.cli.run(self.build_prompt(topic, exclude), SESSION_SCHEMA, tracker.feed)
         return self.parse_result(envelope)
 
     @staticmethod

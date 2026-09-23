@@ -1,6 +1,6 @@
 import random
 
-from app.exclusions import Exclusions
+from app.generation.exclusions import Exclusions
 
 
 def test_thin_keeps_roughly_the_requested_share():

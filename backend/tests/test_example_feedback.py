@@ -4,11 +4,11 @@ import pytest
 from fastapi.testclient import TestClient
 
 from app.claude_cli import ClaudeCli, GenerationError
-from app.example_feedback import ExampleCoach
+from app.coaching.example_feedback import ExampleCoach
+from app.db import Database
 from app.main import create_app
-from app.wiring import Services
 from app.models import ExampleFeedback
-from app.store import SessionStore
+from app.wiring import Services
 from tests.test_api import FakeGenerator, InlineExecutor
 
 PROMPT = "Target: {{expression}} ({{meaning}}; {{usage_note}})\nSentence: {{sentence}}"
@@ -82,7 +82,7 @@ class FakeCoach:
 
 
 def client_with(tmp_path, coach) -> TestClient:
-    app = create_app(SessionStore(tmp_path / "s.db"), Services(FakeGenerator(), example_coach=coach), InlineExecutor())
+    app = create_app(Database(tmp_path / "s.db"), Services(FakeGenerator(), example_coach=coach), InlineExecutor())
     return TestClient(app)
 
 

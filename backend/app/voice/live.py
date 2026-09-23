@@ -6,12 +6,12 @@ one-use token and the setup message for its WebSocket."""
 import copy
 import json
 import logging
-import re
-import urllib.error
-import urllib.request
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Protocol
+
+from app.net import HttpError, post_json
+from app.templates import fill
 
 log = logging.getLogger(__name__)
 
@@ -21,14 +21,6 @@ GEMINI_LIVE_URL = (
     "wss://generativelanguage.googleapis.com/ws/"
     "google.ai.generativelanguage.v1beta.GenerativeService.BidiGenerateContentConstrained"
 )
-PLACEHOLDER = re.compile(r"\{\{(\w+)\}\}")
-
-
-class LiveSessionError(Exception):
-    def __init__(self, status: int, message: str):
-        super().__init__(f"{status}: {message}")
-        self.status = status
-        self.message = message
 
 
 class AgentDefinition:
@@ -48,13 +40,13 @@ class AgentDefinition:
             for part in message.get("content", []):
                 text = part.get("text")
                 if text:
-                    part["text"] = _fill(text, values)
+                    part["text"] = fill(text, **values)
         return session
 
     def context_for(self, **values: str) -> str:
         """The input messages' text, filled in, as one block for a system instruction."""
         texts = [
-            _fill(part["text"], values)
+            fill(part["text"], **values)
             for message in self.template.get("input", [])
             for part in message.get("content", [])
             if part.get("text")
@@ -83,10 +75,6 @@ class AgentDefinition:
         }
 
 
-def _fill(text: str, values: dict[str, str]) -> str:
-    return PLACEHOLDER.sub(lambda m: values.get(m.group(1), m.group(0)), text)
-
-
 class VoiceProvider(Protocol):
     """Opens one live round for an agent. The answer goes to the browser as is."""
 
@@ -107,11 +95,11 @@ class OpenAIVoice:
 
     def open(self, definition: AgentDefinition, sdp: str | None, **values: str) -> dict:
         if not sdp or not sdp.strip():
-            raise LiveSessionError(400, "an SDP offer is required for the OpenAI provider")
+            raise HttpError(400, "an SDP offer is required for the OpenAI provider")
         session = definition.session_for(**values)
         session["model"] = self.model
-        body = json.dumps({"session": session, "transport": {"type": "webrtc", "sdp": sdp}}).encode()
-        answer = _post(self.url, body, {"Authorization": f"Bearer {self.api_key}"})
+        body = {"session": session, "transport": {"type": "webrtc", "sdp": sdp}}
+        answer = post_json(self.url, body, {"Authorization": f"Bearer {self.api_key}"})
         return {"provider": self.name, **answer}
 
 
@@ -143,40 +131,18 @@ class GeminiVoice:
     def open(self, definition: AgentDefinition, sdp: str | None, **values: str) -> dict:
         now = datetime.now(UTC)
         setup = definition.gemini_setup(self.model, self.voice, self.thinking_level, **values)
-        body = json.dumps(
-            {
-                "uses": 1,
-                "expireTime": _rfc3339(now + self.TOKEN_TTL),
-                "newSessionExpireTime": _rfc3339(now + self.CONNECT_WINDOW),
-                "bidiGenerateContentSetup": setup,
-            }
-        ).encode()
-        token = _post(self.tokens_url, body, {"x-goog-api-key": self.api_key})
+        body = {
+            "uses": 1,
+            "expireTime": _rfc3339(now + self.TOKEN_TTL),
+            "newSessionExpireTime": _rfc3339(now + self.CONNECT_WINDOW),
+            "bidiGenerateContentSetup": setup,
+        }
+        token = post_json(self.tokens_url, body, {"x-goog-api-key": self.api_key})
         return {"provider": self.name, "url": f"{self.live_url}?access_token={token['name']}", "setup": setup}
 
 
 def _rfc3339(moment: datetime) -> str:
     return moment.replace(microsecond=0).isoformat().replace("+00:00", "Z")
-
-
-def _post(url: str, body: bytes, headers: dict[str, str]) -> dict:
-    req = urllib.request.Request(
-        url, data=body, method="POST", headers={"Content-Type": "application/json", **headers}
-    )
-    try:
-        with urllib.request.urlopen(req, timeout=30) as res:
-            return json.load(res)
-    except urllib.error.HTTPError as e:
-        raise LiveSessionError(e.code, _error_message(e.read())) from e
-    except urllib.error.URLError as e:
-        raise LiveSessionError(502, str(e.reason)) from e
-
-
-def _error_message(raw: bytes) -> str:
-    try:
-        return json.loads(raw)["error"]["message"]
-    except (ValueError, KeyError, TypeError):
-        return raw.decode(errors="replace")[:300]
 
 
 class LiveAgent:

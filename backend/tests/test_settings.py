@@ -5,41 +5,41 @@ import urllib.error
 import pytest
 from fastapi.testclient import TestClient
 
+from app.config.settings import InvalidSetting, Settings, mask
+from app.db import Database
 from app.main import create_app
-from app.settings import InvalidSetting, Settings, SettingsStore, mask
-from app.store import SessionStore
 from app.wiring import Services
 from tests.test_api import FakeGenerator, InlineExecutor
 
 
 @pytest.fixture
 def store(tmp_path):
-    return SettingsStore(tmp_path / "s.db")
+    return Database(tmp_path / "s.db")
 
 
 def test_default_when_neither_env_nor_db(store):
-    assert Settings.resolve({}, store).get("VOICE_PROVIDER") == "openai"
+    assert Settings({}, store.settings.load()).get("VOICE_PROVIDER") == "openai"
 
 
 def test_env_beats_default_and_blank_env_counts_as_unset(store):
-    settings = Settings.resolve({"CLAUDE_MODEL": "sonnet", "TOPICS_MODEL": "  "}, store)
+    settings = Settings({"CLAUDE_MODEL": "sonnet", "TOPICS_MODEL": "  "}, store.settings.load())
     assert settings.get("CLAUDE_MODEL") == "sonnet"
     assert settings.get("TOPICS_MODEL") == "sonnet"
 
 
 def test_saved_beats_env(store):
-    store.save({"VOICE_PROVIDER": "gemini"})
-    assert Settings.resolve({"VOICE_PROVIDER": "openai"}, store).voice_provider == "gemini"
+    store.settings.save({"VOICE_PROVIDER": "gemini"})
+    assert Settings({"VOICE_PROVIDER": "openai"}, store.settings.load()).get("VOICE_PROVIDER") == "gemini"
 
 
 def test_rejects_unknown_key_and_bad_choice(store):
     with pytest.raises(InvalidSetting):
-        store.save({"NOPE": "x"})
+        store.settings.save({"NOPE": "x"})
     with pytest.raises(InvalidSetting):
-        store.save({"VOICE_PROVIDER": "anthropic"})
+        store.settings.save({"VOICE_PROVIDER": "anthropic"})
     with pytest.raises(InvalidSetting):
-        store.save({"VOICE_NAME": "Siri"})
-    assert store.load() == {}
+        store.settings.save({"VOICE_NAME": "Siri"})
+    assert store.settings.load() == {}
 
 
 def test_voice_model_defaults_per_provider(store):
@@ -85,7 +85,7 @@ def test_mask():
 
 
 def settings_client(tmp_path, env, rebuild=None):
-    store = SessionStore(tmp_path / "s.db")
+    store = Database(tmp_path / "s.db")
     app = create_app(store, Services(FakeGenerator()), InlineExecutor(), rebuild=rebuild, env=env)
     return TestClient(app)
 
@@ -112,7 +112,7 @@ def test_put_stores_overrides_and_rebuilds_services(tmp_path):
     seen = []
 
     def rebuild(settings):
-        seen.append(settings.voice_provider)
+        seen.append(settings.get("VOICE_PROVIDER"))
         return Services(FakeGenerator(), voice_key_name=settings.voice_api_key_name)
 
     with settings_client(tmp_path, {}, rebuild) as c:
@@ -150,6 +150,9 @@ class FakeGet:
             raise urllib.error.HTTPError(req.full_url, self.status, "err", {}, body)
         return self
 
+    def read(self):
+        return b""
+
     def __enter__(self):
         return self
 
@@ -159,7 +162,7 @@ class FakeGet:
 
 def test_key_test_uses_the_typed_value_with_the_provider_header(tmp_path, monkeypatch):
     get = FakeGet()
-    monkeypatch.setattr("app.keycheck.urllib.request.urlopen", get)
+    monkeypatch.setattr("app.net.urllib.request.urlopen", get)
     with settings_client(tmp_path, {}) as c:
         res = c.post("/api/settings/test-key", json={"key": "GEMINI_API_KEY", "value": "AIza-typed"})
     assert res.json() == {"ok": True, "message": "key works"}
@@ -169,7 +172,7 @@ def test_key_test_uses_the_typed_value_with_the_provider_header(tmp_path, monkey
 
 def test_key_test_falls_back_to_the_saved_key_and_reports_failures(tmp_path, monkeypatch):
     get = FakeGet(401, "Incorrect API key provided")
-    monkeypatch.setattr("app.keycheck.urllib.request.urlopen", get)
+    monkeypatch.setattr("app.net.urllib.request.urlopen", get)
     with settings_client(tmp_path, {"OPENAI_API_KEY": "sk-saved"}) as c:
         res = c.post("/api/settings/test-key", json={"key": "OPENAI_API_KEY"})
     assert res.json() == {"ok": False, "message": "401: Incorrect API key provided"}
@@ -183,19 +186,19 @@ def test_key_test_without_any_key(tmp_path):
 
 
 def test_azure_settings_have_defaults_and_typed_accessors(store):
-    settings = Settings.resolve({"AZURE_SPEECH_KEY": "az-key-000012345"}, store)
-    assert settings.azure_speech_key == "az-key-000012345"
-    assert settings.azure_speech_region == "koreacentral"
+    settings = Settings({"AZURE_SPEECH_KEY": "az-key-000012345"}, store.settings.load())
+    assert settings.get("AZURE_SPEECH_KEY") == "az-key-000012345"
+    assert settings.get("AZURE_SPEECH_REGION") == "koreacentral"
     assert settings.assess_word_score == 60
     assert settings.assess_break_confidence == 0.75
-    store.save({"ASSESS_WORD_SCORE": "50", "ASSESS_BREAK_CONFIDENCE": "0.9"})
-    settings = Settings.resolve({}, store)
+    store.settings.save({"ASSESS_WORD_SCORE": "50", "ASSESS_BREAK_CONFIDENCE": "0.9"})
+    settings = Settings({}, store.settings.load())
     assert settings.assess_word_score == 50
     assert settings.assess_break_confidence == 0.9
 
 
 def test_azure_key_is_masked_in_fields(store):
-    fields = {f.key: f for f in Settings.resolve({"AZURE_SPEECH_KEY": "az-key-000012345"}, store).fields()}
+    fields = {f.key: f for f in Settings({"AZURE_SPEECH_KEY": "az-key-000012345"}, store.settings.load()).fields()}
     assert fields["AZURE_SPEECH_KEY"].secret is True
     assert fields["AZURE_SPEECH_KEY"].value == "…2345"
     assert fields["AZURE_SPEECH_REGION"].group == "assess"
@@ -203,14 +206,14 @@ def test_azure_key_is_masked_in_fields(store):
 
 def test_threshold_settings_reject_non_numbers(store):
     with pytest.raises(InvalidSetting):
-        store.save({"ASSESS_WORD_SCORE": "sixty"})
+        store.settings.save({"ASSESS_WORD_SCORE": "sixty"})
     with pytest.raises(InvalidSetting):
-        store.save({"ASSESS_BREAK_CONFIDENCE": "1.5"})
+        store.settings.save({"ASSESS_BREAK_CONFIDENCE": "1.5"})
 
 
 def test_key_test_for_azure_posts_to_the_region_token_endpoint(tmp_path, monkeypatch):
     get = FakeGet()
-    monkeypatch.setattr("app.keycheck.urllib.request.urlopen", get)
+    monkeypatch.setattr("app.net.urllib.request.urlopen", get)
     with settings_client(tmp_path, {"AZURE_SPEECH_REGION": "japaneast"}) as c:
         res = c.post("/api/settings/test-key", json={"key": "AZURE_SPEECH_KEY", "value": "az-typed"})
     assert res.json() == {"ok": True, "message": "key works"}
@@ -221,6 +224,6 @@ def test_key_test_for_azure_posts_to_the_region_token_endpoint(tmp_path, monkeyp
 
 
 def test_key_test_for_azure_needs_a_region():
-    from app.keycheck import check_key
+    from app.config.keycheck import check_key
 
     assert check_key("AZURE_SPEECH_KEY", "az-typed", region=" ").message == "set AZURE_SPEECH_REGION first"

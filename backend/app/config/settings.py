@@ -2,15 +2,13 @@
 in the settings modal lives in a SQLite table and wins from then on, and the
 app rebuilds its services from the result without a restart. Infra values
 that need a restart (DB path, agent folders, ports, the Claude OAuth token)
-stay out of here."""
+stay out of here. The saved values live in app.db.settings."""
 
-import sqlite3
 from collections.abc import Mapping
 from dataclasses import dataclass
-from pathlib import Path
 from typing import Literal
 
-from app.illustrator import STYLE_LABELS, STYLES
+from app.pictures.illustrator import STYLE_LABELS, STYLES
 
 Group = Literal["keys", "voice", "assess", "claude", "text", "images"]
 
@@ -132,29 +130,6 @@ def validate(values: Mapping[str, str]) -> None:
                 raise InvalidSetting(f"{key} must be between {lo:g} and {hi:g}")
 
 
-class SettingsStore:
-    """What the user saved. Same file as the sessions, its own table."""
-
-    def __init__(self, path: Path | str) -> None:
-        self._path = Path(path)
-        self._path.parent.mkdir(parents=True, exist_ok=True)
-        with self._connect() as conn:
-            conn.execute("CREATE TABLE IF NOT EXISTS settings (key TEXT PRIMARY KEY, value TEXT NOT NULL)")
-
-    def _connect(self) -> sqlite3.Connection:
-        return sqlite3.connect(self._path)
-
-    def load(self) -> dict[str, str]:
-        with self._connect() as conn:
-            return dict(conn.execute("SELECT key, value FROM settings").fetchall())
-
-    def save(self, values: Mapping[str, str]) -> None:
-        validate(values)
-        with self._connect() as conn:
-            for key, value in values.items():
-                conn.execute("INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)", (key, value))
-
-
 @dataclass(frozen=True)
 class Field:
     """One setting as the modal sees it: the effective value, secrets masked."""
@@ -175,10 +150,6 @@ class Settings:
     def __init__(self, env: Mapping[str, str], saved: Mapping[str, str]) -> None:
         self._env = {k: v.strip() for k, v in env.items() if k in SPEC_BY_KEY}
         self._saved = dict(saved)
-
-    @classmethod
-    def resolve(cls, env: Mapping[str, str], store: SettingsStore) -> "Settings":
-        return cls(env, store.load())
 
     def get(self, key: str) -> str:
         if key in self._saved:
@@ -203,16 +174,12 @@ class Settings:
     # Typed accessors for the places that build services.
 
     @property
-    def voice_provider(self) -> str:
-        return self.get("VOICE_PROVIDER")
-
-    @property
     def voice_model(self) -> str:
         """The chosen model, or the provider's default when the field is blank."""
         chosen = self.get("VOICE_MODEL")
         if chosen:
             return chosen
-        return GEMINI_VOICE_MODEL if self.voice_provider == "gemini" else OPENAI_VOICE_MODEL
+        return GEMINI_VOICE_MODEL if self.get("VOICE_PROVIDER") == "gemini" else OPENAI_VOICE_MODEL
 
     @property
     def voice_thinking(self) -> str | None:
@@ -220,28 +187,16 @@ class Settings:
         return self.get("VOICE_THINKING") if self.voice_model.endswith("-extended-thinking") else None
 
     @property
-    def voice_name(self) -> str:
-        return self.get("VOICE_NAME")
+    def voice_api_key_name(self) -> str:
+        return "GEMINI_API_KEY" if self.get("VOICE_PROVIDER") == "gemini" else "OPENAI_API_KEY"
 
     @property
     def voice_api_key(self) -> str:
-        return self.get("GEMINI_API_KEY" if self.voice_provider == "gemini" else "OPENAI_API_KEY")
-
-    @property
-    def voice_api_key_name(self) -> str:
-        return "GEMINI_API_KEY" if self.voice_provider == "gemini" else "OPENAI_API_KEY"
+        return self.get(self.voice_api_key_name)
 
     @property
     def claude_skills(self) -> tuple[str, ...]:
         return tuple(s.strip() for s in self.get("CLAUDE_SKILLS").split(",") if s.strip())
-
-    @property
-    def azure_speech_key(self) -> str:
-        return self.get("AZURE_SPEECH_KEY")
-
-    @property
-    def azure_speech_region(self) -> str:
-        return self.get("AZURE_SPEECH_REGION")
 
     @property
     def assess_word_score(self) -> int:

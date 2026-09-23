@@ -2,8 +2,9 @@ import json
 
 import pytest
 
-from app.exclusions import Exclusions
-from app.generator import ClaudeCliGenerator, GenerationError
+from app.claude_cli import GenerationError
+from app.generation.exclusions import Exclusions
+from app.generation.generator import SESSION_SCHEMA, ClaudeCliGenerator
 from tests.conftest import sample_content
 
 
@@ -26,7 +27,7 @@ def test_parse_result_raises_on_missing_structured_output():
 
 def test_build_command_includes_model_effort_and_schema():
     gen = ClaudeCliGenerator(model="sonnet", effort="high")
-    cmd = gen.build_command()
+    cmd = gen.cli.build_command(SESSION_SCHEMA)
     assert cmd[0] == "claude"
     assert cmd[cmd.index("--model") + 1] == "sonnet"
     assert cmd[cmd.index("--effort") + 1] == "high"
@@ -39,7 +40,7 @@ def test_build_command_includes_model_effort_and_schema():
 
 
 def test_default_effort_is_xhigh():
-    cmd = ClaudeCliGenerator(model="sonnet").build_command()
+    cmd = ClaudeCliGenerator(model="sonnet").cli.build_command(SESSION_SCHEMA)
     assert cmd[cmd.index("--effort") + 1] == "xhigh"
 
 
@@ -51,7 +52,7 @@ def test_prompt_states_counts_and_relaxed_vocabulary_rule():
 
 
 def test_build_command_exposes_skill_read_builtin_web_and_firecrawl():
-    cmd = ClaudeCliGenerator(model="sonnet").build_command()
+    cmd = ClaudeCliGenerator(model="sonnet").cli.build_command(SESSION_SCHEMA)
     assert cmd[cmd.index("--tools") + 1] == "Skill,Read,WebSearch,WebFetch"
     allowed = cmd[cmd.index("--allowedTools") + 1].split(",")
     assert allowed == [
@@ -94,7 +95,7 @@ def test_prompt_asks_for_short_discussion_questions():
 
 def test_schema_and_prompt_ask_for_sources():
     gen = ClaudeCliGenerator(model="sonnet")
-    schema = json.loads(gen.build_command()[gen.build_command().index("--json-schema") + 1])
+    schema = json.loads(gen.cli.build_command(SESSION_SCHEMA)[gen.cli.build_command(SESSION_SCHEMA).index("--json-schema") + 1])
     assert "sources" in schema["properties"]["article"]["required"]
     assert "list only the web pages you actually drew on" in gen.build_prompt("x")
 

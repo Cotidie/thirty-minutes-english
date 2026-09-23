@@ -1,7 +1,7 @@
 import pytest
 
-from app.generator import EXPRESSION_COUNT, VOCABULARY_COUNT
-from app.models import Article, Expression, SessionContent, VocabularyItem
+from app.generation.generator import EXPRESSION_COUNT, VOCABULARY_COUNT
+from app.models import Article, Expression, Question, SessionContent, VocabularyItem
 
 
 def sample_content(topic: str = "Digital twins", title: str = "Twins at Work") -> SessionContent:
@@ -19,7 +19,7 @@ def sample_content(topic: str = "Digital twins", title: str = "Twins at Work") -
         article=Article(
             title=title,
             body="A body with the word ubiquitous in it.",
-            questions=["q1", "q2", "q3"],
+            questions=[Question(text=q) for q in ("q1", "q2", "q3")],
         ),
         vocabulary=[
             VocabularyItem(word=f"word{i}", pos="noun", definition=f"def {i}", example=f"ex {i}", scene=f"scene {i}")

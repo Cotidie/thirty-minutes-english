@@ -3,11 +3,11 @@ import json
 import pytest
 from fastapi.testclient import TestClient
 
-from app.cards import AskReview, PhraseCardExtractor
+from app.coaching.cards import PhraseCardExtractor, cards_for
+from app.db import Database
 from app.main import create_app
-from app.wiring import Services
 from app.models import PhraseCard
-from app.store import SessionStore
+from app.wiring import Services
 from tests.test_api import FakeGenerator, InlineExecutor
 
 
@@ -27,48 +27,46 @@ class FakeExtractor:
 
 
 @pytest.fixture
-def store(tmp_path) -> SessionStore:
-    return SessionStore(tmp_path / "s.db")
+def store(tmp_path) -> Database:
+    return Database(tmp_path / "s.db")
 
 
 def test_extracts_only_the_asks_without_a_card(store):
-    first = store.add_ask(None, "눈치 좀 챙겨", "Read the room.", 11)
-    store.set_ask_card(first.id, PhraseCard(asked="눈치 좀 챙겨", english="Read the room.", note="kept"))
-    second = store.add_ask(None, "I have much work", "I'm swamped.", 9)
+    first = store.records.add_ask(None, "눈치 좀 챙겨", "Read the room.", 11)
+    store.records.set_ask_card(first.id, PhraseCard(asked="눈치 좀 챙겨", english="Read the room.", note="kept"))
+    second = store.records.add_ask(None, "I have much work", "I'm swamped.", 9)
     extractor = FakeExtractor()
 
-    cards = AskReview(store, extractor).cards_for()
+    cards = cards_for(store.records, extractor)
 
     assert extractor.batches == [[second.id]]
     assert {a.id: a.card.note for a in cards} == {first.id: "kept", second.id: "note"}
 
 
 def test_a_second_review_calls_nothing(store):
-    store.add_ask(None, "q", "a", 1)
+    store.records.add_ask(None, "q", "a", 1)
     extractor = FakeExtractor()
-    review = AskReview(store, extractor)
-
-    review.cards_for()
-    review.cards_for()
+    cards_for(store.records, extractor)
+    cards_for(store.records, extractor)
 
     assert len(extractor.batches) == 1
 
 
 def test_a_failed_extraction_still_returns_the_transcripts(store):
-    store.add_ask(None, "q", "a", 1)
-    cards = AskReview(store, FakeExtractor(ValueError("bad json"))).cards_for()
+    store.records.add_ask(None, "q", "a", 1)
+    cards = cards_for(store.records, FakeExtractor(ValueError("bad json")))
     assert [a.coach_text for a in cards] == ["a"]
     assert cards[0].card is None
 
 
 def test_review_without_an_extractor_returns_transcripts(store):
-    store.add_ask(None, "q", "a", 1)
-    assert AskReview(store, None).cards_for()[0].card is None
+    store.records.add_ask(None, "q", "a", 1)
+    assert cards_for(store.records, None)[0].card is None
 
 
 def test_cards_endpoint_narrows_to_one_session(tmp_path):
     extractor = FakeExtractor()
-    store = SessionStore(tmp_path / "s.db")
+    store = Database(tmp_path / "s.db")
     app = create_app(store, Services(FakeGenerator(), extractor=extractor), InlineExecutor())
     with TestClient(app) as c:
         session_id = c.post("/api/sessions", json={"topic": "Digital twins"}).json()["session_id"]
@@ -109,11 +107,10 @@ def test_extractor_sends_rounds_and_reads_the_answer(tmp_path, monkeypatch):
         sent["auth"] = req.headers["Authorization"]
         return FakeResponse()
 
-    monkeypatch.setattr("app.cards.urllib.request.urlopen", fake_urlopen)
-    monkeypatch.setattr("app.cards.json.load", lambda res: json.loads(res.read()))
+    monkeypatch.setattr("app.net.urllib.request.urlopen", fake_urlopen)
 
-    store = SessionStore(tmp_path / "s.db")
-    ask = store.add_ask(None, "눈치 좀 챙겨", "Read the room.", 11)
+    store = Database(tmp_path / "s.db")
+    ask = store.records.add_ask(None, "눈치 좀 챙겨", "Read the room.", 11)
     object.__setattr__(ask, "id", 7)
 
     cards = extractor.extract([ask])

@@ -2,7 +2,7 @@ import random
 from datetime import date
 
 from app.models import Category
-from app.topics import (
+from app.topics.pool import (
     AI_TOPICS,
     CS_TOPICS,
     HISTORY_TOPICS,

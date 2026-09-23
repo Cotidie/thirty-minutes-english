@@ -1,4 +1,4 @@
-from app.progress import Progress, Stage, StreamTracker
+from app.generation.progress import Progress, Stage, StreamTracker
 
 
 def assistant(*blocks: dict) -> dict:

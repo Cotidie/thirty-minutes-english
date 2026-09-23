@@ -3,10 +3,11 @@ import json
 import pytest
 from fastapi.testclient import TestClient
 
+from app.db import Database
 from app.main import create_app
+from app.net import HttpError
+from app.voice.live import AgentDefinition, GeminiVoice, LiveAgent, OpenAIVoice
 from app.wiring import Services
-from app.live import AgentDefinition, GeminiVoice, LiveAgent, LiveSessionError, OpenAIVoice
-from app.store import SessionStore
 from tests.test_api import FakeGenerator, InlineExecutor
 
 PARAGRAPH = "Researchers verified that the new battery lasts twice as long."
@@ -39,7 +40,7 @@ class FakeLiveSessions:
 
     name = "fake"
 
-    def __init__(self, error: LiveSessionError | None = None):
+    def __init__(self, error: HttpError | None = None):
         self.calls: list[tuple[dict, str | None]] = []
         self.error = error
 
@@ -72,7 +73,7 @@ class FakePost:
 
 
 def make_client(tmp_path, agents):
-    app = create_app(SessionStore(tmp_path / "s.db"), Services(FakeGenerator(), agents=agents), InlineExecutor())
+    app = create_app(Database(tmp_path / "s.db"), Services(FakeGenerator(), agents=agents), InlineExecutor())
     return TestClient(app)
 
 
@@ -130,7 +131,7 @@ def test_503_when_agent_not_configured(tmp_path, path, body):
 
 
 def test_upstream_error_becomes_502(tmp_path, agent_dir):
-    sessions = FakeLiveSessions(LiveSessionError(401, "Incorrect API key"))
+    sessions = FakeLiveSessions(HttpError(401, "Incorrect API key"))
     with make_client(tmp_path, read_aloud(agent_dir, sessions)) as c:
         res = c.post("/api/read-aloud/sessions", json={"paragraph": PARAGRAPH, "sdp": "v=0"})
     assert res.status_code == 502
@@ -144,9 +145,9 @@ def test_rejects_blank_paragraph(tmp_path, agent_dir):
 
 def test_openai_provider_needs_an_offer_and_overrides_the_model(agent_dir, monkeypatch):
     post = FakePost({"session": {"id": "live_1"}, "transport": {"type": "webrtc", "sdp": "v=0 answer"}})
-    monkeypatch.setattr("app.live.urllib.request.urlopen", post)
+    monkeypatch.setattr("app.net.urllib.request.urlopen", post)
     voice = OpenAIVoice("sk-test", "gpt-live-2")
-    with pytest.raises(LiveSessionError) as e:
+    with pytest.raises(HttpError) as e:
         voice.open(AgentDefinition(agent_dir), None, paragraph=PARAGRAPH)
     assert e.value.status == 400
 
@@ -175,7 +176,7 @@ def test_gemini_setup_carries_the_thinking_level_when_given(agent_dir):
 
 def test_gemini_provider_mints_a_locked_token_and_returns_the_setup(agent_dir, monkeypatch):
     post = FakePost({"name": "auth_tokens/abc"})
-    monkeypatch.setattr("app.live.urllib.request.urlopen", post)
+    monkeypatch.setattr("app.net.urllib.request.urlopen", post)
     voice = GeminiVoice("AIza-test", "gemini-3.8-live-extended-thinking", "Puck", "low")
     answer = voice.open(AgentDefinition(agent_dir), None, paragraph=PARAGRAPH)
     assert answer["provider"] == "gemini"
@@ -193,7 +194,7 @@ def test_gemini_provider_mints_a_locked_token_and_returns_the_setup(agent_dir, m
 
 
 def test_gemini_round_needs_no_offer(tmp_path, agent_dir, monkeypatch):
-    monkeypatch.setattr("app.live.urllib.request.urlopen", FakePost({"name": "auth_tokens/abc"}))
+    monkeypatch.setattr("app.net.urllib.request.urlopen", FakePost({"name": "auth_tokens/abc"}))
     voice = GeminiVoice("AIza-test", "gemini-3.8-live", "Kore", None)
     agents = {"read-aloud": LiveAgent("read-aloud", AgentDefinition(agent_dir), voice)}
     with make_client(tmp_path, agents) as c:

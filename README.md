@@ -11,13 +11,13 @@ cp .env.example .env               # 처음 한 번. 키는 비워 두고 앱의
 docker compose up -d --build
 ```
 
-`http://localhost:5173` 접속. 두 컨테이너는 `restart: unless-stopped`라 컴퓨터를 재시작해도 Docker가 뜨면 같이 뜬다. `docker compose stop`으로 직접 끈 경우에만 재부팅 후에도 꺼진 채로 남는다. 주제를 비워 두면 풀(`backend/app/topics.py`)에서 최근 10회에 안 나온 주제를 자동으로 고른다.
+`http://localhost:5173` 접속. 두 컨테이너는 `restart: unless-stopped`라 컴퓨터를 재시작해도 Docker가 뜨면 같이 뜬다. `docker compose stop`으로 직접 끈 경우에만 재부팅 후에도 꺼진 채로 남는다. 주제를 비워 두면 풀(`backend/app/topics/pool.py`)에서 최근 10회에 안 나온 주제를 자동으로 고른다.
 
 홈 화면 추천 주제 12개는 하루 단위로 바뀐다. 3개는 그날 뉴스에서 새로 뽑고(`FRESH_COUNT`), 9개는 고정 풀에서 날짜를 씨앗으로 고른다(`POOL_COUNT`). 고정 풀은 8개 카테고리(컴퓨터과학 · 산업공학 · AI · 문학 · 세계사 · 세계 이슈 · 한국 · 연구 생활, 각 40개 이상)이고, 하루치는 카테고리를 한 바퀴 돌며 하나씩 뽑으므로 세 전공 카테고리가 매일 최소 하나씩 나온다. 같은 날에는 몇 번을 새로고침해도 같은 12개가 나오고, 자정을 넘기면 바뀐다. 라벨 옆 `↻`를 누르면 그 자리에서 다시 뽑는다: 고정 풀 9개는 바로 새 조합으로 바뀌고, 뉴스 3개는 백그라운드로 다시 가져오는 동안 이전 목록이 남아 있다가 도착하면 바뀐다(`POST /api/topics/refresh`).
 
 주제마다 카테고리(`news` · `korea` · `research` · `cs` · `ie` · `ai` · `literature` · `history` · `world`)가 붙어 `/api/topics`에 `{text, category}`로 내려간다. 칩 색은 카테고리별로 다르고, 칩 아래 범례가 그날 나온 카테고리만 이름으로 보여준다. 색 정의는 `frontend/src/components/TopicPicker.css`의 `[data-category=...]` 규칙에 모여 있다.
 
-뉴스 3개는 그날 처음 `/api/topics`를 호출할 때 백그라운드로 `claude` CLI를 한 번 돌려 받아 `topic_days` 테이블에 저장한다(하루 1회). 주요 외신 1면·톱 수준으로 크게 다뤄진 기사만 받는다(독립된 주요 매체 2곳 이상이 비중 있게 다룬 것이 기준). 3개 중 1개는 한국 기사로, 영문 국내 매체(연합뉴스, 코리아헤럴드, 중앙데일리, 코리아타임스) 톱 기준으로 고른다(`KOREA_COUNT`). 칩 문구는 다른 풀과 맞춰 7단어 이하 명사구로 받고, 의문사로 시작하는 문장은 금지한다. 웹 검색이 막혔거나 기준을 넘은 기사가 없으면 빈 목록을 돌려받고, 그날치를 저장하지 않아 다음 요청에서 다시 시도한다. 도착 전이나 실패했을 때는 12개 전부 고정 풀에서 채우므로 화면이 비지 않는다. `pending`은 백그라운드 fetch가 실제로 도는 동안만 참이다(실패하면 바로 거짓, 다음 페이지 로드에서 재시도). 프론트는 `pending`이 참인 동안 15초 간격으로 최대 3분간 다시 물어보고, 그 뒤엔 새로고침 버튼을 다시 연다. fetch가 실패하면 `error`에 이유(CLI 오류 메시지, 또는 검색 결과 없음)가 실려 오고, 홈 화면의 Today's topic 아래에 그대로 표시된다. 표현 5개는 주제와 무관한 B2~C1+ 범용 표현이고, 어휘 10개는 주제 연관 단어로 아티클 밖에서도 고른다. 최근 40세션에서 이미 나온 표현·단어는 프롬프트에 제외 목록으로 넘긴다. 각 항목은 10% 확률로 목록에서 빠져 가끔 다시 나올 수 있다(`JobRunner.REPEAT_ALLOWANCE`).
+뉴스 3개는 그날 처음 `/api/topics`를 호출할 때 백그라운드로 `claude` CLI를 한 번 돌려 받아 `topic_days` 테이블에 저장한다(하루 1회). 주요 외신 1면·톱 수준으로 크게 다뤄진 기사만 받는다(독립된 주요 매체 2곳 이상이 비중 있게 다룬 것이 기준). 3개 중 1개는 한국 기사로, 영문 국내 매체(연합뉴스, 코리아헤럴드, 중앙데일리, 코리아타임스) 톱 기준으로 고른다(`KOREA_COUNT`). 칩 문구는 다른 풀과 맞춰 7단어 이하 명사구로 받고, 의문사로 시작하는 문장은 금지한다. 웹 검색이 막혔거나 기준을 넘은 기사가 없으면 빈 목록을 돌려받고, 그날치를 저장하지 않아 다음 요청에서 다시 시도한다. 도착 전이나 실패했을 때는 12개 전부 고정 풀에서 채우므로 화면이 비지 않는다. `pending`은 백그라운드 fetch가 실제로 도는 동안만 참이다(실패하면 바로 거짓, 다음 페이지 로드에서 재시도). 프론트는 `pending`이 참인 동안 15초 간격으로 최대 3분간 다시 물어보고, 그 뒤엔 새로고침 버튼을 다시 연다. fetch가 실패하면 `error`에 이유(CLI 오류 메시지, 또는 검색 결과 없음)가 실려 오고, 홈 화면의 Today's topic 아래에 그대로 표시된다. 표현 5개는 주제와 무관한 B2~C1+ 범용 표현이고, 어휘 10개는 주제 연관 단어로 아티클 밖에서도 고른다. 최근 40세션에서 이미 나온 표현·단어는 프롬프트에 제외 목록으로 넘긴다. 각 항목은 10% 확률로 목록에서 빠져 가끔 다시 나올 수 있다(`generation/jobs.py`의 `JobRunner.REPEAT_ALLOWANCE`).
 
 생성은 로컬 `claude` CLI(`claude -p --json-schema --output-format stream-json`)를 서브프로세스로 호출한다. `POST /api/sessions`는 202로 작업 ID를 돌려주고, 프론트가 `GET /api/jobs/{id}`를 1초마다 폴링해 단계(스킬 로드 → 웹 검색 n회 → 작성 → 구조 확인)와 진행 바를 보여준다. 작업은 서버 메모리에 살아 있으므로 홈에 다시 들어오면 `GET /api/jobs`(진행 중인 작업 목록)로 찾아 같은 진행 바를 이어서 보여준다. 퍼센트는 단계 하한 + 경과 시간(최근 5회 중앙값 기준) 추정이다. API 키 불필요, Claude 구독으로 처리. 1회 생성 약 1~2분(opus 기준). CLI에는 `Skill`, `Read`, 내장 `WebSearch`/`WebFetch`, firecrawl MCP(`firecrawl_search`, `firecrawl_scrape`)가 열려 있다. 검색은 firecrawl을 먼저 쓰고, firecrawl이 없거나(OAuth 만료 등) 실패하면 내장 `WebSearch`로 넘어간다. 아티클은 최대 3회 웹 검색으로 사실을 확인하고 최근 이슈를 각도로 잡는다. firecrawl은 호스트에서 `claude mcp add --transport http firecrawl https://mcp.firecrawl.dev/v2/mcp-oauth` 후 한 번 OAuth 로그인해 두면 된다. 토큰이 만료되면(`claude mcp list`가 `Needs authentication`을 보임) 호스트에서 `claude`를 열어 `/mcp` → firecrawl → Authenticate로 다시 로그인하고, `docker compose restart backend`로 자격증명을 다시 복사한다(컨테이너는 시작할 때 호스트 `.credentials.json`을 복사한다).
 
@@ -49,7 +49,7 @@ docker compose up -d --build
 | `OPENROUTER_API_KEY` | 비움 | OpenRouter MCP의 bearer 토큰. provider가 `openrouter`인데 비어 있으면 그림 없이 생성 |
 | `COMFY_API_KEY` | 비움 | comfy-cloud MCP의 bearer 토큰. provider가 `comfy`일 때 |
 | `IMAGE_MODEL` | 비움 | 이미지 모델. 비우면 provider 기본값(Nano Banana Pro). 설정 모달 메뉴에 GPT-Image 2.5, Nano Banana 2 등이 있다 |
-| `IMAGE_STYLE` | `photo` | 그림 스타일: `photo`(사진, 묘사할 거리가 가장 많다) · `cinematic` · `storybook` · `comic` · `sketch` · `flat`. 프롬프트는 `illustrator.STYLES` |
+| `IMAGE_STYLE` | `photo` | 그림 스타일: `photo`(사진, 묘사할 거리가 가장 많다) · `cinematic` · `storybook` · `comic` · `sketch` · `flat`. 프롬프트는 `pictures/illustrator.py`의 `STYLES` |
 
 ## 한국어 칩
 
@@ -57,14 +57,14 @@ docker compose up -d --build
 
 ## Vocabulary 그림
 
-세션 생성 마지막 단계(`illustrating`, 진행 바의 "Drawing a picture for each word")에서 단어마다 그 단어가 어울리는 상황을 그린 그림을 한 장씩 만든다. 장면(`scene`)은 세션 생성 프롬프트가 단어와 함께 쓴다: 두세 문장으로 장소, 사람과 행동, 가리킬 수 있는 세부 서너 가지(사물·날씨·시간대·배경)를 담고, 글자가 필요 없는 구체적인 상황이며 단어끼리 장소와 시간이 겹치지 않게 한다(규칙 문장은 `illustrator.SCENE_RULES` 하나를 두 프롬프트가 같이 쓴다). 이미지 프롬프트는 `IMAGE_STYLE`의 스타일 문장 + 디테일·글자 금지 문장(`IMAGE_RULES`) + 장면이다. `backend/app/illustrator.py`가 그 장면들을 `IMAGE_PROVIDER`의 MCP 서버에 보낸다. MCP 호출은 `backend/app/mcp_client.py`(JSON-RPC over HTTP)가 하고, 인증은 OAuth 로그인 대신 그 provider의 API 키를 bearer 토큰으로 보낸다(OAuth 토큰은 몇 시간에서 7일이면 만료되므로). `claude` 실행은 없다.
+세션 생성 마지막 단계(`illustrating`, 진행 바의 "Drawing a picture for each word")에서 단어마다 그 단어가 어울리는 상황을 그린 그림을 한 장씩 만든다. 장면(`scene`)은 세션 생성 프롬프트가 단어와 함께 쓴다: 두세 문장으로 장소, 사람과 행동, 가리킬 수 있는 세부 서너 가지(사물·날씨·시간대·배경)를 담고, 글자가 필요 없는 구체적인 상황이며 단어끼리 장소와 시간이 겹치지 않게 한다(규칙 문장은 `pictures/scenes.py`의 `SCENE_RULES` 하나를 두 프롬프트가 같이 쓴다). 이미지 프롬프트는 `IMAGE_STYLE`의 스타일 문장 + 디테일·글자 금지 문장(`IMAGE_RULES`) + 장면이다. `backend/app/pictures/`(`illustrator.py`, `painters.py`)가 그 장면들을 `IMAGE_PROVIDER`의 MCP 서버에 보낸다. MCP 호출은 `backend/app/mcp_client.py`(JSON-RPC over HTTP)가 하고, 인증은 OAuth 로그인 대신 그 provider의 API 키를 bearer 토큰으로 보낸다(OAuth 토큰은 몇 시간에서 7일이면 만료되므로). `claude` 실행은 없다.
 
 | provider | MCP | 호출 | 기본 모델 |
 |---|---|---|---|
 | `openrouter` | `https://mcp.openrouter.ai/mcp` | 단어마다 `generate-image`를 열 개 동시에, 응답의 inline image 블록(base64) | `google/gemini-3-pro-image` |
 | `comfy` | `https://cloud.comfy.org/mcp` | `submit_batch`(한 배치, `confirm: true`; comfy가 열 장을 동시에 그린다) → `wait_for_batch` → `get_batch_output`의 서명 URL을 열 개 동시에 내려받음 | `vertexai/nano-banana-pro` |
 
-OpenAI 모델은 OpenRouter 표기(`openai/gpt-image-2.5-flare`)로 적으면 comfy에서도 통한다(`openai/images-generations` + `params.model`로 바꿔 보낸다). 그림은 `backend/data/images/{job}-{n}.png`에 두고 `/api/images/`로 서빙하며, 세션 content의 각 단어에 `scene`과 `image`가 붙는다. 그림 하나가 실패하면 그 단어만 그림 없이, 전체가 실패하면 경고만 남기고 세션은 그림 없이 저장된다. 카드의 그림 왼쪽 위 `↻`를 누르면 스타일 메뉴가 열리고, 고르면 `POST /api/sessions/{id}/pictures/{index}`(`{style}`)가 텍스트 모델(`EXAMPLE_MODEL`, `illustrator.SceneWriter`)에 새 장면을 쓰게 한 뒤 그 스타일로 다시 그려 저장한다: 새 파일을 쓰고, `store.replace_vocabulary_item`이 한 트랜잭션(`BEGIN IMMEDIATE`) 안에서 그 단어 하나만 바꾸고 이전 항목을 돌려주면, 그때 이전 파일을 지운다(`illustrator.discard`). 세션 전체를 읽었다 다시 쓰면 동시에 진행 중인 다른 단어의 redraw가 서로 덮어써 삭제된 파일명이 남았기 때문이다. 같은 프롬프트를 반복하면 비슷한 그림만 나오므로, 매번 무작위 `Spark`(장소 30·순간 12·반전 12 가지 중 하나씩)를 출발점으로 주고 이전 장면과 다르게 쓰라고 한다. 기다리는 동안 그림 위에 도는 링과 경과 초가 뜬다(요청 하나라 진짜 진행률은 없고 링은 60초를 향해 차오르다 95%에서 멈춘다). 별표와 `↻`는 그림 모서리 위에 반투명 원으로 얹혀 있다. 설정 모달의 `Test`가 키를 확인한다(OpenRouter는 `/api/v1/key`, comfy는 MCP initialize). comfy-cloud 구독이 끝나면 `IMAGE_PROVIDER`를 `openrouter`로 둔다. 비용은 각 대시보드에서 확인한다(Nano Banana Pro 기준 장당 $0.1~0.2).
+OpenAI 모델은 OpenRouter 표기(`openai/gpt-image-2.5-flare`)로 적으면 comfy에서도 통한다(`openai/images-generations` + `params.model`로 바꿔 보낸다). 그림은 `backend/data/images/{job}-{n}.png`에 두고 `/api/images/`로 서빙하며, 세션 content의 각 단어에 `scene`과 `image`가 붙는다. 그림 하나가 실패하면 그 단어만 그림 없이, 전체가 실패하면 경고만 남기고 세션은 그림 없이 저장된다. 카드의 그림 왼쪽 위 `↻`를 누르면 스타일 메뉴가 열리고, 고르면 `POST /api/sessions/{id}/pictures/{index}`(`{style}`)가 텍스트 모델(`EXAMPLE_MODEL`, `pictures/scenes.py`의 `SceneWriter`)에 새 장면을 쓰게 한 뒤 그 스타일로 다시 그려 저장한다: 새 파일을 쓰고, `db/sessions.py`의 `replace_vocabulary_item`이 한 트랜잭션(`BEGIN IMMEDIATE`) 안에서 그 단어 하나만 바꾸고 이전 항목을 돌려주면, 그때 이전 파일을 지운다(`Illustrator.discard`). 세션 전체를 읽었다 다시 쓰면 동시에 진행 중인 다른 단어의 redraw가 서로 덮어써 삭제된 파일명이 남았기 때문이다. 같은 프롬프트를 반복하면 비슷한 그림만 나오므로, 매번 무작위 `Spark`(장소 30·순간 12·반전 12 가지 중 하나씩)를 출발점으로 주고 이전 장면과 다르게 쓰라고 한다. 기다리는 동안 그림 위에 도는 링과 경과 초가 뜬다(요청 하나라 진짜 진행률은 없고 링은 60초를 향해 차오르다 95%에서 멈춘다). 별표와 `↻`는 그림 모서리 위에 반투명 원으로 얹혀 있다. 설정 모달의 `Test`가 키를 확인한다(OpenRouter는 `/api/v1/key`, comfy는 MCP initialize). comfy-cloud 구독이 끝나면 `IMAGE_PROVIDER`를 `openrouter`로 둔다. 비용은 각 대시보드에서 확인한다(Nano Banana Pro 기준 장당 $0.1~0.2).
 
 ## Article 한국어 번역
 
@@ -147,6 +147,22 @@ Read aloud 라운드는 코치가 한마디라도 했으면 끝날 때 자동으
 ## 스타일
 
 컴포넌트마다 같은 이름의 `.css`를 옆에 두고 그 컴포넌트가 import한다(`VocabularyTab.tsx` → `VocabularyTab.css`). 색·글꼴 토큰, reset, `.btn`은 `src/styles/base.css` 하나에 있고 `main.tsx`가 가장 먼저 읽는다. Ask와 Your turn/Practice가 같이 쓰는 라운드 쪽지는 `Slip`, Summary와 Asks의 카드는 `AskCard` 컴포넌트다.
+
+## 백엔드 구조
+
+| 경로 | 내용 |
+|---|---|
+| `app/main.py` | `create_app`: DB, 서비스, 라우터 조립 |
+| `app/wiring.py` | 설정에서 서비스(생성기, 코치, 화가 등)를 만든다. 설정을 저장하면 다시 만든다 |
+| `app/api/` | 라우터 5개(`settings`, `topics`, `sessions`, `coaches`, `records`), 요청·응답 모델(`schemas.py`) |
+| `app/db/` | SQLite 파일 하나와 저장소 4개(`sessions`, `records`, `caches`, `settings`) |
+| `app/generation/` | 세션 생성 프롬프트, 백그라운드 작업, 진행 단계 |
+| `app/pictures/` | 스타일, 장면, 이미지 MCP 화가 |
+| `app/voice/` | 음성 코치 provider, Azure 판정기 토큰 |
+| `app/coaching/` | Your turn 피드백, Phrasing, Ask 카드 |
+| `app/topics/` | 고정 풀, 하루 뉴스 주제 |
+| `app/config/` | 설정 목록과 키 확인 |
+| `app/net.py`, `claude_cli.py`, `mcp_client.py`, `templates.py` | 공용: HTTP, `claude` CLI, MCP, `{{name}}` 채우기 |
 
 ## Docker
 

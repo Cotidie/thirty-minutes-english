@@ -5,10 +5,11 @@ text run of the claude CLI with the prompt in the example-coach folder.
 """
 
 from pathlib import Path
-from typing import Literal, Protocol
+from typing import Literal
 
-from app.claude_cli import ClaudeCli, structured_output
+from app.claude_cli import ClaudeCli, Runner, structured_output
 from app.models import ExampleFeedback
+from app.templates import fill
 
 Kind = Literal["expression", "word"]
 TEMPLATES: dict[Kind, str] = {"expression": "feedback.md", "word": "feedback-word.md"}
@@ -24,10 +25,6 @@ FEEDBACK_SCHEMA: dict = {
 }
 
 
-class Runner(Protocol):
-    def run(self, prompt: str, schema: dict, on_event=None) -> dict: ...
-
-
 class ExampleCoach:
     """An expression gets the light native fix (`feedback.md`); a word gets a freer
     rewording that uses it well, describing the word's picture (`feedback-word.md`)."""
@@ -38,7 +35,7 @@ class ExampleCoach:
 
     @classmethod
     def with_cli(cls, agent_dir: Path, model: str, effort: str = "low") -> "ExampleCoach":
-        return cls(ClaudeCli(model=model, effort=effort, tools=(), mcp=None, timeout_s=90), agent_dir)
+        return cls(ClaudeCli.text_only(model, effort), agent_dir)
 
     def build_prompt(
         self, expression: str, meaning: str, usage_note: str, sentence: str, kind: Kind = "expression", scene: str = ""
@@ -53,10 +50,7 @@ class ExampleCoach:
             "scene": scene or "no picture; go by the sentence",
             "sentence": sentence,
         }
-        prompt = self._templates[kind]
-        for name, value in values.items():
-            prompt = prompt.replace("{{" + name + "}}", value)
-        return prompt
+        return fill(self._templates[kind], **values)
 
     def feedback(
         self, expression: str, meaning: str, usage_note: str, sentence: str, kind: Kind = "expression", scene: str = ""

@@ -1,12 +1,13 @@
 import pytest
 from fastapi.testclient import TestClient
 
-from app.generator import EXPRESSION_COUNT, VOCABULARY_COUNT, GenerationError
+from app.claude_cli import GenerationError
+from app.db import Database
+from app.generation.generator import EXPRESSION_COUNT, VOCABULARY_COUNT
+from app.generation.progress import Progress, Stage
 from app.main import create_app
+from app.topics.pool import TOPICS
 from app.wiring import Services
-from app.progress import Progress, Stage
-from app.store import SessionStore
-from app.topics import TOPICS
 
 TOPIC_TEXTS = {t.text for t in TOPICS}
 from tests.conftest import sample_content
@@ -40,7 +41,7 @@ class FailingGenerator:
 @pytest.fixture
 def client(tmp_path):
     gen = FakeGenerator()
-    app = create_app(SessionStore(tmp_path / "s.db"), Services(gen), InlineExecutor())
+    app = create_app(Database(tmp_path / "s.db"), Services(gen), InlineExecutor())
     with TestClient(app) as c:
         c.generator = gen
         yield c
@@ -107,7 +108,7 @@ def test_topics_endpoint_offers_a_stable_daily_slice(client):
 
 
 def test_job_reports_failure_when_generator_fails(tmp_path):
-    app = create_app(SessionStore(tmp_path / "s.db"), Services(FailingGenerator()), InlineExecutor())
+    app = create_app(Database(tmp_path / "s.db"), Services(FailingGenerator()), InlineExecutor())
     with TestClient(app) as c:
         job = c.post("/api/sessions", json={"topic": "X"}).json()
     assert job["status"] == "failed"
@@ -130,7 +131,7 @@ class FakeIllustrator:
 
 def test_pictures_are_drawn_after_the_text_and_saved_with_the_session(tmp_path):
     illustrator = FakeIllustrator()
-    app = create_app(SessionStore(tmp_path / "s.db"), Services(FakeGenerator(), illustrator=illustrator), InlineExecutor())
+    app = create_app(Database(tmp_path / "s.db"), Services(FakeGenerator(), illustrator=illustrator), InlineExecutor())
     with TestClient(app) as c:
         job = c.post("/api/sessions", json={"topic": "X"}).json()
         session = c.get(f"/api/sessions/{job['session_id']}").json()
@@ -142,7 +143,7 @@ def test_pictures_are_drawn_after_the_text_and_saved_with_the_session(tmp_path):
 
 def test_a_session_still_goes_out_when_the_pictures_fail(tmp_path):
     services = Services(FakeGenerator(), illustrator=FakeIllustrator(GenerationError("openrouter down")))
-    app = create_app(SessionStore(tmp_path / "s.db"), services, InlineExecutor())
+    app = create_app(Database(tmp_path / "s.db"), services, InlineExecutor())
     with TestClient(app) as c:
         job = c.post("/api/sessions", json={"topic": "X"}).json()
         session = c.get(f"/api/sessions/{job['session_id']}").json()
@@ -172,7 +173,7 @@ class RedrawingIllustrator(FakeIllustrator):
 def test_a_word_can_be_redrawn_in_a_chosen_style_and_the_session_keeps_it(tmp_path):
     illustrator = RedrawingIllustrator()
     services = Services(FakeGenerator(), illustrator=illustrator, scene_writer=FakeSceneWriter())
-    app = create_app(SessionStore(tmp_path / "s.db"), services, InlineExecutor())
+    app = create_app(Database(tmp_path / "s.db"), services, InlineExecutor())
     with TestClient(app) as c:
         sid = c.post("/api/sessions", json={"topic": "X"}).json()["session_id"]
         res = c.post(f"/api/sessions/{sid}/pictures/1", json={"style": "comic"})
@@ -280,7 +281,7 @@ class HeldExecutor:
 
 def test_jobs_endpoint_lists_only_running_jobs(tmp_path):
     executor = HeldExecutor()
-    app = create_app(SessionStore(tmp_path / "s.db"), Services(FakeGenerator()), executor)
+    app = create_app(Database(tmp_path / "s.db"), Services(FakeGenerator()), executor)
     with TestClient(app) as client:
         assert client.get("/api/jobs").json() == []
         first = create(client, "First")

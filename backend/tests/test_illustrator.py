@@ -1,14 +1,20 @@
 import base64
-import threading
-
 import json
+import threading
 
 import pytest
 
-import app.illustrator as mod
+import app.pictures.painters as mod
 from app.claude_cli import GenerationError
-from app.illustrator import IMAGE_RULES, STYLES, Spark, ComfyPainter, Illustrator, OpenRouterPainter, SceneWriter, fetch_url, painter_for
 from app.mcp_client import McpError
+from app.pictures.illustrator import IMAGE_RULES, STYLES, Illustrator
+from app.pictures.painters import (
+    ComfyPainter,
+    OpenRouterPainter,
+    fetch_url,
+    painter_for,
+)
+from app.pictures.scenes import SceneWriter, Spark
 from tests.conftest import sample_content
 
 

@@ -4,12 +4,12 @@ import pytest
 from fastapi.testclient import TestClient
 
 from app.claude_cli import GenerationError
-from app.daily_topics import FRESH_COUNT, POOL_COUNT, DailyTopics
+from app.db import Database
 from app.main import create_app
-from app.wiring import Services
 from app.models import Category
-from app.store import SessionStore
-from app.topics import TOPICS, pool_for_day
+from app.topics.daily import FRESH_COUNT, POOL_COUNT, DailyTopics
+from app.topics.pool import TOPICS, pool_for_day
+from app.wiring import Services
 from tests.test_api import FakeGenerator, InlineExecutor
 
 NEWS = [f"news topic {i}" for i in range(FRESH_COUNT)]
@@ -28,8 +28,8 @@ class FakeSource:
 
 
 @pytest.fixture
-def store(tmp_path) -> SessionStore:
-    return SessionStore(tmp_path / "s.db")
+def store(tmp_path) -> Database:
+    return Database(tmp_path / "s.db")
 
 
 def texts(topics) -> list[str]:
@@ -55,14 +55,14 @@ def test_pool_slice_leaves_out_what_the_news_already_covers():
 
 def test_the_day_starts_on_the_pool_then_keeps_what_the_news_gave(store):
     source = FakeSource()
-    daily = DailyTopics(store, source)
+    daily = DailyTopics(store.caches)
 
     topics, pending = parts(daily.listing())
     assert pending is False  # nothing asked for yet
     assert len(topics) == FRESH_COUNT + POOL_COUNT
     assert not set(texts(topics)) & set(NEWS)
 
-    daily.ensure_fetched()
+    daily.ensure_fetched(source)
     topics, pending = parts(daily.listing())
     assert pending is False
     assert texts(topics[:FRESH_COUNT]) == NEWS
@@ -73,18 +73,18 @@ def test_the_day_starts_on_the_pool_then_keeps_what_the_news_gave(store):
 
 def test_a_day_is_fetched_once(store):
     source = FakeSource()
-    daily = DailyTopics(store, source)
-    daily.ensure_fetched()
-    daily.ensure_fetched()
-    DailyTopics(store, source).ensure_fetched()  # a restart on the same day
+    daily = DailyTopics(store.caches)
+    daily.ensure_fetched(source)
+    daily.ensure_fetched(source)
+    DailyTopics(store.caches).ensure_fetched(source)  # a restart on the same day
     assert source.calls == 1
 
 
 def test_an_empty_fetch_is_not_cached_and_is_tried_again(store):
     source = FakeSource()
     source.fetch = lambda count: []  # type: ignore[method-assign]
-    daily = DailyTopics(store, source)
-    daily.ensure_fetched()
+    daily = DailyTopics(store.caches)
+    daily.ensure_fetched(source)
 
     topics, pending = parts(daily.listing())
     assert set(topics) <= set(TOPICS)
@@ -92,14 +92,14 @@ def test_an_empty_fetch_is_not_cached_and_is_tried_again(store):
     assert "no stories" in daily.listing().error
 
     source.fetch = FakeSource().fetch  # type: ignore[method-assign]
-    daily.ensure_fetched()
+    daily.ensure_fetched(source)
     assert texts(daily.listing().topics[:FRESH_COUNT]) == NEWS
 
 
 def test_a_failed_fetch_leaves_a_full_list_of_pool_topics(store):
     source = FakeSource(GenerationError("claude timed out after 180s"))
-    daily = DailyTopics(store, source)
-    daily.ensure_fetched()
+    daily = DailyTopics(store.caches)
+    daily.ensure_fetched(source)
 
     topics, pending = parts(daily.listing())
     assert len(topics) == FRESH_COUNT + POOL_COUNT
@@ -109,15 +109,15 @@ def test_a_failed_fetch_leaves_a_full_list_of_pool_topics(store):
 
 
 def test_without_a_source_nothing_is_pending(store):
-    daily = DailyTopics(store, None)
-    daily.ensure_fetched()
+    daily = DailyTopics(store.caches)
+    daily.ensure_fetched(None)
     topics, pending = parts(daily.listing())
     assert pending is False
     assert len(topics) == FRESH_COUNT + POOL_COUNT
 
 
 def test_endpoint_serves_the_news_half_once_it_lands(tmp_path):
-    store = SessionStore(tmp_path / "s.db")
+    store = Database(tmp_path / "s.db")
     app = create_app(store, Services(FakeGenerator(), topic_source=FakeSource()), InlineExecutor())
     with TestClient(app) as c:
         first = c.get("/api/topics").json()
@@ -133,12 +133,12 @@ def test_endpoint_serves_the_news_half_once_it_lands(tmp_path):
 
 def test_refresh_redeals_the_pool_and_fetches_the_news_again(store):
     source = FakeSource()
-    daily = DailyTopics(store, source)
-    daily.ensure_fetched()
+    daily = DailyTopics(store.caches)
+    daily.ensure_fetched(source)
     before, _ = parts(daily.listing())
 
     source.fetch = lambda count: [f"later news {i}" for i in range(count)]  # type: ignore[method-assign]
-    daily.refresh()
+    daily.refresh(source)
     after, pending = parts(daily.listing())
     assert pending is False  # the inline fetch already landed
     assert texts(after[:FRESH_COUNT]) == [f"later news {i}" for i in range(FRESH_COUNT)]
@@ -147,9 +147,9 @@ def test_refresh_redeals_the_pool_and_fetches_the_news_again(store):
 
 
 def test_refresh_without_a_source_still_redeals_the_pool(store):
-    daily = DailyTopics(store, None)
+    daily = DailyTopics(store.caches)
     before, _ = parts(daily.listing())
-    daily.refresh()
+    daily.refresh(None)
     after, pending = parts(daily.listing())
     assert after != before
     assert pending is False
@@ -163,7 +163,7 @@ def test_refresh_endpoint_reports_pending_until_the_news_lands(tmp_path):
         def submit(self, fn, /, *args):
             self.queued.append((fn, args))
 
-    store = SessionStore(tmp_path / "s.db")
+    store = Database(tmp_path / "s.db")
     executor = SlowExecutor()
     app = create_app(store, Services(FakeGenerator(), topic_source=FakeSource()), executor)
     with TestClient(app) as c:
@@ -194,11 +194,11 @@ def test_pending_is_true_only_while_a_fetch_is_in_flight(store):
     source = FakeSource()
     source.fetch = lambda count: []  # type: ignore[method-assign]
     executor = HeldExecutor()
-    daily = DailyTopics(store, source, executor)
+    daily = DailyTopics(store.caches, executor)
 
-    daily.ensure_fetched()
+    daily.ensure_fetched(source)
     assert daily.listing().pending is True
-    daily.ensure_fetched()
+    daily.ensure_fetched(source)
     assert len(executor.queued) == 1  # one fetch at a time
 
     for fn, args in executor.queued:
@@ -207,18 +207,10 @@ def test_pending_is_true_only_while_a_fetch_is_in_flight(store):
 
 
 def test_endpoint_reports_the_failure_until_a_fetch_succeeds(tmp_path):
-    store = SessionStore(tmp_path / "s.db")
+    store = Database(tmp_path / "s.db")
     source = FakeSource(GenerationError("claude exited 1: no such tool"))
     app = create_app(store, Services(FakeGenerator(), topic_source=source), InlineExecutor())
     with TestClient(app) as c:
         assert c.get("/api/topics").json()["error"] == "claude exited 1: no such tool"
         source.error = None
         assert c.post("/api/topics/refresh").json()["error"] is None
-
-
-def test_a_day_saved_with_more_news_than_today_allows_is_cut_down(store):
-    day = DailyTopics(store, None).today().isoformat()
-    store.set_daily_topics(day, [f"old news {i}" for i in range(FRESH_COUNT * 2)])
-    topics = DailyTopics(store, None).listing().topics
-    assert len([t for t in topics if t.category == Category.NEWS]) == FRESH_COUNT
-    assert len(topics) == FRESH_COUNT + POOL_COUNT

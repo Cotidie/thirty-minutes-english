@@ -4,9 +4,9 @@ import pytest
 from fastapi.testclient import TestClient
 
 from app.claude_cli import GenerationError
+from app.coaching.phrasing import PhrasingMarker, breaks_in
+from app.db import Database
 from app.main import create_app
-from app.phrasing import PhrasingMarker, breaks_in
-from app.store import SessionStore
 from app.wiring import Services
 from tests.test_api import FakeGenerator, InlineExecutor
 
@@ -63,7 +63,7 @@ class FakeMarker:
 
 
 def client_with(tmp_path, marker) -> TestClient:
-    app = create_app(SessionStore(tmp_path / "s.db"), Services(FakeGenerator(), phrasing=marker), InlineExecutor())
+    app = create_app(Database(tmp_path / "s.db"), Services(FakeGenerator(), phrasing=marker), InlineExecutor())
     return TestClient(app)
 
 

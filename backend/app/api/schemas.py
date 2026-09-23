@@ -1,0 +1,165 @@
+"""Request and response bodies of the HTTP API; the domain models live in app.models."""
+
+from typing import Literal
+
+from pydantic import BaseModel, ConfigDict, field_validator
+
+from app.models import Correction
+
+
+class CreateSessionRequest(BaseModel):
+    topic: str | None = None
+
+
+class JobStatus(BaseModel):
+    id: str
+    topic: str
+    status: Literal["running", "done", "failed"]
+    stage: Literal["starting", "skills", "searching", "writing", "finalizing", "illustrating"]
+    searches: int
+    elapsed_seconds: float
+    stage_elapsed_seconds: float
+    expected_seconds: float
+    session_id: int | None = None
+    error: str | None = None
+
+
+def _not_blank(value: str) -> str:
+    if not value.strip():
+        raise ValueError("must not be blank")
+    return value
+
+
+class ReadAloudRequest(BaseModel):
+    """`sdp` is the browser's WebRTC offer; only the OpenAI provider needs one."""
+
+    paragraph: str
+    sdp: str | None = None
+
+    _check = field_validator("paragraph")(_not_blank)
+
+
+class PhraseRequest(BaseModel):
+    sdp: str | None = None
+    topic: str | None = None
+
+
+class ExampleSessionRequest(BaseModel):
+    sdp: str | None = None
+    expression: str
+    meaning: str
+    usage_note: str = ""
+
+    _check = field_validator("expression", "meaning")(_not_blank)
+
+
+class ExampleFeedbackRequest(BaseModel):
+    """One sentence a reader made with a target, for the coach to say back and judge."""
+
+    expression: str
+    meaning: str
+    usage_note: str = ""
+    user_text: str
+    """An expression gets the light native fix; a word gets a free rewording that uses it well."""
+    kind: Literal["expression", "word"] = "expression"
+    """For a word: the picture's scene, so the rewording can describe it."""
+    scene: str = ""
+
+    _check = field_validator("expression", "meaning", "user_text")(_not_blank)
+
+
+class ExampleRequest(BaseModel):
+    session_id: int
+    expression: str
+    user_text: str
+    coach_text: str
+    seconds: float = 0
+
+    _check = field_validator("expression", "user_text", "coach_text")(_not_blank)
+
+
+class AskRequest(BaseModel):
+    session_id: int | None = None
+    user_text: str
+    coach_text: str
+    seconds: float = 0
+
+    _check = field_validator("user_text", "coach_text")(_not_blank)
+
+
+class ReadingRequest(BaseModel):
+    session_id: int | None = None
+    paragraph: str
+    user_text: str
+    coach_text: str
+    seconds: float = 0
+    corrections: list[Correction] = []
+
+    _check = field_validator("paragraph")(_not_blank)
+
+
+class PhrasingRequest(BaseModel):
+    paragraph: str
+
+    _check = field_validator("paragraph")(_not_blank)
+
+
+class RedrawRequest(BaseModel):
+    """Which style to draw this one picture in; blank means the configured IMAGE_STYLE."""
+
+    style: str = ""
+
+
+class Phrasing(BaseModel):
+    """Indices of the words a fluent reader starts a new thought group on."""
+
+    breaks: list[int]
+
+
+class LiveSession(BaseModel):
+    """Passthrough of the provider's answer, tagged with `provider`. OpenAI:
+    {session: {id}, transport: {type, sdp}}. Gemini: {url, setup}."""
+
+    model_config = ConfigDict(extra="allow")
+
+    provider: Literal["openai", "gemini"]
+
+
+class AssessorSession(BaseModel):
+    """What the browser needs to stream the microphone to Azure and judge the result."""
+
+    token: str
+    region: str
+    word_score: int
+    break_confidence: float
+
+
+class SettingField(BaseModel):
+    key: str
+    group: Literal["keys", "voice", "assess", "claude", "text", "images"]
+    value: str
+    secret: bool
+    default: str
+    choices: list[str] | None
+    suggestions: list[str]
+    labels: dict[str, str] = {}
+
+
+class SettingsView(BaseModel):
+    fields: list[SettingField]
+
+
+class SettingsUpdate(BaseModel):
+    values: dict[str, str]
+
+
+class KeyTestRequest(BaseModel):
+    """Which key to try. `value` is what is typed in the modal; blank means the saved key."""
+
+    key: Literal["OPENAI_API_KEY", "GEMINI_API_KEY", "AZURE_SPEECH_KEY", "OPENROUTER_API_KEY", "COMFY_API_KEY"]
+    value: str = ""
+
+
+class KeyTestResult(BaseModel):
+    ok: bool
+    message: str

@@ -2,18 +2,26 @@
 settings change can rebuild it all without a restart."""
 
 import logging
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 
-from app.assessor import AzureAssessor
-from app.cards import Extractor, PhraseCardExtractor
-from app.daily_topics import ClaudeTopicSource, TopicSource
-from app.example_feedback import TEMPLATES, ExampleCoach
-from app.generator import ClaudeCliGenerator, Generator
-from app.illustrator import Illustrator, SceneWriter, painter_for
-from app.live import AgentDefinition, GeminiVoice, LiveAgent, OpenAIVoice, VoiceProvider
-from app.phrasing import PhrasingMarker
-from app.settings import Settings
+from app.coaching.cards import SCHEMA_FILE, Extractor, PhraseCardExtractor
+from app.coaching.example_feedback import TEMPLATES, ExampleCoach
+from app.coaching.phrasing import PhrasingMarker
+from app.config.settings import Settings
+from app.generation.generator import ClaudeCliGenerator, Generator
+from app.pictures.illustrator import Illustrator
+from app.pictures.painters import painter_for
+from app.pictures.scenes import SceneWriter
+from app.topics.daily import ClaudeTopicSource, TopicSource
+from app.voice.assessor import AzureAssessor
+from app.voice.live import (
+    AgentDefinition,
+    GeminiVoice,
+    LiveAgent,
+    OpenAIVoice,
+    VoiceProvider,
+)
 
 log = logging.getLogger(__name__)
 
@@ -24,7 +32,7 @@ AGENT_NAMES = ("read-aloud", "phrase", "example")
 class Services:
     generator: Generator
     topic_source: TopicSource | None = None
-    agents: dict[str, LiveAgent] | None = None
+    agents: dict[str, LiveAgent] = field(default_factory=dict)
     extractor: Extractor | None = None
     example_coach: ExampleCoach | None = None
     illustrator: Illustrator | None = None
@@ -33,14 +41,10 @@ class Services:
     assessor: AzureAssessor | None = None
     voice_key_name: str = "OPENAI_API_KEY"
 
-    def __post_init__(self) -> None:
-        self.agents = self.agents or {}
-
 
 def build_services(settings: Settings, agent_dirs: dict[str, Path], image_dir: Path | None = None) -> Services:
     """`agent_dirs` maps read-aloud / phrase / example to their folders; `image_dir` is
     where the vocabulary pictures land (none: no pictures)."""
-    openai_key = settings.get("OPENAI_API_KEY")
     return Services(
         generator=ClaudeCliGenerator(
             model=settings.get("CLAUDE_MODEL"),
@@ -49,7 +53,7 @@ def build_services(settings: Settings, agent_dirs: dict[str, Path], image_dir: P
         ),
         topic_source=ClaudeTopicSource(model=settings.get("TOPICS_MODEL"), effort=settings.get("TOPICS_EFFORT")),
         agents=_live_agents(settings, agent_dirs),
-        extractor=_extractor(openai_key, agent_dirs["phrase"], "cards.schema.json", settings, PhraseCardExtractor),
+        extractor=_extractor(settings, agent_dirs["phrase"]),
         example_coach=_example_coach(settings, agent_dirs["example"]),
         illustrator=_illustrator(settings, image_dir),
         scene_writer=SceneWriter.with_cli(settings.get("EXAMPLE_MODEL")),
@@ -61,12 +65,12 @@ def build_services(settings: Settings, agent_dirs: dict[str, Path], image_dir: P
 
 def _assessor(settings: Settings) -> AzureAssessor | None:
     """Azure pronunciation assessment, once its key is set."""
-    key = settings.azure_speech_key
+    key = settings.get("AZURE_SPEECH_KEY")
     if not key:
         return None
     return AzureAssessor(
         key,
-        settings.azure_speech_region,
+        settings.get("AZURE_SPEECH_REGION"),
         settings.assess_word_score,
         settings.assess_break_confidence,
     )
@@ -77,8 +81,8 @@ def voice_provider(settings: Settings) -> VoiceProvider | None:
     key = settings.voice_api_key
     if not key:
         return None
-    if settings.voice_provider == "gemini":
-        return GeminiVoice(key, settings.voice_model, settings.voice_name, settings.voice_thinking)
+    if settings.get("VOICE_PROVIDER") == "gemini":
+        return GeminiVoice(key, settings.voice_model, settings.get("VOICE_NAME"), settings.voice_thinking)
     return OpenAIVoice(key, settings.voice_model)
 
 
@@ -96,11 +100,12 @@ def _live_agents(settings: Settings, agent_dirs: dict[str, Path]) -> dict[str, L
     return agents
 
 
-def _extractor(api_key: str, agent_dir: Path, schema: str, settings: Settings, build) -> Extractor | None:
-    """An extractor per agent folder, once an OpenAI key and that folder's schema exist."""
-    if not api_key or not (agent_dir / schema).is_file():
+def _extractor(settings: Settings, agent_dir: Path) -> Extractor | None:
+    """Ask cards, once an OpenAI key and the phrase-coach schema exist."""
+    key = settings.get("OPENAI_API_KEY")
+    if not key or not (agent_dir / SCHEMA_FILE).is_file():
         return None
-    return build(api_key, agent_dir, settings.get("SUMMARY_MODEL"))
+    return PhraseCardExtractor(key, agent_dir, settings.get("SUMMARY_MODEL"))
 
 
 def _phrasing(settings: Settings, agent_dir: Path) -> PhrasingMarker | None:

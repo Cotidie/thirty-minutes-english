@@ -4,9 +4,9 @@ folder. The answer is checked word for word against the paragraph."""
 
 import re
 from pathlib import Path
-from typing import Protocol
 
-from app.claude_cli import ClaudeCli, GenerationError, structured_output
+from app.claude_cli import ClaudeCli, GenerationError, Runner, structured_output
+from app.templates import fill
 
 PHRASING_SCHEMA: dict = {
     "type": "object",
@@ -18,10 +18,6 @@ PHRASING_SCHEMA: dict = {
 SLASH = re.compile(r"\s*/\s*")
 
 
-class Runner(Protocol):
-    def run(self, prompt: str, schema: dict, on_event=None) -> dict: ...
-
-
 class PhrasingMarker:
     def __init__(self, cli: Runner, agent_dir: Path) -> None:
         self._cli = cli
@@ -29,10 +25,10 @@ class PhrasingMarker:
 
     @classmethod
     def with_cli(cls, agent_dir: Path, model: str, effort: str = "low") -> "PhrasingMarker":
-        return cls(ClaudeCli(model=model, effort=effort, tools=(), mcp=None, timeout_s=90), agent_dir)
+        return cls(ClaudeCli.text_only(model, effort), agent_dir)
 
     def build_prompt(self, paragraph: str) -> str:
-        return self._template.replace("{{paragraph}}", paragraph)
+        return fill(self._template, paragraph=paragraph)
 
     def mark(self, paragraph: str) -> list[int]:
         """Indices of the words that open a new thought group (never 0). Raises GenerationError."""

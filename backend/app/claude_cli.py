@@ -11,6 +11,7 @@ import subprocess
 import threading
 from collections.abc import Callable
 from dataclasses import dataclass
+from typing import Protocol
 
 
 @dataclass(frozen=True)
@@ -42,6 +43,12 @@ class GenerationError(Exception):
     pass
 
 
+class Runner(Protocol):
+    """What the text-run callers need from ClaudeCli; tests pass a fake."""
+
+    def run(self, prompt: str, schema: dict, on_event: OnEvent | None = None) -> dict: ...
+
+
 class ClaudeCli:
     def __init__(
         self,
@@ -56,6 +63,11 @@ class ClaudeCli:
         self.mcp = mcp
         self.timeout_s = timeout_s
         self.tools = tools
+
+    @classmethod
+    def text_only(cls, model: str, effort: str = "low", timeout_s: float = 90) -> "ClaudeCli":
+        """No tools and no MCP server: a plain structured answer to the prompt."""
+        return cls(model=model, effort=effort, mcp=None, timeout_s=timeout_s, tools=())
 
     def build_command(self, schema: dict) -> list[str]:
         """`--tools ""` runs with no tools at all; without an MCP server none is loaded either."""

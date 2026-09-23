@@ -11,10 +11,11 @@ from statistics import median
 from threading import Lock
 from typing import Literal, Protocol
 
-from app.generator import GenerationError, Generator
-from app.progress import Progress, Stage
-from app.models import SessionContent
-from app.store import SessionStore
+from app.claude_cli import GenerationError
+from app.db.sessions import SessionRepo
+from app.generation.generator import Generator
+from app.generation.progress import Progress, Stage
+from app.pictures.illustrator import Illustrator
 
 Status = Literal["running", "done", "failed"]
 log = logging.getLogger(__name__)
@@ -51,34 +52,23 @@ class Executor(Protocol):
     def submit(self, fn, /, *args): ...
 
 
-class Illustrator(Protocol):
-    def illustrate(self, job_id: str, content: SessionContent) -> SessionContent: ...
-
-
 class JobRunner:
     DEFAULT_EXPECTED_SECONDS = 150.0
     REPEAT_ALLOWANCE = 0.1  # each past item escapes the exclusion list with this probability
 
-    def __init__(
-        self,
-        generator: Generator,
-        store: SessionStore,
-        executor: Executor | None = None,
-        illustrator: Illustrator | None = None,
-    ) -> None:
-        self.generator = generator
-        self.illustrator = illustrator
-        self._store = store
+    def __init__(self, sessions: SessionRepo, executor: Executor | None = None) -> None:
+        self._sessions = sessions
         self.executor = executor or ThreadPoolExecutor(max_workers=2)
         self._jobs: dict[str, Job] = {}
         self._durations: deque[float] = deque(maxlen=5)
         self._lock = Lock()
 
-    def start(self, topic: str) -> Job:
+    def start(self, topic: str, generator: Generator, illustrator: Illustrator | None = None) -> Job:
+        """Generates in the background; the pictures follow when an illustrator is given."""
         job = Job(id=uuid.uuid4().hex[:12], topic=topic)
         with self._lock:
             self._jobs[job.id] = job
-        self.executor.submit(self._run, job)
+        self.executor.submit(self._run, job, generator, illustrator)
         return job
 
     def get(self, job_id: str) -> Job | None:
@@ -94,13 +84,13 @@ class JobRunner:
         with self._lock:
             return median(self._durations) if self._durations else self.DEFAULT_EXPECTED_SECONDS
 
-    def _run(self, job: Job) -> None:
+    def _run(self, job: Job, generator: Generator, illustrator: Illustrator | None) -> None:
         try:
-            used = self._store.used_items()
+            used = self._sessions.used_items()
             exclude = used.thin(1 - self.REPEAT_ALLOWANCE, random.Random())
             log.info("job %s: banning %d/%d expressions, %d/%d words", job.id,
                      len(exclude.expressions), len(used.expressions), len(exclude.words), len(used.words))
-            content = self.generator.generate(job.topic, on_progress=job.apply, exclude=exclude)
+            content = generator.generate(job.topic, on_progress=job.apply, exclude=exclude)
         except GenerationError as e:
             job.error = str(e)
             job.status = "failed"
@@ -111,13 +101,13 @@ class JobRunner:
         )
         if leaked:
             log.warning("job %s: %d banned items came back anyway: %s", job.id, len(leaked), leaked)
-        if self.illustrator:
+        if illustrator:
             job.apply(Progress(Stage.ILLUSTRATING, job.searches))
             try:
-                content = self.illustrator.illustrate(job.id, content)
+                content = illustrator.illustrate(job.id, content)
             except GenerationError as e:
                 log.warning("job %s: the session goes out without pictures: %s", job.id, e)
-        session = self._store.create(content)
+        session = self._sessions.create(content)
         with self._lock:
             self._durations.append(job.elapsed_seconds)
         job.session_id = session.id

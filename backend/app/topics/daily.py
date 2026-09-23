@@ -7,9 +7,9 @@ from datetime import UTC, date, datetime
 from typing import Protocol
 
 from app.claude_cli import ClaudeCli, GenerationError, structured_output
+from app.db.caches import CacheRepo
 from app.models import Category, Topic, TopicListing
-from app.store import SessionStore
-from app.topics import pool_for_day
+from app.topics.pool import pool_for_day
 
 log = logging.getLogger(__name__)
 
@@ -79,9 +79,8 @@ class ClaudeTopicSource:
 class DailyTopics:
     """Today's list, and the background refresh that fills its news slots."""
 
-    def __init__(self, store: SessionStore, source: TopicSource | None, executor=None):
-        self.store = store
-        self.source = source
+    def __init__(self, caches: CacheRepo, executor=None):
+        self._caches = caches
         self._executor = executor
         # The day whose news fetch is running right now, and how many times
         # the pool half has been redealt today.
@@ -96,38 +95,36 @@ class DailyTopics:
     def listing(self) -> TopicListing:
         """The day's topics, whether a fetch is still on its way, and the last failure."""
         day = self.today()
-        # A day saved under an older, larger FRESH_COUNT is cut down rather than shown whole.
-        fresh = (self.store.get_daily_topics(day.isoformat()) or [])[:FRESH_COUNT]
+        fresh = self._caches.get_daily_topics(day.isoformat()) or []
         pool = pool_for_day(day, POOL_COUNT + FRESH_COUNT - len(fresh), exclude=fresh, salt=self._salt)
         news = [Topic(text=t, category=Category.NEWS) for t in fresh]
         return TopicListing(topics=news + pool, pending=self._inflight == day.isoformat(), error=self._error)
 
-    def ensure_fetched(self) -> None:
+    def ensure_fetched(self, source: TopicSource | None) -> None:
         """Starts the day's fetch if it has not run yet. Safe to call on every request."""
         day = self.today().isoformat()
-        if self.source is None or self._inflight == day or self.store.get_daily_topics(day) is not None:
+        if source is None or self._inflight == day or self._caches.get_daily_topics(day) is not None:
             return
-        self._start(day)
+        self._start(day, source)
 
-    def refresh(self) -> None:
+    def refresh(self, source: TopicSource | None) -> None:
         """Deals a new pool slice now and fetches the news again in the background."""
         day = self.today().isoformat()
         self._salt += 1
-        if self.source is None or self._inflight == day:
+        if source is None or self._inflight == day:
             return
-        self._start(day)
+        self._start(day, source)
 
-    def _start(self, day: str) -> None:
+    def _start(self, day: str, source: TopicSource) -> None:
         self._inflight = day
         if self._executor is None:
-            self._fetch(day)
+            self._fetch(day, source)
         else:
-            self._executor.submit(self._fetch, day)
+            self._executor.submit(self._fetch, day, source)
 
-    def _fetch(self, day: str) -> None:
-        assert self.source is not None
+    def _fetch(self, day: str, source: TopicSource) -> None:
         try:
-            self._keep(day, self.source.fetch(FRESH_COUNT))
+            self._keep(day, source.fetch(FRESH_COUNT))
         except (GenerationError, KeyError, TypeError) as e:
             self._error = str(e)
             log.warning("could not fetch today's topics, staying on the pool: %s", e)
@@ -142,5 +139,5 @@ class DailyTopics:
             log.warning("no news topics came back for %s, staying on the pool", day)
             return
         self._error = None
-        self.store.set_daily_topics(day, topics)
+        self._caches.set_daily_topics(day, topics)
         log.info("topics for %s: %d from the news", day, len(topics))
