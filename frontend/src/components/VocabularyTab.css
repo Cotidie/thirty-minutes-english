@@ -303,6 +303,7 @@
 
 /* The word's situation, drawn: the learner describes it with the word. */
 .vocab-picture {
+  display: block; /* inline, it would leave a descender gap under the picture */
   width: 100%;
   aspect-ratio: 4 / 3;
   object-fit: contain;
