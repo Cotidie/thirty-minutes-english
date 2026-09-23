@@ -28,5 +28,5 @@ def test_pick_topic_is_random_among_unused():
 def test_a_day_shows_every_domain_before_repeating_one():
     dealt = pool_for_day(date(2026, 9, 21), 9)
     categories = [t.category for t in dealt]
-    assert set(categories[:8]) == {p[0].category for p in POOLS}
+    assert set(categories[:8]) == set(POOLS)
     assert len(dealt) == 9

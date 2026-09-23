@@ -15,6 +15,7 @@ export function useTopics() {
   const [topics, setTopics] = useState<Topic[]>([])
   const [pending, setPending] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [labels, setLabels] = useState<Record<string, string>>({})
   const live = useRef(true)
   const tries = useRef(0)
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -29,6 +30,7 @@ export function useTopics() {
     if (!live.current) return
     setTopics(listing.topics)
     setError(listing.error)
+    setLabels(listing.labels)
     // Past the limit we stop believing the server and let the button go again.
     const keepLooking = listing.pending && tries.current++ < TOPIC_POLL_LIMIT
     setPending(keepLooking)
@@ -59,5 +61,5 @@ export function useTopics() {
       .catch(() => live.current && setPending(false))
   }, [take])
 
-  return { topics, pending, error, refresh }
+  return { topics, labels, pending, error, refresh }
 }

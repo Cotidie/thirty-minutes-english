@@ -2,7 +2,7 @@ import { render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { api } from '../api'
-import type { SettingField } from '../types'
+import type { SettingField, SettingGroup } from '../types'
 import { SettingsModal } from './SettingsModal'
 
 vi.mock('../api', () => ({ api: { getSettings: vi.fn(), putSettings: vi.fn(), testKey: vi.fn() } }))
@@ -15,6 +15,10 @@ function field(partial: Partial<SettingField> & Pick<SettingField, 'key' | 'grou
     choices: null,
     suggestions: [],
     labels: {},
+    testable: false,
+    follows: null,
+    variants: {},
+    shown_when: null,
     ...partial,
   }
 }
@@ -24,9 +28,20 @@ const FIELDS: SettingField[] = [
   field({
     key: 'VOICE_MODEL',
     group: 'voice',
-    suggestions: ['gpt-live-1', 'gemini-3.8-live', 'gemini-3.8-live-extended-thinking'],
+    follows: 'VOICE_PROVIDER',
+    variants: {
+      openai: { default: 'gpt-live-1', suggestions: ['gpt-live-1'] },
+      gemini: { default: 'gemini-3.8-live-extended-thinking', suggestions: ['gemini-3.8-live-extended-thinking', 'gemini-3.8-live'] },
+    },
   }),
-  field({ key: 'VOICE_THINKING', group: 'voice', value: 'low', default: 'low', choices: ['low', 'medium', 'high'] }),
+  field({
+    key: 'VOICE_THINKING',
+    group: 'voice',
+    value: 'low',
+    default: 'low',
+    choices: ['low', 'medium', 'high'],
+    shown_when: ['VOICE_PROVIDER', 'gemini'],
+  }),
   field({
     key: 'VOICE_NAME',
     group: 'voice',
@@ -34,18 +49,27 @@ const FIELDS: SettingField[] = [
     default: 'Kore',
     choices: ['Kore', 'Puck'],
     labels: { Kore: 'Firm', Puck: 'Upbeat' },
+    shown_when: ['VOICE_PROVIDER', 'gemini'],
   }),
-  field({ key: 'OPENAI_API_KEY', group: 'keys', value: '…1234', secret: true }),
-  field({ key: 'GEMINI_API_KEY', group: 'keys', secret: true }),
-  field({ key: 'AZURE_SPEECH_KEY', group: 'keys', secret: true }),
+  field({ key: 'OPENAI_API_KEY', group: 'keys', value: '…1234', secret: true, testable: true }),
+  field({ key: 'GEMINI_API_KEY', group: 'keys', secret: true, testable: true }),
+  field({ key: 'AZURE_SPEECH_KEY', group: 'keys', secret: true, testable: true }),
   field({ key: 'AZURE_SPEECH_REGION', group: 'assess', value: 'koreacentral', default: 'koreacentral' }),
   field({ key: 'CLAUDE_MODEL', group: 'claude', value: 'sonnet', default: 'opus', suggestions: ['opus', 'sonnet'] }),
   field({ key: 'SUMMARY_MODEL', group: 'text', value: 'gpt-5.6-luna', default: 'gpt-5.6-luna' }),
 ]
 
+const GROUPS: SettingGroup[] = [
+  { id: 'keys', title: 'API keys' },
+  { id: 'voice', title: 'Voice coach' },
+  { id: 'assess', title: 'Read aloud assessor' },
+  { id: 'claude', title: 'Claude generation' },
+  { id: 'text', title: 'Summary text model' },
+]
+
 beforeEach(() => {
-  vi.mocked(api.getSettings).mockReset().mockResolvedValue({ fields: FIELDS })
-  vi.mocked(api.putSettings).mockReset().mockImplementation(async () => ({ fields: FIELDS }))
+  vi.mocked(api.getSettings).mockReset().mockResolvedValue({ groups: GROUPS, fields: FIELDS })
+  vi.mocked(api.putSettings).mockReset().mockImplementation(async () => ({ groups: GROUPS, fields: FIELDS }))
   vi.mocked(api.testKey).mockReset()
 })
 
@@ -63,7 +87,7 @@ describe('SettingsModal', () => {
     expect(key.placeholder).toBe('…1234')
     expect((screen.getByLabelText(/CLAUDE_MODEL/) as HTMLInputElement).value).toBe('sonnet')
     const legends = Array.from(document.querySelectorAll('legend')).map((l) => l.textContent)
-    expect(legends).toEqual(['API keys', 'Voice coach', 'Read aloud assessor', 'Claude generation', 'Summary text model', 'Vocabulary pictures'])
+    expect(legends).toEqual(GROUPS.map((g) => g.title))
   })
 
   it('hides the Gemini-only fields under OpenAI and shows them once the provider flips', async () => {
@@ -75,17 +99,13 @@ describe('SettingsModal', () => {
     const voice = screen.getByLabelText(/VOICE_NAME/) as HTMLSelectElement
     expect(voice.tagName).toBe('SELECT')
     expect(Array.from(voice.options).map((o) => o.textContent)).toEqual(['Kore · Firm', 'Puck · Upbeat'])
-    // Default Gemini model is the extended-thinking one, so the level shows.
     expect(screen.getByLabelText(/VOICE_THINKING/)).toBeInTheDocument()
     const model = screen.getByLabelText(/VOICE_MODEL/) as HTMLInputElement
     expect(model.placeholder).toBe('gemini-3.8-live-extended-thinking')
     const options = Array.from(document.querySelectorAll('#setting-VOICE_MODEL-options option')).map((o) =>
       o.getAttribute('value'),
     )
-    expect(options).toEqual(['gemini-3.8-live', 'gemini-3.8-live-extended-thinking'])
-
-    await userEvent.type(model, 'gemini-3.8-live')
-    expect(screen.queryByLabelText(/VOICE_THINKING/)).not.toBeInTheDocument()
+    expect(options).toEqual(['gemini-3.8-live-extended-thinking', 'gemini-3.8-live'])
   })
 
   it('saves only what changed, including a typed secret', async () => {

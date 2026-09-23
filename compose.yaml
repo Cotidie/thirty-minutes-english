@@ -6,35 +6,15 @@ services:
       args:
         UID: ${UID:-1000}
         HOME_DIR: ${HOME}
+    # Every runtime setting (keys, models, providers) comes from .env as is; the ⚙ modal's list
+    # (backend/app/config/settings.py) owns their defaults, so none are repeated here.
+    env_file:
+      - path: .env
+        required: false
     environment:
-      CLAUDE_CODE_OAUTH_TOKEN: ${CLAUDE_CODE_OAUTH_TOKEN:-}
-      CLAUDE_MODEL: ${CLAUDE_MODEL:-opus}
-      CLAUDE_EFFORT: ${CLAUDE_EFFORT:-xhigh}
-      CLAUDE_SKILLS: ${CLAUDE_SKILLS:-}
-      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
-      GEMINI_API_KEY: ${GEMINI_API_KEY:-}
-      AZURE_SPEECH_KEY: ${AZURE_SPEECH_KEY:-}
-      AZURE_SPEECH_REGION: ${AZURE_SPEECH_REGION:-koreacentral}
-      ASSESS_WORD_SCORE: ${ASSESS_WORD_SCORE:-60}
-      ASSESS_BREAK_CONFIDENCE: ${ASSESS_BREAK_CONFIDENCE:-0.75}
-      VOICE_PROVIDER: ${VOICE_PROVIDER:-openai}
-      VOICE_MODEL: ${VOICE_MODEL:-}
-      VOICE_THINKING: ${VOICE_THINKING:-low}
-      VOICE_NAME: ${VOICE_NAME:-Kore}
       READ_ALOUD_AGENT_DIR: /agents/read-aloud-coach
       PHRASE_AGENT_DIR: /agents/phrase-coach
       EXAMPLE_AGENT_DIR: /agents/example-coach
-      SUMMARY_MODEL: ${SUMMARY_MODEL:-gpt-5.6-luna}
-      TOPICS_MODEL: ${TOPICS_MODEL:-sonnet}
-      TOPICS_EFFORT: ${TOPICS_EFFORT:-medium}
-      OPENROUTER_API_KEY: ${OPENROUTER_API_KEY:-}
-      COMFY_API_KEY: ${COMFY_API_KEY:-}
-      FIRECRAWL_API_KEY: ${FIRECRAWL_API_KEY:-}
-      IMAGE_PROVIDER: ${IMAGE_PROVIDER:-openrouter}
-      IMAGE_MODEL: ${IMAGE_MODEL:-}
-      IMAGE_STYLE: ${IMAGE_STYLE:-photo}
-      EXAMPLE_MODEL: ${EXAMPLE_MODEL:-opus}
-      EXAMPLE_EFFORT: ${EXAMPLE_EFFORT:-low}
     volumes:
       - ./backend/data:/data
       - ../read-aloud-coach:/agents/read-aloud-coach:ro

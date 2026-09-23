@@ -4,6 +4,8 @@ from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, field_validator
 
+from app.generation.jobs import Status
+from app.generation.progress import Stage
 from app.models import Correction
 
 
@@ -14,8 +16,8 @@ class CreateSessionRequest(BaseModel):
 class JobStatus(BaseModel):
     id: str
     topic: str
-    status: Literal["running", "done", "failed"]
-    stage: Literal["starting", "skills", "searching", "writing", "finalizing", "illustrating"]
+    status: Status
+    stage: Stage
     searches: int
     elapsed_seconds: float
     stage_elapsed_seconds: float
@@ -134,18 +136,35 @@ class AssessorSession(BaseModel):
     break_confidence: float
 
 
+class Variant(BaseModel):
+    default: str
+    suggestions: list[str]
+
+
 class SettingField(BaseModel):
+    """One setting as the modal draws it. Every rule the modal applies comes from here."""
+
     key: str
-    group: Literal["keys", "voice", "assess", "claude", "text", "images"]
+    group: str
     value: str
     secret: bool
     default: str
     choices: list[str] | None
     suggestions: list[str]
     labels: dict[str, str] = {}
+    testable: bool = False  # a Test button checks the key
+    follows: str | None = None  # the setting whose value picks one of `variants`
+    variants: dict[str, Variant] = {}
+    shown_when: tuple[str, str] | None = None  # (key, value): hidden otherwise
+
+
+class SettingGroup(BaseModel):
+    id: str
+    title: str
 
 
 class SettingsView(BaseModel):
+    groups: list[SettingGroup]
     fields: list[SettingField]
 
 
@@ -156,7 +175,7 @@ class SettingsUpdate(BaseModel):
 class KeyTestRequest(BaseModel):
     """Which key to try. `value` is what is typed in the modal; blank means the saved key."""
 
-    key: Literal["OPENAI_API_KEY", "GEMINI_API_KEY", "AZURE_SPEECH_KEY", "OPENROUTER_API_KEY", "COMFY_API_KEY", "FIRECRAWL_API_KEY"]
+    key: str
     value: str = ""
 
 

@@ -12,14 +12,9 @@ from app.config.settings import Settings
 from app.db import Database
 from app.generation.jobs import Executor, JobRunner
 from app.topics.daily import DailyTopics
-from app.wiring import Services, build_services
+from app.wiring import Services, agent_dirs, build_services
 
 ROOT = Path(__file__).resolve().parent.parent
-AGENT_DIRS = {
-    "read-aloud": ("READ_ALOUD_AGENT_DIR", ROOT.parent.parent / "read-aloud-coach"),
-    "phrase": ("PHRASE_AGENT_DIR", ROOT.parent.parent / "phrase-coach"),
-    "example": ("EXAMPLE_AGENT_DIR", ROOT.parent.parent / "example-coach"),
-}
 
 
 def create_app(
@@ -50,7 +45,7 @@ def create_app(
 def default_app() -> FastAPI:
     logging.basicConfig(level=logging.INFO, format="%(levelname)s %(name)s: %(message)s")
     db = Database(os.environ.get("DB_PATH", ROOT / "data" / "sessions.db"))
-    dirs = {name: Path(os.environ.get(var, default)) for name, (var, default) in AGENT_DIRS.items()}
+    dirs = agent_dirs(os.environ, ROOT.parent.parent)
     image_dir = db.path.parent / "images"
 
     def rebuild(settings: Settings) -> Services:

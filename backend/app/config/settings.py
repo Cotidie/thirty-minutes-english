@@ -6,31 +6,30 @@ stay out of here. The saved values live in app.db.settings."""
 
 from collections.abc import Mapping
 from dataclasses import dataclass
-from typing import Literal
 
 from app.pictures.illustrator import STYLE_LABELS, STYLES
+from app.pictures.painters import DEFAULT_MODEL as IMAGE_DEFAULT_MODEL
 
-Group = Literal["keys", "voice", "assess", "claude", "text", "images"]
+# The modal's sections, in order.
+GROUPS: dict[str, str] = {
+    "keys": "API keys",
+    "voice": "Voice coach",
+    "assess": "Read aloud assessor",
+    "claude": "Claude generation",
+    "text": "Summary text model",
+    "images": "Vocabulary pictures",
+}
 
 EFFORTS = ("low", "medium", "high", "xhigh", "max")
 CLAUDE_MODELS = ("opus", "sonnet")
-IMAGE_PROVIDERS = ("openrouter", "comfy", "off")
-# Image models as each MCP names them; blank takes the provider's default (Nano Banana Pro).
-# OpenAI ids are spelled OpenRouter's way and translated for comfy.
-IMAGE_MODELS = (
-    "google/gemini-3-pro-image",  # openrouter
-    "google/gemini-3.1-flash-image",
-    "google/gemini-3.1-flash-lite-image",
-    "vertexai/nano-banana-pro",  # comfy
-    "vertexai/nano-banana-2",
-    "vertexai/nano-banana-2-lite",
-    "openai/gpt-image-2.5-flare",  # both
-    "openai/gpt-image-2.5-sunburst",
-    "openai/gpt-image-2",
-)
-OPENAI_VOICE_MODEL = "gpt-live-1"
-GEMINI_VOICE_MODEL = "gemini-3.8-live-extended-thinking"
-GEMINI_VOICE_MODELS = ("gemini-3.8-live", GEMINI_VOICE_MODEL)
+IMAGE_PROVIDERS = (*IMAGE_DEFAULT_MODEL, "off")
+# Image models as each MCP names them. OpenAI ids are spelled OpenRouter's way and translated for comfy.
+OPENAI_IMAGE_MODELS = ("openai/gpt-image-2.5-flare", "openai/gpt-image-2.5-sunburst", "openai/gpt-image-2")
+IMAGE_MODELS = {
+    "openrouter": ("google/gemini-3-pro-image", "google/gemini-3.1-flash-image", "google/gemini-3.1-flash-lite-image", *OPENAI_IMAGE_MODELS),
+    "comfy": ("vertexai/nano-banana-pro", "vertexai/nano-banana-2", "vertexai/nano-banana-2-lite", *OPENAI_IMAGE_MODELS),
+}
+VOICE_MODELS = {"openai": ("gpt-live-1",), "gemini": ("gemini-3.8-live-extended-thinking", "gemini-3.8-live")}
 THINKING_LEVELS = ("low", "medium", "high")
 # The Gemini API has no voices.list; this is the TTS list the Live native-audio
 # models share (ai.google.dev/gemini-api/docs/speech-generation#voices).
@@ -69,15 +68,31 @@ GEMINI_VOICES = {
 
 
 @dataclass(frozen=True)
+class Variant:
+    """What a field offers while the setting it follows holds one value."""
+
+    default: str = ""
+    suggestions: tuple[str, ...] = ()
+
+
+def variants(by_value: Mapping[str, tuple[str, ...]]) -> dict[str, Variant]:
+    """The first suggestion of each list is that value's default."""
+    return {value: Variant(models[0], models) for value, models in by_value.items()}
+
+
+@dataclass(frozen=True)
 class Spec:
     key: str
-    group: Group
+    group: str
     default: str = ""
     secret: bool = False
     choices: tuple[str, ...] | None = None  # strict: a value outside is rejected
     suggestions: tuple[str, ...] = ()  # free text with a menu of common values
     labels: Mapping[str, str] | None = None  # a short description per choice, for the menu
     number: tuple[float, float] | None = None  # strict: must parse as a number inside [lo, hi]
+    follows: str | None = None  # the setting whose value picks a Variant below
+    variants: Mapping[str, Variant] | None = None
+    shown_when: tuple[str, str] | None = None  # (key, value): the field only matters then
 
 
 SPECS: tuple[Spec, ...] = (
@@ -88,9 +103,9 @@ SPECS: tuple[Spec, ...] = (
     Spec("COMFY_API_KEY", "keys", secret=True),
     Spec("FIRECRAWL_API_KEY", "keys", secret=True),  # optional: search works keyless, rate limited
     Spec("VOICE_PROVIDER", "voice", "openai", choices=("openai", "gemini")),
-    Spec("VOICE_MODEL", "voice", suggestions=(OPENAI_VOICE_MODEL, *GEMINI_VOICE_MODELS)),
-    Spec("VOICE_THINKING", "voice", "low", choices=THINKING_LEVELS),
-    Spec("VOICE_NAME", "voice", "Kore", choices=tuple(GEMINI_VOICES), labels=GEMINI_VOICES),
+    Spec("VOICE_MODEL", "voice", follows="VOICE_PROVIDER", variants=variants(VOICE_MODELS)),
+    Spec("VOICE_THINKING", "voice", "low", choices=THINKING_LEVELS, shown_when=("VOICE_PROVIDER", "gemini")),
+    Spec("VOICE_NAME", "voice", "Kore", choices=tuple(GEMINI_VOICES), labels=GEMINI_VOICES, shown_when=("VOICE_PROVIDER", "gemini")),
     Spec("AZURE_SPEECH_REGION", "assess", "koreacentral"),
     Spec("ASSESS_WORD_SCORE", "assess", "60", number=(0, 100)),
     Spec("ASSESS_BREAK_CONFIDENCE", "assess", "0.75", number=(0, 1)),
@@ -102,7 +117,7 @@ SPECS: tuple[Spec, ...] = (
     Spec("EXAMPLE_MODEL", "claude", "opus", suggestions=CLAUDE_MODELS),
     Spec("EXAMPLE_EFFORT", "claude", "low", choices=EFFORTS),
     Spec("IMAGE_PROVIDER", "images", "openrouter", choices=IMAGE_PROVIDERS),
-    Spec("IMAGE_MODEL", "images", suggestions=IMAGE_MODELS),
+    Spec("IMAGE_MODEL", "images", follows="IMAGE_PROVIDER", variants=variants(IMAGE_MODELS)),
     Spec("IMAGE_STYLE", "images", "photo", choices=tuple(STYLES), labels=STYLE_LABELS),
     Spec("SUMMARY_MODEL", "text", "gpt-5.6-luna"),
 )
@@ -131,20 +146,6 @@ def validate(values: Mapping[str, str]) -> None:
                 raise InvalidSetting(f"{key} must be between {lo:g} and {hi:g}")
 
 
-@dataclass(frozen=True)
-class Field:
-    """One setting as the modal sees it: the effective value, secrets masked."""
-
-    key: str
-    group: Group
-    value: str
-    secret: bool
-    default: str
-    choices: tuple[str, ...] | None
-    suggestions: tuple[str, ...]
-    labels: dict[str, str]
-
-
 class Settings:
     """Saved values first, then the environment, then the code default. Blank env values count as unset."""
 
@@ -157,30 +158,25 @@ class Settings:
             return self._saved[key]
         return self._env.get(key) or SPEC_BY_KEY[key].default
 
-    def fields(self) -> list[Field]:
-        return [
-            Field(
-                key=spec.key,
-                group=spec.group,
-                value=mask(self.get(spec.key)) if spec.secret else self.get(spec.key),
-                secret=spec.secret,
-                default=spec.default,
-                choices=spec.choices,
-                suggestions=spec.suggestions,
-                labels=dict(spec.labels or {}),
-            )
-            for spec in SPECS
-        ]
+    def effective(self, key: str) -> str:
+        """The value a service uses: a blank field that follows another takes that value's default."""
+        spec = SPEC_BY_KEY[key]
+        value = self.get(key)
+        if not value and spec.variants:
+            variant = spec.variants.get(self.get(spec.follows or ""))
+            return variant.default if variant else ""
+        return value
+
+    def shown(self, key: str) -> str:
+        """The value for the modal: secrets masked."""
+        value = self.get(key)
+        return mask(value) if SPEC_BY_KEY[key].secret else value
 
     # Typed accessors for the places that build services.
 
     @property
     def voice_model(self) -> str:
-        """The chosen model, or the provider's default when the field is blank."""
-        chosen = self.get("VOICE_MODEL")
-        if chosen:
-            return chosen
-        return GEMINI_VOICE_MODEL if self.get("VOICE_PROVIDER") == "gemini" else OPENAI_VOICE_MODEL
+        return self.effective("VOICE_MODEL")
 
     @property
     def voice_thinking(self) -> str | None:

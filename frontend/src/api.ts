@@ -1,6 +1,5 @@
 import type { JobStatus } from './lib/progress'
 import type {
-  ApiKeyName,
   Ask,
   AssessorSession,
   Correction,
@@ -59,7 +58,7 @@ export const api = {
   putSettings: (values: SettingsUpdate) =>
     request<SettingsView>('/api/settings', { method: 'PUT', body: JSON.stringify({ values }) }),
   /** One authenticated call to the provider with the typed key, or the saved one when blank. */
-  testKey: (key: ApiKeyName, value: string) =>
+  testKey: (key: string, value: string) =>
     request<KeyTestResult>('/api/settings/test-key', { method: 'POST', body: JSON.stringify({ key, value }) }),
   /** Which voice provider a round will land on, read right before opening one. */
   voiceProvider: async (): Promise<VoiceProvider> => {

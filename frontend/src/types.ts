@@ -51,11 +51,10 @@ export interface SessionContent {
   vocabulary: VocabularyItem[]
 }
 
-export type Category = 'cs' | 'ie' | 'ai' | 'literature' | 'history' | 'world' | 'korea' | 'research' | 'news'
-
 export interface Topic {
   text: string
-  category: Category
+  /** A category id; its name comes with the listing's `labels`. */
+  category: string
 }
 
 /** Phrases and words starred in a session. */
@@ -70,6 +69,8 @@ export interface TopicListing {
   pending: boolean
   /** Why the last news fetch brought nothing, or null once one succeeds. */
   error: string | null
+  /** Every category's name, in the order the key lists them. */
+  labels: Record<string, string>
 }
 
 export interface SessionSummary {
@@ -103,12 +104,15 @@ interface GeminiLiveSession {
 export type LiveSession = OpenAILiveSession | GeminiLiveSession
 export type VoiceProvider = LiveSession['provider']
 
-export type SettingGroup = 'keys' | 'voice' | 'assess' | 'claude' | 'text' | 'images'
-
 /** One runtime setting, its effective value; secrets come masked. */
+export interface SettingVariant {
+  default: string
+  suggestions: string[]
+}
+
 export interface SettingField {
   key: string
-  group: SettingGroup
+  group: string
   value: string
   secret: boolean
   default: string
@@ -118,6 +122,18 @@ export interface SettingField {
   suggestions: string[]
   /** A short description per choice, shown in the menu. */
   labels: Record<string, string>
+  /** A Test button can check this key. */
+  testable: boolean
+  /** The setting whose current value picks one of `variants` (its default and menu). */
+  follows: string | null
+  variants: Record<string, SettingVariant>
+  /** [key, value]: the field only shows while that setting holds that value. */
+  shown_when: [string, string] | null
+}
+
+export interface SettingGroup {
+  id: string
+  title: string
 }
 
 /** What the redraw menu shows: style keys with their labels, and the one Settings holds. */
@@ -128,18 +144,11 @@ export interface PictureStyles {
 }
 
 export interface SettingsView {
+  groups: SettingGroup[]
   fields: SettingField[]
 }
 
 export type SettingsUpdate = Record<string, string>
-
-export type ApiKeyName =
-  | 'OPENAI_API_KEY'
-  | 'GEMINI_API_KEY'
-  | 'AZURE_SPEECH_KEY'
-  | 'OPENROUTER_API_KEY'
-  | 'COMFY_API_KEY'
-  | 'FIRECRAWL_API_KEY'
 
 export interface KeyTestResult {
   ok: boolean

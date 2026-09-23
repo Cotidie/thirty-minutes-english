@@ -10,7 +10,7 @@ import './HomePage.css'
 
 export function HomePage() {
   const navigate = useNavigate()
-  const { topics, pending, error: topicError, refresh } = useTopics()
+  const { topics, labels: topicLabels, pending, error: topicError, refresh } = useTopics()
   const open = useCallback((sessionId: number) => navigate(`/s/${sessionId}`), [navigate])
   const { job, running: busy, error, start: generate } = useGenerationJob(open)
   const [sessions, setSessions] = useState<SessionSummary[]>([])
@@ -30,12 +30,13 @@ export function HomePage() {
       <header className="home-header">
         <h1 className="brand">Thirty minutes of English</h1>
         <p className="lede">
-          Six expressions, one short article, twelve words. Everything you two need to talk for half an hour.
+          A few expressions, one short article, and the words around it. Everything you two need to talk for half an hour.
         </p>
       </header>
 
       <TopicPicker
         suggestions={topics}
+        labels={topicLabels}
         pending={pending}
         error={topicError}
         busy={busy}

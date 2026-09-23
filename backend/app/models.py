@@ -19,6 +19,20 @@ class Category(StrEnum):
     NEWS = "news"
 
 
+# What each category is called in the key under the chips, in the order the key lists them.
+CATEGORY_LABELS: dict[Category, str] = {
+    Category.NEWS: "In the news",
+    Category.KOREA: "Korea",
+    Category.RESEARCH: "Research",
+    Category.CS: "Computer science",
+    Category.IE: "Industrial engineering",
+    Category.AI: "AI",
+    Category.LITERATURE: "Literature",
+    Category.HISTORY: "History",
+    Category.WORLD: "World",
+}
+
+
 class Topic(BaseModel):
     model_config = ConfigDict(frozen=True)
 
@@ -113,6 +127,7 @@ class TopicListing(BaseModel):
     topics: list[Topic]
     pending: bool
     error: str | None = None
+    labels: dict[Category, str] = CATEGORY_LABELS
 
 
 class ExampleFeedback(BaseModel):

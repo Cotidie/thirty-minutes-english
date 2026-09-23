@@ -2,6 +2,7 @@
 settings change can rebuild it all without a restart."""
 
 import logging
+from collections.abc import Mapping
 from dataclasses import dataclass, field
 from pathlib import Path
 
@@ -25,7 +26,12 @@ from app.voice.live import (
 
 log = logging.getLogger(__name__)
 
-AGENT_NAMES = ("read-aloud", "phrase", "example")
+# Each coach: the env var that points at its definition folder, and the folder next to this app by default.
+AGENTS: dict[str, tuple[str, str]] = {
+    "read-aloud": ("READ_ALOUD_AGENT_DIR", "read-aloud-coach"),
+    "phrase": ("PHRASE_AGENT_DIR", "phrase-coach"),
+    "example": ("EXAMPLE_AGENT_DIR", "example-coach"),
+}
 
 
 @dataclass
@@ -40,6 +46,10 @@ class Services:
     phrasing: PhrasingMarker | None = None
     assessor: AzureAssessor | None = None
     voice_key_name: str = "OPENAI_API_KEY"
+
+
+def agent_dirs(env: Mapping[str, str], apps_dir: Path) -> dict[str, Path]:
+    return {name: Path(env.get(var) or apps_dir / folder) for name, (var, folder) in AGENTS.items()}
 
 
 def build_services(settings: Settings, agent_dirs: dict[str, Path], image_dir: Path | None = None) -> Services:
@@ -92,7 +102,7 @@ def _live_agents(settings: Settings, agent_dirs: dict[str, Path]) -> dict[str, L
     if provider is None:
         return {}
     agents = {}
-    for name in AGENT_NAMES:
+    for name in AGENTS:
         agent_dir = agent_dirs[name]
         if (agent_dir / "session.json").is_file():
             agents[name] = LiveAgent(name, AgentDefinition(agent_dir), provider)

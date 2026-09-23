@@ -70,22 +70,17 @@ def settings_client(tmp_path, env, rebuild=None):
     return TestClient(app)
 
 
-def test_get_masks_secrets(tmp_path):
+def test_get_masks_secrets_and_carries_the_rules_the_modal_applies(tmp_path):
     with settings_client(tmp_path, {"OPENAI_API_KEY": "sk-openai-1234", "CLAUDE_MODEL": "sonnet"}) as c:
-        fields = {f["key"]: f for f in c.get("/api/settings").json()["fields"]}
-    assert fields["OPENAI_API_KEY"] == {
-        "key": "OPENAI_API_KEY",
-        "group": "keys",
-        "value": "…1234",
-        "secret": True,
-        "default": "",
-        "choices": None,
-        "suggestions": [],
-        "labels": {},
-    }
-    assert fields["CLAUDE_MODEL"]["value"] == "sonnet"
-    assert fields["VOICE_NAME"]["choices"][:2] == ["Zephyr", "Puck"]
-    assert fields["VOICE_NAME"]["labels"]["Kore"] == "Firm"
+        view = c.get("/api/settings").json()
+    fields = {f["key"]: f for f in view["fields"]}
+    assert fields["OPENAI_API_KEY"]["value"] == "…1234" and fields["OPENAI_API_KEY"]["testable"] is True
+    assert fields["CLAUDE_MODEL"]["value"] == "sonnet" and fields["CLAUDE_MODEL"]["testable"] is False
+    model = fields["VOICE_MODEL"]
+    assert model["follows"] == "VOICE_PROVIDER"
+    assert model["variants"]["gemini"]["default"] == model["variants"]["gemini"]["suggestions"][0]
+    assert fields["VOICE_NAME"]["shown_when"] == ["VOICE_PROVIDER", "gemini"]
+    assert {f["group"] for f in view["fields"]} == {g["id"] for g in view["groups"]}
 
 
 def test_put_stores_overrides_and_rebuilds_services(tmp_path):

@@ -5,17 +5,36 @@ from app.api.schemas import (
     KeyTestRequest,
     KeyTestResult,
     SettingField,
+    SettingGroup,
     SettingsUpdate,
     SettingsView,
+    Variant,
 )
-from app.config.keycheck import check_key
-from app.config.settings import InvalidSetting, Settings
+from app.config.keycheck import KEYS, check_key
+from app.config.settings import GROUPS, SPECS, InvalidSetting, Settings
 
 router = APIRouter(prefix="/api/settings")
 
 
 def view(settings: Settings) -> SettingsView:
-    return SettingsView(fields=[SettingField(**vars(f)) for f in settings.fields()])
+    fields = [
+        SettingField(
+            key=spec.key,
+            group=spec.group,
+            value=settings.shown(spec.key),
+            secret=spec.secret,
+            default=spec.default,
+            choices=list(spec.choices) if spec.choices else None,
+            suggestions=list(spec.suggestions),
+            labels=dict(spec.labels or {}),
+            testable=spec.key in KEYS,
+            follows=spec.follows,
+            variants={value: Variant(default=v.default, suggestions=list(v.suggestions)) for value, v in (spec.variants or {}).items()},
+            shown_when=spec.shown_when,
+        )
+        for spec in SPECS
+    ]
+    return SettingsView(groups=[SettingGroup(id=g, title=title) for g, title in GROUPS.items()], fields=fields)
 
 
 @router.get("", response_model=SettingsView)
@@ -40,6 +59,8 @@ def put_settings(body: SettingsUpdate, db: Db, request: Request) -> SettingsView
 @router.post("/test-key", response_model=KeyTestResult)
 def test_key(body: KeyTestRequest, settings: CurrentSettings) -> KeyTestResult:
     """`value` is what is typed in the modal; blank tries the saved key."""
+    if body.key not in KEYS:
+        raise HTTPException(status_code=422, detail=f"{body.key} has no key check")
     key = body.value.strip() or settings.get(body.key)
     result = check_key(body.key, key, region=settings.get("AZURE_SPEECH_REGION"))
     return KeyTestResult(ok=result.ok, message=result.message)

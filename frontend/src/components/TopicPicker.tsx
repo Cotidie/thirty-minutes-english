@@ -1,9 +1,11 @@
 import { useState } from 'react'
-import type { Category, Topic } from '../types'
+import type { Topic } from '../types'
 import './TopicPicker.css'
 
 interface Props {
   suggestions: Topic[]
+  /** Category names in key order; colour carries the category, so the key names each colour. */
+  labels: Record<string, string>
   /** The news half is still on its way; the list may change under you. */
   pending: boolean
   /** Why the news half is missing, when the last fetch failed. */
@@ -13,26 +15,11 @@ interface Props {
   onRefresh: () => void
 }
 
-/** Colour carries the category, so the key names what each colour means. */
-const CATEGORY_LABELS: Record<Category, string> = {
-  news: 'In the news',
-  cs: 'Computer science',
-  ie: 'Industrial engineering',
-  ai: 'AI',
-  literature: 'Literature',
-  history: 'History',
-  world: 'World',
-  korea: 'Korea',
-  research: 'Research',
-}
-
-const CATEGORY_ORDER: Category[] = ['news', 'korea', 'research', 'cs', 'ie', 'ai', 'literature', 'history', 'world']
-
-export function TopicPicker({ suggestions, pending, error, busy, onGenerate, onRefresh }: Props) {
+export function TopicPicker({ suggestions, labels, pending, error, busy, onGenerate, onRefresh }: Props) {
   const [topic, setTopic] = useState('')
   // The server decides how many the day offers, and in what order.
   const shown = suggestions
-  const legend = CATEGORY_ORDER.filter((c) => shown.some((s) => s.category === c))
+  const legend = Object.keys(labels).filter((c) => shown.some((s) => s.category === c))
 
   return (
     <form
@@ -96,7 +83,7 @@ export function TopicPicker({ suggestions, pending, error, busy, onGenerate, onR
           <ul className="chip-key" aria-label="Topic categories">
             {legend.map((c) => (
               <li key={c} data-category={c}>
-                {CATEGORY_LABELS[c]}
+                {labels[c]}
               </li>
             ))}
           </ul>

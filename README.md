@@ -15,7 +15,7 @@ docker compose up -d --build
 
 홈 화면 추천 주제 12개는 하루 단위로 바뀐다. 3개는 그날 뉴스에서 새로 뽑고(`FRESH_COUNT`), 9개는 고정 풀에서 날짜를 씨앗으로 고른다(`POOL_COUNT`). 고정 풀은 8개 카테고리(컴퓨터과학 · 산업공학 · AI · 문학 · 세계사 · 세계 이슈 · 한국 · 연구 생활, 각 40개 이상)이고, 하루치는 카테고리를 한 바퀴 돌며 하나씩 뽑으므로 세 전공 카테고리가 매일 최소 하나씩 나온다. 같은 날에는 몇 번을 새로고침해도 같은 12개가 나오고, 자정을 넘기면 바뀐다. 라벨 옆 `↻`를 누르면 그 자리에서 다시 뽑는다: 고정 풀 9개는 바로 새 조합으로 바뀌고, 뉴스 3개는 백그라운드로 다시 가져오는 동안 이전 목록이 남아 있다가 도착하면 바뀐다(`POST /api/topics/refresh`).
 
-주제마다 카테고리(`news` · `korea` · `research` · `cs` · `ie` · `ai` · `literature` · `history` · `world`)가 붙어 `/api/topics`에 `{text, category}`로 내려간다. 칩 색은 카테고리별로 다르고, 칩 아래 범례가 그날 나온 카테고리만 이름으로 보여준다. 색 정의는 `frontend/src/components/TopicPicker.css`의 `[data-category=...]` 규칙에 모여 있다.
+주제마다 카테고리(`news` · `korea` · `research` · `cs` · `ie` · `ai` · `literature` · `history` · `world`)가 붙어 `/api/topics`에 `{text, category}`로 내려간다. 칩 색은 카테고리별로 다르고, 칩 아래 범례가 그날 나온 카테고리만 이름으로 보여준다. 카테고리 이름과 범례 순서는 `backend/app/models.py`의 `CATEGORY_LABELS`가 정하고 `/api/topics`의 `labels`로 내려간다. 색 정의만 `frontend/src/components/TopicPicker.css`의 `[data-category=...]` 규칙에 있다.
 
 뉴스 3개는 그날 처음 `/api/topics`를 호출할 때 백그라운드로 Claude(Agent SDK)를 한 번 돌려 받아 `topic_days` 테이블에 저장한다(하루 1회). 주요 외신 1면·톱 수준으로 크게 다뤄진 기사만 받는다(독립된 주요 매체 2곳 이상이 비중 있게 다룬 것이 기준). 3개 중 1개는 한국 기사로, 영문 국내 매체(연합뉴스, 코리아헤럴드, 중앙데일리, 코리아타임스) 톱 기준으로 고른다(`KOREA_COUNT`). 칩 문구는 다른 풀과 맞춰 7단어 이하 명사구로 받고, 의문사로 시작하는 문장은 금지한다. 웹 검색이 막혔거나 기준을 넘은 기사가 없으면 빈 목록을 돌려받고, 그날치를 저장하지 않아 다음 요청에서 다시 시도한다. 도착 전이나 실패했을 때는 12개 전부 고정 풀에서 채우므로 화면이 비지 않는다. `pending`은 백그라운드 fetch가 실제로 도는 동안만 참이다(실패하면 바로 거짓, 다음 페이지 로드에서 재시도). 프론트는 `pending`이 참인 동안 15초 간격으로 최대 3분간 다시 물어보고, 그 뒤엔 새로고침 버튼을 다시 연다. fetch가 실패하면 `error`에 이유(SDK 오류 메시지, 또는 검색 결과 없음)가 실려 오고, 홈 화면의 Today's topic 아래에 그대로 표시된다. 표현 5개는 주제와 무관한 B2~C1+ 범용 표현이고, 어휘 10개는 주제 연관 단어로 아티클 밖에서도 고른다. 최근 40세션에서 이미 나온 표현·단어는 프롬프트에 넣지 않고, 생성 중에 모델이 부르는 in-process 도구 `check_items`(`generation/generator.py`)가 들고 있다. 모델은 고른 항목을 이 도구로 확인하고 이미 나온 것(관사·대명사만 다른 변형 포함, `generation/exclusions.py`의 `key`)을 바꾼다. 각 항목은 10% 확률로 목록에서 빠져 가끔 다시 나올 수 있다(`generation/jobs.py`의 `JobRunner.REPEAT_ALLOWANCE`).
 
@@ -73,7 +73,7 @@ OpenAI 모델은 OpenRouter 표기(`openai/gpt-image-2.5-flare`)로 적으면 co
 
 ## 설정 모달
 
-모든 페이지 우상단 ⚙(단축키 `,`)가 위 표의 환경변수를 전부 편집하는 모달을 연다(`DB_PATH`, `*_AGENT_DIR`, `FRONTEND_PORT`, `CLAUDE_CODE_OAUTH_TOKEN`처럼 재시작이 필요한 인프라 값은 제외). `.env`는 초기값일 뿐이고, 모달에서 저장한 값은 `PUT /api/settings`로 SQLite `settings` 테이블에 남아 그 뒤로는 그 값이 쓰인다(컨테이너를 다시 만들어도 `backend/data`에 남는다). 저장 직후 backend가 생성기·주제 소스·음성 코치·추출기를 다시 조립하므로 재시작 없이 다음 라운드부터 바뀐 provider와 모델이 쓰인다. API 키는 마스킹(`…끝 4자`)으로만 내려오고 입력칸을 비워 두면 그대로 유지된다. 키 칸 옆 `Test`는 `POST /api/settings/test-key`로 그 provider의 모델 목록을 한 번 조회해 키가 통하는지 바로 보여 준다(입력칸이 비어 있으면 저장된 키를 시험한다).
+모든 페이지 우상단 ⚙(단축키 `,`)가 위 표의 환경변수를 전부 편집하는 모달을 연다(`DB_PATH`, `*_AGENT_DIR`, `FRONTEND_PORT`, `CLAUDE_CODE_OAUTH_TOKEN`처럼 재시작이 필요한 인프라 값은 제외). 모달은 그리는 규칙을 전부 `GET /api/settings`에서 받는다: 그룹과 제목(`groups`), 필드마다 `testable`(Test 버튼), `follows`와 `variants`(다른 설정 값에 따라 바뀌는 기본값과 메뉴, 예: `VOICE_MODEL`은 `VOICE_PROVIDER`를 따른다), `shown_when`(그 값일 때만 보임). 원본은 `backend/app/config/settings.py`의 `SPECS` 하나다. `.env`는 초기값일 뿐이고(`compose.yaml`이 `env_file`로 통째로 넘긴다), 모달에서 저장한 값은 `PUT /api/settings`로 SQLite `settings` 테이블에 남아 그 뒤로는 그 값이 쓰인다(컨테이너를 다시 만들어도 `backend/data`에 남는다). 저장 직후 backend가 생성기·주제 소스·음성 코치·추출기를 다시 조립하므로 재시작 없이 다음 라운드부터 바뀐 provider와 모델이 쓰인다. API 키는 마스킹(`…끝 4자`)으로만 내려오고 입력칸을 비워 두면 그대로 유지된다. 키 칸 옆 `Test`는 `POST /api/settings/test-key`로 그 provider의 모델 목록을 한 번 조회해 키가 통하는지 바로 보여 준다(입력칸이 비어 있으면 저장된 키를 시험한다).
 
 ## 음성 코치 provider (GPT-Live / Gemini Live)
 
@@ -148,6 +148,17 @@ Read aloud 라운드는 코치가 한마디라도 했으면 끝날 때 자동으
 ## 스타일
 
 컴포넌트마다 같은 이름의 `.css`를 옆에 두고 그 컴포넌트가 import한다(`VocabularyTab.tsx` → `VocabularyTab.css`). 색·글꼴 토큰, reset, `.btn`은 `src/styles/base.css` 하나에 있고 `main.tsx`가 가장 먼저 읽는다. Ask와 Your turn/Practice가 같이 쓰는 라운드 쪽지는 `Slip`, Summary와 Asks의 카드는 `AskCard` 컴포넌트다.
+
+## 추가·변경 방법
+
+| 바꾸는 것 | 고치는 곳 |
+|---|---|
+| 설정 하나(키, 모델, provider) | `backend/app/config/settings.py`의 `SPECS`에 `Spec` 한 줄. 모달, 검증, 기본값이 따라온다. 서비스에서 쓰려면 `wiring.py`에서 `settings.get(...)` |
+| API 키의 Test | `backend/app/config/keycheck.py`의 `GETS`(REST GET 하나로 확인되면) 또는 `check_key`의 분기 |
+| 모델 목록·provider 기본값 | 같은 파일의 `VOICE_MODELS`, `IMAGE_MODELS`(목록 첫 항목이 기본값). 이미지 provider 자체는 `pictures/painters.py`의 `DEFAULT_MODEL`과 `painter_for` |
+| 그림 스타일 | `pictures/illustrator.py`의 `STYLES`, `STYLE_LABELS`. redraw 메뉴와 설정 모달이 따라온다 |
+| 주제 카테고리 | `models.py`의 `Category`와 `CATEGORY_LABELS`, `topics/pool.py`의 `TEXTS`에 주제 목록. 칩 색은 `TopicPicker.css` |
+| 음성 코치 에이전트 | `wiring.py`의 `AGENTS`(이름, 폴더 환경변수, 기본 폴더), 그리고 그 코치를 여는 라우트(`api/coaches.py`) |
 
 ## 백엔드 구조
 

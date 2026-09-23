@@ -23,7 +23,7 @@ const running: JobStatus = {
 }
 
 beforeEach(() => {
-  vi.mocked(api.topics).mockResolvedValue({ topics: [], pending: false, error: null })
+  vi.mocked(api.topics).mockResolvedValue({ topics: [], pending: false, error: null, labels: {} })
   vi.mocked(api.listSessions).mockResolvedValue([])
   vi.mocked(api.getJob).mockResolvedValue(running)
 })

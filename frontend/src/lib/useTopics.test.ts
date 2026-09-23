@@ -18,7 +18,7 @@ afterEach(() => {
 
 describe('useTopics', () => {
   it('keeps asking while the news half is pending, then stops', async () => {
-    vi.mocked(api.topics).mockResolvedValueOnce({ topics: pool, pending: true, error: null }).mockResolvedValue({ topics: news, pending: false, error: null })
+    vi.mocked(api.topics).mockResolvedValueOnce({ topics: pool, pending: true, error: null, labels: {} }).mockResolvedValue({ topics: news, pending: false, error: null, labels: {} })
     const { result } = renderHook(() => useTopics())
     await waitFor(() => expect(result.current.pending).toBe(true))
 
@@ -31,13 +31,13 @@ describe('useTopics', () => {
   })
 
   it('refresh deals a new list and polls again until it lands', async () => {
-    vi.mocked(api.topics).mockResolvedValue({ topics: news, pending: false, error: null })
+    vi.mocked(api.topics).mockResolvedValue({ topics: news, pending: false, error: null, labels: {} })
     const later: Topic[] = [{ text: 'A newer story', category: 'news' }, ...pool]
-    vi.mocked(api.refreshTopics).mockResolvedValue({ topics: news, pending: true, error: null })
+    vi.mocked(api.refreshTopics).mockResolvedValue({ topics: news, pending: true, error: null, labels: {} })
     const { result } = renderHook(() => useTopics())
     await waitFor(() => expect(result.current.topics).toEqual(news))
 
-    vi.mocked(api.topics).mockResolvedValue({ topics: later, pending: false, error: null })
+    vi.mocked(api.topics).mockResolvedValue({ topics: later, pending: false, error: null, labels: {} })
     await act(async () => {
       result.current.refresh()
     })
@@ -50,7 +50,7 @@ describe('useTopics', () => {
   })
 
   it('gives up after the poll limit so the refresh button comes back', async () => {
-    vi.mocked(api.topics).mockResolvedValue({ topics: pool, pending: true, error: null })
+    vi.mocked(api.topics).mockResolvedValue({ topics: pool, pending: true, error: null, labels: {} })
     const { result } = renderHook(() => useTopics())
     await waitFor(() => expect(result.current.pending).toBe(true))
 
@@ -64,7 +64,7 @@ describe('useTopics', () => {
   })
 
   it('passes on why the news half is missing', async () => {
-    vi.mocked(api.topics).mockResolvedValue({ topics: pool, pending: false, error: 'claude exited 1' })
+    vi.mocked(api.topics).mockResolvedValue({ topics: pool, pending: false, error: 'claude exited 1', labels: {} })
     const { result } = renderHook(() => useTopics())
     await waitFor(() => expect(result.current.error).toBe('claude exited 1'))
     expect(result.current.pending).toBe(false)

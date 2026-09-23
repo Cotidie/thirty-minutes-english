@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { api } from '../api'
-import type { ApiKeyName, KeyTestResult, SettingField, SettingGroup, SettingsUpdate } from '../types'
+import type { KeyTestResult, SettingField, SettingGroup, SettingsUpdate } from '../types'
 import './SettingsModal.css'
 
 interface Props {
@@ -8,29 +8,9 @@ interface Props {
   onClose: () => void
 }
 
-const GROUP_TITLE: Record<SettingGroup, string> = {
-  keys: 'API keys',
-  voice: 'Voice coach',
-  assess: 'Read aloud assessor',
-  claude: 'Claude generation',
-  text: 'Summary text model',
-  images: 'Vocabulary pictures',
-}
-
-const PROVIDER_MODEL_DEFAULT: Record<string, string> = {
-  openai: 'gpt-live-1',
-  gemini: 'gemini-3.8-live-extended-thinking',
-}
-const IMAGE_MODEL_DEFAULT: Record<string, string> = {
-  openrouter: 'google/gemini-3-pro-image',
-  comfy: 'vertexai/nano-banana-pro',
-  off: '',
-}
-
-/** A model field shows its provider's default; a secret shows its masked value. */
-function placeholderFor(f: SettingField, voiceProvider: string, imageProvider: string): string {
-  if (f.key === 'VOICE_MODEL') return PROVIDER_MODEL_DEFAULT[voiceProvider] ?? ''
-  if (f.key === 'IMAGE_MODEL') return IMAGE_MODEL_DEFAULT[imageProvider] ?? ''
+/** A field that follows another shows that value's default; a secret shows its masked value. */
+function placeholderFor(f: SettingField, draft: Record<string, string>): string {
+  if (f.follows) return f.variants[draft[f.follows]]?.default ?? ''
   return f.secret ? f.value || 'not set' : f.default
 }
 
@@ -43,6 +23,7 @@ function placeholderFor(f: SettingField, voiceProvider: string, imageProvider: s
 export function SettingsModal({ open, onClose }: Props) {
   const dialogRef = useRef<HTMLDialogElement>(null)
   const [fields, setFields] = useState<SettingField[] | null>(null)
+  const [groups, setGroups] = useState<SettingGroup[]>([])
   const [draft, setDraft] = useState<Record<string, string>>({})
   const [saving, setSaving] = useState(false)
   const [keyTests, setKeyTests] = useState<Record<string, KeyTestResult | 'testing'>>({})
@@ -61,8 +42,9 @@ export function SettingsModal({ open, onClose }: Props) {
     setNotice(null)
     setKeyTests({})
     api.getSettings().then(
-      ({ fields }) => {
+      ({ groups, fields }) => {
         if (!live) return
+        setGroups(groups)
         setFields(fields)
         setDraft(Object.fromEntries(fields.map((f) => [f.key, f.secret ? '' : f.value])))
       },
@@ -73,8 +55,6 @@ export function SettingsModal({ open, onClose }: Props) {
     }
   }, [open])
 
-  const provider = draft.VOICE_PROVIDER ?? 'openai'
-  const effectiveModel = draft.VOICE_MODEL || PROVIDER_MODEL_DEFAULT[provider] || ''
   const changes = useMemo<SettingsUpdate>(() => {
     const update: SettingsUpdate = {}
     for (const f of fields ?? []) {
@@ -89,7 +69,7 @@ export function SettingsModal({ open, onClose }: Props) {
   }
 
   /** Tries the typed key, or the saved one when the field is blank. */
-  const testKey = async (key: ApiKeyName) => {
+  const testKey = async (key: string) => {
     setKeyTests((t) => ({ ...t, [key]: 'testing' }))
     try {
       const result = await api.testKey(key, draft[key] ?? '')
@@ -114,21 +94,9 @@ export function SettingsModal({ open, onClose }: Props) {
     }
   }
 
-  const visible = (f: SettingField): boolean => {
-    if (f.key === 'VOICE_NAME') return provider === 'gemini'
-    if (f.key === 'VOICE_THINKING') return effectiveModel.endsWith('-extended-thinking')
-    return true
-  }
-
-  const suggestionsFor = (f: SettingField): string[] => {
-    if (f.key !== 'VOICE_MODEL') return f.suggestions
-    return f.suggestions.filter((m) => (provider === 'gemini' ? m.startsWith('gemini') : !m.startsWith('gemini')))
-  }
-
-  const groups = (['keys', 'voice', 'assess', 'claude', 'text', 'images'] as const).map((g) => ({
-    group: g,
-    fields: (fields ?? []).filter((f) => f.group === g && visible(f)),
-  }))
+  const visible = (f: SettingField): boolean => !f.shown_when || draft[f.shown_when[0]] === f.shown_when[1]
+  const suggestionsFor = (f: SettingField): string[] =>
+    f.follows ? (f.variants[draft[f.follows]]?.suggestions ?? []) : f.suggestions
 
   return (
     <dialog ref={dialogRef} className="settings" aria-label="Settings" onClose={onClose}>
@@ -147,10 +115,10 @@ export function SettingsModal({ open, onClose }: Props) {
         {fields === null ? (
           <p className="settings-loading">{notice?.kind === 'error' ? notice.text : 'Loading…'}</p>
         ) : (
-          groups.map(({ group, fields }) => (
-            <fieldset key={group} className="settings-group">
-              <legend>{GROUP_TITLE[group]}</legend>
-              {fields.map((f) => (
+          groups.map((group) => (
+            <fieldset key={group.id} className="settings-group">
+              <legend>{group.title}</legend>
+              {fields.filter((f) => f.group === group.id && visible(f)).map((f) => (
                 <div key={f.key} className="settings-row">
                   <label htmlFor={`setting-${f.key}`}>
                     <code>{f.key}</code>
@@ -159,12 +127,10 @@ export function SettingsModal({ open, onClose }: Props) {
                     field={f}
                     value={draft[f.key] ?? ''}
                     suggestions={suggestionsFor(f)}
-                    placeholder={placeholderFor(f, provider, draft.IMAGE_PROVIDER ?? 'openrouter')}
+                    placeholder={placeholderFor(f, draft)}
                     onChange={(v) => edit(f.key, v)}
                   />
-                  {isApiKey(f.key) && (
-                    <KeyTest state={keyTests[f.key]} onTest={() => void testKey(f.key as ApiKeyName)} />
-                  )}
+                  {f.testable && <KeyTest state={keyTests[f.key]} onTest={() => void testKey(f.key)} />}
                 </div>
               ))}
             </fieldset>
@@ -183,17 +149,6 @@ export function SettingsModal({ open, onClose }: Props) {
     </dialog>
   )
 }
-
-const API_KEYS: readonly string[] = [
-  'OPENAI_API_KEY',
-  'GEMINI_API_KEY',
-  'AZURE_SPEECH_KEY',
-  'OPENROUTER_API_KEY',
-  'COMFY_API_KEY',
-  'FIRECRAWL_API_KEY',
-] satisfies ApiKeyName[]
-
-const isApiKey = (key: string): key is ApiKeyName => API_KEYS.includes(key)
 
 function KeyTest({ state, onTest }: { state: KeyTestResult | 'testing' | undefined; onTest: () => void }) {
   return (
