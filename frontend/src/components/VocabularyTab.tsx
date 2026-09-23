@@ -71,7 +71,7 @@ function SceneCaption({ caption, word }: { caption: string; word: string }) {
           setShown((s) => !s)
         }}
       >
-        <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden="true">
+        <svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.6" aria-hidden="true">
           <path d="M2 3.5h12v7H7l-3 2.5v-2.5H2z" strokeLinejoin="round" />
         </svg>
         {shown ? 'Hide' : 'Scene'}
@@ -86,7 +86,7 @@ function VocabCard({ item, drawing }: { item: VocabularyItem; drawing: boolean }
   return (
     <div className={`vocab-card${revealed ? ' is-revealed' : ''}`} onClick={() => setRevealed((r) => !r)}>
       {item.image && (
-        <span className="vocab-picture-frame">
+        <span className="vocab-picture-frame" style={{ '--picture': `url(/api/images/${item.image})` } as React.CSSProperties}>
           <img className={`vocab-picture${drawing ? ' is-drawing' : ''}`} src={`/api/images/${item.image}`} alt={item.scene ?? item.word} />
           {drawing ? <Drawing seconds={seconds} /> : item.caption && <SceneCaption key={item.image} caption={item.caption} word={item.word} />}
         </span>

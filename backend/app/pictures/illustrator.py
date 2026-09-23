@@ -33,7 +33,7 @@ STYLE_LABELS: dict[str, str] = {
 }
 # On every style: plenty to point at, and the learner has to supply the word, so the picture must not.
 IMAGE_RULES = (
-    "One coherent scene, rich in detail: a foreground, a background, several people or objects, "
+    "A landscape picture, 4:3. One coherent scene, rich in detail: a foreground, a background, several people or objects, "
     "and small props a viewer could point at. "
     "No text, letters, numbers, signs, or captions anywhere in the image."
 )
