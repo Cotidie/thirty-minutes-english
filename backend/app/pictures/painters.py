@@ -90,9 +90,12 @@ class OpenRouterPainter:
 
 
 class ComfyPainter:
-    """One batch for all the pictures (comfy draws them side by side), waited on, then the signed URLs fetched at once."""
+    """One batch for all the pictures, waited on, then the signed URLs fetched at once. comfy draws
+    as many side by side as the plan allows (Standard: one at a time) and keeps the batch across
+    connections, so a dropped connection reconnects and waits on, and a give-up keeps what is done."""
 
-    WAIT_ROUNDS = 20  # wait_for_batch returns after ~25 s each; about 8 minutes in all
+    WAIT_ROUNDS = 24  # wait_for_batch returns after ~25 s each; about 10 minutes in all
+    RECONNECTS = 2
 
     def __init__(self, server: McpHttp, model: str, fetch=None) -> None:
         self._server = server
@@ -108,20 +111,62 @@ class ComfyPainter:
             for i, p in enumerate(prompts)
         ]
         try:
-            async with self._server.session() as session:
-                submitted = payload(await session.call("submit_batch", {"client_os": "linux", "confirm": True, "items": items}))
-                batch_id, job_ids = submitted["batch_id"], submitted["job_ids"]
-                for _ in range(self.WAIT_ROUNDS):
-                    waited = payload(await session.call("wait_for_batch", {"batch_id": batch_id}))
-                    counter.reach(finished(waited))
-                    if not waited.get("timed_out"):
-                        break
-                outputs = payload(await session.call("get_batch_output", {"batch_id": batch_id, "client_os": "linux"}))
+            submitted = await self._call("submit_batch", {"client_os": "linux", "confirm": True, "items": items})
+            batch_id, job_ids = submitted["batch_id"], submitted["job_ids"]
         except (McpError, KeyError, TypeError) as e:
-            log.warning("comfy could not draw the pictures: %s", e)
+            log.warning("comfy could not take the batch: %s", e)
+            return [None] * len(prompts)
+        log.info("comfy batch %s: %d pictures", batch_id, len(job_ids))
+        try:
+            await self._wait(batch_id, counter)
+        except McpError as e:
+            log.warning("comfy batch %s: stopped waiting, keeping what is drawn: %s", batch_id, e)
+        except BaseException:
+            await self._cancel(batch_id, job_ids)
+            raise
+        try:
+            outputs = await self._call("get_batch_output", {"batch_id": batch_id, "client_os": "linux"})
+        except McpError as e:
+            log.warning("comfy batch %s: could not collect the pictures: %s", batch_id, e)
             return [None] * len(prompts)
         url_of = {o["job_id"]: o["url"] for o in outputs.get("outputs", []) if o.get("url")}
         return list(await asyncio.gather(*(self._fetch_or_none(url_of.get(job)) for job in job_ids)))
+
+    async def _wait(self, batch_id: str, counter: Counter) -> None:
+        """Until every picture is ready or failed, or the rounds run out; reconnects when the connection drops."""
+        rounds, reconnects = 0, 0
+        while rounds < self.WAIT_ROUNDS:
+            try:
+                async with self._server.session() as session:
+                    while rounds < self.WAIT_ROUNDS:
+                        rounds += 1
+                        waited = payload(await session.call("wait_for_batch", {"batch_id": batch_id}))
+                        counter.reach(finished(waited))
+                        if not waited.get("timed_out"):
+                            return
+                return
+            except McpError as e:
+                reconnects += 1
+                if reconnects > self.RECONNECTS:
+                    raise
+                log.warning("comfy batch %s: connection dropped, reconnecting: %s", batch_id, e)
+
+    async def _cancel(self, batch_id: str, job_ids: list[str]) -> None:
+        """Stops the pictures still queued so a cancelled session does not keep billing."""
+        try:
+            async with self._server.session() as session:
+                for job in job_ids:
+                    try:
+                        await session.call("cancel_job", {"prompt_id": job})
+                    except McpError:
+                        pass  # already finished
+            log.info("comfy batch %s: cancelled", batch_id)
+        except McpError as e:
+            log.warning("comfy batch %s: could not cancel: %s", batch_id, e)
+
+    async def _call(self, tool: str, arguments: dict):
+        async with self._server.session() as session:
+            return payload(await session.call(tool, arguments))
 
     def _model_fields(self) -> dict:
         """comfy names every OpenAI image model `openai/images-generations` and takes the variant

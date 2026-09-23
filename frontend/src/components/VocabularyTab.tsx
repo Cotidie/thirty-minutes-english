@@ -114,7 +114,7 @@ export function VocabularyTab({ items, sessionId, onPicture, starred, onToggleSt
       </p>
       <div className="vocab-grid">
         {items.map((item, index) => (
-          <div key={item.word} className="vocab-cell">
+          <div key={item.word} className={`vocab-cell${item.image ? '' : ' is-bare'}`}>
             <VocabCard item={item} drawing={drawing.has(index)} />
             <StarButton label={item.word} on={starred.includes(item.word)} onToggle={() => onToggleStar(item.word)} />
             {item.scene && (

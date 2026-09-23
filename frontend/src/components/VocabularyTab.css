@@ -63,6 +63,22 @@
   cursor: pointer;
 }
 
+/* No picture to sit on: the redraw button joins the star at the top right, clear of the word. */
+.vocab-cell.is-bare .vocab-redraw {
+  left: auto;
+  right: 3.7rem;
+}
+
+/* ...and the word line stops short of both, so its 한 chip stays visible. */
+.vocab-cell.is-bare .vocab-word {
+  padding-right: 4.6rem;
+}
+
+.vocab-cell.is-bare .vocab-styles {
+  left: auto;
+  right: 1.6rem;
+}
+
 .vocab-cell .vocab-redraw:hover:not(:disabled) {
   color: var(--ink);
 }

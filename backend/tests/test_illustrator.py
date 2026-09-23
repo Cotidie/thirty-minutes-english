@@ -231,3 +231,40 @@ def test_the_illustrator_reports_each_finished_picture(tmp_path):
 def test_a_batch_without_a_summary_is_counted_from_its_jobs():
     assert finished({"jobs": [{"state": "ready"}, {"state": "pending"}, {"state": "failed"}]}) == 2
     assert finished({"timed_out": True}) == 0
+
+
+async def fetch_ok(url):
+    return b"PNG" + url[-1].encode()
+
+
+def comfy_server(waits: list, outputs: list[str]) -> FakeServer:
+    return FakeServer({
+        "submit_batch": [text({"batch_id": "b1", "job_ids": ["j0", "j1"]})],
+        "wait_for_batch": waits,
+        "get_batch_output": [text({"outputs": [{"job_id": j, "url": f"https://x/{j[-1]}"} for j in outputs]})],
+        "cancel_job": [text("cancelled"), McpError("cancel_job: already finished")],
+    })
+
+
+def test_comfy_reconnects_when_the_connection_drops_and_waits_on():
+    server = comfy_server(
+        [McpError("dropped"), text({"timed_out": False, "summary": {"ready": 2}})], ["j0", "j1"]
+    )
+    assert ComfyPainter(server, "m", fetch=fetch_ok).paint(["a", "b"]) == [b"PNG0", b"PNG1"]
+    assert [c[0] for c in server.calls] == ["submit_batch", "wait_for_batch", "wait_for_batch", "get_batch_output"]
+
+
+def test_comfy_keeps_the_pictures_already_drawn_when_it_gives_up():
+    server = comfy_server([McpError("dropped")] * 3, ["j0"])
+    assert ComfyPainter(server, "m", fetch=fetch_ok).paint(["a", "b"]) == [b"PNG0", None]
+
+
+def test_a_cancel_during_the_wait_cancels_every_comfy_job():
+    server = comfy_server([text({"timed_out": True, "summary": {"ready": 0}})], [])
+
+    def cancel(_):
+        raise KeyError("cancelled")
+
+    with pytest.raises(KeyError):
+        ComfyPainter(server, "m", fetch=fetch_ok).paint(["a", "b"], cancel)
+    assert [c[1] for c in server.calls if c[0] == "cancel_job"] == [{"prompt_id": "j0"}, {"prompt_id": "j1"}]
