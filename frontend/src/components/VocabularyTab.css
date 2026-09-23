@@ -74,11 +74,6 @@
   padding-right: 4.6rem;
 }
 
-.vocab-cell.is-bare .vocab-styles {
-  left: auto;
-  right: 1.6rem;
-}
-
 .vocab-cell .vocab-redraw:hover:not(:disabled) {
   color: var(--ink);
 }
@@ -135,37 +130,41 @@
   }
 }
 
-/* The style menu under the redraw button. */
-.vocab-styles {
-  position: absolute;
-  top: 3.7rem;
-  left: 1.6rem;
-  z-index: 2;
-  margin: 0;
-  padding: 0.25rem;
-  list-style: none;
-  background: var(--paper);
-  border: 1px solid var(--line);
-  border-radius: 6px;
-  box-shadow: 0 4px 14px rgb(27 36 49 / 12%);
+/* The style every ↻ draws in, picked once above the cards. */
+.vocab-style-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.4rem;
+  margin: -1rem 0 1.5rem;
   font-family: var(--sans);
   font-size: 0.85rem;
 }
 
-.vocab-styles button {
-  display: block;
-  width: 100%;
-  border: 0;
-  background: transparent;
-  padding: 0.35rem 0.6rem;
-  text-align: left;
-  font: inherit;
-  cursor: pointer;
-  border-radius: 4px;
+.vocab-style-label {
+  margin-right: 0.3rem;
+  color: var(--muted);
 }
 
-.vocab-styles button:hover {
-  background: rgb(27 36 49 / 6%);
+.vocab-style {
+  min-height: 2.25rem;
+  padding: 0 0.85rem;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--paper);
+  color: var(--ink);
+  font: inherit;
+  cursor: pointer;
+}
+
+.vocab-style:hover {
+  border-color: var(--ink);
+}
+
+.vocab-style[aria-checked='true'] {
+  border-color: var(--ink);
+  background: var(--ink);
+  color: var(--paper);
 }
 
 .vocab-redraw-error {

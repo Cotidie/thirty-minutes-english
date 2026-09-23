@@ -28,7 +28,7 @@ const items = [
 ]
 
 describe('VocabularyTab', () => {
-  it('redraws one word in a chosen style from its menu and hands the new item up', async () => {
+  it('redraws one word at once in the style picked above the cards and hands the new item up', async () => {
     const drawn = [{ ...items[0], scene: 'phones on a train', image: 'a.png' }, items[1]]
     const fresh = { ...drawn[0], scene: 'phones at a dinner table', image: 'b.png' }
     vi.mocked(api.redrawPicture).mockResolvedValue(fresh)
@@ -36,13 +36,14 @@ describe('VocabularyTab', () => {
     render(<VocabularyTab items={drawn} sessionId={3} onPicture={onPicture} starred={[]} onToggleStar={vi.fn()} examples={none} onExample={vi.fn()} />)
 
     expect(screen.queryByRole('button', { name: 'New picture for mitigate' })).not.toBeInTheDocument() // no scene yet
+    expect(await screen.findByRole('radio', { name: 'photo' })).toHaveAttribute('aria-checked', 'true') // the configured style
     await userEvent.click(screen.getByRole('button', { name: 'New picture for ubiquitous' }))
-    const menu = await screen.findByRole('menu', { name: 'Picture style for ubiquitous' })
-    expect(menu).toHaveTextContent('photo (current)')
-    await userEvent.click(screen.getByRole('menuitem', { name: 'comic · comic panel' }))
-    expect(api.redrawPicture).toHaveBeenCalledWith(3, 0, 'comic')
+    expect(api.redrawPicture).toHaveBeenLastCalledWith(3, 0, 'photo')
+
+    await userEvent.click(screen.getByRole('radio', { name: 'comic panel' }))
+    await userEvent.click(screen.getByRole('button', { name: 'New picture for ubiquitous' }))
+    expect(api.redrawPicture).toHaveBeenLastCalledWith(3, 0, 'comic')
     expect(onPicture).toHaveBeenCalledWith(0, fresh)
-    expect(screen.queryByRole('menu')).not.toBeInTheDocument()
   })
 
   it('counts the seconds over the picture while a redraw is on its way', async () => {
@@ -52,7 +53,6 @@ describe('VocabularyTab', () => {
     vi.mocked(api.redrawPicture).mockReturnValue(new Promise((resolve) => (finish = resolve)))
     render(<VocabularyTab items={drawn} sessionId={3} onPicture={vi.fn()} starred={[]} onToggleStar={vi.fn()} examples={none} onExample={vi.fn()} />)
     await userEvent.click(screen.getByRole('button', { name: 'New picture for ubiquitous' }))
-    await userEvent.click(screen.getByRole('menuitem', { name: /comic/ }))
     expect(screen.getByRole('status')).toHaveTextContent('Drawing… 0s')
     await act(() => vi.advanceTimersByTimeAsync(2100))
     expect(screen.getByRole('status')).toHaveTextContent('Drawing… 2s')

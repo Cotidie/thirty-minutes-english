@@ -80,17 +80,22 @@ interface Props {
 export function VocabularyTab({ items, sessionId, onPicture, starred, onToggleStar, examples, onExample }: Props) {
   const [drawing, setDrawing] = useState<Set<number>>(new Set())
   const [failed, setFailed] = useState<Record<number, string>>({})
-  /** The cell whose style menu is open. */
-  const [menu, setMenu] = useState<number | null>(null)
   const [styles, setStyles] = useState<PictureStyles>({ current: '', options: [] })
+  /** The style every ↻ draws in; starts at the configured one, changes only this page. */
+  const [style, setStyle] = useState('')
 
   useEffect(() => {
-    api.pictureStyles().then(setStyles).catch(() => undefined)
+    api
+      .pictureStyles()
+      .then((s) => {
+        setStyles(s)
+        setStyle(s.current)
+      })
+      .catch(() => undefined)
   }, [])
 
-  /** A new scene and picture for one word, in place, in the chosen style. */
-  const redraw = async (index: number, style: string) => {
-    setMenu(null)
+  /** A new scene and picture for one word, in place, in the style picked above the cards. */
+  const redraw = async (index: number) => {
     setDrawing((d) => new Set(d).add(index))
     setFailed(({ [index]: _, ...rest }) => rest)
     try {
@@ -112,6 +117,24 @@ export function VocabularyTab({ items, sessionId, onPicture, starred, onToggleSt
         Take turns. Read the word and its sentence aloud, then explain in English what you think it means. Check only
         after both of you have tried.
       </p>
+      {styles.options.length > 0 && (
+        <div className="vocab-style-bar" role="radiogroup" aria-label="Style for new pictures">
+          <span className="vocab-style-label">↻ redraws in</span>
+          {styles.options.map((o) => (
+            <button
+              key={o.id}
+              type="button"
+              role="radio"
+              aria-checked={o.id === style}
+              title={o.description}
+              className="vocab-style"
+              onClick={() => setStyle(o.id)}
+            >
+              {o.description || o.id}
+            </button>
+          ))}
+        </div>
+      )}
       <div className="vocab-grid">
         {items.map((item, index) => (
           <div key={item.word} className={`vocab-cell${item.image ? '' : ' is-bare'}`}>
@@ -122,25 +145,12 @@ export function VocabularyTab({ items, sessionId, onPicture, starred, onToggleSt
                 type="button"
                 className="vocab-redraw"
                 aria-label={`New picture for ${item.word}`}
-                aria-expanded={menu === index}
-                title={drawing.has(index) ? 'Drawing…' : 'New scene, new picture'}
+                title={drawing.has(index) ? 'Drawing…' : `New scene, new picture${style ? ` (${style})` : ''}`}
                 disabled={drawing.has(index)}
-                onClick={() => setMenu(menu === index ? null : index)}
+                onClick={() => void redraw(index)}
               >
                 {drawing.has(index) ? '…' : '↻'}
               </button>
-            )}
-            {menu === index && (
-              <ul className="vocab-styles" role="menu" aria-label={`Picture style for ${item.word}`}>
-                {(styles.options.length > 0 ? styles.options : [{ id: '', description: '' }]).map((style) => (
-                  <li key={style.id}>
-                    <button type="button" role="menuitem" onClick={() => void redraw(index, style.id)}>
-                      {style.id ? [style.id, style.description].filter(Boolean).join(' · ') : 'Draw again'}
-                      {style.id && style.id === styles.current ? ' (current)' : ''}
-                    </button>
-                  </li>
-                ))}
-              </ul>
             )}
             {failed[index] && <p className="vocab-redraw-error">{failed[index]}</p>}
             <Practice
