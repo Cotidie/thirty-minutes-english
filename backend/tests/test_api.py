@@ -12,6 +12,7 @@ from app.llm import GenerationError
 from app.main import create_app
 from app.topics.pool import TOPICS
 from app.wiring import Services
+from app.pictures.scenes import Scene
 
 TOPIC_TEXTS = {t.text for t in TOPICS}
 from tests.conftest import sample_content
@@ -164,7 +165,7 @@ def test_a_session_still_goes_out_when_the_pictures_fail(tmp_path):
 
 class FakeSceneWriter:
     def write(self, item):
-        return f"another scene for {item.word}"
+        return Scene(f"another scene for {item.word}", f"why it is {item.word}")
 
 
 class RedrawingIllustrator(FakeIllustrator):
@@ -175,7 +176,7 @@ class RedrawingIllustrator(FakeIllustrator):
 
     def redraw(self, session_id, index, item, scene, style=""):
         self.styles.append(style)
-        return item.model_copy(update={"scene": scene, "image": f"{session_id}-{index}-new.png"})
+        return item.model_copy(update={"scene": scene.text, "caption": scene.caption, "image": f"{session_id}-{index}-new.png"})
 
     def discard(self, image):
         self.discarded.append(image)
@@ -189,7 +190,7 @@ def test_a_word_can_be_redrawn_in_a_chosen_style_and_the_session_keeps_it(tmp_pa
         sid = c.post("/api/sessions", json={"topic": "X"}).json()["session_id"]
         res = c.post(f"/api/sessions/{sid}/pictures/1", json={"style": "comic"})
         assert res.status_code == 200
-        assert res.json()["scene"] == "another scene for word1"
+        assert (res.json()["scene"], res.json()["caption"]) == ("another scene for word1", "why it is word1")
         assert res.json()["image"] == f"{sid}-1-new.png"
         assert c.get(f"/api/sessions/{sid}").json()["content"]["vocabulary"][1]["image"] == f"{sid}-1-new.png"
         assert c.post(f"/api/sessions/{sid}/pictures/99", json={}).status_code == 404

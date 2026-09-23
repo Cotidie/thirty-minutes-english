@@ -13,8 +13,15 @@ is there and what they are doing, and three or four supporting details a viewer 
 weather, time of day, what is going on in the background. Physical and specific ("a single toll booth open \
 on a wide highway at dusk, a line of cars backed up behind it, a driver leaning out of a window, a cyclist \
 slipping past on the shoulder"), never abstract, and nothing that needs written words in the picture"""
+# The line the learner opens over the picture when it is unclear why it shows the word.
+CAPTION_RULES = """one or two short sentences, at most 30 words, in plain B2 English, saying what is going on in the scene and why it shows the word; use the word itself, in the form the sentence needs"""
 
-SCENE_SCHEMA: dict = {"type": "object", "additionalProperties": False, "required": ["scene"], "properties": {"scene": {"type": "string"}}}
+SCENE_SCHEMA: dict = {
+    "type": "object",
+    "additionalProperties": False,
+    "required": ["scene", "caption"],
+    "properties": {"scene": {"type": "string"}, "caption": {"type": "string"}},
+}
 
 SCENE_PROMPT = """A learner will be shown a picture and asked to describe it in one sentence using this word:
 
@@ -23,6 +30,7 @@ Meaning: {definition}
 Example: {example}
 
 Write a new scene for the picture: {rules}.
+Then a caption for it: {caption_rules}.
 
 Start from this spark and build the scene around it; swap any part that does not fit the word, but keep \
 its flavour so the scene is fresh: {spark}.
@@ -54,6 +62,14 @@ TWISTS = (
 
 
 @dataclass(frozen=True)
+class Scene:
+    """What a picture shows (the image prompt) and the short line saying why it shows the word."""
+
+    text: str
+    caption: str
+
+
+@dataclass(frozen=True)
 class Spark:
     """A random starting point for a scene: where, when, and one thing that makes it a story."""
 
@@ -70,7 +86,7 @@ class Spark:
 
 
 class SceneWriter:
-    """A fresh scene for one word, from a short text run of the claude CLI seeded with a random Spark."""
+    """A fresh scene and its caption for one word, from a short text run of the claude CLI seeded with a random Spark."""
 
     def __init__(self, cli: Runner, rng: random.Random | None = None) -> None:
         self._cli = cli
@@ -83,13 +99,13 @@ class SceneWriter:
     def build_prompt(self, item: VocabularyItem, spark: Spark) -> str:
         return SCENE_PROMPT.format(
             word=item.word, pos=item.pos, definition=item.definition, example=item.example,
-            rules=SCENE_RULES, spark=spark, previous=item.scene or "none",
+            rules=SCENE_RULES, caption_rules=CAPTION_RULES, spark=spark, previous=item.scene or "none",
         )
 
-    def write(self, item: VocabularyItem) -> str:
-        """Raises GenerationError when the run fails or comes back blank."""
-        prompt = self.build_prompt(item, Spark.roll(self._rng))
-        scene = str(self._cli.run(prompt, SCENE_SCHEMA).get("scene", "")).strip()
-        if not scene:
+    def write(self, item: VocabularyItem) -> Scene:
+        """Raises GenerationError when the run fails or comes back without a scene."""
+        written = self._cli.run(self.build_prompt(item, Spark.roll(self._rng)), SCENE_SCHEMA)
+        scene = Scene(str(written.get("scene", "")).strip(), str(written.get("caption", "")).strip())
+        if not scene.text:
             raise GenerationError("the model wrote no scene")
         return scene

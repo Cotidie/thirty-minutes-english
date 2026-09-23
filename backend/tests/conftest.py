@@ -41,7 +41,7 @@ def sample_content(topic: str = "Digital twins", title: str = "Twins at Work") -
             translation=[SentencePair(en="A body with the word ubiquitous in it.", ko="어디에나 있다는 단어가 든 본문이다.")],
         ),
         vocabulary=[
-            VocabularyItem(word=f"word{i}", pos="noun", definition=f"def {i}", example=f"ex {i}", synonyms=[f"same {i}"], korean=f"단어 {i}", scene=f"scene {i}")
+            VocabularyItem(word=f"word{i}", pos="noun", definition=f"def {i}", example=f"ex {i}", synonyms=[f"same {i}"], korean=f"단어 {i}", scene=f"scene {i}", caption=f"caption {i}")
             for i in range(VOCABULARY_COUNT)
         ],
     )

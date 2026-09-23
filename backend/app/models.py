@@ -93,6 +93,8 @@ class VocabularyItem(BaseModel):
     korean: str | None = None
     """A drawable situation the word fits, written with the session; drawn for the card."""
     scene: str | None = None
+    """One or two sentences on what the picture shows and why it is the word; hidden until asked for."""
+    caption: str | None = None
     """File name under the images folder, served at /api/images/{image}."""
     image: str | None = None
 

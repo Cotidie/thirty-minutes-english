@@ -17,7 +17,7 @@ from app.pictures.painters import (
     finished,
     painter_for,
 )
-from app.pictures.scenes import SceneWriter, Spark
+from app.pictures.scenes import Scene, SceneWriter, Spark
 from tests.conftest import sample_content
 
 
@@ -185,10 +185,10 @@ def test_redraw_draws_the_new_scene_in_the_asked_style_under_a_new_name_and_disc
     old = content.vocabulary[2].model_copy(update={"image": "old.png"})
     (tmp_path / "old.png").write_bytes(b"OLD")
     painter = FakePainter()
-    drawn = Illustrator(painter, tmp_path, "photo").redraw(7, 2, old, "a fresh scene", "comic")
+    drawn = Illustrator(painter, tmp_path, "photo").redraw(7, 2, old, Scene("a fresh scene", "why it fits"), "comic")
 
     assert painter.prompts == [f"{STYLES['comic']} {IMAGE_RULES} a fresh scene"]
-    assert drawn.scene == "a fresh scene"
+    assert (drawn.scene, drawn.caption) == ("a fresh scene", "why it fits")
     assert drawn.image.startswith("7-2-") and drawn.image.endswith(".png")
     assert (tmp_path / drawn.image).read_bytes() == b"PNG0"
     assert (tmp_path / "old.png").exists()  # dropped only once the new name is stored
@@ -197,25 +197,27 @@ def test_redraw_draws_the_new_scene_in_the_asked_style_under_a_new_name_and_disc
     assert not (tmp_path / "old.png").exists()
 
     with pytest.raises(GenerationError):
-        Illustrator(FakePainter(blank={0}), tmp_path).redraw(7, 2, drawn, "another", "")
+        Illustrator(FakePainter(blank={0}), tmp_path).redraw(7, 2, drawn, Scene("another", ""), "")
 
 
 class FakeCli:
-    def __init__(self, scene: str):
+    def __init__(self, scene: str, caption: str = "why"):
         self.scene = scene
+        self.caption = caption
         self.prompt = ""
 
     def run(self, prompt: str, schema: dict, on_message=None) -> dict:
         self.prompt = prompt
-        return {"scene": self.scene}
+        return {"scene": self.scene, "caption": self.caption}
 
 
 def test_scene_writer_names_the_word_the_scene_to_avoid_and_a_rolled_spark():
     import random
 
     item = sample_content().vocabulary[0].model_copy(update={"scene": "the old scene"})
-    cli = FakeCli("  a new scene ")
-    assert SceneWriter(cli, random.Random(3)).write(item) == "a new scene"
+    cli = FakeCli("  a new scene ", " the caption ")
+    assert SceneWriter(cli, random.Random(3)).write(item) == Scene("a new scene", "the caption")
+    assert "caption" in cli.prompt
     assert "Word: word0 (noun)" in cli.prompt and "the old scene" in cli.prompt
     spark = Spark.roll(random.Random(3))
     assert str(spark) in cli.prompt and spark.place in str(spark)

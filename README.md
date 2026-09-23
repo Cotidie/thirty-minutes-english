@@ -58,6 +58,8 @@ docker compose up -d --build
 
 같은 프롬프트가 `synonyms`(학습자가 이미 아는 더 쉬운 말 1~2개, 예문 속 그 자리에 들어가는 것만)도 쓴다. 규칙은 앱 스킬 `plugin/skills/session-writing/SKILL.md`의 Synonyms 절. 표현은 뜻 아래에, 단어는 뜻을 눌러 펼쳤을 때 뜻 아래에 `≈ a, b` 한 줄로 나온다(`components/Synonyms.tsx`). 단어 카드에서 항상 보이게 하면 뜻을 떠올리기 전에 힌트가 되므로 뜻과 함께 숨긴다. `synonyms`가 없는 예전 세션은 그 줄이 없다.
 
+그림마다 `caption`(그림에서 무슨 일이 일어나고 왜 그 단어인지 한두 문장, 30단어 이하, 단어를 그대로 넣음)이 붙는다. 세션 생성 프롬프트가 scene과 함께 쓰고, ↻ redraw는 `SceneWriter`가 새 scene과 함께 다시 쓴다(`app/pictures/scenes.py`의 `CAPTION_RULES`, 결과는 `Scene(text, caption)`). 평소에는 숨겨 두고, 그림 왼쪽 아래 `Scene`을 누르면 그림이 흐려지며 그 위로 문장이 떠오른다(`VocabularyTab.tsx`의 `SceneCaption`). 문장 속 단어는 형광펜으로 칠하고, 문장이나 `Hide`를 누르면 닫힌다. 카드의 뜻은 열리지 않는다. `caption`이 없는 예전 세션은 버튼이 없다. 19번 세션에는 손으로 채워 넣었다.
+
 ## Vocabulary 그림
 
 세션 생성 마지막 단계(`illustrating`, 진행 바의 "Drawing a picture for each word")에서 단어마다 그 단어가 어울리는 상황을 그린 그림을 한 장씩 만든다. 장면(`scene`)은 세션 생성 프롬프트가 단어와 함께 쓴다: 두세 문장으로 장소, 사람과 행동, 가리킬 수 있는 세부 서너 가지(사물·날씨·시간대·배경)를 담고, 글자가 필요 없는 구체적인 상황이며 단어끼리 장소와 시간이 겹치지 않게 한다(규칙 문장은 `pictures/scenes.py`의 `SCENE_RULES` 하나를 두 프롬프트가 같이 쓴다). 이미지 프롬프트는 `IMAGE_STYLE`의 스타일 문장 + 디테일·글자 금지 문장(`IMAGE_RULES`) + 장면이다. `backend/app/pictures/`(`illustrator.py`, `painters.py`)가 그 장면들을 `IMAGE_PROVIDER`의 MCP 서버에 보낸다. MCP 호출은 공식 `mcp` SDK의 `Client`(Streamable HTTP, `backend/app/mcp_client.py`의 `McpHttp`)가 하고, 인증은 OAuth 로그인 대신 그 provider의 API 키를 bearer 토큰으로 보낸다(OAuth 토큰은 몇 시간에서 7일이면 만료되므로). `claude` 실행은 없다.

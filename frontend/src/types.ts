@@ -44,6 +44,8 @@ export interface VocabularyItem {
   korean?: string | null
   /** A situation the word fits, drawn for the card; the learner describes it with the word. */
   scene?: string | null
+  /** One or two sentences on what the picture shows and why it is the word; hidden until asked for. */
+  caption?: string | null
   /** File name under /api/images/. */
   image?: string | null
 }

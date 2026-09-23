@@ -9,7 +9,7 @@ from app.generation.exclusions import Exclusions
 from app.generation.progress import Progress, StreamTracker
 from app.llm import WEB_TOOLS, Claude, GenerationError, McpServer, firecrawl
 from app.models import SessionContent
-from app.pictures.scenes import SCENE_RULES
+from app.pictures.scenes import CAPTION_RULES, SCENE_RULES
 
 OnProgress = Callable[[Progress], None]
 
@@ -100,7 +100,7 @@ SESSION_SCHEMA: dict = {
             "items": {
                 "type": "object",
                 "additionalProperties": False,
-                "required": ["word", "pos", "definition", "synonyms", "example", "korean", "scene"],
+                "required": ["word", "pos", "definition", "synonyms", "example", "korean", "scene", "caption"],
                 "properties": {
                     "word": {"type": "string"},
                     "pos": {"type": "string"},
@@ -109,6 +109,7 @@ SESSION_SCHEMA: dict = {
                     "example": {"type": "string"},
                     "korean": {"type": "string"},
                     "scene": {"type": "string"},
+                    "caption": {"type": "string"},
                 },
             },
         },
@@ -162,7 +163,7 @@ academic and professional English over topic-specific jargon; no proper nouns. \
 For each give the word, part of speech, a concise learner-dictionary definition, synonyms (1 or 2 more common words \
 that could replace it in this sense), one example \
 sentence different from the article, korean (the Korean equivalent in the sense used here, one or two \
-words, no explanation), and a scene: {scene_rules}. Vary the scenes across the words: \
+words, no explanation), a scene: {scene_rules}, and a caption for the scene: {caption_rules}. Vary the scenes across the words: \
 different places, times of day, and kinds of people, so no two look alike.
 
 Set topic to the article topic. Use American English. Return only the structured output."""
@@ -220,7 +221,11 @@ class ClaudeGenerator:
 
     def build_prompt(self, topic: str, exclude: Exclusions | None = None) -> str:
         prompt = PROMPT_TEMPLATE.format(
-            topic=topic, expression_count=EXPRESSION_COUNT, vocabulary_count=VOCABULARY_COUNT, scene_rules=SCENE_RULES
+            topic=topic,
+            expression_count=EXPRESSION_COUNT,
+            vocabulary_count=VOCABULARY_COUNT,
+            scene_rules=SCENE_RULES,
+            caption_rules=CAPTION_RULES,
         )
         prompt = SKILLS_PREAMBLE.format(skills=", ".join(self._skills)) + prompt
         if exclude:

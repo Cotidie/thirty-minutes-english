@@ -9,6 +9,7 @@ from pathlib import Path
 from app.llm import GenerationError
 from app.models import SessionContent, VocabularyItem
 from app.pictures.painters import OnDrawn, Painter
+from app.pictures.scenes import Scene
 
 log = logging.getLogger(__name__)
 
@@ -68,17 +69,17 @@ class Illustrator:
             vocabulary[i] = item.model_copy(update={"image": name})
         return content.model_copy(update={"vocabulary": vocabulary})
 
-    def redraw(self, session_id: int, index: int, item: VocabularyItem, scene: str, style: str = "") -> VocabularyItem:
-        """The item with `scene` drawn in `style` under a new file name. The old file stays until
+    def redraw(self, session_id: int, index: int, item: VocabularyItem, scene: Scene, style: str = "") -> VocabularyItem:
+        """The item with `scene` (and its caption) drawn in `style` under a new file name. The old file stays until
         the caller has stored the new name and calls `discard` on whatever name it replaced.
         Raises GenerationError when no picture came back."""
-        [png] = self._painter.paint([self.prompt(scene, style)])
+        [png] = self._painter.paint([self.prompt(scene.text, style)])
         if png is None:
             raise GenerationError("no picture came back")
         self._dir.mkdir(parents=True, exist_ok=True)
         name = f"{session_id}-{index}-{uuid.uuid4().hex[:8]}.png"
         (self._dir / name).write_bytes(png)
-        return item.model_copy(update={"scene": scene, "image": name})
+        return item.model_copy(update={"scene": scene.text, "caption": scene.caption or None, "image": name})
 
     def discard(self, image: str | None) -> None:
         if image:

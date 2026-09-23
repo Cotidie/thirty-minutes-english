@@ -84,6 +84,22 @@ describe('VocabularyTab', () => {
     expect(second).toHaveTextContent(/^make less severe$/)
   })
 
+  it('opens the scene caption over the picture with the word marked, without opening the meaning', async () => {
+    const drawn = [{ ...items[0], scene: 'phones on a train', caption: 'Everyone on the train holds a phone: phones are ubiquitous.', image: 'a.png' }, items[1]]
+    render(<VocabularyTab items={drawn} sessionId={3} onPicture={vi.fn()} starred={[]} onToggleStar={vi.fn()} examples={none} onExample={vi.fn()} />)
+    expect(screen.queryByRole('button', { name: 'What the picture for mitigate shows' })).not.toBeInTheDocument() // no caption
+    const note = screen.getByRole('note', { hidden: true })
+    expect(note).not.toHaveClass('is-shown')
+
+    await userEvent.click(screen.getByRole('button', { name: 'What the picture for ubiquitous shows' }))
+    expect(note).toHaveClass('is-shown')
+    expect(note.querySelector('mark')).toHaveTextContent('ubiquitous')
+    expect(screen.getAllByText('Tap to check the meaning')).toHaveLength(2)
+
+    await userEvent.click(note)
+    expect(note).not.toHaveClass('is-shown')
+  })
+
   it('shows the picture drawn for a word, and nothing where there is none', () => {
     const drawn = [{ ...items[0], scene: 'a phone in every hand on a train', image: 'job-0.png' }, items[1]]
     render(<VocabularyTab items={drawn} sessionId={3} onPicture={vi.fn()} starred={[]} onToggleStar={vi.fn()} examples={none} onExample={vi.fn()} />)

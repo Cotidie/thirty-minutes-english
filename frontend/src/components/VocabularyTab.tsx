@@ -35,6 +35,51 @@ function Drawing({ seconds }: { seconds: number }) {
   )
 }
 
+/** The caption with the word (in whatever form it takes there) marked. */
+function Marked({ text, word }: { text: string; word: string }) {
+  const stem = word.replace(/e$/, '').replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+  const parts = text.split(new RegExp(`(\\b${stem}\\w*)`, 'i'))
+  return <>{parts.map((part, i) => (i % 2 ? <mark key={i}>{part}</mark> : part))}</>
+}
+
+/** Why the picture is the word: the picture blurs and the caption rises over it; a click on it closes. */
+function SceneCaption({ caption, word }: { caption: string; word: string }) {
+  const [shown, setShown] = useState(false)
+  return (
+    <>
+      <span
+        className={`vocab-caption${shown ? ' is-shown' : ''}`}
+        role="note"
+        aria-hidden={!shown}
+        onClick={(e) => {
+          e.stopPropagation()
+          setShown(false)
+        }}
+      >
+        <span className="vocab-caption-label">The scene</span>
+        <span className="vocab-caption-text">
+          <Marked text={caption} word={word} />
+        </span>
+      </span>
+      <button
+        type="button"
+        className="vocab-caption-toggle"
+        aria-expanded={shown}
+        aria-label={shown ? `Hide the scene for ${word}` : `What the picture for ${word} shows`}
+        onClick={(e) => {
+          e.stopPropagation()
+          setShown((s) => !s)
+        }}
+      >
+        <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden="true">
+          <path d="M2 3.5h12v7H7l-3 2.5v-2.5H2z" strokeLinejoin="round" />
+        </svg>
+        {shown ? 'Hide' : 'Scene'}
+      </button>
+    </>
+  )
+}
+
 function VocabCard({ item, drawing }: { item: VocabularyItem; drawing: boolean }) {
   const [revealed, setRevealed] = useState(false)
   const seconds = useElapsed(drawing)
@@ -43,7 +88,7 @@ function VocabCard({ item, drawing }: { item: VocabularyItem; drawing: boolean }
       {item.image && (
         <span className="vocab-picture-frame">
           <img className={`vocab-picture${drawing ? ' is-drawing' : ''}`} src={`/api/images/${item.image}`} alt={item.scene ?? item.word} />
-          {drawing && <Drawing seconds={seconds} />}
+          {drawing ? <Drawing seconds={seconds} /> : item.caption && <SceneCaption key={item.image} caption={item.caption} word={item.word} />}
         </span>
       )}
       <span className="vocab-word">

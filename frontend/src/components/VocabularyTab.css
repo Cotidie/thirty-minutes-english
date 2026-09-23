@@ -91,6 +91,103 @@
   display: block;
 }
 
+/* Why the picture is the word: the picture blurs and the caption rises over it. */
+.vocab-picture {
+  transition:
+    filter 0.45s ease,
+    transform 0.45s ease;
+}
+
+.vocab-picture-frame {
+  overflow: hidden;
+  border-radius: 6px;
+}
+
+.vocab-picture-frame:has(.vocab-caption.is-shown) .vocab-picture {
+  filter: blur(7px) saturate(0.6);
+  transform: scale(1.06);
+}
+
+.vocab-caption {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  align-content: center;
+  gap: 0.5rem;
+  padding: 1.5rem 1.6rem 3rem;
+  background: rgb(251 252 250 / 0%);
+  opacity: 0;
+  transform: translateY(0.5rem);
+  pointer-events: none;
+  cursor: pointer;
+  transition:
+    opacity 0.45s ease 0.1s,
+    transform 0.45s ease 0.1s,
+    background 0.45s ease;
+}
+
+.vocab-caption.is-shown {
+  opacity: 1;
+  transform: none;
+  background: rgb(251 252 250 / 72%);
+  pointer-events: auto;
+}
+
+.vocab-caption-label {
+  font-family: var(--sans);
+  font-size: 0.7rem;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.vocab-caption-text {
+  font-family: var(--serif);
+  font-size: 1.22rem;
+  line-height: 1.4;
+  color: var(--ink);
+}
+
+.vocab-caption-text mark {
+  background: linear-gradient(transparent 40%, var(--marker) 40%, var(--marker) 92%, transparent 92%);
+  color: inherit;
+}
+
+.vocab-caption-toggle {
+  position: absolute;
+  left: 0.5rem;
+  bottom: 0.5rem;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  min-height: 2rem;
+  padding: 0 0.7rem 0 0.55rem;
+  border: 0;
+  border-radius: 999px;
+  background: rgb(255 255 255 / 78%);
+  backdrop-filter: blur(3px);
+  font: 500 0.8rem var(--sans);
+  color: var(--ink);
+  cursor: pointer;
+}
+
+.vocab-caption-toggle:hover {
+  background: #fff;
+}
+
+.vocab-caption-toggle:focus-visible {
+  outline: 2px solid var(--phrase);
+  outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .vocab-picture,
+  .vocab-caption {
+    transition: none;
+  }
+}
+
 /* While a new picture is on its way: a ring that creeps round, and the seconds so far. */
 .vocab-drawing {
   position: absolute;
