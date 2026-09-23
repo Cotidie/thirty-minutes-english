@@ -16,7 +16,8 @@ log = logging.getLogger(__name__)
 GEMINI_TTS_MODEL = "gemini-3.8-flash-tts"
 OPENAI_TTS_MODEL = "gpt-4o-mini-tts"
 OPENAI_TTS_VOICE = "marin"
-READING = "Read this sentence aloud clearly, at a natural, unhurried pace, in American English: "
+# OpenAI takes this apart from the text; Gemini reads out whatever it is given, so it gets the sentence alone.
+READING = "Read the sentence clearly, at a natural, unhurried pace, in American English."
 
 
 class Voice(Protocol):
@@ -40,7 +41,7 @@ class GeminiTts:
 
     def speak(self, text: str) -> bytes:
         body = {
-            "contents": [{"parts": [{"text": READING + text}]}],
+            "contents": [{"parts": [{"text": text}]}],
             "generationConfig": {
                 "responseModalities": ["AUDIO"],
                 "speechConfig": {"voiceConfig": {"prebuiltVoiceConfig": {"voiceName": self._voice}}},
@@ -65,7 +66,7 @@ class OpenAITts:
         self.name = f"openai-{model}-{voice}"
 
     def speak(self, text: str) -> bytes:
-        body = {"model": self._model, "voice": self._voice, "input": text, "instructions": READING.removesuffix(": "), "response_format": "mp3"}
+        body = {"model": self._model, "voice": self._voice, "input": text, "instructions": READING, "response_format": "mp3"}
         with httpx2.Client(timeout=60, transport=self._transport) as client:
             response = client.post("https://api.openai.com/v1/audio/speech", headers={"Authorization": f"Bearer {self._key}"}, json=body)
         response.raise_for_status()

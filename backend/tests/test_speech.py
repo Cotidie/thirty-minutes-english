@@ -47,7 +47,7 @@ def test_gemini_reads_in_the_chosen_voice_and_openai_asks_for_mp3():
     assert OpenAITts("k", transport=transport).speak("Hi.") == b"MP3"
     gemini, openai = seen
     assert gemini["generationConfig"]["speechConfig"]["voiceConfig"]["prebuiltVoiceConfig"]["voiceName"] == "Iapetus"
-    assert gemini["contents"][0]["parts"][0]["text"].endswith("Hi.")
+    assert gemini["contents"][0]["parts"][0]["text"] == "Hi."  # nothing else, or it is read out too
     assert (openai["input"], openai["response_format"]) == ("Hi.", "mp3")
 
 
