@@ -1,3 +1,6 @@
+import json
+
+import httpx2
 import pytest
 
 from app.generation.generator import EXPRESSION_COUNT, VOCABULARY_COUNT
@@ -46,3 +49,28 @@ def sample_content(topic: str = "Digital twins", title: str = "Twins at Work") -
 @pytest.fixture
 def content() -> SessionContent:
     return sample_content()
+
+
+class FakeHttp:
+    """Every outgoing HTTP request lands here: recorded, then answered with `status` and `json`."""
+
+    def __init__(self) -> None:
+        self.requests: list[httpx2.Request] = []
+        self.status = 200
+        self.json: object = {}
+
+    def answer(self, request: httpx2.Request) -> httpx2.Response:
+        self.requests.append(request)
+        if isinstance(self.json, str):
+            return httpx2.Response(self.status, text=self.json)
+        return httpx2.Response(self.status, json=self.json)
+
+    def sent(self, i: int = 0) -> dict:
+        return json.loads(self.requests[i].content)
+
+
+@pytest.fixture
+def http(monkeypatch) -> FakeHttp:
+    fake = FakeHttp()
+    monkeypatch.setattr("app.net.TRANSPORT", httpx2.MockTransport(fake.answer))
+    return fake

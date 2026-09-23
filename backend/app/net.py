@@ -1,8 +1,11 @@
-"""JSON over HTTP with the standard library, and one error type for every provider."""
+"""JSON over HTTP with httpx2 (the client the mcp SDK uses too), and one error type for every provider."""
 
 import json
-import urllib.error
-import urllib.request
+
+import httpx2
+
+# Tests swap in an httpx2.MockTransport here.
+TRANSPORT: httpx2.BaseTransport | None = None
 
 
 class HttpError(Exception):
@@ -14,25 +17,20 @@ class HttpError(Exception):
         self.message = message
 
 
-def send(req: urllib.request.Request, timeout: float) -> bytes:
-    """The response body. Raises HttpError."""
+def request(method: str, url: str, headers: dict[str, str] | None = None, body: dict | None = None, timeout: float = 30) -> httpx2.Response:
+    """The response, once it came back 2xx. Raises HttpError."""
     try:
-        with urllib.request.urlopen(req, timeout=timeout) as res:
-            return res.read()
-    except urllib.error.HTTPError as e:
-        raise HttpError(e.code, error_message(e.read())) from e
-    except urllib.error.URLError as e:
-        raise HttpError(502, str(e.reason)) from e
+        with httpx2.Client(timeout=timeout, transport=TRANSPORT) as client:
+            response = client.request(method, url, headers=headers, json=body)
+    except httpx2.HTTPError as e:
+        raise HttpError(502, str(e) or type(e).__name__) from e
+    if response.is_error:
+        raise HttpError(response.status_code, error_message(response.content))
+    return response
 
 
 def post_json(url: str, body: dict, headers: dict[str, str], timeout: float = 30) -> dict:
-    req = urllib.request.Request(
-        url,
-        data=json.dumps(body).encode(),
-        method="POST",
-        headers={"Content-Type": "application/json", **headers},
-    )
-    return json.loads(send(req, timeout))
+    return request("POST", url, headers, body, timeout).json()
 
 
 def error_message(raw: bytes) -> str:

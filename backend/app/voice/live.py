@@ -88,10 +88,9 @@ class OpenAIVoice:
 
     name = "openai"
 
-    def __init__(self, api_key: str, model: str, url: str = OPENAI_SESSIONS_URL):
+    def __init__(self, api_key: str, model: str):
         self.api_key = api_key
         self.model = model
-        self.url = url
 
     def open(self, definition: AgentDefinition, sdp: str | None, **values: str) -> dict:
         if not sdp or not sdp.strip():
@@ -99,7 +98,7 @@ class OpenAIVoice:
         session = definition.session_for(**values)
         session["model"] = self.model
         body = {"session": session, "transport": {"type": "webrtc", "sdp": sdp}}
-        answer = post_json(self.url, body, {"Authorization": f"Bearer {self.api_key}"})
+        answer = post_json(OPENAI_SESSIONS_URL, body, {"Authorization": f"Bearer {self.api_key}"})
         return {"provider": self.name, **answer}
 
 
@@ -118,15 +117,11 @@ class GeminiVoice:
         model: str,
         voice: str,
         thinking_level: str | None,
-        tokens_url: str = GEMINI_TOKENS_URL,
-        live_url: str = GEMINI_LIVE_URL,
     ):
         self.api_key = api_key
         self.model = model
         self.voice = voice
         self.thinking_level = thinking_level
-        self.tokens_url = tokens_url
-        self.live_url = live_url
 
     def open(self, definition: AgentDefinition, sdp: str | None, **values: str) -> dict:
         now = datetime.now(UTC)
@@ -137,8 +132,8 @@ class GeminiVoice:
             "newSessionExpireTime": _rfc3339(now + self.CONNECT_WINDOW),
             "bidiGenerateContentSetup": setup,
         }
-        token = post_json(self.tokens_url, body, {"x-goog-api-key": self.api_key})
-        return {"provider": self.name, "url": f"{self.live_url}?access_token={token['name']}", "setup": setup}
+        token = post_json(GEMINI_TOKENS_URL, body, {"x-goog-api-key": self.api_key})
+        return {"provider": self.name, "url": f"{GEMINI_LIVE_URL}?access_token={token['name']}", "setup": setup}
 
 
 def _rfc3339(moment: datetime) -> str:

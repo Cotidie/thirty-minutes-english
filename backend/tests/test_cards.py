@@ -80,34 +80,15 @@ def test_cards_endpoint_narrows_to_one_session(tmp_path):
         assert len(c.post("/api/asks/cards").json()) == 2
 
 
-def test_extractor_sends_rounds_and_reads_the_answer(tmp_path, monkeypatch):
+def test_extractor_sends_rounds_and_reads_the_answer(tmp_path, http):
     agent_dir = tmp_path / "phrase"
     (agent_dir / "prompts").mkdir(parents=True)
     (agent_dir / "prompts" / "summarize.md").write_text("Turn rounds into cards.")
     (agent_dir / "cards.schema.json").write_text(json.dumps({"title": "PhraseCards", "type": "object"}))
     extractor = PhraseCardExtractor("sk-test", agent_dir, "gpt-5.6-luna")
 
-    sent = {}
-
-    class FakeResponse:
-        def __enter__(self):
-            return self
-
-        def __exit__(self, *args):
-            return False
-
-        def read(self):
-            card = {"id": 7, "asked": "눈치", "english": "Read the room.", "alternatives": [], "note": "n"}
-            return json.dumps(
-                {"output": [{"content": [{"type": "output_text", "text": json.dumps({"cards": [card]})}]}]}
-            ).encode()
-
-    def fake_urlopen(req, timeout=0):
-        sent["body"] = json.loads(req.data)
-        sent["auth"] = req.headers["Authorization"]
-        return FakeResponse()
-
-    monkeypatch.setattr("app.net.urllib.request.urlopen", fake_urlopen)
+    card = {"id": 7, "asked": "눈치", "english": "Read the room.", "alternatives": [], "note": "n"}
+    http.json = {"output": [{"content": [{"type": "output_text", "text": json.dumps({"cards": [card]})}]}]}
 
     store = Database(tmp_path / "s.db")
     ask = store.records.add_ask(None, "눈치 좀 챙겨", "Read the room.", 11)
@@ -115,9 +96,9 @@ def test_extractor_sends_rounds_and_reads_the_answer(tmp_path, monkeypatch):
 
     cards = extractor.extract([ask])
 
-    assert sent["auth"] == "Bearer sk-test"
-    assert sent["body"]["model"] == "gpt-5.6-luna"
-    assert json.loads(sent["body"]["input"][1]["content"]) == [
+    assert http.requests[0].headers["Authorization"] == "Bearer sk-test"
+    assert http.sent()["model"] == "gpt-5.6-luna"
+    assert json.loads(http.sent()["input"][1]["content"]) == [
         {"id": 7, "user": "눈치 좀 챙겨", "coach": "Read the room."}
     ]
     assert cards[7].english == "Read the room."

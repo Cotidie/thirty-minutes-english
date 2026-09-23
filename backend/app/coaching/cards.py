@@ -25,12 +25,11 @@ class Extractor(Protocol):
 class PhraseCardExtractor:
     """One OpenAI Responses call for the whole batch; the model answers per ask id."""
 
-    def __init__(self, api_key: str, agent_dir: Path, model: str, url: str = RESPONSES_URL):
+    def __init__(self, api_key: str, agent_dir: Path, model: str):
         self.api_key = api_key
         self.prompt = (agent_dir / "prompts" / "summarize.md").read_text()
         self.schema = json.loads((agent_dir / SCHEMA_FILE).read_text())
         self.model = model
-        self.url = url
 
     def extract(self, asks: list[Ask]) -> dict[int, PhraseCard]:
         rows = [{"id": a.id, "user": a.user_text, "coach": a.coach_text} for a in sorted(asks, key=lambda a: a.id)]
@@ -50,7 +49,7 @@ class PhraseCardExtractor:
                 }
             },
         }
-        answer = json.loads(_output_text(post_json(self.url, body, {"Authorization": f"Bearer {self.api_key}"}, 60)))
+        answer = json.loads(_output_text(post_json(RESPONSES_URL, body, {"Authorization": f"Bearer {self.api_key}"}, 60)))
         return {card["id"]: PhraseCard.model_validate(card) for card in answer["cards"]}
 
 

@@ -1,6 +1,6 @@
 # 표준 라이브러리 → 통용 라이브러리 교체 계획
 
-- 상태: 1번 완료(`claude-agent-sdk`, firecrawl·entrypoint·호스트 파일 복사 제거, 배제 목록은 in-process 도구 `check_items`로). 2번 완료(공식 `mcp` SDK `Client`, 그림 병렬은 `asyncio.gather`, firecrawl 검색 MCP를 키 없이 우선 사용). 3·4번 남음. 3번은 `mcp`가 쓰는 `httpx2`로 한다.
+- 상태: 1번 완료(`claude-agent-sdk`, firecrawl·entrypoint·호스트 파일 복사 제거, 배제 목록은 in-process 도구 `check_items`로). 2번 완료(공식 `mcp` SDK `Client`, 그림 병렬은 `asyncio.gather`, firecrawl 검색 MCP를 키 없이 우선 사용). 3번 완료(`urllib` 전부 `httpx2`로, 테스트는 `net.TRANSPORT`에 `MockTransport`). 4번(선택)만 남음.
 - 원칙: 라이브러리 하나당 커밋 하나. 순서는 아래 번호대로.
 - async SDK는 동기 메서드 안에서 `asyncio.run(...)`으로 감싼다. 라우트와 `generation/jobs.py`의 스레드 풀은 그대로 둔다. 각 호출은 워커 스레드에서 돌기 때문에 이벤트 루프가 겹치지 않는다.
 

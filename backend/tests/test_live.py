@@ -51,27 +51,6 @@ class FakeLiveSessions:
         return {"provider": "openai", "session": {"id": "live_123"}, "transport": {"type": "webrtc", "sdp": "v=0 answer"}}
 
 
-class FakePost:
-    """Stands in for urllib.request.urlopen: records the request, answers with one JSON body."""
-
-    def __init__(self, answer: dict):
-        self.answer = answer
-        self.requests = []
-
-    def __call__(self, req, timeout=None):
-        self.requests.append(req)
-        return self
-
-    def __enter__(self):
-        return self
-
-    def __exit__(self, *exc):
-        return False
-
-    def read(self):
-        return json.dumps(self.answer).encode()
-
-
 def make_client(tmp_path, agents):
     app = create_app(Database(tmp_path / "s.db"), Services(FakeGenerator(), agents=agents), InlineExecutor())
     return TestClient(app)
@@ -143,9 +122,8 @@ def test_rejects_blank_paragraph(tmp_path, agent_dir):
         assert c.post("/api/read-aloud/sessions", json={"paragraph": "", "sdp": "v=0"}).status_code == 422
 
 
-def test_openai_provider_needs_an_offer_and_overrides_the_model(agent_dir, monkeypatch):
-    post = FakePost({"session": {"id": "live_1"}, "transport": {"type": "webrtc", "sdp": "v=0 answer"}})
-    monkeypatch.setattr("app.net.urllib.request.urlopen", post)
+def test_openai_provider_needs_an_offer_and_overrides_the_model(agent_dir, http):
+    http.json = {"session": {"id": "live_1"}, "transport": {"type": "webrtc", "sdp": "v=0 answer"}}
     voice = OpenAIVoice("sk-test", "gpt-live-2")
     with pytest.raises(HttpError) as e:
         voice.open(AgentDefinition(agent_dir), None, paragraph=PARAGRAPH)
@@ -153,10 +131,10 @@ def test_openai_provider_needs_an_offer_and_overrides_the_model(agent_dir, monke
 
     answer = voice.open(AgentDefinition(agent_dir), "v=0 offer", paragraph=PARAGRAPH)
     assert answer["provider"] == "openai" and answer["transport"]["sdp"] == "v=0 answer"
-    sent = json.loads(post.requests[0].data)
+    sent = http.sent()
     assert sent["session"]["model"] == "gpt-live-2"
     assert sent["transport"] == {"type": "webrtc", "sdp": "v=0 offer"}
-    assert post.requests[0].get_header("Authorization") == "Bearer sk-test"
+    assert http.requests[0].headers["Authorization"] == "Bearer sk-test"
 
 
 def test_gemini_setup_folds_context_into_the_system_instruction(agent_dir):
@@ -174,27 +152,26 @@ def test_gemini_setup_carries_the_thinking_level_when_given(agent_dir):
     assert setup["generationConfig"]["thinkingConfig"] == {"thinkingLevel": "medium"}
 
 
-def test_gemini_provider_mints_a_locked_token_and_returns_the_setup(agent_dir, monkeypatch):
-    post = FakePost({"name": "auth_tokens/abc"})
-    monkeypatch.setattr("app.net.urllib.request.urlopen", post)
+def test_gemini_provider_mints_a_locked_token_and_returns_the_setup(agent_dir, http):
+    http.json = {"name": "auth_tokens/abc"}
     voice = GeminiVoice("AIza-test", "gemini-3.8-live-extended-thinking", "Puck", "low")
     answer = voice.open(AgentDefinition(agent_dir), None, paragraph=PARAGRAPH)
     assert answer["provider"] == "gemini"
 
-    sent = json.loads(post.requests[0].data)
+    sent = http.sent()
     assert sent["uses"] == 1
     assert sent["bidiGenerateContentSetup"]["model"] == "models/gemini-3.8-live-extended-thinking"
     assert sent["bidiGenerateContentSetup"] == answer["setup"]
     assert sent["expireTime"].endswith("Z") and sent["newSessionExpireTime"].endswith("Z")
-    assert post.requests[0].get_header("X-goog-api-key") == "AIza-test"
+    assert http.requests[0].headers["x-goog-api-key"] == "AIza-test"
     assert answer["provider"] == "gemini"
     assert answer["url"].endswith("BidiGenerateContentConstrained?access_token=auth_tokens/abc")
     assert answer["setup"]["generationConfig"]["thinkingConfig"] == {"thinkingLevel": "low"}
     assert PARAGRAPH in answer["setup"]["systemInstruction"]["parts"][0]["text"]
 
 
-def test_gemini_round_needs_no_offer(tmp_path, agent_dir, monkeypatch):
-    monkeypatch.setattr("app.net.urllib.request.urlopen", FakePost({"name": "auth_tokens/abc"}))
+def test_gemini_round_needs_no_offer(tmp_path, agent_dir, http):
+    http.json = {"name": "auth_tokens/abc"}
     voice = GeminiVoice("AIza-test", "gemini-3.8-live", "Kore", None)
     agents = {"read-aloud": LiveAgent("read-aloud", AgentDefinition(agent_dir), voice)}
     with make_client(tmp_path, agents) as c:

@@ -1,13 +1,12 @@
 """One cheap authenticated request per provider, so the settings modal can
 say whether a key works before a round depends on it."""
 
-import urllib.request
 from dataclasses import dataclass
 
 from app.mcp_client import McpError, McpHttp
-from app.net import HttpError, send
+from app.net import HttpError, request
 from app.pictures.painters import COMFY_MCP
-from app.voice.assessor import token_request
+from app.voice.assessor import issue_token
 
 GETS = {
     "OPENAI_API_KEY": ("https://api.openai.com/v1/models?limit=1", "Authorization", "Bearer "),
@@ -39,10 +38,10 @@ def check_key(name: str, key: str, region: str = "") -> KeyCheck:
             # comfy-cloud has no REST key endpoint; its MCP server turns a bad key away at connect.
             McpHttp(COMFY_MCP, key, read_timeout_s=15).check()
         elif name == "AZURE_SPEECH_KEY":
-            send(token_request(key, region), timeout=15)
+            issue_token(key, region)
         else:
             url, header, prefix = GETS[name]
-            send(urllib.request.Request(url, headers={header: prefix + key}), timeout=15)
+            request("GET", url, {header: prefix + key}, timeout=15)
     except HttpError as e:
         if e.status == 502:
             return KeyCheck(False, f"could not reach the provider: {e.message}")
