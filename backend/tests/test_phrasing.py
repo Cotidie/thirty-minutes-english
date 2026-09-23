@@ -3,9 +3,9 @@ from pathlib import Path
 import pytest
 from fastapi.testclient import TestClient
 
-from app.claude_cli import GenerationError
 from app.coaching.phrasing import PhrasingMarker, breaks_in
 from app.db import Database
+from app.llm import GenerationError
 from app.main import create_app
 from app.wiring import Services
 from tests.test_api import FakeGenerator, InlineExecutor
@@ -18,10 +18,10 @@ class FakeCli:
         self.marked = marked
         self.prompts: list[str] = []
 
-    def run(self, prompt: str, schema: dict, on_event=None) -> dict:
+    def run(self, prompt: str, schema: dict, on_message=None) -> dict:
         self.prompts.append(prompt)
         assert schema["required"] == ["marked"]
-        return {"structured_output": {"marked": self.marked}}
+        return {"marked": self.marked}
 
 
 @pytest.fixture

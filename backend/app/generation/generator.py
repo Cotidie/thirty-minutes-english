@@ -1,17 +1,12 @@
 from collections.abc import Callable
 from typing import Protocol
 
+from claude_agent_sdk import create_sdk_mcp_server, tool
 from pydantic import ValidationError
 
-from app.claude_cli import (
-    FIRECRAWL,
-    ClaudeCli,
-    GenerationError,
-    McpServer,
-    structured_output,
-)
 from app.generation.exclusions import Exclusions
 from app.generation.progress import Progress, StreamTracker
+from app.llm import WEB_TOOLS, Claude, GenerationError, McpServer
 from app.models import SessionContent
 from app.pictures.scenes import SCENE_RULES
 
@@ -136,8 +131,7 @@ one thing learners get wrong; no full sentences needed), 2 example sentences tha
 and korean: the natural Korean equivalent of the expression, a short phrase, no explanation.
 
 2. article: a short article of 250 to 350 words on the topic, written for a smart general reader. \
-Run at most 3 searches, with firecrawl_search when it is offered and WebSearch when it is missing or \
-fails, to ground the article in accurate, current facts (dates, names, figures) and prefer a recent development or debate as the angle; never invent \
+Run at most 3 web searches to ground the article in accurate, current facts (dates, names, figures) and prefer a recent development or debate as the angle; never invent \
 specifics you did not verify. In sources, list only the web pages you actually drew on (page title \
 and exact URL from the search results); leave it empty if you used none. \
 Use 3 to 5 paragraphs separated by blank lines. Take a clear angle so there is something to discuss. \
@@ -168,13 +162,11 @@ different places, times of day, and kinds of people, so no two look alike.
 Set topic to the article topic. Use American English. Return only the structured output."""
 
 
-EXCLUSIONS_TEMPLATE = """
+CHECK_ITEMS_RULE = """
 
-HARD CONSTRAINT. The items below were already taught in earlier sessions. Do not include any of them, \
-nor close variants (same phrase with a different pronoun, particle, or tense). Before you finalize, \
-check every expression and every vocabulary word against these lists and replace any match.
-Banned expressions: {expressions}
-Banned words: {words}"""
+Earlier sessions already taught some expressions and words. Before you finalize, call check_items with \
+every expression phrase and every vocabulary word you chose. Replace each one it reports as already \
+taught with a fresh item, then call it again with the replacements until it reports nothing."""
 
 SKILLS_PREAMBLE = """Before writing, invoke each of these skills with the Skill tool and follow \
 their instructions while producing the content: {skills}.
@@ -182,17 +174,25 @@ their instructions while producing the content: {skills}.
 """
 
 
-class ClaudeCliGenerator:
-    def __init__(
-        self,
-        model: str = "opus",
-        effort: str = "xhigh",
-        skills: tuple[str, ...] = (),
-        mcp: McpServer | None = FIRECRAWL,
-        timeout_s: float = 300,
-    ) -> None:
+def check_items_reply(exclude: Exclusions, args: dict) -> str:
+    taught = exclude.taught(args.get("expressions", []), args.get("words", []))
+    return f"Already taught, replace: {'; '.join(taught)}" if taught else "None of these were taught before."
+
+
+def check_items_server(exclude: Exclusions) -> McpServer:
+    """An in-process tool the model checks its picks against, so the banned list stays out of the prompt."""
+
+    @tool("check_items", "Which of these expressions and words earlier sessions already taught", {"expressions": list[str], "words": list[str]})
+    async def check_items(args: dict) -> dict:
+        return {"content": [{"type": "text", "text": check_items_reply(exclude, args)}]}
+
+    return McpServer("session", create_sdk_mcp_server("session", tools=[check_items]), ("mcp__session__check_items",))
+
+
+class ClaudeGenerator:
+    def __init__(self, model: str = "opus", effort: str = "xhigh", skills: tuple[str, ...] = (), timeout_s: float = 300) -> None:
         self._skills = skills
-        self.cli = ClaudeCli(model=model, effort=effort, mcp=mcp, timeout_s=timeout_s)
+        self.claude = Claude(model, effort, timeout_s, tools=("Read", *WEB_TOOLS), skills=skills)
 
     def build_prompt(self, topic: str, exclude: Exclusions | None = None) -> str:
         prompt = PROMPT_TEMPLATE.format(
@@ -201,10 +201,7 @@ class ClaudeCliGenerator:
         if self._skills:
             prompt = SKILLS_PREAMBLE.format(skills=", ".join(self._skills)) + prompt
         if exclude:
-            prompt += EXCLUSIONS_TEMPLATE.format(
-                expressions="; ".join(exclude.expressions) or "none",
-                words=", ".join(exclude.words) or "none",
-            )
+            prompt += CHECK_ITEMS_RULE
         return prompt
 
     def generate(
@@ -214,12 +211,8 @@ class ClaudeCliGenerator:
         exclude: Exclusions | None = None,
     ) -> SessionContent:
         tracker = StreamTracker(on_progress or (lambda _: None))
-        envelope = self.cli.run(self.build_prompt(topic, exclude), SESSION_SCHEMA, tracker.feed)
-        return self.parse_result(envelope)
-
-    @staticmethod
-    def parse_result(envelope: dict) -> SessionContent:
-        payload = structured_output(envelope)
+        extra = (check_items_server(exclude),) if exclude else ()
+        payload = self.claude.run(self.build_prompt(topic, exclude), SESSION_SCHEMA, tracker.feed, extra)
         try:
             return SessionContent.model_validate(payload)
         except ValidationError as e:

@@ -17,9 +17,9 @@ docker compose up -d --build
 
 주제마다 카테고리(`news` · `korea` · `research` · `cs` · `ie` · `ai` · `literature` · `history` · `world`)가 붙어 `/api/topics`에 `{text, category}`로 내려간다. 칩 색은 카테고리별로 다르고, 칩 아래 범례가 그날 나온 카테고리만 이름으로 보여준다. 색 정의는 `frontend/src/components/TopicPicker.css`의 `[data-category=...]` 규칙에 모여 있다.
 
-뉴스 3개는 그날 처음 `/api/topics`를 호출할 때 백그라운드로 `claude` CLI를 한 번 돌려 받아 `topic_days` 테이블에 저장한다(하루 1회). 주요 외신 1면·톱 수준으로 크게 다뤄진 기사만 받는다(독립된 주요 매체 2곳 이상이 비중 있게 다룬 것이 기준). 3개 중 1개는 한국 기사로, 영문 국내 매체(연합뉴스, 코리아헤럴드, 중앙데일리, 코리아타임스) 톱 기준으로 고른다(`KOREA_COUNT`). 칩 문구는 다른 풀과 맞춰 7단어 이하 명사구로 받고, 의문사로 시작하는 문장은 금지한다. 웹 검색이 막혔거나 기준을 넘은 기사가 없으면 빈 목록을 돌려받고, 그날치를 저장하지 않아 다음 요청에서 다시 시도한다. 도착 전이나 실패했을 때는 12개 전부 고정 풀에서 채우므로 화면이 비지 않는다. `pending`은 백그라운드 fetch가 실제로 도는 동안만 참이다(실패하면 바로 거짓, 다음 페이지 로드에서 재시도). 프론트는 `pending`이 참인 동안 15초 간격으로 최대 3분간 다시 물어보고, 그 뒤엔 새로고침 버튼을 다시 연다. fetch가 실패하면 `error`에 이유(CLI 오류 메시지, 또는 검색 결과 없음)가 실려 오고, 홈 화면의 Today's topic 아래에 그대로 표시된다. 표현 5개는 주제와 무관한 B2~C1+ 범용 표현이고, 어휘 10개는 주제 연관 단어로 아티클 밖에서도 고른다. 최근 40세션에서 이미 나온 표현·단어는 프롬프트에 제외 목록으로 넘긴다. 각 항목은 10% 확률로 목록에서 빠져 가끔 다시 나올 수 있다(`generation/jobs.py`의 `JobRunner.REPEAT_ALLOWANCE`).
+뉴스 3개는 그날 처음 `/api/topics`를 호출할 때 백그라운드로 Claude(Agent SDK)를 한 번 돌려 받아 `topic_days` 테이블에 저장한다(하루 1회). 주요 외신 1면·톱 수준으로 크게 다뤄진 기사만 받는다(독립된 주요 매체 2곳 이상이 비중 있게 다룬 것이 기준). 3개 중 1개는 한국 기사로, 영문 국내 매체(연합뉴스, 코리아헤럴드, 중앙데일리, 코리아타임스) 톱 기준으로 고른다(`KOREA_COUNT`). 칩 문구는 다른 풀과 맞춰 7단어 이하 명사구로 받고, 의문사로 시작하는 문장은 금지한다. 웹 검색이 막혔거나 기준을 넘은 기사가 없으면 빈 목록을 돌려받고, 그날치를 저장하지 않아 다음 요청에서 다시 시도한다. 도착 전이나 실패했을 때는 12개 전부 고정 풀에서 채우므로 화면이 비지 않는다. `pending`은 백그라운드 fetch가 실제로 도는 동안만 참이다(실패하면 바로 거짓, 다음 페이지 로드에서 재시도). 프론트는 `pending`이 참인 동안 15초 간격으로 최대 3분간 다시 물어보고, 그 뒤엔 새로고침 버튼을 다시 연다. fetch가 실패하면 `error`에 이유(SDK 오류 메시지, 또는 검색 결과 없음)가 실려 오고, 홈 화면의 Today's topic 아래에 그대로 표시된다. 표현 5개는 주제와 무관한 B2~C1+ 범용 표현이고, 어휘 10개는 주제 연관 단어로 아티클 밖에서도 고른다. 최근 40세션에서 이미 나온 표현·단어는 프롬프트에 넣지 않고, 생성 중에 모델이 부르는 in-process 도구 `check_items`(`generation/generator.py`)가 들고 있다. 모델은 고른 항목을 이 도구로 확인하고 이미 나온 것(관사·대명사만 다른 변형 포함, `generation/exclusions.py`의 `key`)을 바꾼다. 각 항목은 10% 확률로 목록에서 빠져 가끔 다시 나올 수 있다(`generation/jobs.py`의 `JobRunner.REPEAT_ALLOWANCE`).
 
-생성은 로컬 `claude` CLI(`claude -p --json-schema --output-format stream-json`)를 서브프로세스로 호출한다. `POST /api/sessions`는 202로 작업 ID를 돌려주고, 프론트가 `GET /api/jobs/{id}`를 1초마다 폴링해 단계(스킬 로드 → 웹 검색 n회 → 작성 → 구조 확인)와 진행 바를 보여준다. 작업은 서버 메모리에 살아 있으므로 홈에 다시 들어오면 `GET /api/jobs`(진행 중인 작업 목록)로 찾아 같은 진행 바를 이어서 보여준다. 퍼센트는 단계 하한 + 경과 시간(최근 5회 중앙값 기준) 추정이다. API 키 불필요, Claude 구독으로 처리. 1회 생성 약 1~2분(opus 기준). CLI에는 `Skill`, `Read`, 내장 `WebSearch`/`WebFetch`, firecrawl MCP(`firecrawl_search`, `firecrawl_scrape`)가 열려 있다. 검색은 firecrawl을 먼저 쓰고, firecrawl이 없거나(OAuth 만료 등) 실패하면 내장 `WebSearch`로 넘어간다. 아티클은 최대 3회 웹 검색으로 사실을 확인하고 최근 이슈를 각도로 잡는다. firecrawl은 호스트에서 `claude mcp add --transport http firecrawl https://mcp.firecrawl.dev/v2/mcp-oauth` 후 한 번 OAuth 로그인해 두면 된다. 토큰이 만료되면(`claude mcp list`가 `Needs authentication`을 보임) 호스트에서 `claude`를 열어 `/mcp` → firecrawl → Authenticate로 다시 로그인하고, `docker compose restart backend`로 자격증명을 다시 복사한다(컨테이너는 시작할 때 호스트 `.credentials.json`을 복사한다).
+생성은 `claude-agent-sdk`의 `query()`로 돌린다(`app/llm.py`의 `Claude.run`, 구조화 출력은 `output_format`의 JSON Schema). SDK가 Claude Code CLI를 동봉하므로 컨테이너에 따로 설치하지 않는다. `POST /api/sessions`는 202로 작업 ID를 돌려주고, 프론트가 `GET /api/jobs/{id}`를 1초마다 폴링해 단계(스킬 로드 → 웹 검색 n회 → 작성 → 구조 확인)와 진행 바를 보여준다. 단계는 SDK가 흘려보내는 메시지의 도구 호출로 판단한다(`generation/progress.py`). 작업은 서버 메모리에 살아 있으므로 홈에 다시 들어오면 `GET /api/jobs`(진행 중인 작업 목록)로 찾아 같은 진행 바를 이어서 보여준다. 퍼센트는 단계 하한 + 경과 시간(최근 5회 중앙값 기준) 추정이다. API 키 불필요, `CLAUDE_CODE_OAUTH_TOKEN`으로 Claude 구독에서 처리한다. 1회 생성 약 1~2분(opus 기준). 세션 생성에 열린 도구는 내장 `WebSearch`/`WebFetch`, `Read`, `check_items`이고, `CLAUDE_SKILLS`가 있으면 `Skill`도 열린다. 아티클은 최대 3회 웹 검색으로 사실을 확인하고 최근 이슈를 각도로 잡는다. 실행마다 걸린 시간·턴 수·환산 비용이 backend 로그에 한 줄 남는다.
 
 | 환경변수 | 기본값 | 용도 |
 |---|---|---|
@@ -34,7 +34,7 @@ docker compose up -d --build
 | `ASSESS_BREAK_CONFIDENCE` | `0.75` | 단어 앞 UnexpectedBreak confidence가 이 값 위면 끊어읽기 교정 |
 | `CLAUDE_MODEL` | `opus` | 생성 모델. `sonnet`이면 더 빠름 |
 | `CLAUDE_EFFORT` | `xhigh` | reasoning effort. `low`, `medium`, `high`, `xhigh`, `max` |
-| `CLAUDE_SKILLS` | 비움 | 생성 전에 호출할 스킬. 쉼표 구분. 예: `stop-slop,cotidie:write-like-me` |
+| `CLAUDE_SKILLS` | 비움 | 생성 전에 호출할 스킬. 쉼표 구분. 예: `stop-slop,anti-ai-writing` |
 | `DB_PATH` | `backend/data/sessions.db` | SQLite 파일 |
 | `OPENAI_API_KEY` | 비움 | GPT-Live 코치(provider가 `openai`일 때)와 Summary 탭 텍스트 추출용 |
 | `READ_ALOUD_AGENT_DIR` | `../read-aloud-coach` | 발음·끊어 읽기 코치 정의 폴더(프롬프트, 세션 설정) |
@@ -101,7 +101,7 @@ Article 탭의 문단마다 `Read aloud` 버튼이 있다. 누르면 마이크�
 | 다시 읽어 맞음 | 표시가 초록 ✓ (Azure가 확인) | |
 | `Done` | 마이크와 Azure를 놓는다. 표시는 남아 그 뒤에도, `Close` 뒤에도 클릭할 수 있다. `Read again`으로 새 라운드 | |
 
-문단마다 `Phrasing` 버튼이 있다. 처음 누르면 `POST /api/phrasing`이 `claude` CLI(`EXAMPLE_MODEL`/`EXAMPLE_EFFORT`, 도구 없음)에 `../read-aloud-coach/prompts/phrasing.md`를 넣어 thought group 경계에 ` / `가 들어간 문단을 받고, 단어열이 원문과 같은지 확인한 뒤 경계 인덱스를 `phrasings` 테이블에 캐시한다(문단당 한 번, 약 5~10초). 화면에는 파란 슬래시로 보이고 다시 누르면 숨는다. 켜 둔 채 Read aloud를 하면 슬래시 자리에서 멈춘 것은 끊어읽기 오류로 표시하지 않는다.
+문단마다 `Phrasing` 버튼이 있다. 처음 누르면 `POST /api/phrasing`이 Claude(`EXAMPLE_MODEL`/`EXAMPLE_EFFORT`, 도구 없음)에 `../read-aloud-coach/prompts/phrasing.md`를 넣어 thought group 경계에 ` / `가 들어간 문단을 받고, 단어열이 원문과 같은지 확인한 뒤 경계 인덱스를 `phrasings` 테이블에 캐시한다(문단당 한 번, 약 5~10초). 화면에는 파란 슬래시로 보이고 다시 누르면 숨는다. 켜 둔 채 Read aloud를 하면 슬래시 자리에서 멈춘 것은 끊어읽기 오류로 표시하지 않는다.
 
 라운드가 끝나면 `POST /api/readings`에 `corrections`로 함께 저장된다. Summary 탭은 `GET /api/readings`로 그 목록을 읽는다. 텍스트 모델로 transcript를 정리하던 단계는 없앴다.
 
@@ -117,9 +117,9 @@ Azure 키는 backend에만 있다. `GET /api/assessor/token`이 10분짜리 토�
 
 에이전트 정의는 `../phrase-coach/`에 있다. `../read-aloud-coach/`와 같은 규약이고, backend의 같은 `LiveAgent`가 둘 다 읽는다.
 
-## Your turn / Practice (GPT-Live + claude CLI)
+## Your turn / Practice (GPT-Live + Claude)
 
-Expressions 탭의 표현마다 노란 `Your turn: one sentence each.` 라벨이, Vocabulary 탭의 카드마다 `Practice` 버튼이 있다. 둘 다 같은 `Practice` 컴포넌트다. 누르면 마이크가 붙고 참가자가 그 표현이나 단어로 문장 하나를 말한다. GPT-Live는 듣기와 읽어 주기만 맡는다: 문장이 끝나면 "Got it." 한마디, 그 첫 발화를 신호로 프론트가 사용자 transcript를 `POST /api/example/feedback`에 보낸다. backend는 `claude` CLI(`EXAMPLE_MODEL`, 기본 opus, `EXAMPLE_EFFORT` 기본 low, 도구 없음)에 `../example-coach/prompts/feedback.md`를 넣어 `paraphrase`(원어민이 말하는 대로 바꿔 말한 문장, 고칠 곳은 모두 고침)와 `feedback`(고친 곳마다 짧은 문장 하나씩의 목록) 두 필드를 받는다. 쪽지에서는 목록을 불릿으로 보여 준다. 답이 오는 동안 쪽지에 `Writing the native version…`이 뜨고 라운드는 닫히지 않는다(약 10초). 답이 오면 화면에 두 줄로 보이고, 같은 문장을 `session.instructions.append`로 넘겨 코치가 그대로 소리 내어 읽는다. 코치가 5초간 조용하면 라운드가 끝나고 `Keep`으로 그 표현 아래에 쌓인다. 쪽지 위의 `↻`는 처음부터 다시, `✕`는 듣는 중이든 끝난 뒤든 버린다. 텍스트 모델이 실패하면 오류가 쪽지에 그대로 뜨고 Keep은 잠긴다.
+Expressions 탭의 표현마다 노란 `Your turn: one sentence each.` 라벨이, Vocabulary 탭의 카드마다 `Practice` 버튼이 있다. 둘 다 같은 `Practice` 컴포넌트다. 누르면 마이크가 붙고 참가자가 그 표현이나 단어로 문장 하나를 말한다. GPT-Live는 듣기와 읽어 주기만 맡는다: 문장이 끝나면 "Got it." 한마디, 그 첫 발화를 신호로 프론트가 사용자 transcript를 `POST /api/example/feedback`에 보낸다. backend는 Claude(`EXAMPLE_MODEL`, 기본 opus, `EXAMPLE_EFFORT` 기본 low, 도구 없음)에 `../example-coach/prompts/feedback.md`를 넣어 `paraphrase`(원어민이 말하는 대로 바꿔 말한 문장, 고칠 곳은 모두 고침)와 `feedback`(고친 곳마다 짧은 문장 하나씩의 목록) 두 필드를 받는다. 쪽지에서는 목록을 불릿으로 보여 준다. 답이 오는 동안 쪽지에 `Writing the native version…`이 뜨고 라운드는 닫히지 않는다(약 10초). 답이 오면 화면에 두 줄로 보이고, 같은 문장을 `session.instructions.append`로 넘겨 코치가 그대로 소리 내어 읽는다. 코치가 5초간 조용하면 라운드가 끝나고 `Keep`으로 그 표현 아래에 쌓인다. 쪽지 위의 `↻`는 처음부터 다시, `✕`는 듣는 중이든 끝난 뒤든 버린다. 텍스트 모델이 실패하면 오류가 쪽지에 그대로 뜨고 Keep은 잠긴다.
 
 Vocabulary 카드의 Practice는 판단 프롬프트가 `../example-coach/prompts/feedback-word.md`로 바뀐다(`kind: "word"`, 그림 설명 `scene`을 함께 보낸다). 사용자는 카드의 그림을 보며 그 단어로 한 문장을 말하고, `paraphrase`는 가벼운 교정이 아니라 원어민이 그 그림을 그 단어로 묘사하는 문장(자유로운 의역)이며, `feedback`의 첫 줄은 언제나 단어 사용에 대한 것이다. 그림이 없는 예전 세션에서는 문장만 보고 판단한다.
 
@@ -162,20 +162,20 @@ Read aloud 라운드는 코치가 한마디라도 했으면 끝날 때 자동으
 | `app/coaching/` | Your turn 피드백, Phrasing, Ask 카드 |
 | `app/topics/` | 고정 풀, 하루 뉴스 주제 |
 | `app/config/` | 설정 목록과 키 확인 |
-| `app/net.py`, `claude_cli.py`, `mcp_client.py`, `templates.py` | 공용: HTTP, `claude` CLI, MCP, `{{name}}` 채우기 |
+| `app/net.py`, `llm.py`, `mcp_client.py`, `templates.py` | 공용: HTTP, Claude(Agent SDK), 이미지 MCP, `{{name}}` 채우기 |
 
 ## Docker
 
-인증은 호스트의 `~/.claude/.credentials.json`(claude.ai 로그인 + firecrawl OAuth)을 컨테이너 시작 시 복사한다. 호스트에서 로그인이 바뀌면 `docker compose restart backend`. 호스트 로그인과 분리하려면 `claude setup-token` 값을 `.env`의 `CLAUDE_CODE_OAUTH_TOKEN`에 넣는다.
+Claude 인증은 `.env`의 `CLAUDE_CODE_OAUTH_TOKEN` 하나다. 호스트에서 `claude setup-token`을 한 번 돌려 나온 값을 넣는다(1년짜리). 호스트의 `~/.claude` 파일은 복사하지 않는다.
 
 포트가 겹치면 `.env`의 `FRONTEND_PORT`를 바꾼다.
 
 | 서비스 | 내용 |
 |---|---|
-| backend | python 3.13 + uv + Claude Code 바이너리. `backend/data`를 `/data`로 마운트해 SQLite 유지 |
+| backend | python 3.13 + uv. Claude Code CLI는 `claude-agent-sdk`에 동봉. `backend/data`를 `/data`로 마운트해 SQLite 유지 |
 | frontend | Vite 빌드를 nginx로 서빙. `/api`를 backend:8765로 프록시, 타임아웃 600초 |
 
-스킬은 호스트의 `~/.claude/skills`와 `~/.claude/plugins`를 읽기 전용으로 같은 경로에 마운트한다(플러그인 매니페스트가 절대경로를 쓰므로 컨테이너 HOME을 호스트와 맞춘다). 호스트 `settings.json`에서는 `enabledPlugins`만 가져오므로 훅과 권한 설정은 컨테이너 안에서 돌지 않는다. MCP는 `--strict-mcp-config`로 firecrawl(HTTP)만 붙인다.
+`CLAUDE_SKILLS`용 스킬은 호스트의 `~/.claude/skills`를 읽기 전용으로 같은 경로에 마운트해 SDK의 `skills` 옵션으로 연다. 플러그인 스킬(`name:skill` 형태)은 지원하지 않는다. MCP는 `strict_mcp_config`라 호스트 설정의 서버는 붙지 않는다.
 
 ### 개발
 
@@ -199,8 +199,7 @@ docker compose -f compose.yaml -f compose.dev.yaml up --build
 ## 구조
 
 ```
-backend/   FastAPI. app/{main,wiring,settings,generator,claude_cli,daily_topics,live,cards,store,topics,models}.py, tests/
-           wiring.py가 설정으로 서비스를 조립하고, settings.py가 env + SQLite 오버라이드를 합친다
+backend/   FastAPI. 패키지 구성은 위 "백엔드 구조" 표, tests/
 frontend/  React 19 + Vite + TS. src/{pages,components,lib}. lib/live/가 provider별 전송(openaiWebrtc, geminiWebsocket)
 compose.yaml      사용용. compose.dev.yaml을 겹치면 개발용(핫 리로드)
 ```

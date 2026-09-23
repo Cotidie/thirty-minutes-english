@@ -6,7 +6,7 @@ import logging
 import uuid
 from pathlib import Path
 
-from app.claude_cli import GenerationError
+from app.llm import GenerationError
 from app.models import SessionContent, VocabularyItem
 from app.pictures.painters import Painter
 

@@ -1,10 +1,10 @@
 import pytest
 from fastapi.testclient import TestClient
 
-from app.claude_cli import GenerationError
 from app.db import Database
 from app.generation.generator import EXPRESSION_COUNT, VOCABULARY_COUNT
 from app.generation.progress import Progress, Stage
+from app.llm import GenerationError
 from app.main import create_app
 from app.topics.pool import TOPICS
 from app.wiring import Services

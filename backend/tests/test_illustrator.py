@@ -5,7 +5,7 @@ import threading
 import pytest
 
 import app.pictures.painters as mod
-from app.claude_cli import GenerationError
+from app.llm import GenerationError
 from app.mcp_client import McpError
 from app.pictures.illustrator import IMAGE_RULES, STYLES, Illustrator
 from app.pictures.painters import (
@@ -205,9 +205,9 @@ class FakeCli:
         self.scene = scene
         self.prompt = ""
 
-    def run(self, prompt: str, schema: dict, on_event=None) -> dict:
+    def run(self, prompt: str, schema: dict, on_message=None) -> dict:
         self.prompt = prompt
-        return {"structured_output": {"scene": self.scene}}
+        return {"scene": self.scene}
 
 
 def test_scene_writer_names_the_word_the_scene_to_avoid_and_a_rolled_spark():

@@ -3,6 +3,7 @@ name = "english-speaking-backend"
 version = "0.1.0"
 requires-python = ">=3.13"
 dependencies = [
+    "claude-agent-sdk>=0.2.158",
     "fastapi>=0.141.1",
     "uvicorn[standard]>=0.52.4",
 ]

@@ -7,7 +7,7 @@ text run of the claude CLI with the prompt in the example-coach folder.
 from pathlib import Path
 from typing import Literal
 
-from app.claude_cli import ClaudeCli, Runner, structured_output
+from app.llm import Claude, Runner
 from app.models import ExampleFeedback
 from app.templates import fill
 
@@ -35,7 +35,7 @@ class ExampleCoach:
 
     @classmethod
     def with_cli(cls, agent_dir: Path, model: str, effort: str = "low") -> "ExampleCoach":
-        return cls(ClaudeCli.text_only(model, effort), agent_dir)
+        return cls(Claude(model, effort), agent_dir)
 
     def build_prompt(
         self, expression: str, meaning: str, usage_note: str, sentence: str, kind: Kind = "expression", scene: str = ""
@@ -57,4 +57,4 @@ class ExampleCoach:
     ) -> ExampleFeedback:
         """Raises GenerationError when the run fails."""
         prompt = self.build_prompt(expression, meaning, usage_note, sentence, kind, scene)
-        return ExampleFeedback.model_validate(structured_output(self._cli.run(prompt, FEEDBACK_SCHEMA)))
+        return ExampleFeedback.model_validate(self._cli.run(prompt, FEEDBACK_SCHEMA))

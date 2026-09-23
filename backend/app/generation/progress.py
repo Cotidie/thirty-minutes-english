@@ -1,8 +1,18 @@
-"""Turn claude's stream-json events into coarse generation stages."""
+"""Turn the run's messages into coarse generation stages."""
 
 from collections.abc import Callable
 from dataclasses import dataclass
 from enum import StrEnum
+
+from claude_agent_sdk import (
+    AssistantMessage,
+    Message,
+    TextBlock,
+    ThinkingBlock,
+    ToolUseBlock,
+)
+
+from app.llm import WEB_TOOLS
 
 
 class Stage(StrEnum):
@@ -21,7 +31,7 @@ class Progress:
 
 
 class StreamTracker:
-    """Feed every stream-json event; emits a Progress whenever the stage or search count changes."""
+    """Feed every message; emits a Progress whenever the stage or search count changes."""
 
     def __init__(self, on_progress: Callable[[Progress], None]) -> None:
         self._on_progress = on_progress
@@ -32,25 +42,23 @@ class StreamTracker:
     def progress(self) -> Progress:
         return Progress(self._stage, self._searches)
 
-    def feed(self, event: dict) -> None:
-        if event.get("type") != "assistant":
+    def feed(self, message: Message) -> None:
+        if not isinstance(message, AssistantMessage):
             return
         before = self.progress
-        for block in event.get("message", {}).get("content", []):
+        for block in message.content:
             self._apply(block)
         if self.progress != before:
             self._on_progress(self.progress)
 
-    def _apply(self, block: dict) -> None:
-        kind = block.get("type")
-        if kind == "tool_use":
-            name = block.get("name", "")
-            if name == "Skill":
+    def _apply(self, block) -> None:
+        if isinstance(block, ToolUseBlock):
+            if block.name == "Skill":
                 self._stage = Stage.SKILLS
-            elif name.startswith("mcp__") or name in ("WebSearch", "WebFetch"):
+            elif block.name in WEB_TOOLS:
                 self._searches += 1
                 self._stage = Stage.SEARCHING
-            elif name == "StructuredOutput":
+            elif block.name == "StructuredOutput":
                 self._stage = Stage.FINALIZING
-        elif kind in ("text", "thinking") and self._stage != Stage.FINALIZING:
+        elif isinstance(block, (TextBlock, ThinkingBlock)) and self._stage != Stage.FINALIZING:
             self._stage = Stage.WRITING

@@ -5,7 +5,7 @@ folder. The answer is checked word for word against the paragraph."""
 import re
 from pathlib import Path
 
-from app.claude_cli import ClaudeCli, GenerationError, Runner, structured_output
+from app.llm import Claude, GenerationError, Runner
 from app.templates import fill
 
 PHRASING_SCHEMA: dict = {
@@ -25,15 +25,14 @@ class PhrasingMarker:
 
     @classmethod
     def with_cli(cls, agent_dir: Path, model: str, effort: str = "low") -> "PhrasingMarker":
-        return cls(ClaudeCli.text_only(model, effort), agent_dir)
+        return cls(Claude(model, effort), agent_dir)
 
     def build_prompt(self, paragraph: str) -> str:
         return fill(self._template, paragraph=paragraph)
 
     def mark(self, paragraph: str) -> list[int]:
         """Indices of the words that open a new thought group (never 0). Raises GenerationError."""
-        envelope = self._cli.run(self.build_prompt(paragraph), PHRASING_SCHEMA)
-        marked = str(structured_output(envelope).get("marked", ""))
+        marked = str(self._cli.run(self.build_prompt(paragraph), PHRASING_SCHEMA).get("marked", ""))
         return breaks_in(marked, paragraph)
 
 

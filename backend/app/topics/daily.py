@@ -6,8 +6,8 @@ import logging
 from datetime import UTC, date, datetime
 from typing import Protocol
 
-from app.claude_cli import ClaudeCli, GenerationError, structured_output
 from app.db.caches import CacheRepo
+from app.llm import WEB_TOOLS, Claude, GenerationError
 from app.models import Category, Topic, TopicListing
 from app.topics.pool import pool_for_day
 
@@ -57,8 +57,7 @@ party politics or a running war's daily movements, and skip celebrity news.
 
 Run at most 5 searches: one on what the major international outlets are leading with right now, one on \
 what the Korean outlets are leading with, and the rest to check that a story cleared the bar. \
-Search with firecrawl_search when it is offered; if it is missing or fails, use WebSearch instead. \
-If neither works, or the searches return nothing usable, return an empty list. Never invent a story, and never return placeholder text or a note about the tools you were given. \
+If search does not work, or the searches return nothing usable, return an empty list. Never invent a story, and never return placeholder text or a note about the tools you were given. \
 Return only the structured output."""
 
 
@@ -68,11 +67,10 @@ class TopicSource(Protocol):
 
 class ClaudeTopicSource:
     def __init__(self, model: str = "sonnet", effort: str = "medium", timeout_s: float = 240):
-        self._cli = ClaudeCli(model=model, effort=effort, timeout_s=timeout_s)
+        self._claude = Claude(model, effort, timeout_s, tools=WEB_TOOLS)
 
     def fetch(self, count: int) -> list[str]:
-        envelope = self._cli.run(PROMPT.format(count=count, korea_count=KOREA_COUNT), TOPICS_SCHEMA)
-        topics = structured_output(envelope)["topics"]
+        topics = self._claude.run(PROMPT.format(count=count, korea_count=KOREA_COUNT), TOPICS_SCHEMA)["topics"]
         return [t.strip() for t in topics if t.strip()]
 
 

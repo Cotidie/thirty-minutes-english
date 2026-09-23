@@ -13,7 +13,7 @@ from app.api.schemas import (
     PhrasingRequest,
     ReadAloudRequest,
 )
-from app.claude_cli import GenerationError
+from app.llm import GenerationError
 from app.models import ExampleFeedback
 from app.net import HttpError
 from app.wiring import Services

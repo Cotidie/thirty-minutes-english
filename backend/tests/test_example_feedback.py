@@ -3,9 +3,9 @@ from pathlib import Path
 import pytest
 from fastapi.testclient import TestClient
 
-from app.claude_cli import ClaudeCli, GenerationError
 from app.coaching.example_feedback import ExampleCoach
 from app.db import Database
+from app.llm import GenerationError
 from app.main import create_app
 from app.models import ExampleFeedback
 from app.wiring import Services
@@ -21,10 +21,10 @@ class FakeCli:
         self.prompts: list[str] = []
         self.schemas: list[dict] = []
 
-    def run(self, prompt: str, schema: dict, on_event=None) -> dict:
+    def run(self, prompt: str, schema: dict, on_message=None) -> dict:
         self.prompts.append(prompt)
         self.schemas.append(schema)
-        return {"structured_output": self.output}
+        return self.output
 
 
 @pytest.fixture
@@ -59,14 +59,6 @@ def test_feedback_is_the_two_lines_the_model_returns(agent_dir):
     )
     assert cli.schemas[0]["required"] == ["paraphrase", "feedback"]
     assert cli.schemas[0]["properties"]["feedback"]["type"] == "array"  # one entry per change, shown as bullets
-
-
-def test_the_feedback_run_has_no_tools_and_no_mcp():
-    cmd = ClaudeCli(model="opus", effort="low", tools=(), mcp=None).build_command({"type": "object"})
-    assert cmd[cmd.index("--tools") + 1] == ""
-    assert "--allowedTools" not in cmd
-    assert "--mcp-config" not in cmd
-    assert "--strict-mcp-config" in cmd
 
 
 class FakeCoach:

@@ -2,8 +2,8 @@ from fastapi import APIRouter, HTTPException, Response
 
 from app.api.deps import Db, Jobs, Svc, failed, off, require_session
 from app.api.schemas import CreateSessionRequest, JobStatus, RedrawRequest
-from app.claude_cli import GenerationError
 from app.generation.jobs import Job, JobRunner
+from app.llm import GenerationError
 from app.models import Session, SessionSummary, Stars, VocabularyItem
 from app.topics.pool import pick_topic
 

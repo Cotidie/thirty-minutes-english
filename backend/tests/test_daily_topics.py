@@ -3,8 +3,8 @@ from datetime import date
 import pytest
 from fastapi.testclient import TestClient
 
-from app.claude_cli import GenerationError
 from app.db import Database
+from app.llm import GenerationError
 from app.main import create_app
 from app.models import Category
 from app.topics.daily import FRESH_COUNT, POOL_COUNT, DailyTopics

@@ -9,7 +9,7 @@ from app.coaching.cards import SCHEMA_FILE, Extractor, PhraseCardExtractor
 from app.coaching.example_feedback import TEMPLATES, ExampleCoach
 from app.coaching.phrasing import PhrasingMarker
 from app.config.settings import Settings
-from app.generation.generator import ClaudeCliGenerator, Generator
+from app.generation.generator import ClaudeGenerator, Generator
 from app.pictures.illustrator import Illustrator
 from app.pictures.painters import painter_for
 from app.pictures.scenes import SceneWriter
@@ -46,7 +46,7 @@ def build_services(settings: Settings, agent_dirs: dict[str, Path], image_dir: P
     """`agent_dirs` maps read-aloud / phrase / example to their folders; `image_dir` is
     where the vocabulary pictures land (none: no pictures)."""
     return Services(
-        generator=ClaudeCliGenerator(
+        generator=ClaudeGenerator(
             model=settings.get("CLAUDE_MODEL"),
             effort=settings.get("CLAUDE_EFFORT"),
             skills=settings.claude_skills,

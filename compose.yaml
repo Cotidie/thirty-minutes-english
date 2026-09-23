@@ -40,9 +40,6 @@ services:
       - ../phrase-coach:/agents/phrase-coach:ro
       - ../example-coach:/agents/example-coach:ro
       - ${HOME}/.claude/skills:${HOME}/.claude/skills:ro
-      - ${HOME}/.claude/plugins:${HOME}/.claude/plugins:ro
-      - ${HOME}/.claude/settings.json:/host-settings.json:ro
-      - ${HOME}/.claude/.credentials.json:/host-credentials.json:ro
 
   frontend:
     restart: unless-stopped

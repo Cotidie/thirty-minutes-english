@@ -3,7 +3,7 @@
 import random
 from dataclasses import dataclass
 
-from app.claude_cli import ClaudeCli, GenerationError, Runner, structured_output
+from app.llm import Claude, GenerationError, Runner
 from app.models import VocabularyItem
 
 # What a scene is, for the session generator and the redraw writer alike.
@@ -78,7 +78,7 @@ class SceneWriter:
 
     @classmethod
     def with_cli(cls, model: str) -> "SceneWriter":
-        return cls(ClaudeCli.text_only(model, timeout_s=60))
+        return cls(Claude(model, timeout_s=60))
 
     def build_prompt(self, item: VocabularyItem, spark: Spark) -> str:
         return SCENE_PROMPT.format(
@@ -89,7 +89,7 @@ class SceneWriter:
     def write(self, item: VocabularyItem) -> str:
         """Raises GenerationError when the run fails or comes back blank."""
         prompt = self.build_prompt(item, Spark.roll(self._rng))
-        scene = str(structured_output(self._cli.run(prompt, SCENE_SCHEMA)).get("scene", "")).strip()
+        scene = str(self._cli.run(prompt, SCENE_SCHEMA).get("scene", "")).strip()
         if not scene:
             raise GenerationError("the model wrote no scene")
         return scene

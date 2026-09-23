@@ -11,10 +11,10 @@ from statistics import median
 from threading import Lock
 from typing import Literal, Protocol
 
-from app.claude_cli import GenerationError
 from app.db.sessions import SessionRepo
 from app.generation.generator import Generator
 from app.generation.progress import Progress, Stage
+from app.llm import GenerationError
 from app.pictures.illustrator import Illustrator
 
 Status = Literal["running", "done", "failed"]
@@ -95,10 +95,7 @@ class JobRunner:
             job.error = str(e)
             job.status = "failed"
             return
-        leaked = sorted(
-            {e.phrase for e in content.expressions} & set(exclude.expressions)
-            | {v.word for v in content.vocabulary} & set(exclude.words)
-        )
+        leaked = exclude.taught([e.phrase for e in content.expressions], [v.word for v in content.vocabulary])
         if leaked:
             log.warning("job %s: %d banned items came back anyway: %s", job.id, len(leaked), leaked)
         if illustrator:

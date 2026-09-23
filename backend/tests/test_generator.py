@@ -1,109 +1,60 @@
-import json
-
+import jsonschema
 import pytest
 
-from app.claude_cli import GenerationError
 from app.generation.exclusions import Exclusions
-from app.generation.generator import SESSION_SCHEMA, ClaudeCliGenerator
+from app.generation.generator import (
+    CHECK_ITEMS_RULE,
+    SESSION_SCHEMA,
+    ClaudeGenerator,
+    check_items_reply,
+)
+from app.generation.progress import Progress, Stage
+from app.llm import GenerationError
 from tests.conftest import sample_content
+from tests.fake_claude import FakeQuery, assistant, result, tool_use
 
 
-def test_parse_result_returns_content():
-    payload = sample_content().model_dump()
-    parsed = ClaudeCliGenerator.parse_result({"is_error": False, "structured_output": payload})
-    assert parsed.article.title == "Twins at Work"
-    assert len(parsed.vocabulary) == 10
+def generator_with(fake: FakeQuery, **kwargs) -> ClaudeGenerator:
+    gen = ClaudeGenerator(model="sonnet", **kwargs)
+    object.__setattr__(gen.claude, "query", fake)
+    return gen
 
 
-def test_parse_result_raises_on_error_envelope():
-    with pytest.raises(GenerationError, match="rate limited"):
-        ClaudeCliGenerator.parse_result({"is_error": True, "result": "rate limited"})
+def test_generate_validates_the_payload_and_reports_progress():
+    fake = FakeQuery(assistant(tool_use("WebSearch")), assistant(tool_use("StructuredOutput")), result(sample_content().model_dump()))
+    seen = []
+    content = generator_with(fake).generate("Digital twins", seen.append)
+    assert content.article.title == "Twins at Work"
+    assert seen == [Progress(Stage.SEARCHING, 1), Progress(Stage.FINALIZING, 1)]
 
 
-def test_parse_result_raises_on_missing_structured_output():
-    with pytest.raises(GenerationError):
-        ClaudeCliGenerator.parse_result({"is_error": False, "result": "plain text"})
+def test_a_payload_that_fails_validation_raises():
+    with pytest.raises(GenerationError, match="validation"):
+        generator_with(FakeQuery(result({"topic": "x"}))).generate("x")
 
 
-def test_build_command_includes_model_effort_and_schema():
-    gen = ClaudeCliGenerator(model="sonnet", effort="high")
-    cmd = gen.cli.build_command(SESSION_SCHEMA)
-    assert cmd[0] == "claude"
-    assert cmd[cmd.index("--model") + 1] == "sonnet"
-    assert cmd[cmd.index("--effort") + 1] == "high"
-    assert cmd[cmd.index("--output-format") + 1] == "stream-json"
-    assert "--verbose" in cmd
-    schema = json.loads(cmd[cmd.index("--json-schema") + 1])
-    assert set(schema["required"]) == {"topic", "expressions", "article", "vocabulary"}
-    assert schema["properties"]["expressions"]["minItems"] == 5
-    assert schema["properties"]["vocabulary"]["maxItems"] == 10
+def test_past_items_go_to_a_check_tool_not_the_prompt():
+    fake = FakeQuery(result(sample_content().model_dump()))
+    generator_with(fake).generate("x", exclude=Exclusions(("push back",), ("scrutiny",)))
+    prompt, options = fake.calls[0]
+    assert CHECK_ITEMS_RULE in prompt and "push back" not in prompt
+    assert "session" in options.mcp_servers
+    assert "mcp__session__check_items" in options.allowed_tools
 
 
-def test_default_effort_is_xhigh():
-    cmd = ClaudeCliGenerator(model="sonnet").cli.build_command(SESSION_SCHEMA)
-    assert cmd[cmd.index("--effort") + 1] == "xhigh"
+def test_no_check_tool_without_past_items():
+    fake = FakeQuery(result(sample_content().model_dump()))
+    generator_with(fake).generate("x", exclude=Exclusions())
+    prompt, options = fake.calls[0]
+    assert CHECK_ITEMS_RULE not in prompt and "session" not in options.mcp_servers
 
 
-def test_prompt_states_counts_and_relaxed_vocabulary_rule():
-    prompt = ClaudeCliGenerator(model="sonnet").build_prompt("x")
-    assert "5 general-purpose expressions" in prompt
-    assert "10 words at B2 to C1+" in prompt
-    assert "even if they do not appear in the article" in prompt
+def test_check_items_names_close_variants_of_taught_items():
+    exclude = Exclusions(("play devil's advocate", "push back"), ("scrutiny",))
+    reply = check_items_reply(exclude, {"expressions": ["play the devil's advocate", "on the fence"], "words": ["Scrutiny", "candor"]})
+    assert reply == "Already taught, replace: play the devil's advocate; Scrutiny"
+    assert check_items_reply(exclude, {"expressions": ["on the fence"], "words": []}) == "None of these were taught before."
 
 
-def test_build_command_exposes_skill_read_builtin_web_and_firecrawl():
-    cmd = ClaudeCliGenerator(model="sonnet").cli.build_command(SESSION_SCHEMA)
-    assert cmd[cmd.index("--tools") + 1] == "Skill,Read,WebSearch,WebFetch"
-    allowed = cmd[cmd.index("--allowedTools") + 1].split(",")
-    assert allowed == [
-        "Skill", "Read", "WebSearch", "WebFetch",
-        "mcp__firecrawl__firecrawl_search", "mcp__firecrawl__firecrawl_scrape",
-    ]
-    assert cmd[cmd.index("--setting-sources") + 1] == "user"
-    assert "--restricted" not in cmd
-    assert "--strict-mcp-config" in cmd
-    mcp = json.loads(cmd[cmd.index("--mcp-config") + 1])
-    assert list(mcp["mcpServers"]) == ["firecrawl"]
-
-
-def test_prompt_mentions_topic():
-    gen = ClaudeCliGenerator(model="sonnet")
-    assert "Digital twins" in gen.build_prompt("Digital twins")
-
-
-def test_prompt_falls_back_to_builtin_web_search():
-    prompt = ClaudeCliGenerator(model="sonnet").build_prompt("x")
-    assert "firecrawl_search when it is offered and WebSearch when it is missing or fails" in prompt
-
-
-def test_prompt_lists_skills_when_configured():
-    gen = ClaudeCliGenerator(model="sonnet", skills=("stop-slop", "cotidie:write-like-me"))
-    prompt = gen.build_prompt("Digital twins")
-    assert prompt.startswith("Before writing, invoke each of these skills")
-    assert "stop-slop, cotidie:write-like-me" in prompt
-    assert "Digital twins" in prompt
-
-
-def test_prompt_has_no_skill_preamble_by_default():
-    assert not ClaudeCliGenerator(model="sonnet").build_prompt("x").startswith("Before writing")
-
-
-def test_prompt_asks_for_short_discussion_questions():
-    prompt = ClaudeCliGenerator(model="sonnet").build_prompt("x")
-    assert "at most 14 words" in prompt
-
-
-def test_schema_and_prompt_ask_for_sources():
-    gen = ClaudeCliGenerator(model="sonnet")
-    schema = json.loads(gen.cli.build_command(SESSION_SCHEMA)[gen.cli.build_command(SESSION_SCHEMA).index("--json-schema") + 1])
-    assert "sources" in schema["properties"]["article"]["required"]
-    assert "list only the web pages you actually drew on" in gen.build_prompt("x")
-
-
-def test_prompt_lists_exclusions_only_when_given():
-    gen = ClaudeCliGenerator(model="sonnet")
-    assert "HARD CONSTRAINT" not in gen.build_prompt("x")
-    assert "HARD CONSTRAINT" not in gen.build_prompt("x", Exclusions())
-    prompt = gen.build_prompt("x", Exclusions(("on the fence", "push back"), ("scrutiny",)))
-    assert "Banned expressions: on the fence; push back" in prompt
-    assert "Banned words: scrutiny" in prompt
+def test_a_full_session_fits_the_schema_the_model_answers_in():
+    jsonschema.validate(sample_content().model_dump(exclude={"vocabulary": {"__all__": {"image"}}}), SESSION_SCHEMA)
