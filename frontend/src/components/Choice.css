@@ -3,6 +3,56 @@
   min-width: 0;
 }
 
+/* The model field and its pin button. */
+.choice-model {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: flex-start;
+  gap: 0.4rem;
+}
+
+.choice-pin {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 2.75rem;
+  height: 2.75rem;
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  background: #fff;
+  color: var(--muted);
+  cursor: pointer;
+}
+
+.choice-pin:hover {
+  color: var(--ink);
+}
+
+.choice-pin.is-on {
+  border-color: var(--ink);
+  color: var(--ink);
+  background: var(--marker-soft);
+}
+
+.choice-section + .choice-section {
+  border-top: 1px solid var(--line);
+}
+
+.choice-section-head {
+  padding: 0.45rem 0.75rem 0.2rem;
+  color: var(--muted);
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.choice-item-pin {
+  display: inline-flex;
+  color: var(--ink);
+}
+
 .choice-field {
   display: flex;
   align-items: center;

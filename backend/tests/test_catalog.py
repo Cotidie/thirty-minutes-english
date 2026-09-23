@@ -96,8 +96,8 @@ def test_claude_models_come_from_claude_code(monkeypatch):
 
     monkeypatch.setattr(catalog_module, "ClaudeSDKClient", FakeClient)
     assert claude_models({}) == [
-        ModelOption("opus", "Opus 5.5", "Most capable", ("low", "max"), resolved="claude-opus-5-5"),
-        ModelOption("haiku", "Haiku 4.5", "Fastest", ()),
+        ModelOption("opus", "Opus 5.5", ("low", "max"), resolved="claude-opus-5-5"),
+        ModelOption("haiku", "Haiku 4.5", ()),
     ]
 
 
@@ -119,7 +119,7 @@ def test_gemini_lists_live_models_only(http):
         {"name": "models/gemini-3.5-transcribe-live", "supportedGenerationMethods": ["bidiGenerateContent"]},
         {"name": "models/gemini-3-pro", "supportedGenerationMethods": ["generateContent"]},
     ]}
-    assert gemini_live({"GEMINI_API_KEY": "AIza"}) == [ModelOption("gemini-3.8-live", "Gemini 3.8 Live", "Live audio")]
+    assert gemini_live({"GEMINI_API_KEY": "AIza"}) == [ModelOption("gemini-3.8-live", "Gemini 3.8 Live")]
 
 
 def test_openrouter_lists_image_models_by_id(http):
@@ -154,7 +154,7 @@ def test_comfy_lists_text_to_image_partner_models(monkeypatch):
     monkeypatch.setattr(catalog_module, "McpHttp", FakeServer)
     assert comfy_images({"COMFY_API_KEY": "c"}) == [
         ModelOption("vertexai/nano-banana-pro"),
-        ModelOption("xai/grok-image-generate", description="Generates an image"),
+        ModelOption("xai/grok-image-generate"),
     ]
 
 
@@ -219,3 +219,31 @@ def test_undated_lists_go_by_the_version_in_the_name_with_aliases_on_top():
     ]
     comfy = [ModelOption("bfl/flux-pro-1.1-ultra"), ModelOption("qwen/qwen-image-3"), ModelOption("vertexai/nano-banana-pro")]
     assert [o.id for o in newest_first(comfy)] == ["vertexai/nano-banana-pro", "qwen/qwen-image-3", "bfl/flux-pro-1.1-ultra"]
+
+
+def test_a_pinned_model_leads_its_menu_and_outlives_the_newest_ten(tmp_path):
+    db = Database(tmp_path / "s.db")
+    models = [ModelOption(f"m{i}", created=float(i)) for i in range(15)]
+    cat = Catalog(db.caches, {"openrouter_images": lambda _: models}, background=False)
+    cat.refresh({})
+    app = create_app(db, Services(FakeGenerator()), InlineExecutor(), env={}, catalog=cat)
+
+    def menu(view) -> list[tuple[str, bool]]:
+        image = {f["key"]: f for f in view["fields"]}["IMAGE_MODEL"]["variants"]["openrouter"]
+        assert image["catalog"] == "openrouter_images"
+        return [(o["id"], o["pinned"]) for o in image["options"]]
+
+    with TestClient(app) as c:
+        pinned = menu(c.post("/api/settings/models/pin", json={"catalog": "openrouter_images", "model": "m1", "pinned": True}).json())
+        assert pinned[0] == ("m1", True)  # m1 is far older than the newest ten
+        assert pinned[1] == ("google/gemini-3-pro-image", False)  # the default, which this provider does not list
+        assert [i for i, _ in pinned[2:12]] == [f"m{i}" for i in range(14, 4, -1)]
+
+        unpinned = menu(c.post("/api/settings/models/pin", json={"catalog": "openrouter_images", "model": "m1", "pinned": False}).json())
+        assert "m1" not in [i for i, _ in unpinned]
+
+
+def test_a_list_cached_by_an_older_version_still_reads(tmp_path):
+    db = Database(tmp_path / "s.db")
+    db.caches.set_model_list("x", {"at": 1000.0, "options": [{"id": "m", "description": "dropped field", "efforts": ["low"]}]})
+    assert Catalog(db.caches, {}, Clock()).options("x", {}) == [ModelOption("m", efforts=("low",))]

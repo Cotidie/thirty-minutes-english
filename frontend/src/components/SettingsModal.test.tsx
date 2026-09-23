@@ -5,7 +5,7 @@ import { api } from '../api'
 import type { SettingField, SettingGroup } from '../types'
 import { SettingsModal } from './SettingsModal'
 
-vi.mock('../api', () => ({ api: { getSettings: vi.fn(), putSettings: vi.fn(), testKey: vi.fn(), refreshModels: vi.fn() } }))
+vi.mock('../api', () => ({ api: { getSettings: vi.fn(), putSettings: vi.fn(), testKey: vi.fn(), refreshModels: vi.fn(), pinModel: vi.fn() } }))
 
 const opt = (id: string, description = '', label = '', efforts: string[] | null = null) => ({ id, label, description, efforts })
 
@@ -16,6 +16,7 @@ function field(partial: Partial<SettingField> & Pick<SettingField, 'key' | 'grou
     default: '',
     options: [],
     free: false,
+    catalog: null,
     testable: false,
     follows: null,
     variants: {},
@@ -36,8 +37,12 @@ const FIELDS: SettingField[] = [
     follows: 'VOICE_PROVIDER',
     free: true,
     variants: {
-      openai: { default: 'gpt-live-1', options: [opt('gpt-live-1')] },
-      gemini: { default: 'gemini-3.8-live-extended-thinking', options: [opt('gemini-3.8-live-extended-thinking'), opt('gemini-3.8-live')] },
+      openai: { default: 'gpt-live-1', catalog: 'openai_voice', options: [opt('gpt-live-1')] },
+      gemini: {
+        default: 'gemini-3.8-live-extended-thinking',
+        catalog: 'gemini_live',
+        options: [opt('gemini-3.8-live-extended-thinking'), opt('gemini-3.8-live')],
+      },
     },
   }),
   field({
@@ -66,6 +71,7 @@ const FIELDS: SettingField[] = [
     value: 'sonnet',
     default: 'opus',
     free: true,
+    catalog: 'claude',
     options: [opt('opus', 'Most capable', 'Opus 5.5', ['low', 'max']), opt('sonnet', 'Efficient', 'Sonnet 5', ['low', 'high']), opt('haiku', 'Fastest', 'Haiku 4.5', [])],
   }),
   field({ key: 'CLAUDE_EFFORT', group: 'claude', value: 'high', default: 'xhigh', effort_of: 'CLAUDE_MODEL' }),
@@ -256,6 +262,29 @@ describe('SettingsModal models', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Refresh model lists' }))
     await userEvent.click(screen.getByRole('combobox', { name: 'CLAUDE_MODEL' }))
     expect((await screen.findAllByRole('option')).map((o) => o.textContent)).toEqual(['Fable 5.1claude-fable-5-1'])
+  })
+})
+
+describe('SettingsModal pins', () => {
+  it('pins the chosen model so it leads the menu', async () => {
+    vi.mocked(api.pinModel).mockResolvedValueOnce({
+      groups: GROUPS,
+      fields: FIELDS.map((f) =>
+        f.key === 'CLAUDE_MODEL'
+          ? { ...f, options: [{ ...f.options[1], pinned: true }, f.options[0], f.options[2]] }
+          : f,
+      ),
+    })
+    await open()
+    await showTab('Claude generation')
+    await userEvent.click(screen.getByRole('button', { name: 'Pin sonnet' }))
+    expect(api.pinModel).toHaveBeenCalledWith('claude', 'sonnet', true)
+    expect(await screen.findByRole('button', { name: 'Unpin sonnet' })).toHaveAttribute('aria-pressed', 'true')
+
+    await userEvent.click(screen.getByRole('combobox', { name: 'CLAUDE_MODEL' }))
+    expect(await screen.findByText('Pinned')).toBeInTheDocument()
+    const rows = await screen.findAllByRole('option')
+    expect(rows.map((o) => within(o).queryByRole('img', { name: 'Pinned' }) !== null)).toEqual([true, false, false])
   })
 })
 

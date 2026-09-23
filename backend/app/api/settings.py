@@ -7,16 +7,18 @@ from app.api.schemas import (
     KeyTestRequest,
     KeyTestResult,
     Option,
+    PinRequest,
     SettingField,
     SettingGroup,
     SettingsUpdate,
     SettingsView,
     Variant,
 )
-from app.config.catalog import Catalog
+from app.config.catalog import Catalog, ModelOption
 from app.config.keycheck import KEYS, check_key
 from app.config.settings import GROUPS, SPEC_BY_KEY, SPECS, InvalidSetting, Settings, Spec, split_list
 from app.config.skills import host_skills
+from app.db import Database
 
 router = APIRouter(prefix="/api/settings")
 
@@ -26,22 +28,28 @@ def keys_of(settings: Settings) -> dict[str, str]:
     return {spec.key: settings.get(spec.key) for spec in SPECS if spec.secret}
 
 
-Costs = dict[str, tuple[float, int]]  # model -> (average dollars per picture here, pictures)
+class ModelMenus:
+    """Model menus as the modal shows them: pinned models first, then the newest, then the
+    default and the saved one when they are older; image models carry what a picture cost here."""
 
+    def __init__(self, catalog: Catalog, settings: Settings, db: Database) -> None:
+        self._catalog = catalog
+        self._keys = keys_of(settings)
+        self._costs = db.costs.per_picture()
+        self._pins = db.pins
 
-def listed(
-    catalog: Catalog, source: str, settings: Settings, default: str, saved: str = "", costs: Costs | None = None
-) -> list[Option]:
-    """A provider's newest models plus the default and the saved one, each with what a picture
-    cost here when we drew with it; the default goes first when the provider does not list it."""
-    costs = costs or {}
-    options = [
-        Option(**asdict(o), per_image=costs.get(o.id, (None, 0))[0], per_image_count=costs.get(o.id, (None, 0))[1])
-        for o in catalog.options(source, keys_of(settings), keep=(default, saved))
-    ]
-    if default and default not in {o.id for o in options}:
-        options.insert(0, Option(id=default, description="Default"))
-    return options
+    def listed(self, source: str, default: str, saved: str = "") -> list[Option]:
+        pins = self._pins.pinned(source)
+        found = {o.id: o for o in self._catalog.options(source, self._keys, keep=(default, saved, *pins))}
+        ids = [*pins, *(i for i in found if i not in pins)]
+        if default and default not in ids:
+            ids.insert(len(pins), default)  # not listed by the provider (or not fetched yet)
+        return [self._option(i, found.get(i), i in pins) for i in ids]
+
+    def _option(self, model: str, listed: ModelOption | None, pinned: bool) -> Option:
+        per_image, count = self._costs.get(model, (None, 0))
+        details = asdict(listed) if listed else {"id": model}
+        return Option(**details, per_image=per_image, per_image_count=count, pinned=pinned)
 
 
 def skill_options(saved: str) -> list[Option]:
@@ -51,28 +59,29 @@ def skill_options(saved: str) -> list[Option]:
     return [Option(id=name, description=text) for name, text in skills.items()] + missing
 
 
-def options_of(spec: Spec, settings: Settings, catalog: Catalog) -> list[Option]:
+def options_of(spec: Spec, settings: Settings, menus: ModelMenus) -> list[Option]:
     if spec.multi:
         return skill_options(settings.get(spec.key))
     if spec.catalog:
-        return listed(catalog, spec.catalog, settings, spec.default, settings.get(spec.key))
+        return menus.listed(spec.catalog, spec.default, settings.get(spec.key))
     labels = spec.labels or {}
     return [Option(id=c, description=labels.get(c, "")) for c in spec.choices or ()]
 
 
-def field_of(spec: Spec, settings: Settings, catalog: Catalog, costs: Costs) -> SettingField:
+def field_of(spec: Spec, settings: Settings, menus: ModelMenus) -> SettingField:
     return SettingField(
         key=spec.key,
         group=spec.group,
         value=settings.shown(spec.key),
         secret=spec.secret,
         default=spec.default,
-        options=options_of(spec, settings, catalog),
+        options=options_of(spec, settings, menus),
         free=bool(spec.catalog or spec.variants),
+        catalog=spec.catalog,
         testable=spec.key in KEYS,
         follows=spec.follows,
         variants={
-            value: Variant(default=v.default, options=listed(catalog, v.catalog, settings, v.default, settings.get(spec.key), costs))
+            value: Variant(default=v.default, catalog=v.catalog, options=menus.listed(v.catalog, v.default, settings.get(spec.key)))
             for value, v in (spec.variants or {}).items()
         },
         effort_of=spec.effort_of,
@@ -83,10 +92,11 @@ def field_of(spec: Spec, settings: Settings, catalog: Catalog, costs: Costs) -> 
     )
 
 
-def view(settings: Settings, catalog: Catalog, costs: Costs) -> SettingsView:
+def view(settings: Settings, catalog: Catalog, db: Database) -> SettingsView:
+    menus = ModelMenus(catalog, settings, db)
     return SettingsView(
         groups=[SettingGroup(id=g, title=title) for g, title in GROUPS.items()],
-        fields=[field_of(spec, settings, catalog, costs) for spec in SPECS],
+        fields=[field_of(spec, settings, menus) for spec in SPECS],
     )
 
 
@@ -102,14 +112,14 @@ def check_multi(values: dict[str, str]) -> None:
 
 @router.get("", response_model=SettingsView)
 def get_settings(settings: CurrentSettings, catalog: Models, db: Db) -> SettingsView:
-    return view(settings, catalog, db.costs.per_picture())
+    return view(settings, catalog, db)
 
 
 @router.post("/models/refresh", response_model=SettingsView)
 def refresh_models(settings: CurrentSettings, catalog: Models, db: Db) -> SettingsView:
     """Fetches every model list now (the modal's Refresh model lists); a failed one keeps its last copy."""
     catalog.refresh(keys_of(settings))
-    return view(settings, catalog, db.costs.per_picture())
+    return view(settings, catalog, db)
 
 
 @router.put("", response_model=SettingsView)
@@ -126,7 +136,14 @@ def put_settings(body: SettingsUpdate, db: Db, catalog: Models, request: Request
     rebuild: Rebuild | None = request.app.state.rebuild
     if rebuild is not None:
         request.app.state.services = rebuild(settings)
-    return view(settings, catalog, db.costs.per_picture())
+    return view(settings, catalog, db)
+
+
+@router.post("/models/pin", response_model=SettingsView)
+def pin_model(body: PinRequest, settings: CurrentSettings, catalog: Models, db: Db) -> SettingsView:
+    """Keeps a model on its list's menu (or lets it go); saved at once, apart from Save."""
+    db.pins.set(body.catalog, body.model, body.pinned)
+    return view(settings, catalog, db)
 
 
 @router.post("/test-key", response_model=KeyTestResult)

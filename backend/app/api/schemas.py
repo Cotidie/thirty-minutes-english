@@ -153,10 +153,12 @@ class Option(BaseModel):
     text_per_m: float | None = None  # list price, $ per million prompt tokens
     per_image: float | None = None  # what a picture cost here on average (image models we drew with)
     per_image_count: int = 0  # how many pictures that average covers
+    pinned: bool = False  # kept on the menu, at the top, however old
 
 
 class Variant(BaseModel):
     default: str
+    catalog: str  # the model list these options come from, the key pins are kept under
     options: list[Option]
 
 
@@ -170,6 +172,7 @@ class SettingField(BaseModel):
     default: str
     options: list[Option] = []  # the menu; strict unless `free`
     free: bool = False  # any text is allowed, `options` only suggest (model ids)
+    catalog: str | None = None  # the model list behind `options` (pins are kept per list)
     testable: bool = False  # a Test button checks the key
     follows: str | None = None  # the setting whose value picks one of `variants`
     variants: dict[str, Variant] = {}
@@ -192,6 +195,12 @@ class SettingsView(BaseModel):
 
 class SettingsUpdate(BaseModel):
     values: dict[str, str]
+
+
+class PinRequest(BaseModel):
+    catalog: str
+    model: str
+    pinned: bool
 
 
 class KeyTestRequest(BaseModel):

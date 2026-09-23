@@ -16,6 +16,8 @@ type KeyTestState = KeyTestResult | 'testing'
 interface Menu {
   options: SettingOption[]
   placeholder: string
+  /** The model list the options come from, for pinning. */
+  catalog?: string
   off?: string
 }
 
@@ -29,6 +31,7 @@ function menuFor(f: SettingField, draft: Record<string, string>, byKey: Map<stri
     return {
       options: variant?.options ?? [],
       placeholder: variant?.default ?? '',
+      catalog: variant?.catalog,
     }
   }
   if (f.effort_of) {
@@ -57,7 +60,7 @@ function menuFor(f: SettingField, draft: Record<string, string>, byKey: Map<stri
       options: [],
       placeholder: f.value ? `Saved: ${f.value}. Type to replace.` : 'Not set',
     }
-  return { options: f.options, placeholder: f.default }
+  return { options: f.options, placeholder: f.default, catalog: f.catalog ?? undefined }
 }
 
 function draftOf(fields: SettingField[]): Record<string, string> {
@@ -181,6 +184,14 @@ export function SettingsModal({ open, onClose }: Props) {
   const current = groups.find((g) => g.id === tab)
   const byKey = new Map((fields ?? []).map((f) => [f.key, f]))
   const hasModels = inGroup(tab).some((f) => f.free)
+
+  const pin = async (catalog: string, model: string, pinned: boolean) => {
+    try {
+      setFields((await api.pinModel(catalog, model, pinned)).fields)
+    } catch (e) {
+      setNotice({ kind: 'error', text: e instanceof Error ? e.message : String(e) })
+    }
+  }
 
   const refreshModels = async () => {
     setRefreshing(true)
@@ -306,6 +317,7 @@ export function SettingsModal({ open, onClose }: Props) {
                     idle={!!f.used_when && draft[f.used_when[0]] !== f.used_when[1]}
                     test={keyTests[f.key]}
                     onChange={(v) => edit(f.key, v)}
+                    onPin={(catalog, model, pinned) => void pin(catalog, model, pinned)}
                     onTest={() => void testKey(f.key)}
                   />
                 ))}
@@ -370,9 +382,10 @@ interface RowProps {
   test: KeyTestState | undefined
   onChange: (value: string) => void
   onTest: () => void
+  onPin: (catalog: string, model: string, pinned: boolean) => void
 }
 
-function Row({ field, value, menu, idle, test, onChange, onTest }: RowProps) {
+function Row({ field, value, menu, idle, test, onChange, onTest, onPin }: RowProps) {
   const id = `setting-${field.key}`
   return (
     <div className={`settings-row${field.testable ? ' is-key' : ''}`}>
@@ -385,7 +398,7 @@ function Row({ field, value, menu, idle, test, onChange, onTest }: RowProps) {
         <KeyStatus test={test} idle={idle} testable={field.testable} />
       </div>
       <div className="settings-row-control">
-        <Control id={id} field={field} value={value} menu={menu} onChange={onChange} />
+        <Control id={id} field={field} value={value} menu={menu} onChange={onChange} onPin={onPin} />
         {field.testable && (
           <button type="button" className="settings-test" onClick={onTest} disabled={test === 'testing'}>
             {test === 'testing' ? 'Testing…' : 'Test'}
@@ -441,9 +454,10 @@ interface ControlProps {
   value: string
   menu: Menu
   onChange: (value: string) => void
+  onPin: (catalog: string, model: string, pinned: boolean) => void
 }
 
-function Control({ id, field, value, menu, onChange }: ControlProps) {
+function Control({ id, field, value, menu, onChange, onPin }: ControlProps) {
   const labelledBy = `${id}-label`
   if (field.multi) return <MultiPick id={id} field={field} value={value} onChange={onChange} />
   if (field.free)
@@ -454,6 +468,7 @@ function Control({ id, field, value, menu, onChange }: ControlProps) {
         value={value}
         placeholder={menu.placeholder}
         onChange={onChange}
+        onPin={menu.catalog ? (model, pinned) => onPin(menu.catalog!, model, pinned) : undefined}
       />
     )
   if (menu.off || menu.options.length > 0 || field.effort_of)

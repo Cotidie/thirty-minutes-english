@@ -59,6 +59,9 @@ export const api = {
   getSettings: () => request<SettingsView>('/api/settings'),
   /** Fetches every provider's model list now; the settings as they then read. */
   refreshModels: () => request<SettingsView>('/api/settings/models/refresh', { method: 'POST' }),
+  /** Keeps a model on its list's menu, or lets it go; saved at once. The settings as they then read. */
+  pinModel: (catalog: string, model: string, pinned: boolean) =>
+    request<SettingsView>('/api/settings/models/pin', { method: 'POST', body: JSON.stringify({ catalog, model, pinned }) }),
   putSettings: (values: SettingsUpdate) =>
     request<SettingsView>('/api/settings', { method: 'PUT', body: JSON.stringify({ values }) }),
   /** One authenticated call to the provider with the typed key, or the saved one when blank. */

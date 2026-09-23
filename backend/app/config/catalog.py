@@ -10,7 +10,7 @@ import re
 import threading
 import time
 from collections.abc import Callable, Mapping
-from dataclasses import asdict, dataclass
+from dataclasses import asdict, dataclass, fields
 
 from claude_agent_sdk import ClaudeAgentOptions, ClaudeSDKClient
 
@@ -26,7 +26,6 @@ log = logging.getLogger(__name__)
 class ModelOption:
     id: str
     label: str = ""
-    description: str = ""
     efforts: tuple[str, ...] | None = None  # Claude only: the effort levels it takes; () = none
     created: float | None = None  # release time (unix) when the provider says; sorts the list
     resolved: str = ""  # the dated model an alias points at (Claude Code's resolvedModel); sorts the list
@@ -75,7 +74,6 @@ def claude_models(_: Keys) -> list[ModelOption]:
         ModelOption(
             m["value"],
             m.get("displayName", ""),
-            m.get("description", ""),
             tuple(m.get("supportedEffortLevels") or ()) if m.get("supportsEffort") else (),
             resolved=m.get("resolvedModel", ""),
         )
@@ -108,7 +106,7 @@ def gemini_live(keys: Keys) -> list[ModelOption]:
         return []
     models = get_json(f"https://generativelanguage.googleapis.com/v1beta/models?pageSize=1000&key={key}").get("models", [])
     return [
-        ModelOption(m["name"].removeprefix("models/"), m.get("displayName", ""), first_sentence(m.get("description", "")))
+        ModelOption(m["name"].removeprefix("models/"), m.get("displayName", ""))
         for m in models
         if "bidiGenerateContent" in m.get("supportedGenerationMethods", [])
         and not re.search(r"transcribe|translate|robotics", m["name"])
@@ -121,7 +119,6 @@ def openrouter_images(_: Keys) -> list[ModelOption]:
         ModelOption(
             m["id"],
             m.get("name", ""),
-            first_sentence(m.get("description", "")),
             created=m.get("created"),
             image_per_m=per_million((m.get("pricing") or {}).get("image_output")),
             text_per_m=per_million((m.get("pricing") or {}).get("prompt")),
@@ -146,18 +143,13 @@ def comfy_images(keys: Keys) -> list[ModelOption]:
 
     async def fetch() -> dict:
         async with McpHttp(COMFY_MCP, key).session() as session:
-            return payload(await session.call("search_models", {"source": "partner", "type": "image", "limit": 100, "detail": "full"}))
+            return payload(await session.call("search_models", {"source": "partner", "type": "image", "limit": 100}))
 
     return [
-        ModelOption(m["model_name"], description=first_sentence(m.get("description", "")))
+        ModelOption(m["model_name"])
         for m in asyncio.run(fetch()).get("data", [])
         if "text-to-image" in m.get("tags", [])
     ]
-
-
-def first_sentence(text: str, limit: int = 140) -> str:
-    sentence = " ".join(text.split()).split(". ")[0]
-    return sentence if len(sentence) <= limit else sentence[: limit - 1].rstrip() + "…"
 
 
 FETCHERS: dict[str, Fetcher] = {
@@ -168,6 +160,15 @@ FETCHERS: dict[str, Fetcher] = {
     "openrouter_images": openrouter_images,
     "comfy_images": comfy_images,
 }
+
+
+FIELDS = {f.name for f in fields(ModelOption)}
+
+
+def from_cache(stored: dict) -> ModelOption:
+    """A cached option; fields an older version stored and this one dropped are ignored."""
+    known = {k: v for k, v in stored.items() if k in FIELDS}
+    return ModelOption(**{**known, "efforts": None if known.get("efforts") is None else tuple(known["efforts"])})
 
 
 class Catalog:
@@ -190,10 +191,7 @@ class Catalog:
         cached = self._caches.get_model_list(source)
         if cached is None or self._clock() - cached["at"] > self.TTL_S:
             self.refresh_later(keys, [source])
-        every = [
-            ModelOption(**{**o, "efforts": None if o.get("efforts") is None else tuple(o["efforts"])})
-            for o in (cached or {}).get("options", [])
-        ]
+        every = [from_cache(o) for o in (cached or {}).get("options", [])]
         return every[:NEWEST] + [o for o in every[NEWEST:] if o.id in keep]
 
     def efforts_of(self, model: str) -> tuple[str, ...] | None:

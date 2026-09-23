@@ -118,10 +118,14 @@ export interface SettingOption {
   /** Image models: what a picture cost here on average, over `per_image_count` pictures. */
   per_image?: number | null
   per_image_count?: number
+  /** Kept at the top of the menu however old it gets. */
+  pinned?: boolean
 }
 
 export interface SettingVariant {
   default: string
+  /** The model list behind `options`; pins are kept per list. */
+  catalog: string
   options: SettingOption[]
 }
 
@@ -135,6 +139,8 @@ export interface SettingField {
   options: SettingOption[]
   /** Any text is allowed; `options` only suggest (model ids). */
   free: boolean
+  /** The model list behind `options`; pins are kept per list. */
+  catalog: string | null
   /** A Test button can check this key. */
   testable: boolean
   /** The setting whose current value picks one of `variants` (its default and menu). */

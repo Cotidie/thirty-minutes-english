@@ -5,6 +5,7 @@ from pathlib import Path
 
 from app.db.caches import CacheRepo
 from app.db.costs import CostRepo
+from app.db.pins import PinRepo
 from app.db.records import RecordRepo
 from app.db.sessions import SessionRepo
 from app.db.settings import SettingsRepo
@@ -65,6 +66,12 @@ CREATE TABLE IF NOT EXISTS image_costs (
     model TEXT NOT NULL,
     cost REAL NOT NULL
 );
+CREATE TABLE IF NOT EXISTS model_pins (
+    source TEXT NOT NULL,
+    model TEXT NOT NULL,
+    pinned_at TEXT NOT NULL,
+    PRIMARY KEY (source, model)
+);
 CREATE TABLE IF NOT EXISTS model_lists (
     source TEXT PRIMARY KEY,
     list_json TEXT NOT NULL
@@ -86,6 +93,7 @@ class Database:
         self.records = RecordRepo(self)
         self.caches = CacheRepo(self)
         self.costs = CostRepo(self)
+        self.pins = PinRepo(self)
         self.settings = SettingsRepo(self)
 
     def connect(self) -> sqlite3.Connection:
