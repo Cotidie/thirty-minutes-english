@@ -33,7 +33,7 @@ export function priceOf(option: SettingOption): { perPicture: string; list: stri
     option.seconds_per_image != null ? `${Math.round(option.seconds_per_image)}s` : '',
   ].filter(Boolean)
   return {
-    perPicture: here.length ? `≈ ${here.join(' · ')} / picture` : 'no picture yet',
+    perPicture: here.length ? `≈ ${here.join(' · ')}` : 'no picture yet',
     list: option.image_per_m != null ? `${dollars(option.image_per_m)} / 1M tok` : '',
   }
 }
@@ -107,7 +107,12 @@ export function ModelList({ name, labelledBy, options, value, default: fallback,
                     <span className="model-list-name">{o.label || o.id}</span>
                   </label>
                   {(listed || measured) && (
-                    <span className={`model-list-cost${price.perPicture.startsWith('≈') ? ' is-measured' : ''}`}>{price.perPicture}</span>
+                    <span
+                      className={`model-list-cost${price.perPicture.startsWith('≈') ? ' is-measured' : ''}`}
+                      title="Per picture drawn here: average cost and time of the latest 20"
+                    >
+                      {price.perPicture}
+                    </span>
                   )}
                   {listed && <span className="model-list-price">{price.list}</span>}
                   <button
