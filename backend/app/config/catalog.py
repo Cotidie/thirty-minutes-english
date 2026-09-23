@@ -33,7 +33,7 @@ class ModelOption:
     text_per_m: float | None = None  # list price, dollars per million prompt tokens
 
 
-NEWEST = 10  # a list keeps its newest models only (a saved older one still works)
+NEWEST = 10  # a dropdown keeps its newest models only (a saved older one still works); an inline list shows all
 VERSION = re.compile(r"(?<![\d.])(\d+)(?:[.-](\d{1,2})(?!\d))?")  # 3.8, 5-5 (Claude ids), 2
 MONTH_YEAR = re.compile(r"(\d{2})-(\d{4})")
 
@@ -185,14 +185,15 @@ class Catalog:
         self._running: set[str] = set()
         self._lock = threading.Lock()
 
-    def options(self, source: str, keys: Keys, keep: tuple[str, ...] = ()) -> list[ModelOption]:
-        """The newest `NEWEST` models, plus any in `keep` (the default, the saved one) that are
-        older, so they keep their name and price; the cache holds the whole list."""
+    def options(self, source: str, keys: Keys, keep: tuple[str, ...] = (), limit: int | None = NEWEST) -> list[ModelOption]:
+        """The newest `limit` models (None: all), plus any in `keep` (the default, the saved one)
+        that are older, so they keep their name and price; the cache holds the whole list."""
         cached = self._caches.get_model_list(source)
         if cached is None or self._clock() - cached["at"] > self.TTL_S:
             self.refresh_later(keys, [source])
         every = [from_cache(o) for o in (cached or {}).get("options", [])]
-        return every[:NEWEST] + [o for o in every[NEWEST:] if o.id in keep]
+        cut = len(every) if limit is None else limit
+        return every[:cut] + [o for o in every[cut:] if o.id in keep]
 
     def efforts_of(self, model: str) -> tuple[str, ...] | None:
         """A Claude model's effort levels from the cached list; None when the model is not listed."""

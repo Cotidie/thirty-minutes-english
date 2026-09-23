@@ -14,7 +14,7 @@ from app.api.schemas import (
     SettingsView,
     Variant,
 )
-from app.config.catalog import Catalog, ModelOption
+from app.config.catalog import NEWEST, Catalog, ModelOption
 from app.config.keycheck import KEYS, check_key
 from app.config.settings import GROUPS, SPEC_BY_KEY, SPECS, InvalidSetting, Settings, Spec, split_list
 from app.config.skills import host_skills
@@ -38,9 +38,11 @@ class ModelMenus:
         self._costs = db.costs.per_picture()
         self._pins = db.pins
 
-    def listed(self, source: str, default: str, saved: str = "") -> list[Option]:
+    def listed(self, source: str, default: str, saved: str = "", everything: bool = False) -> list[Option]:
+        """`everything`: the whole list (an inline list scrolls); else the newest ten, as a dropdown shows."""
         pins = self._pins.pinned(source)
-        found = {o.id: o for o in self._catalog.options(source, self._keys, keep=(default, saved, *pins))}
+        limit = None if everything else NEWEST
+        found = {o.id: o for o in self._catalog.options(source, self._keys, keep=(default, saved, *pins), limit=limit)}
         ids = [*pins, *(i for i in found if i not in pins)]
         if default and default not in ids:
             ids.insert(len(pins), default)  # not listed by the provider (or not fetched yet)
@@ -78,10 +80,13 @@ def field_of(spec: Spec, settings: Settings, menus: ModelMenus) -> SettingField:
         options=options_of(spec, settings, menus),
         free=bool(spec.catalog or spec.variants),
         catalog=spec.catalog,
+        inline=spec.inline,
         testable=spec.key in KEYS,
         follows=spec.follows,
         variants={
-            value: Variant(default=v.default, catalog=v.catalog, options=menus.listed(v.catalog, v.default, settings.get(spec.key)))
+            value: Variant(
+                default=v.default, catalog=v.catalog, options=menus.listed(v.catalog, v.default, settings.get(spec.key), spec.inline)
+            )
             for value, v in (spec.variants or {}).items()
         },
         effort_of=spec.effort_of,

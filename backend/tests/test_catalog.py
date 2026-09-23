@@ -197,6 +197,7 @@ def test_the_menu_shows_the_newest_ten_plus_older_ones_asked_for(tmp_path):
     cat.refresh({})
     assert [o.id for o in cat.options("x", {})] == [f"m{i}" for i in range(11, 1, -1)]
     assert [o.id for o in cat.options("x", {}, keep=("m0",))][-1] == "m0"  # the default or the saved one, with its details
+    assert len(cat.options("x", {}, limit=None)) == 12  # an inline list shows all
 
 
 def test_undated_lists_go_by_the_version_in_the_name_with_aliases_on_top():
@@ -221,7 +222,7 @@ def test_undated_lists_go_by_the_version_in_the_name_with_aliases_on_top():
     assert [o.id for o in newest_first(comfy)] == ["vertexai/nano-banana-pro", "qwen/qwen-image-3", "bfl/flux-pro-1.1-ultra"]
 
 
-def test_a_pinned_model_leads_its_menu_and_outlives_the_newest_ten(tmp_path):
+def test_a_pinned_model_leads_its_menu(tmp_path):
     db = Database(tmp_path / "s.db")
     models = [ModelOption(f"m{i}", created=float(i)) for i in range(15)]
     cat = Catalog(db.caches, {"openrouter_images": lambda _: models}, background=False)
@@ -235,12 +236,12 @@ def test_a_pinned_model_leads_its_menu_and_outlives_the_newest_ten(tmp_path):
 
     with TestClient(app) as c:
         pinned = menu(c.post("/api/settings/models/pin", json={"catalog": "openrouter_images", "model": "m1", "pinned": True}).json())
-        assert pinned[0] == ("m1", True)  # m1 is far older than the newest ten
+        assert pinned[0] == ("m1", True)
         assert pinned[1] == ("google/gemini-3-pro-image", False)  # the default, which this provider does not list
-        assert [i for i, _ in pinned[2:12]] == [f"m{i}" for i in range(14, 4, -1)]
+        assert [i for i, _ in pinned[2:]] == [f"m{i}" for i in range(14, -1, -1) if i != 1]  # the inline list shows all
 
         unpinned = menu(c.post("/api/settings/models/pin", json={"catalog": "openrouter_images", "model": "m1", "pinned": False}).json())
-        assert "m1" not in [i for i, _ in unpinned]
+        assert unpinned[0] == ("google/gemini-3-pro-image", False) and ("m1", False) in unpinned  # back in date order
 
 
 def test_a_list_cached_by_an_older_version_still_reads(tmp_path):

@@ -1,0 +1,194 @@
+.model-list {
+  flex: 1;
+  min-width: 0;
+  display: grid;
+  gap: 0.5rem;
+}
+
+.model-list-bar {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+}
+
+.model-list-bar input {
+  flex: 1;
+  min-width: 0;
+  min-height: 2.5rem;
+  box-sizing: border-box;
+  padding: 0 0.75rem;
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  background: #fff;
+  font: inherit;
+  color: inherit;
+}
+
+.model-list-sort {
+  display: flex;
+  flex: none;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  overflow: hidden;
+}
+
+.model-list-sort button {
+  min-height: 2.5rem;
+  padding: 0 0.9rem;
+  border: 0;
+  background: #fff;
+  color: var(--muted);
+  font: inherit;
+  font-size: 0.85rem;
+  cursor: pointer;
+}
+
+.model-list-sort button[aria-pressed='true'] {
+  background: var(--ink);
+  color: var(--paper);
+}
+
+.model-list-rows {
+  max-height: 20rem;
+  overflow-y: auto;
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  background: #fff;
+}
+
+.model-list-section + .model-list-section {
+  border-top: 1px solid var(--line);
+}
+
+.model-list-head {
+  margin: 0;
+  padding: 0.45rem 0.75rem 0.15rem;
+  color: var(--muted);
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+/* One line per model: pick, name | cost here | list price | pin. */
+.model-list-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto 5.5rem 2.25rem;
+  align-items: center;
+  gap: 0.75rem;
+  min-height: 2.75rem;
+  padding: 0 0.5rem 0 0.75rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.model-list-rows.is-unpriced .model-list-row {
+  grid-template-columns: minmax(0, 1fr) 2.25rem;
+}
+
+.model-list-row:hover {
+  background: var(--ground);
+}
+
+.model-list-row.is-chosen {
+  background: var(--marker-soft);
+}
+
+.model-list-pick {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  min-width: 0;
+  min-height: 2.75rem;
+  cursor: pointer;
+}
+
+.model-list-pick input {
+  flex: none;
+  margin: 0;
+}
+
+.model-list-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: 500;
+}
+
+.model-list-cost {
+  color: var(--muted);
+  font-size: 0.82rem;
+  white-space: nowrap;
+}
+
+.model-list-cost.is-measured {
+  color: var(--ink);
+  font-weight: 600;
+}
+
+.model-list-price {
+  color: var(--muted);
+  font-size: 0.82rem;
+  text-align: right;
+  white-space: nowrap;
+}
+
+.model-list-pin {
+  display: grid;
+  place-items: center;
+  width: 2.25rem;
+  height: 2.25rem;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--line);
+  cursor: pointer;
+}
+
+.model-list-row:hover .model-list-pin,
+.model-list-pin:focus-visible {
+  color: var(--muted);
+}
+
+.model-list-pin.is-on {
+  color: var(--ink);
+}
+
+.model-list-empty {
+  margin: 0;
+  padding: 0.75rem;
+  color: var(--muted);
+}
+
+.model-list-other {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  color: var(--muted);
+  font-size: 0.85rem;
+}
+
+.model-list-other input {
+  flex: 1;
+  min-width: 0;
+  min-height: 2.5rem;
+  box-sizing: border-box;
+  padding: 0 0.75rem;
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  background: #fff;
+  font: inherit;
+  font-size: 0.9rem;
+  color: var(--ink);
+}
+
+/* Phones: the list price drops; the cost here stays. */
+@media (max-width: 40rem) {
+  .model-list-row {
+    grid-template-columns: minmax(0, 1fr) auto 2.25rem;
+  }
+
+  .model-list-price {
+    display: none;
+  }
+}

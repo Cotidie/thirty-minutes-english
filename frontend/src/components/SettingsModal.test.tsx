@@ -17,6 +17,7 @@ function field(partial: Partial<SettingField> & Pick<SettingField, 'key' | 'grou
     options: [],
     free: false,
     catalog: null,
+    inline: false,
     testable: false,
     follows: null,
     variants: {},

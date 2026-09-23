@@ -79,6 +79,7 @@ class Spec:
     follows: str | None = None  # the provider setting whose value picks a Variant below
     variants: Mapping[str, Variant] | None = None
     effort_of: str | None = None  # an effort level, offered as the chosen Claude model allows
+    inline: bool = False  # the model menu shows as a list in the panel (with prices), not a dropdown
     number: tuple[float, float] | None = None  # strict: must parse as a number inside [lo, hi]
     shown_when: tuple[str, str] | None = None  # (key, value): the field only matters then
     used_when: tuple[str, str] | None = None  # (key, value): a key the app only calls then; shown, marked idle otherwise
@@ -139,7 +140,7 @@ SPECS: tuple[Spec, ...] = (
          help="How much the feedback model thinks. Low keeps feedback quick."),
     Spec("IMAGE_PROVIDER", "images", "openrouter", choices=IMAGE_PROVIDERS,
          help="Who draws the vocabulary pictures. OpenRouter draws them all at once; Comfy draws as many at once as your plan allows; off skips pictures."),
-    Spec("IMAGE_MODEL", "images", follows="IMAGE_PROVIDER", variants=IMAGE_VARIANTS,
+    Spec("IMAGE_MODEL", "images", follows="IMAGE_PROVIDER", variants=IMAGE_VARIANTS, inline=True,
          help="The image model. Blank uses the provider's default."),
     Spec("IMAGE_STYLE", "images", "photo", choices=tuple(STYLES), labels=STYLE_LABELS,
          help="The look of new pictures. A photo gives the most to describe."),

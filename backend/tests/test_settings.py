@@ -82,6 +82,7 @@ def test_get_masks_secrets_and_carries_the_rules_the_modal_applies(tmp_path):
     gemini = model["variants"]["gemini"]
     assert [o["id"] for o in gemini["options"]] == [gemini["default"]]  # nothing fetched yet: the default alone
     assert fields["CLAUDE_EFFORT"]["effort_of"] == "CLAUDE_MODEL"
+    assert fields["IMAGE_MODEL"]["inline"] is True and fields["CLAUDE_MODEL"]["inline"] is False
     assert [o["id"] for o in fields["VOICE_PROVIDER"]["options"]] == ["openai", "gemini"] and not fields["VOICE_PROVIDER"]["free"]
     assert fields["VOICE_NAME"]["shown_when"] == ["VOICE_PROVIDER", "gemini"]
     assert fields["COMFY_API_KEY"]["used_when"] == ["IMAGE_PROVIDER", "comfy"]

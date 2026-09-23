@@ -141,6 +141,8 @@ export interface SettingField {
   free: boolean
   /** The model list behind `options`; pins are kept per list. */
   catalog: string | null
+  /** Draw the model menu as a list in the panel, with prices, not a dropdown. */
+  inline: boolean
   /** A Test button can check this key. */
   testable: boolean
   /** The setting whose current value picks one of `variants` (its default and menu). */

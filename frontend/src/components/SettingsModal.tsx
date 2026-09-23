@@ -3,6 +3,7 @@ import { UNSAFE_PortalProvider } from 'react-aria'
 import { api } from '../api'
 import type { KeyTestResult, SettingField, SettingGroup, SettingOption, SettingsUpdate } from '../types'
 import { ChoiceSelect, ModelCombo } from './Choice'
+import { ModelList } from './ModelList'
 import './SettingsModal.css'
 
 interface Props {
@@ -460,6 +461,18 @@ interface ControlProps {
 function Control({ id, field, value, menu, onChange, onPin }: ControlProps) {
   const labelledBy = `${id}-label`
   if (field.multi) return <MultiPick id={id} field={field} value={value} onChange={onChange} />
+  if (field.inline && menu.catalog)
+    return (
+      <ModelList
+        name={id}
+        labelledBy={labelledBy}
+        options={menu.options}
+        value={value}
+        default={menu.placeholder}
+        onChange={onChange}
+        onPin={(model, pinned) => onPin(menu.catalog!, model, pinned)}
+      />
+    )
   if (field.free)
     return (
       <ModelCombo
