@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
-import { Link, useParams } from 'react-router-dom'
+import { Link, useLocation, useNavigate, useParams } from 'react-router-dom'
 import { api } from '../api'
 import { ArticleTab } from '../components/ArticleTab'
 import { ExpressionsTab } from '../components/ExpressionsTab'
@@ -14,6 +14,8 @@ import './SessionPage.css'
 
 /** Sits after the timed phases; the timer never sends you here. */
 const SUMMARY_TAB = PHASES.length
+/** Each tab's name in the address (/s/19#vocabulary), so a reload stays on it. */
+const TAB_KEYS = [...PHASES.map((p) => p.key), 'summary']
 
 export function SessionPage() {
   const { id } = useParams()
@@ -21,16 +23,21 @@ export function SessionPage() {
   const { examples, add: addExample } = useExamples(Number(id))
   const [session, setSession] = useState<Session | null>(null)
   const [error, setError] = useState<string | null>(null)
-  const [tab, setTab] = useState(0)
+  const { hash } = useLocation()
+  const navigate = useNavigate()
+  const tab = Math.max(0, TAB_KEYS.indexOf(hash.slice(1)))
 
   useEffect(() => {
     api.getSession(Number(id)).then(setSession).catch((e: Error) => setError(e.message))
   }, [id])
 
-  const showTab = useCallback((index: number) => {
-    setTab(index)
-    window.scrollTo({ top: 0 })
-  }, [])
+  const showTab = useCallback(
+    (index: number) => {
+      navigate({ hash: TAB_KEYS[index] }, { replace: true })
+      window.scrollTo({ top: 0 })
+    },
+    [navigate],
+  )
 
   if (error) {
     return (

@@ -134,6 +134,8 @@ Vocabulary 카드의 Practice는 판단 프롬프트가 `../example-coach/prompt
 
 에이전트 정의는 `../example-coach/`에 있다. 다른 두 코치와 같은 규약이고, backend `POST /api/example/sessions`가 표현·뜻·노트를 채워 중계한다.
 
+세션 페이지는 보고 있는 탭을 주소의 `#` 뒤에 둔다(`/s/19#vocabulary`, `#expressions`·`#article`·`#summary`). 새로고침하거나 주소를 공유해도 그 탭으로 열리고, `#`이 없으면 Expressions로 연다(`SessionPage.tsx`의 `TAB_KEYS`). 타이머가 탭을 넘길 때도 주소가 바뀐다.
+
 ## Summary 탭
 
 레일의 네 번째 항목. 세션이 남긴 것을 네 섹션으로 보여준다.
