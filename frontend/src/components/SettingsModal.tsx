@@ -264,6 +264,8 @@ function Row({ field, value, placeholder, suggestions, idle, test, onChange, onT
         <label htmlFor={`setting-${field.key}`}>
           <code>{field.key}</code>
         </label>
+        {field.help && <InfoTip id={`setting-${field.key}-help`} name={field.key} text={field.help} />}
+        <span className="settings-row-gap" />
         <KeyStatus test={test} idle={idle} testable={field.testable} />
       </div>
       <div className="settings-row-control">
@@ -275,6 +277,24 @@ function Row({ field, value, placeholder, suggestions, idle, test, onChange, onT
         )}
       </div>
     </div>
+  )
+}
+
+/** An ⓘ that shows what the setting does on hover or keyboard focus. */
+function InfoTip({ id, name, text }: { id: string; name: string; text: string }) {
+  return (
+    <span className="settings-info">
+      <button type="button" className="settings-info-button" aria-label={`About ${name}`} aria-describedby={id}>
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.4" aria-hidden="true">
+          <circle cx="8" cy="8" r="6.5" />
+          <path d="M8 7.2v4" strokeLinecap="round" />
+          <circle cx="8" cy="4.9" r="0.4" fill="currentColor" />
+        </svg>
+      </button>
+      <span role="tooltip" id={id} className="settings-tip">
+        {text}
+      </span>
+    </span>
   )
 }
 

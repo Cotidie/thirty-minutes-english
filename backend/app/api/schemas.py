@@ -163,6 +163,7 @@ class SettingField(BaseModel):
     variants: dict[str, Variant] = {}
     shown_when: tuple[str, str] | None = None  # (key, value): hidden otherwise
     used_when: tuple[str, str] | None = None  # (key, value): the key sits idle otherwise
+    help: str = ""  # what the setting does, for the info tooltip
 
 
 class SettingGroup(BaseModel):

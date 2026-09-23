@@ -131,6 +131,8 @@ export interface SettingField {
   shown_when: [string, string] | null
   /** [key, value]: a key the app only calls while that setting holds that value. */
   used_when: [string, string] | null
+  /** What the setting does, for the info tooltip. */
+  help: string
 }
 
 export interface SettingGroup {
