@@ -1,4 +1,5 @@
-"""Answers worth keeping so the model runs once: a day's news topics, a paragraph's phrasing."""
+"""Answers worth keeping so the model runs once: a day's news topics, a paragraph's phrasing,
+and the providers' model lists."""
 
 import json
 from typing import TYPE_CHECKING
@@ -35,3 +36,9 @@ class CacheRepo:
 
     def set_phrasing(self, paragraph: str, breaks: list[int]) -> None:
         self._set("phrasings", "paragraph", "breaks_json", paragraph, breaks)
+
+    def get_model_list(self, source: str) -> dict | None:
+        return self._get("model_lists", "source", "list_json", source)
+
+    def set_model_list(self, source: str, value: dict) -> None:
+        self._set("model_lists", "source", "list_json", source, value)

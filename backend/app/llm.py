@@ -58,7 +58,7 @@ class Runner(Protocol):
 @dataclass(frozen=True)
 class Claude:
     model: str
-    effort: str = "low"
+    effort: str | None = "low"  # None: the model takes no effort level
     timeout_s: float = 90
     tools: tuple[str, ...] = ()  # built-in tools; none by default
     mcp: tuple[McpServer, ...] = ()

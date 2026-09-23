@@ -9,7 +9,13 @@ vi.mock('../api', () => ({
   api: {
     addExample: vi.fn(),
     redrawPicture: vi.fn(),
-    pictureStyles: vi.fn(async () => ({ current: 'photo', choices: ['photo', 'comic'], labels: { comic: 'comic panel' } })),
+    pictureStyles: vi.fn(async () => ({
+      current: 'photo',
+      options: [
+        { id: 'photo', label: '', description: '', efforts: null },
+        { id: 'comic', label: '', description: 'comic panel', efforts: null },
+      ],
+    })),
   },
 }))
 vi.mock('../lib/liveClient', () => ({ connectExample: vi.fn() }))

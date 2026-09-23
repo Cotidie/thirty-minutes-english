@@ -20,16 +20,8 @@ GROUPS: dict[str, str] = {
     "images": "Vocabulary pictures",
 }
 
-EFFORTS = ("low", "medium", "high", "xhigh", "max")
-CLAUDE_MODELS = ("opus", "sonnet")
 IMAGE_PROVIDERS = (*IMAGE_DEFAULT_MODEL, "off")
-# Image models as each MCP names them. OpenAI ids are spelled OpenRouter's way and translated for comfy.
-OPENAI_IMAGE_MODELS = ("openai/gpt-image-2.5-flare", "openai/gpt-image-2.5-sunburst", "openai/gpt-image-2")
-IMAGE_MODELS = {
-    "openrouter": ("google/gemini-3-pro-image", "google/gemini-3.1-flash-image", "google/gemini-3.1-flash-lite-image", *OPENAI_IMAGE_MODELS),
-    "comfy": ("vertexai/nano-banana-pro", "vertexai/nano-banana-2", "vertexai/nano-banana-2-lite", *OPENAI_IMAGE_MODELS),
-}
-VOICE_MODELS = {"openai": ("gpt-live-1",), "gemini": ("gemini-3.8-live-extended-thinking", "gemini-3.8-live")}
+VOICE_DEFAULT_MODEL = {"openai": "gpt-live-1", "gemini": "gemini-3.8-live-extended-thinking"}
 THINKING_LEVELS = ("low", "medium", "high")
 # The Gemini API has no voices.list; this is the TTS list the Live native-audio
 # models share (ai.google.dev/gemini-api/docs/speech-generation#voices).
@@ -69,15 +61,10 @@ GEMINI_VOICES = {
 
 @dataclass(frozen=True)
 class Variant:
-    """What a field offers while the setting it follows holds one value."""
+    """What a model field offers while the provider it follows holds one value."""
 
-    default: str = ""
-    suggestions: tuple[str, ...] = ()
-
-
-def variants(by_value: Mapping[str, tuple[str, ...]]) -> dict[str, Variant]:
-    """The first suggestion of each list is that value's default."""
-    return {value: Variant(models[0], models) for value, models in by_value.items()}
+    default: str
+    catalog: str  # the model list (app.config.catalog) for that provider
 
 
 @dataclass(frozen=True)
@@ -87,15 +74,26 @@ class Spec:
     default: str = ""
     secret: bool = False
     choices: tuple[str, ...] | None = None  # strict: a value outside is rejected
-    suggestions: tuple[str, ...] = ()  # free text with a menu of common values
     labels: Mapping[str, str] | None = None  # a short description per choice, for the menu
-    number: tuple[float, float] | None = None  # strict: must parse as a number inside [lo, hi]
-    follows: str | None = None  # the setting whose value picks a Variant below
+    catalog: str | None = None  # free text with the provider's model list as the menu
+    follows: str | None = None  # the provider setting whose value picks a Variant below
     variants: Mapping[str, Variant] | None = None
+    effort_of: str | None = None  # an effort level, offered as the chosen Claude model allows
+    number: tuple[float, float] | None = None  # strict: must parse as a number inside [lo, hi]
     shown_when: tuple[str, str] | None = None  # (key, value): the field only matters then
     used_when: tuple[str, str] | None = None  # (key, value): a key the app only calls then; shown, marked idle otherwise
     help: str = ""  # one or two sentences for the modal's info tooltip
     multi: bool = False  # a comma list picked from the host's skills (app.config.skills), not typed
+
+
+VOICE_VARIANTS = {
+    "openai": Variant(VOICE_DEFAULT_MODEL["openai"], "openai_voice"),
+    "gemini": Variant(VOICE_DEFAULT_MODEL["gemini"], "gemini_live"),
+}
+IMAGE_VARIANTS = {
+    "openrouter": Variant(IMAGE_DEFAULT_MODEL["openrouter"], "openrouter_images"),
+    "comfy": Variant(IMAGE_DEFAULT_MODEL["comfy"], "comfy_images"),
+}
 
 
 SPECS: tuple[Spec, ...] = (
@@ -113,7 +111,7 @@ SPECS: tuple[Spec, ...] = (
          help="Optional. Web search for sessions and daily topics works without a key, at a lower rate limit."),
     Spec("VOICE_PROVIDER", "voice", "openai", choices=("openai", "gemini"),
          help="Which live voice model the three coaches (Read aloud, Phrasing, Your turn) talk through."),
-    Spec("VOICE_MODEL", "voice", follows="VOICE_PROVIDER", variants=variants(VOICE_MODELS),
+    Spec("VOICE_MODEL", "voice", follows="VOICE_PROVIDER", variants=VOICE_VARIANTS,
          help="The live model. Blank uses the provider's default."),
     Spec("VOICE_THINKING", "voice", "low", choices=THINKING_LEVELS, shown_when=("VOICE_PROVIDER", "gemini"),
          help="How long Gemini thinks before it answers. Higher is more careful and slower to reply."),
@@ -125,27 +123,27 @@ SPECS: tuple[Spec, ...] = (
          help="Azure gives every word an accuracy score from 0 to 100. Words below this number get a pronunciation note. Higher is stricter."),
     Spec("ASSESS_BREAK_CONFIDENCE", "assess", "0.75", number=(0, 1),
          help="Azure reports how sure it is (0 to 1) that you paused where the sentence does not. Above this number, the pause gets a phrasing note. Lower flags more pauses."),
-    Spec("CLAUDE_MODEL", "claude", "opus", suggestions=CLAUDE_MODELS,
+    Spec("CLAUDE_MODEL", "claude", "opus", catalog="claude",
          help="Writes each session: expressions, article, words and picture scenes. Sonnet is faster, Opus writes better."),
-    Spec("CLAUDE_EFFORT", "claude", "xhigh", choices=EFFORTS,
+    Spec("CLAUDE_EFFORT", "claude", "xhigh", effort_of="CLAUDE_MODEL",
          help="How much the session model thinks before it writes. Higher is better and slower."),
     Spec("CLAUDE_SKILLS", "claude", multi=True,
          help="The app's own writing skill always runs. Tick host skills (~/.claude/skills) to load on top of it."),
-    Spec("TOPICS_MODEL", "claude", "sonnet", suggestions=CLAUDE_MODELS,
+    Spec("TOPICS_MODEL", "claude", "sonnet", catalog="claude",
          help="Picks the three news topics once a day."),
-    Spec("TOPICS_EFFORT", "claude", "medium", choices=EFFORTS,
+    Spec("TOPICS_EFFORT", "claude", "medium", effort_of="TOPICS_MODEL",
          help="How much the topics model thinks."),
-    Spec("EXAMPLE_MODEL", "claude", "opus", suggestions=CLAUDE_MODELS,
+    Spec("EXAMPLE_MODEL", "claude", "opus", catalog="claude",
          help="Writes the Your turn and Practice feedback, and new picture scenes on redraw."),
-    Spec("EXAMPLE_EFFORT", "claude", "low", choices=EFFORTS,
+    Spec("EXAMPLE_EFFORT", "claude", "low", effort_of="EXAMPLE_MODEL",
          help="How much the feedback model thinks. Low keeps feedback quick."),
     Spec("IMAGE_PROVIDER", "images", "openrouter", choices=IMAGE_PROVIDERS,
          help="Who draws the vocabulary pictures. OpenRouter draws them all at once; Comfy draws as many at once as your plan allows; off skips pictures."),
-    Spec("IMAGE_MODEL", "images", follows="IMAGE_PROVIDER", variants=variants(IMAGE_MODELS),
+    Spec("IMAGE_MODEL", "images", follows="IMAGE_PROVIDER", variants=IMAGE_VARIANTS,
          help="The image model. Blank uses the provider's default."),
     Spec("IMAGE_STYLE", "images", "photo", choices=tuple(STYLES), labels=STYLE_LABELS,
          help="The look of new pictures. A photo gives the most to describe."),
-    Spec("SUMMARY_MODEL", "text", "gpt-5.6-luna",
+    Spec("SUMMARY_MODEL", "text", "gpt-5.6-luna", catalog="openai_text",
          help="The OpenAI text model that turns the session transcript into the Summary tab."),
 )
 SPEC_BY_KEY = {spec.key: spec for spec in SPECS}

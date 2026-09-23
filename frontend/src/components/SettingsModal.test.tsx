@@ -5,19 +5,21 @@ import { api } from '../api'
 import type { SettingField, SettingGroup } from '../types'
 import { SettingsModal } from './SettingsModal'
 
-vi.mock('../api', () => ({ api: { getSettings: vi.fn(), putSettings: vi.fn(), testKey: vi.fn() } }))
+vi.mock('../api', () => ({ api: { getSettings: vi.fn(), putSettings: vi.fn(), testKey: vi.fn(), refreshModels: vi.fn() } }))
+
+const opt = (id: string, description = '', label = '', efforts: string[] | null = null) => ({ id, label, description, efforts })
 
 function field(partial: Partial<SettingField> & Pick<SettingField, 'key' | 'group'>): SettingField {
   return {
     value: '',
     secret: false,
     default: '',
-    choices: null,
-    suggestions: [],
-    labels: {},
+    options: [],
+    free: false,
     testable: false,
     follows: null,
     variants: {},
+    effort_of: null,
     shown_when: null,
     used_when: null,
     help: '',
@@ -27,14 +29,15 @@ function field(partial: Partial<SettingField> & Pick<SettingField, 'key' | 'grou
 }
 
 const FIELDS: SettingField[] = [
-  field({ key: 'VOICE_PROVIDER', group: 'voice', value: 'openai', choices: ['openai', 'gemini'] }),
+  field({ key: 'VOICE_PROVIDER', group: 'voice', value: 'openai', options: [opt('openai'), opt('gemini')] }),
   field({
     key: 'VOICE_MODEL',
     group: 'voice',
     follows: 'VOICE_PROVIDER',
+    free: true,
     variants: {
-      openai: { default: 'gpt-live-1', suggestions: ['gpt-live-1'] },
-      gemini: { default: 'gemini-3.8-live-extended-thinking', suggestions: ['gemini-3.8-live-extended-thinking', 'gemini-3.8-live'] },
+      openai: { default: 'gpt-live-1', options: [opt('gpt-live-1')] },
+      gemini: { default: 'gemini-3.8-live-extended-thinking', options: [opt('gemini-3.8-live-extended-thinking'), opt('gemini-3.8-live')] },
     },
   }),
   field({
@@ -42,7 +45,7 @@ const FIELDS: SettingField[] = [
     group: 'voice',
     value: 'low',
     default: 'low',
-    choices: ['low', 'medium', 'high'],
+    options: [opt('low'), opt('medium'), opt('high')],
     shown_when: ['VOICE_PROVIDER', 'gemini'],
   }),
   field({
@@ -50,15 +53,22 @@ const FIELDS: SettingField[] = [
     group: 'voice',
     value: 'Kore',
     default: 'Kore',
-    choices: ['Kore', 'Puck'],
-    labels: { Kore: 'Firm', Puck: 'Upbeat' },
+    options: [opt('Kore', 'Firm'), opt('Puck', 'Upbeat')],
     shown_when: ['VOICE_PROVIDER', 'gemini'],
   }),
   field({ key: 'OPENAI_API_KEY', group: 'keys', value: '…1234', secret: true, testable: true }),
   field({ key: 'GEMINI_API_KEY', group: 'keys', secret: true, testable: true }),
   field({ key: 'AZURE_SPEECH_KEY', group: 'keys', secret: true, testable: true }),
   field({ key: 'AZURE_SPEECH_REGION', group: 'assess', value: 'koreacentral', default: 'koreacentral' }),
-  field({ key: 'CLAUDE_MODEL', group: 'claude', value: 'sonnet', default: 'opus', suggestions: ['opus', 'sonnet'] }),
+  field({
+    key: 'CLAUDE_MODEL',
+    group: 'claude',
+    value: 'sonnet',
+    default: 'opus',
+    free: true,
+    options: [opt('opus', 'Most capable', 'Opus 5.5', ['low', 'max']), opt('sonnet', 'Efficient', 'Sonnet 5', ['low', 'high']), opt('haiku', 'Fastest', 'Haiku 4.5', [])],
+  }),
+  field({ key: 'CLAUDE_EFFORT', group: 'claude', value: 'high', default: 'xhigh', effort_of: 'CLAUDE_MODEL' }),
   field({ key: 'SUMMARY_MODEL', group: 'text', value: 'gpt-5.6-luna', default: 'gpt-5.6-luna' }),
 ]
 
@@ -85,6 +95,12 @@ async function showTab(title: string) {
   await userEvent.click(screen.getByRole('tab', { name: new RegExp(title) }))
 }
 
+/** Opens a Select by its setting name and picks one option. */
+async function pick(key: string, option: string) {
+  await userEvent.click(screen.getByRole('button', { name: new RegExp(`${key}$`) }))
+  await userEvent.click(await screen.findByRole('option', { name: new RegExp(`^${option}`) }))
+}
+
 function rowOf(label: string): HTMLElement {
   return screen.getByLabelText(label).closest<HTMLElement>('.settings-row')!
 }
@@ -100,7 +116,7 @@ describe('SettingsModal', () => {
     expect(screen.queryByLabelText('CLAUDE_MODEL')).not.toBeInTheDocument()
 
     await showTab('Claude generation')
-    expect((screen.getByLabelText('CLAUDE_MODEL') as HTMLInputElement).value).toBe('sonnet')
+    expect(screen.getByRole('combobox', { name: 'CLAUDE_MODEL' })).toHaveValue('sonnet')
   })
 
   it('hides the Gemini-only fields under OpenAI and shows them once the provider flips', async () => {
@@ -109,17 +125,18 @@ describe('SettingsModal', () => {
     expect(screen.queryByLabelText('VOICE_NAME')).not.toBeInTheDocument()
     expect(screen.queryByLabelText('VOICE_THINKING')).not.toBeInTheDocument()
 
-    await userEvent.selectOptions(screen.getByLabelText('VOICE_PROVIDER'), 'gemini')
-    const voice = screen.getByLabelText('VOICE_NAME') as HTMLSelectElement
-    expect(voice.tagName).toBe('SELECT')
-    expect(Array.from(voice.options).map((o) => o.textContent)).toEqual(['Kore · Firm', 'Puck · Upbeat'])
-    expect(screen.getByLabelText('VOICE_THINKING')).toBeInTheDocument()
-    const model = screen.getByLabelText('VOICE_MODEL') as HTMLInputElement
-    expect(model.placeholder).toBe('gemini-3.8-live-extended-thinking')
-    const options = Array.from(document.querySelectorAll('#setting-VOICE_MODEL-options option')).map((o) =>
-      o.getAttribute('value'),
-    )
-    expect(options).toEqual(['gemini-3.8-live-extended-thinking', 'gemini-3.8-live'])
+    await pick('VOICE_PROVIDER', 'gemini')
+    await userEvent.click(screen.getByRole('button', { name: /VOICE_NAME$/ }))
+    expect((await screen.findAllByRole('option')).map((o) => o.textContent)).toEqual(['KoreFirm', 'PuckUpbeat'])
+    await userEvent.keyboard('{Escape}')
+    expect(screen.getByRole('button', { name: /VOICE_THINKING$/ })).toBeInTheDocument()
+    const model = screen.getByRole('combobox', { name: 'VOICE_MODEL' })
+    expect(model).toHaveAttribute('placeholder', 'gemini-3.8-live-extended-thinking')
+    await userEvent.click(screen.getByRole('button', { name: /^Show models/ }))
+    expect((await screen.findAllByRole('option')).map((o) => o.textContent)).toEqual([
+      'gemini-3.8-live-extended-thinking',
+      'gemini-3.8-live',
+    ])
   })
 
   it('saves only what changed across groups, counts the edits, and discards on request', async () => {
@@ -130,7 +147,7 @@ describe('SettingsModal', () => {
 
     await userEvent.type(screen.getByLabelText('GEMINI_API_KEY'), 'AIza-new')
     await showTab('Voice coach')
-    await userEvent.selectOptions(screen.getByLabelText('VOICE_PROVIDER'), 'gemini')
+    await pick('VOICE_PROVIDER', 'gemini')
     expect(screen.getByText('2 unsaved changes')).toBeInTheDocument()
     expect(screen.getByRole('tab', { name: /API keys/ })).toHaveTextContent('edited')
 
@@ -142,7 +159,7 @@ describe('SettingsModal', () => {
     })
     expect(await screen.findByText('Saved. The next round uses these.')).toBeInTheDocument()
 
-    await userEvent.selectOptions(screen.getByLabelText('VOICE_PROVIDER'), 'gemini')
+    await pick('VOICE_PROVIDER', 'gemini')
     await userEvent.click(screen.getByRole('button', { name: 'Discard' }))
     expect(screen.getByText('No changes')).toBeInTheDocument()
   })
@@ -178,7 +195,7 @@ describe('SettingsModal', () => {
     vi.mocked(api.putSettings).mockRejectedValueOnce(new Error('VOICE_PROVIDER must be one of openai, gemini'))
     await open()
     await showTab('Voice coach')
-    await userEvent.selectOptions(screen.getByLabelText('VOICE_PROVIDER'), 'gemini')
+    await pick('VOICE_PROVIDER', 'gemini')
     await userEvent.click(screen.getByRole('button', { name: 'Save' }))
     expect(await screen.findByText(/must be one of/)).toBeInTheDocument()
   })
@@ -197,6 +214,51 @@ describe('SettingsModal help', () => {
   })
 })
 
+describe('SettingsModal models', () => {
+  it('lists every model on open even while one is set, and offers the effort levels that model takes', async () => {
+    await open()
+    await showTab('Claude generation')
+    const model = screen.getByRole('combobox', { name: 'CLAUDE_MODEL' })
+    await userEvent.click(model)
+    expect((await screen.findAllByRole('option')).map((o) => o.textContent)).toEqual([
+      'Opus 5.5opusMost capable',
+      'Sonnet 5sonnetEfficient',
+      'Haiku 4.5haikuFastest',
+    ])
+    await userEvent.click(screen.getByRole('option', { name: /^Haiku/ }))
+    expect(model).toHaveValue('haiku')
+    const effort = screen.getByRole('button', { name: /CLAUDE_EFFORT$/ })
+    expect(effort).toBeDisabled()
+    expect(effort).toHaveTextContent('Haiku 4.5 takes no effort level')
+  })
+
+  it('keeps a typed model id nobody lists', async () => {
+    await open()
+    await showTab('Claude generation')
+    const model = screen.getByRole('combobox', { name: 'CLAUDE_MODEL' })
+    await userEvent.clear(model)
+    await userEvent.type(model, 'claude-next')
+    expect(await screen.findByText(/No listed model matches/)).toBeInTheDocument()
+    await userEvent.tab()
+    expect(model).toHaveValue('claude-next')
+    await userEvent.click(screen.getByRole('button', { name: 'Save' }))
+    await waitFor(() => expect(api.putSettings).toHaveBeenCalledTimes(1))
+    expect(vi.mocked(api.putSettings).mock.calls[0][0]).toEqual({ CLAUDE_MODEL: 'claude-next' })
+  })
+
+  it('refreshes the model lists on request', async () => {
+    vi.mocked(api.refreshModels).mockResolvedValueOnce({
+      groups: GROUPS,
+      fields: FIELDS.map((f) => (f.key === 'CLAUDE_MODEL' ? { ...f, options: [opt('claude-fable-5-1', '', 'Fable 5.1')] } : f)),
+    })
+    await open()
+    await showTab('Claude generation')
+    await userEvent.click(screen.getByRole('button', { name: 'Refresh model lists' }))
+    await userEvent.click(screen.getByRole('combobox', { name: 'CLAUDE_MODEL' }))
+    expect((await screen.findAllByRole('option')).map((o) => o.textContent)).toEqual(['Fable 5.1claude-fable-5-1'])
+  })
+})
+
 describe('SettingsModal skills', () => {
   it('ticks host skills from a filtered list and saves them as a comma list', async () => {
     vi.mocked(api.getSettings).mockResolvedValue({
@@ -208,8 +270,7 @@ describe('SettingsModal skills', () => {
           group: 'claude',
           value: 'stop-slop',
           multi: true,
-          choices: ['humanizer', 'stop-slop', 'tdd'],
-          labels: { humanizer: 'Remove signs of AI writing.', 'stop-slop': 'Remove AI writing patterns.', tdd: 'Test first.' },
+          options: [opt('humanizer', 'Remove signs of AI writing.'), opt('stop-slop', 'Remove AI writing patterns.'), opt('tdd', 'Test first.')],
         }),
       ],
     })

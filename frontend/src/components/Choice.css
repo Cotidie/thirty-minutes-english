@@ -1,0 +1,128 @@
+.choice {
+  flex: 1;
+  min-width: 0;
+}
+
+.choice-field {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  min-height: 2.75rem;
+  box-sizing: border-box;
+  padding: 0 0.5rem 0 0.75rem;
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  background: #fff;
+  color: var(--ink);
+  font: inherit;
+  font-size: 0.95rem;
+  text-align: left;
+  cursor: pointer;
+}
+
+.choice-field:focus-within,
+.choice-field[data-focus-visible] {
+  outline: 2px solid var(--phrase);
+  outline-offset: 1px;
+}
+
+.choice-field[data-disabled],
+.choice[data-disabled] .choice-field {
+  background: var(--ground);
+  color: var(--muted);
+  cursor: not-allowed;
+}
+
+.choice-value,
+.choice-input {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.choice-value[data-placeholder] {
+  color: var(--muted);
+}
+
+.choice-input {
+  min-height: 2.6rem;
+  padding: 0;
+  border: 0;
+  outline: none;
+  background: transparent;
+  font: inherit;
+  color: inherit;
+}
+
+.choice-input::placeholder {
+  color: var(--muted);
+}
+
+.choice-toggle {
+  display: grid;
+  place-items: center;
+  width: 2rem;
+  height: 2rem;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+}
+
+.choice-popover {
+  width: var(--trigger-width);
+  max-height: 22rem;
+  overflow-y: auto;
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  background: var(--paper);
+  box-shadow: 0 10px 28px rgb(27 36 49 / 16%);
+}
+
+.choice-list {
+  padding: 0.25rem 0;
+  outline: none;
+}
+
+.choice-item {
+  display: grid;
+  gap: 1px;
+  padding: 0.5rem 0.75rem;
+  cursor: pointer;
+  outline: none;
+}
+
+.choice-item[data-focused] {
+  background: var(--ground);
+}
+
+.choice-item[data-selected] {
+  box-shadow: inset 3px 0 0 var(--ink);
+}
+
+.choice-item-name {
+  display: flex;
+  align-items: baseline;
+  gap: 0.5rem;
+  font-weight: 600;
+}
+
+.choice-item-id {
+  font-size: 0.78rem;
+  font-weight: 400;
+  color: var(--muted);
+}
+
+.choice-item-desc {
+  color: var(--muted);
+  font-size: 0.82rem;
+}
+
+.choice-empty {
+  margin: 0;
+  padding: 0.6rem 0.75rem;
+  color: var(--muted);
+}

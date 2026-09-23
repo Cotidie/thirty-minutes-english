@@ -58,6 +58,10 @@ CREATE TABLE IF NOT EXISTS phrasings (
     paragraph TEXT PRIMARY KEY,
     breaks_json TEXT NOT NULL
 );
+CREATE TABLE IF NOT EXISTS model_lists (
+    source TEXT PRIMARY KEY,
+    list_json TEXT NOT NULL
+);
 CREATE TABLE IF NOT EXISTS settings (
     key TEXT PRIMARY KEY,
     value TEXT NOT NULL

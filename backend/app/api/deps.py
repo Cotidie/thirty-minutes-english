@@ -5,6 +5,7 @@ from typing import Annotated
 
 from fastapi import Depends, HTTPException, Request
 
+from app.config.catalog import Catalog
 from app.config.settings import Settings
 from app.db import Database
 from app.generation.jobs import JobRunner
@@ -30,6 +31,10 @@ def _topics(request: Request) -> DailyTopics:
     return request.app.state.topics
 
 
+def _catalog(request: Request) -> Catalog:
+    return request.app.state.catalog
+
+
 def _settings(request: Request) -> Settings:
     return Settings(request.app.state.env, request.app.state.db.settings.load())
 
@@ -39,6 +44,7 @@ Svc = Annotated[Services, Depends(_services)]
 Jobs = Annotated[JobRunner, Depends(_jobs)]
 Topics = Annotated[DailyTopics, Depends(_topics)]
 CurrentSettings = Annotated[Settings, Depends(_settings)]
+Models = Annotated[Catalog, Depends(_catalog)]
 
 
 def require_session(db: Database, session_id: int | None) -> None:

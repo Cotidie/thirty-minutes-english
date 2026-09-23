@@ -200,7 +200,7 @@ class ClaudeGenerator:
     """`skills` are host skills to load on top of the app's own, which always runs."""
 
     def __init__(
-        self, model: str = "opus", effort: str = "xhigh", skills: tuple[str, ...] = (), firecrawl_key: str = "", timeout_s: float = 300
+        self, model: str = "opus", effort: str | None = "xhigh", skills: tuple[str, ...] = (), firecrawl_key: str = "", timeout_s: float = 300
     ) -> None:
         self._skills = (APP_SKILL, *skills)
         self.claude = Claude(

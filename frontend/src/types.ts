@@ -105,9 +105,18 @@ export type LiveSession = OpenAILiveSession | GeminiLiveSession
 export type VoiceProvider = LiveSession['provider']
 
 /** One runtime setting, its effective value; secrets come masked. */
+/** One menu entry: a model, a provider, a style, a skill. */
+export interface SettingOption {
+  id: string
+  label: string
+  description: string
+  /** A Claude model's effort levels; [] = it takes none; null = not a Claude model. */
+  efforts: string[] | null
+}
+
 export interface SettingVariant {
   default: string
-  suggestions: string[]
+  options: SettingOption[]
 }
 
 export interface SettingField {
@@ -116,24 +125,24 @@ export interface SettingField {
   value: string
   secret: boolean
   default: string
-  /** Strict list: the backend rejects anything else. */
-  choices: string[] | null
-  /** Free text with a menu of common values. */
-  suggestions: string[]
-  /** A short description per choice, shown in the menu. */
-  labels: Record<string, string>
+  /** The menu. Strict unless `free`. */
+  options: SettingOption[]
+  /** Any text is allowed; `options` only suggest (model ids). */
+  free: boolean
   /** A Test button can check this key. */
   testable: boolean
   /** The setting whose current value picks one of `variants` (its default and menu). */
   follows: string | null
   variants: Record<string, SettingVariant>
+  /** An effort level: the menu is what the model in that field takes. */
+  effort_of: string | null
   /** [key, value]: the field only shows while that setting holds that value. */
   shown_when: [string, string] | null
   /** [key, value]: a key the app only calls while that setting holds that value. */
   used_when: [string, string] | null
   /** What the setting does, for the info tooltip. */
   help: string
-  /** `choices` are ticked, not picked; the value is a comma list. */
+  /** `options` are ticked, not picked; the value is a comma list. */
   multi: boolean
 }
 
@@ -145,8 +154,7 @@ export interface SettingGroup {
 /** What the redraw menu shows: style keys with their labels, and the one Settings holds. */
 export interface PictureStyles {
   current: string
-  choices: string[]
-  labels: Record<string, string>
+  options: SettingOption[]
 }
 
 export interface SettingsView {

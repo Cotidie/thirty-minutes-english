@@ -78,8 +78,11 @@ def test_get_masks_secrets_and_carries_the_rules_the_modal_applies(tmp_path):
     assert fields["OPENAI_API_KEY"]["value"] == "…1234" and fields["OPENAI_API_KEY"]["testable"] is True
     assert fields["CLAUDE_MODEL"]["value"] == "sonnet" and fields["CLAUDE_MODEL"]["testable"] is False
     model = fields["VOICE_MODEL"]
-    assert model["follows"] == "VOICE_PROVIDER"
-    assert model["variants"]["gemini"]["default"] == model["variants"]["gemini"]["suggestions"][0]
+    assert model["follows"] == "VOICE_PROVIDER" and model["free"] is True
+    gemini = model["variants"]["gemini"]
+    assert [o["id"] for o in gemini["options"]] == [gemini["default"]]  # nothing fetched yet: the default alone
+    assert fields["CLAUDE_EFFORT"]["effort_of"] == "CLAUDE_MODEL"
+    assert [o["id"] for o in fields["VOICE_PROVIDER"]["options"]] == ["openai", "gemini"] and not fields["VOICE_PROVIDER"]["free"]
     assert fields["VOICE_NAME"]["shown_when"] == ["VOICE_PROVIDER", "gemini"]
     assert fields["COMFY_API_KEY"]["used_when"] == ["IMAGE_PROVIDER", "comfy"]
     assert fields["OPENAI_API_KEY"]["used_when"] is None
@@ -167,9 +170,9 @@ def test_skills_are_ticked_from_the_host_list_and_unknown_names_are_refused(tmp_
     with settings_client(tmp_path, {"CLAUDE_SKILLS": "gone-skill"}) as c:
         field = {f["key"]: f for f in c.get("/api/settings").json()["fields"]}["CLAUDE_SKILLS"]
         assert field["multi"] is True
-        assert field["choices"] == ["stop-slop", "gone-skill"]
-        assert field["labels"]["stop-slop"] == "Remove AI writing patterns."
-        assert "Not found" in field["labels"]["gone-skill"]
+        assert [o["id"] for o in field["options"]] == ["stop-slop", "gone-skill"]
+        assert field["options"][0]["description"] == "Remove AI writing patterns."
+        assert "Not found" in field["options"][1]["description"]
 
         refused = c.put("/api/settings", json={"values": {"CLAUDE_SKILLS": "stop-slop,typo-skill"}})
         assert refused.status_code == 400 and "typo-skill" in refused.json()["detail"]

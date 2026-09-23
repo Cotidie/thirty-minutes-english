@@ -82,7 +82,7 @@ export function VocabularyTab({ items, sessionId, onPicture, starred, onToggleSt
   const [failed, setFailed] = useState<Record<number, string>>({})
   /** The cell whose style menu is open. */
   const [menu, setMenu] = useState<number | null>(null)
-  const [styles, setStyles] = useState<PictureStyles>({ current: '', choices: [], labels: {} })
+  const [styles, setStyles] = useState<PictureStyles>({ current: '', options: [] })
 
   useEffect(() => {
     api.pictureStyles().then(setStyles).catch(() => undefined)
@@ -132,11 +132,11 @@ export function VocabularyTab({ items, sessionId, onPicture, starred, onToggleSt
             )}
             {menu === index && (
               <ul className="vocab-styles" role="menu" aria-label={`Picture style for ${item.word}`}>
-                {(styles.choices.length > 0 ? styles.choices : ['']).map((style) => (
-                  <li key={style}>
-                    <button type="button" role="menuitem" onClick={() => void redraw(index, style)}>
-                      {style ? `${style}${styles.labels[style] ? ` · ${styles.labels[style]}` : ''}` : 'Draw again'}
-                      {style && style === styles.current ? ' (current)' : ''}
+                {(styles.options.length > 0 ? styles.options : [{ id: '', description: '' }]).map((style) => (
+                  <li key={style.id}>
+                    <button type="button" role="menuitem" onClick={() => void redraw(index, style.id)}>
+                      {style.id ? [style.id, style.description].filter(Boolean).join(' · ') : 'Draw again'}
+                      {style.id && style.id === styles.current ? ' (current)' : ''}
                     </button>
                   </li>
                 ))}

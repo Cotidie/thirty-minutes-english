@@ -34,7 +34,7 @@ class ExampleCoach:
         self._templates = {kind: (agent_dir / "prompts" / name).read_text() for kind, name in TEMPLATES.items()}
 
     @classmethod
-    def with_cli(cls, agent_dir: Path, model: str, effort: str = "low") -> "ExampleCoach":
+    def with_cli(cls, agent_dir: Path, model: str, effort: str | None = "low") -> "ExampleCoach":
         return cls(Claude(model, effort), agent_dir)
 
     def build_prompt(

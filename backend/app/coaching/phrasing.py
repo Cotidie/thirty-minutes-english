@@ -24,7 +24,7 @@ class PhrasingMarker:
         self._template = (agent_dir / "prompts" / "phrasing.md").read_text()
 
     @classmethod
-    def with_cli(cls, agent_dir: Path, model: str, effort: str = "low") -> "PhrasingMarker":
+    def with_cli(cls, agent_dir: Path, model: str, effort: str | None = "low") -> "PhrasingMarker":
         return cls(Claude(model, effort), agent_dir)
 
     def build_prompt(self, paragraph: str) -> str:

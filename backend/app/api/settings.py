@@ -1,46 +1,71 @@
+from dataclasses import asdict
+
 from fastapi import APIRouter, HTTPException, Request
 
-from app.api.deps import CurrentSettings, Db, Rebuild
+from app.api.deps import CurrentSettings, Db, Models, Rebuild
 from app.api.schemas import (
     KeyTestRequest,
     KeyTestResult,
+    Option,
     SettingField,
     SettingGroup,
     SettingsUpdate,
     SettingsView,
     Variant,
 )
+from app.config.catalog import Catalog
 from app.config.keycheck import KEYS, check_key
-from app.config.settings import GROUPS, SPECS, InvalidSetting, Settings, Spec, split_list
+from app.config.settings import GROUPS, SPEC_BY_KEY, SPECS, InvalidSetting, Settings, Spec, split_list
 from app.config.skills import host_skills
 
 router = APIRouter(prefix="/api/settings")
 
 
-def skill_choices(saved: str) -> dict[str, str]:
+def keys_of(settings: Settings) -> dict[str, str]:
+    """The API keys the model lists are fetched with."""
+    return {spec.key: settings.get(spec.key) for spec in SPECS if spec.secret}
+
+
+def listed(catalog: Catalog, source: str, settings: Settings, default: str) -> list[Option]:
+    """A provider's models; the default first when the list lacks it (or is not fetched yet)."""
+    options = [Option(**asdict(o)) for o in catalog.options(source, keys_of(settings))]
+    if default and default not in {o.id for o in options}:
+        options.insert(0, Option(id=default, description="Default"))
+    return options
+
+
+def skill_options(saved: str) -> list[Option]:
     """Host skills with their descriptions, plus any saved one this machine no longer has."""
     skills = host_skills()
-    missing = {name: "Not found in ~/.claude/skills; it is skipped." for name in split_list(saved) if name not in skills}
-    return {**skills, **missing}
+    missing = [Option(id=n, description="Not found in ~/.claude/skills; it is skipped.") for n in split_list(saved) if n not in skills]
+    return [Option(id=name, description=text) for name, text in skills.items()] + missing
 
 
-def field_of(spec: Spec, settings: Settings) -> SettingField:
-    choices, labels = (spec.choices, spec.labels or {})
+def options_of(spec: Spec, settings: Settings, catalog: Catalog) -> list[Option]:
     if spec.multi:
-        labels = skill_choices(settings.get(spec.key))
-        choices = tuple(labels)
+        return skill_options(settings.get(spec.key))
+    if spec.catalog:
+        return listed(catalog, spec.catalog, settings, spec.default)
+    labels = spec.labels or {}
+    return [Option(id=c, description=labels.get(c, "")) for c in spec.choices or ()]
+
+
+def field_of(spec: Spec, settings: Settings, catalog: Catalog) -> SettingField:
     return SettingField(
         key=spec.key,
         group=spec.group,
         value=settings.shown(spec.key),
         secret=spec.secret,
         default=spec.default,
-        choices=list(choices) if choices is not None else None,
-        suggestions=list(spec.suggestions),
-        labels=dict(labels),
+        options=options_of(spec, settings, catalog),
+        free=bool(spec.catalog or spec.variants),
         testable=spec.key in KEYS,
         follows=spec.follows,
-        variants={value: Variant(default=v.default, suggestions=list(v.suggestions)) for value, v in (spec.variants or {}).items()},
+        variants={
+            value: Variant(default=v.default, options=listed(catalog, v.catalog, settings, v.default))
+            for value, v in (spec.variants or {}).items()
+        },
+        effort_of=spec.effort_of,
         shown_when=spec.shown_when,
         used_when=spec.used_when,
         help=spec.help,
@@ -48,9 +73,11 @@ def field_of(spec: Spec, settings: Settings) -> SettingField:
     )
 
 
-def view(settings: Settings) -> SettingsView:
-    fields = [field_of(spec, settings) for spec in SPECS]
-    return SettingsView(groups=[SettingGroup(id=g, title=title) for g, title in GROUPS.items()], fields=fields)
+def view(settings: Settings, catalog: Catalog) -> SettingsView:
+    return SettingsView(
+        groups=[SettingGroup(id=g, title=title) for g, title in GROUPS.items()],
+        fields=[field_of(spec, settings, catalog) for spec in SPECS],
+    )
 
 
 def check_multi(values: dict[str, str]) -> None:
@@ -64,12 +91,19 @@ def check_multi(values: dict[str, str]) -> None:
 
 
 @router.get("", response_model=SettingsView)
-def get_settings(settings: CurrentSettings) -> SettingsView:
-    return view(settings)
+def get_settings(settings: CurrentSettings, catalog: Models) -> SettingsView:
+    return view(settings, catalog)
+
+
+@router.post("/models/refresh", response_model=SettingsView)
+def refresh_models(settings: CurrentSettings, catalog: Models) -> SettingsView:
+    """Fetches every model list now (the ↻ in the modal); a failed one keeps its last copy."""
+    catalog.refresh(keys_of(settings))
+    return view(settings, catalog)
 
 
 @router.put("", response_model=SettingsView)
-def put_settings(body: SettingsUpdate, db: Db, request: Request) -> SettingsView:
+def put_settings(body: SettingsUpdate, db: Db, catalog: Models, request: Request) -> SettingsView:
     """Saved, then the services are rebuilt so the next round uses them."""
     try:
         check_multi(body.values)
@@ -77,10 +111,12 @@ def put_settings(body: SettingsUpdate, db: Db, request: Request) -> SettingsView
     except InvalidSetting as e:
         raise HTTPException(status_code=400, detail=str(e)) from e
     settings = Settings(request.app.state.env, db.settings.load())
+    if any(SPEC_BY_KEY[k].secret for k in body.values):
+        catalog.refresh_later(keys_of(settings))  # a new key may unlock a provider's list
     rebuild: Rebuild | None = request.app.state.rebuild
     if rebuild is not None:
         request.app.state.services = rebuild(settings)
-    return view(settings)
+    return view(settings, catalog)
 
 
 @router.post("/test-key", response_model=KeyTestResult)

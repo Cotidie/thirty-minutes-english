@@ -67,7 +67,7 @@ class TopicSource(Protocol):
 
 
 class ClaudeTopicSource:
-    def __init__(self, model: str = "sonnet", effort: str = "medium", firecrawl_key: str = "", timeout_s: float = 240):
+    def __init__(self, model: str = "sonnet", effort: str | None = "medium", firecrawl_key: str = "", timeout_s: float = 240):
         self._claude = Claude(model, effort, timeout_s, tools=WEB_TOOLS, mcp=(firecrawl(firecrawl_key),))
 
     def fetch(self, count: int) -> list[str]:

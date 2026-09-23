@@ -142,9 +142,16 @@ class AssessorSession(BaseModel):
     break_confidence: float
 
 
+class Option(BaseModel):
+    id: str
+    label: str = ""
+    description: str = ""
+    efforts: list[str] | None = None  # a Claude model's effort levels; [] = takes none
+
+
 class Variant(BaseModel):
     default: str
-    suggestions: list[str]
+    options: list[Option]
 
 
 class SettingField(BaseModel):
@@ -155,16 +162,16 @@ class SettingField(BaseModel):
     value: str
     secret: bool
     default: str
-    choices: list[str] | None
-    suggestions: list[str]
-    labels: dict[str, str] = {}
+    options: list[Option] = []  # the menu; strict unless `free`
+    free: bool = False  # any text is allowed, `options` only suggest (model ids)
     testable: bool = False  # a Test button checks the key
     follows: str | None = None  # the setting whose value picks one of `variants`
     variants: dict[str, Variant] = {}
+    effort_of: str | None = None  # options come from that model field's option `efforts`
     shown_when: tuple[str, str] | None = None  # (key, value): hidden otherwise
     used_when: tuple[str, str] | None = None  # (key, value): the key sits idle otherwise
     help: str = ""  # what the setting does, for the info tooltip
-    multi: bool = False  # `choices` are ticked, not picked; the value is a comma list
+    multi: bool = False  # `options` are ticked, not picked; the value is a comma list
 
 
 class SettingGroup(BaseModel):

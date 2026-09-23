@@ -51,12 +51,14 @@ export const api = {
   pictureStyles: async (): Promise<PictureStyles> => {
     const { fields } = await request<SettingsView>('/api/settings')
     const f = fields.find((x) => x.key === 'IMAGE_STYLE')
-    return { current: f?.value || f?.default || '', choices: f?.choices ?? [], labels: f?.labels ?? {} }
+    return { current: f?.value || f?.default || '', options: f?.options ?? [] }
   },
   getStars: (id: number) => request<Stars>(`/api/sessions/${id}/stars`),
   setStars: (id: number, stars: Stars) =>
     request<Stars>(`/api/sessions/${id}/stars`, { method: 'PUT', body: JSON.stringify(stars) }),
   getSettings: () => request<SettingsView>('/api/settings'),
+  /** Fetches every provider's model list now; the settings as they then read. */
+  refreshModels: () => request<SettingsView>('/api/settings/models/refresh', { method: 'POST' }),
   putSettings: (values: SettingsUpdate) =>
     request<SettingsView>('/api/settings', { method: 'PUT', body: JSON.stringify({ values }) }),
   /** One authenticated call to the provider with the typed key, or the saved one when blank. */

@@ -2,14 +2,14 @@
 settings change can rebuild it all without a restart."""
 
 import logging
-from collections.abc import Mapping
+from collections.abc import Callable, Mapping
 from dataclasses import dataclass, field
 from pathlib import Path
 
 from app.coaching.cards import SCHEMA_FILE, Extractor, PhraseCardExtractor
 from app.coaching.example_feedback import TEMPLATES, ExampleCoach
 from app.coaching.phrasing import PhrasingMarker
-from app.config.settings import Settings
+from app.config.settings import SPEC_BY_KEY, Settings
 from app.config.skills import host_skills
 from app.generation.generator import ClaudeGenerator, Generator
 from app.pictures.illustrator import Illustrator
@@ -53,23 +53,37 @@ def agent_dirs(env: Mapping[str, str], apps_dir: Path) -> dict[str, Path]:
     return {name: Path(env.get(var) or apps_dir / folder) for name, (var, folder) in AGENTS.items()}
 
 
-def build_services(settings: Settings, agent_dirs: dict[str, Path], image_dir: Path | None = None) -> Services:
+EffortsOf = Callable[[str], tuple[str, ...] | None]
+
+
+def effort(settings: Settings, key: str, efforts_of: EffortsOf) -> str | None:
+    """The effort setting, or None when its model takes no effort (Haiku), so the run does not fail on it."""
+    levels = efforts_of(settings.get(SPEC_BY_KEY[key].effort_of or ""))
+    return None if levels == () else settings.get(key)
+
+
+def build_services(
+    settings: Settings, agent_dirs: dict[str, Path], image_dir: Path | None = None, efforts_of: EffortsOf = lambda _: None
+) -> Services:
     """`agent_dirs` maps read-aloud / phrase / example to their folders; `image_dir` is
-    where the vocabulary pictures land (none: no pictures)."""
+    where the vocabulary pictures land (none: no pictures); `efforts_of` gives a Claude
+    model's effort levels as Claude Code reported them (None: not known)."""
     return Services(
         generator=ClaudeGenerator(
             model=settings.get("CLAUDE_MODEL"),
-            effort=settings.get("CLAUDE_EFFORT"),
+            effort=effort(settings, "CLAUDE_EFFORT", efforts_of),
             skills=tuple(s for s in settings.claude_skills if s in host_skills()),  # a vanished skill would fail the run
             firecrawl_key=settings.get("FIRECRAWL_API_KEY"),
         ),
-        topic_source=ClaudeTopicSource(settings.get("TOPICS_MODEL"), settings.get("TOPICS_EFFORT"), settings.get("FIRECRAWL_API_KEY")),
+        topic_source=ClaudeTopicSource(
+            settings.get("TOPICS_MODEL"), effort(settings, "TOPICS_EFFORT", efforts_of), settings.get("FIRECRAWL_API_KEY")
+        ),
         agents=_live_agents(settings, agent_dirs),
         extractor=_extractor(settings, agent_dirs["phrase"]),
-        example_coach=_example_coach(settings, agent_dirs["example"]),
+        example_coach=_example_coach(settings, agent_dirs["example"], effort(settings, "EXAMPLE_EFFORT", efforts_of)),
         illustrator=_illustrator(settings, image_dir),
         scene_writer=SceneWriter.with_cli(settings.get("EXAMPLE_MODEL")),
-        phrasing=_phrasing(settings, agent_dirs["read-aloud"]),
+        phrasing=_phrasing(settings, agent_dirs["read-aloud"], effort(settings, "EXAMPLE_EFFORT", efforts_of)),
         assessor=_assessor(settings),
         voice_key_name=settings.voice_api_key_name,
     )
@@ -120,20 +134,20 @@ def _extractor(settings: Settings, agent_dir: Path) -> Extractor | None:
     return PhraseCardExtractor(key, agent_dir, settings.get("SUMMARY_MODEL"))
 
 
-def _phrasing(settings: Settings, agent_dir: Path) -> PhrasingMarker | None:
+def _phrasing(settings: Settings, agent_dir: Path, example_effort: str | None) -> PhrasingMarker | None:
     """Thought-group marking, once the read-aloud folder carries the phrasing prompt."""
     if not (agent_dir / "prompts" / "phrasing.md").is_file():
         log.warning("read-aloud phrasing prompt not found: %s", agent_dir)
         return None
-    return PhrasingMarker.with_cli(agent_dir, settings.get("EXAMPLE_MODEL"), settings.get("EXAMPLE_EFFORT"))
+    return PhrasingMarker.with_cli(agent_dir, settings.get("EXAMPLE_MODEL"), example_effort)
 
 
-def _example_coach(settings: Settings, agent_dir: Path) -> ExampleCoach | None:
+def _example_coach(settings: Settings, agent_dir: Path, example_effort: str | None) -> ExampleCoach | None:
     """The text half of the example coach, once its folder carries the feedback prompt."""
     if not all((agent_dir / "prompts" / name).is_file() for name in TEMPLATES.values()):
         log.warning("example-coach feedback prompts not found: %s", agent_dir)
         return None
-    return ExampleCoach.with_cli(agent_dir, settings.get("EXAMPLE_MODEL"), settings.get("EXAMPLE_EFFORT"))
+    return ExampleCoach.with_cli(agent_dir, settings.get("EXAMPLE_MODEL"), example_effort)
 
 
 def _illustrator(settings: Settings, image_dir: Path | None) -> Illustrator | None:

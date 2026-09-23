@@ -126,8 +126,20 @@
   padding: 1.1rem 1.5rem 0.5rem;
 }
 
-.settings-panel-title {
+.settings-panel-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 1rem;
   margin: 0 0 0.25rem;
+}
+
+.settings-refresh {
+  font-size: 0.85rem;
+}
+
+.settings-panel-title {
+  margin: 0;
   font-size: 1.1rem;
   font-weight: 600;
 }
@@ -224,8 +236,8 @@
   gap: 0.5rem;
 }
 
-.settings-row input,
-.settings-row select {
+.settings-row-control > input,
+.settings-multi-bar input {
   flex: 1;
   width: 100%;
   min-width: 0;
@@ -240,7 +252,8 @@
   color: inherit;
 }
 
-.settings-row input::placeholder {
+.settings-row-control > input::placeholder,
+.settings-multi-bar input::placeholder {
   color: var(--muted);
 }
 
@@ -313,13 +326,9 @@
   background: var(--ground);
 }
 
-.settings-row .settings-multi-item input {
+.settings-multi-item input {
   flex: none;
-  width: 1rem;
-  min-height: 0;
-  height: 1rem;
   margin: 0.2rem 0 0;
-  padding: 0;
 }
 
 .settings-multi-name {

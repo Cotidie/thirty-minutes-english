@@ -79,15 +79,20 @@ def _root(error: BaseException) -> str:
     return str(error) or type(error).__name__
 
 
+def full_text(result: CallToolResult) -> str:
+    return " ".join(block.text for block in result.content if block.type == "text")
+
+
 def text_of(result: CallToolResult) -> str:
-    return " ".join(block.text for block in result.content if block.type == "text")[:500]
+    """The start of the text, short enough for an error message."""
+    return full_text(result)[:500]
 
 
 def payload(result: CallToolResult) -> Any:
     """What a tool returned as data: its structured content, else its text parsed as JSON, else that text."""
     if result.structured_content is not None:
         return result.structured_content
-    text = text_of(result)
+    text = full_text(result)
     try:
         return json.loads(text)
     except ValueError:

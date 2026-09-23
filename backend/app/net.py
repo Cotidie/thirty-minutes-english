@@ -29,6 +29,10 @@ def request(method: str, url: str, headers: dict[str, str] | None = None, body: 
     return response
 
 
+def get_json(url: str, headers: dict[str, str] | None = None, timeout: float = 30) -> dict:
+    return request("GET", url, headers, None, timeout).json()
+
+
 def post_json(url: str, body: dict, headers: dict[str, str], timeout: float = 30) -> dict:
     return request("POST", url, headers, body, timeout).json()
 
