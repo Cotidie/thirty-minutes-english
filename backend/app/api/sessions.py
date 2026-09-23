@@ -22,7 +22,7 @@ def status_of(job: Job, runner: JobRunner) -> JobStatus:
         **asdict(job.progress),
         elapsed_seconds=job.elapsed_seconds,
         stage_elapsed_seconds=job.stage_elapsed_seconds,
-        stage_expected_seconds=runner.stage_expected_seconds(job.stage),
+        stage_expected_seconds=runner.stage_expected_seconds(job.stage, job),
         expected_seconds=runner.expected_seconds(job),
         session_id=job.session_id,
         error=job.error,

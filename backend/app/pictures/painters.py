@@ -4,6 +4,7 @@ import asyncio
 import base64
 import logging
 import re
+import time
 from collections.abc import Callable
 from typing import Protocol
 
@@ -20,12 +21,28 @@ DEFAULT_MODEL = {"openrouter": "google/gemini-3-pro-image", "comfy": "vertexai/n
 
 
 OnDrawn = Callable[[int], None]  # pictures finished so far; raising from it stops the painter
-OnCost = Callable[[str, float], None]  # (model, dollars) for one picture, as the provider billed it
 COST = re.compile(r"cost: \$([\d.]+)")
+
+
+class PictureLog(Protocol):
+    """Where each picture's seconds (and cost, where the provider bills per picture) are kept, per model."""
+
+    def record(self, model: str, seconds: float | None, cost: float | None = None) -> None: ...
+    def seconds(self, model: str) -> float | None: ...
+
+
+class NoLog:
+    def record(self, model: str, seconds: float | None, cost: float | None = None) -> None:
+        pass
+
+    def seconds(self, model: str) -> float | None:
+        return None
 
 
 class Painter(Protocol):
     def paint(self, prompts: list[str], on_drawn: OnDrawn | None = None) -> list[bytes | None]: ...
+    def expected_seconds(self, count: int) -> float | None:
+        """How long `count` pictures usually take with this model here; None until one was drawn."""
 
 
 class Counter:
@@ -45,26 +62,30 @@ class Counter:
         self._on_drawn(self.done)
 
 
-def painter_for(provider: str, model: str, keys: dict[str, str], on_cost: OnCost | None = None) -> Painter | None:
+def painter_for(provider: str, model: str, keys: dict[str, str], pictures: PictureLog | None = None) -> Painter | None:
     """The painter for `provider` ("openrouter" / "comfy"), or None when it is off or its key is missing.
-    `on_cost` hears what each picture cost where the provider says (OpenRouter)."""
+    `pictures` keeps how long each picture took, and its cost where the provider says (OpenRouter)."""
     key = keys.get(provider, "")
     if provider not in DEFAULT_MODEL or not key:
         return None
     model = model or DEFAULT_MODEL[provider]
     if provider == "comfy":
-        return ComfyPainter(McpHttp(COMFY_MCP, key), model)
-    return OpenRouterPainter(McpHttp(OPENROUTER_MCP, key), model, on_cost)
+        return ComfyPainter(McpHttp(COMFY_MCP, key), model, pictures)
+    return OpenRouterPainter(McpHttp(OPENROUTER_MCP, key), model, pictures)
 
 
 class OpenRouterPainter:
     """One generate-image call per picture, all in flight on one session; the PNG comes back inline
-    as base64, beside a text block that names the charge ("cost: $0.007")."""
+    as base64, beside a text block that names the charge ("cost: $0.007"). Each picture is timed
+    from its own call, and since they are drawn side by side, a batch takes about as long as one."""
 
-    def __init__(self, server: McpHttp, model: str, on_cost: OnCost | None = None) -> None:
+    def __init__(self, server: McpHttp, model: str, pictures: PictureLog | None = None) -> None:
         self._server = server
         self._model = model
-        self._on_cost = on_cost or (lambda _model, _cost: None)
+        self._pictures = pictures or NoLog()
+
+    def expected_seconds(self, count: int) -> float | None:
+        return self._pictures.seconds(self._model)
 
     def paint(self, prompts: list[str], on_drawn: OnDrawn | None = None) -> list[bytes | None]:
         return asyncio.run(self._paint(prompts, Counter(on_drawn)))
@@ -83,37 +104,54 @@ class OpenRouterPainter:
             return [None] * len(prompts)
 
     async def _one(self, session: Session, prompt: str) -> bytes | None:
+        started = time.monotonic()
         try:
             result = await session.call("generate-image", {"prompt": prompt, "model": self._model})
         except McpError as e:
             log.warning("openrouter could not draw a picture: %s", e)
             return None
-        if cost := COST.search(text_of(result)):
-            self._on_cost(self._model, float(cost.group(1)))
-        for block in result.content:
-            if block.type == "image" and block.data:
-                return base64.b64decode(block.data)
-        log.warning("openrouter returned no image block")
-        return None
+        cost = COST.search(text_of(result))
+        png = next((base64.b64decode(b.data) for b in result.content if b.type == "image" and b.data), None)
+        if png is None:
+            log.warning("openrouter returned no image block")
+        if png or cost:
+            seconds = time.monotonic() - started if png else None
+            self._pictures.record(self._model, seconds, float(cost.group(1)) if cost else None)
+        return png
 
 
 class ComfyPainter:
     """One batch for all the pictures, waited on, then the signed URLs fetched at once. comfy draws
     as many side by side as the plan allows (Standard: one at a time) and keeps the batch across
-    connections, so a dropped connection reconnects and waits on, and a give-up keeps what is done."""
+    connections, so a dropped connection reconnects and waits on, and a give-up keeps what is done.
+    A picture's seconds are the batch's time shared over the pictures that came back, since the plan
+    draws them one after another."""
 
     WAIT_ROUNDS = 24  # wait_for_batch returns after ~25 s each; about 10 minutes in all
     RECONNECTS = 2
 
-    def __init__(self, server: McpHttp, model: str, fetch=None) -> None:
+    def __init__(self, server: McpHttp, model: str, pictures: PictureLog | None = None, fetch=None) -> None:
         self._server = server
         self._model = model
+        self._pictures = pictures or NoLog()
         self._fetch = fetch or fetch_url
+
+    def expected_seconds(self, count: int) -> float | None:
+        seconds = self._pictures.seconds(self._model)
+        return seconds * count if seconds is not None else None
 
     def paint(self, prompts: list[str], on_drawn: OnDrawn | None = None) -> list[bytes | None]:
         return asyncio.run(self._paint(prompts, Counter(on_drawn)))
 
     async def _paint(self, prompts: list[str], counter: Counter) -> list[bytes | None]:
+        started = time.monotonic()
+        pictures = await self._batch(prompts, counter)
+        if drawn := sum(1 for png in pictures if png is not None):
+            for _ in range(drawn):
+                self._pictures.record(self._model, (time.monotonic() - started) / drawn)
+        return pictures
+
+    async def _batch(self, prompts: list[str], counter: Counter) -> list[bytes | None]:
         items = [
             {"tool": "partner_generate", "type": "image", "aspect_ratio": "4:3", "prompt": p, "description": f"word {i}", **self._model_fields()}
             for i, p in enumerate(prompts)

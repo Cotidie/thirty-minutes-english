@@ -13,8 +13,8 @@ const model = (id: string, extra: Partial<SettingOption> = {}): SettingOption =>
 })
 
 const OPTIONS = [
-  model('google/gemini-3-pro-image', { label: 'Nano Banana Pro', image_per_m: 120, per_image: 0.134, pinned: true }),
-  model('recraft/v4-flash', { label: 'Recraft V4.1 Flash', image_per_m: 1.68 }),
+  model('google/gemini-3-pro-image', { label: 'Nano Banana Pro', image_per_m: 120, per_image: 0.134, seconds_per_image: 17.6, pinned: true }),
+  model('recraft/v4-flash', { label: 'Recraft V4.1 Flash', image_per_m: 1.68, seconds_per_image: 40 }),
   model('openai/gpt-image-2.5', { label: 'GPT Image 2.5', image_per_m: 30 }),
 ]
 
@@ -37,9 +37,10 @@ function renderList(value = '', onChange = vi.fn(), onPin = vi.fn()) {
 }
 
 describe('priceOf', () => {
-  it('leads with what a picture cost here, then the list price', () => {
-    expect(priceOf(OPTIONS[0])).toEqual({ perPicture: '≈ $0.13 / picture', list: '$120 / 1M tok' })
-    expect(priceOf(OPTIONS[1])).toEqual({ perPicture: 'no picture yet', list: '$1.68 / 1M tok' })
+  it('leads with what a picture cost and took here, then the list price', () => {
+    expect(priceOf(OPTIONS[0])).toEqual({ perPicture: '≈ $0.13 · 18s / picture', list: '$120 / 1M tok' })
+    expect(priceOf(OPTIONS[1])).toEqual({ perPicture: '≈ 40s / picture', list: '$1.68 / 1M tok' })
+    expect(priceOf(OPTIONS[2])).toEqual({ perPicture: 'no picture yet', list: '$30 / 1M tok' })
   })
 })
 
@@ -70,6 +71,12 @@ describe('ModelList', () => {
       'Recraft V4.1 Flash',
       'GPT Image 2.5',
     ])
+    await userEvent.click(screen.getByRole('button', { name: 'Fastest' }))
+    const fastest = screen.getByText('Fastest', { selector: 'p' }).closest('div')!
+    expect(within(fastest).getAllByRole('radio').map((r) => r.closest('label')?.textContent)).toEqual([
+      'Recraft V4.1 Flash', // timed here; GPT Image 2.5 was never drawn
+      'GPT Image 2.5',
+    ])
     await userEvent.type(screen.getByLabelText('Filter models'), 'gpt')
     expect(screen.getAllByRole('radio')).toHaveLength(1)
   })
@@ -83,7 +90,7 @@ describe('ModelList', () => {
 })
 
 describe('ModelList without prices', () => {
-  it('drops the price columns and the cost sort', () => {
+  it('drops the price columns and the sorts until a picture was timed', () => {
     render(
       <ModelList
         name="image"
@@ -97,5 +104,22 @@ describe('ModelList without prices', () => {
     )
     expect(screen.queryByRole('button', { name: 'Cheapest' })).not.toBeInTheDocument()
     expect(screen.queryByText('no picture yet')).not.toBeInTheDocument()
+  })
+
+  it('shows the time a comfy picture took, with a sort by it and no list price', () => {
+    render(
+      <ModelList
+        name="image"
+        labelledBy="l"
+        options={[model('vertexai/nano-banana-pro', { seconds_per_image: 30 }), model('xai/grok-image-generate')]}
+        value=""
+        default="vertexai/nano-banana-pro"
+        onChange={vi.fn()}
+        onPin={vi.fn()}
+      />,
+    )
+    expect(screen.getByText('≈ 30s / picture')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Fastest' })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Cheapest' })).not.toBeInTheDocument()
   })
 })

@@ -12,7 +12,7 @@ from threading import Lock
 from typing import Literal, Protocol
 
 from app.db.sessions import SessionRepo
-from app.generation.generator import Generator
+from app.generation.generator import VOCABULARY_COUNT, Generator
 from app.generation.progress import Progress, Stage, with_pictures
 from app.llm import GenerationError
 from app.models import SessionContent
@@ -45,6 +45,7 @@ class Job:
     status: Status = "running"
     progress: Progress = field(default_factory=lambda: Progress(Stage.STARTING))
     stage_seconds: dict[Stage, float] = field(default_factory=dict)  # time in each stage left so far, summed over visits
+    foreseen: dict[Stage, float] = field(default_factory=dict)  # what this job's own setup says a stage takes
     session_id: int | None = None
     error: str | None = None
 
@@ -94,6 +95,7 @@ class JobRunner:
     def start(self, topic: str, generator: Generator, illustrator: Illustrator | None = None) -> Job:
         """Generates in the background; the pictures follow when an illustrator is given."""
         job = Job(id=uuid.uuid4().hex[:12], topic=topic)
+        self._foresee_pictures(job, illustrator, VOCABULARY_COUNT)
         with self._lock:
             self._jobs[job.id] = job
         self.executor.submit(self._run, job, generator, illustrator)
@@ -114,7 +116,10 @@ class JobRunner:
             job.cancel()
         return job
 
-    def stage_expected_seconds(self, stage: Stage) -> float:
+    def stage_expected_seconds(self, stage: Stage, job: Job | None = None) -> float:
+        """What `job`'s own setup foresees (its picture model's time here), else the latest runs' median."""
+        if job and stage in job.foreseen:
+            return job.foreseen[stage]
         with self._lock:
             history = self._stage_history[stage]
             return median(history) if history else DEFAULT_STAGE_SECONDS[stage]
@@ -126,7 +131,7 @@ class JobRunner:
         for stage in Stage:
             spent = job.stage_seconds.get(stage, 0.0) + (job.stage_elapsed_seconds if stage == job.stage else 0.0)
             ahead = order.index(stage) >= order.index(job.stage)
-            total += max(spent, self.stage_expected_seconds(stage)) if ahead else spent
+            total += max(spent, self.stage_expected_seconds(stage, job)) if ahead else spent
         return total
 
     def _run(self, job: Job, generator: Generator, illustrator: Illustrator | None) -> None:
@@ -161,9 +166,15 @@ class JobRunner:
         job.status = "done"
 
     @staticmethod
-    def _illustrate(job: Job, illustrator: Illustrator, content: SessionContent) -> SessionContent:
+    def _foresee_pictures(job: Job, illustrator: Illustrator | None, count: int) -> None:
+        seconds = illustrator.expected_seconds(count) if illustrator else None
+        if seconds is not None:
+            job.foreseen[Stage.ILLUSTRATING] = seconds
+
+    def _illustrate(self, job: Job, illustrator: Illustrator, content: SessionContent) -> SessionContent:
         """Pictures on the words; a painter failure sends the session out without them."""
         total = sum(1 for item in content.vocabulary if item.scene)
+        self._foresee_pictures(job, illustrator, total)
         job.apply(with_pictures(job.progress, 0, total))
         try:
             return illustrator.illustrate(job.id, content, lambda done: job.apply(with_pictures(job.progress, done, total)))

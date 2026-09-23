@@ -152,6 +152,7 @@ class Option(BaseModel):
     image_per_m: float | None = None  # list price, $ per million image tokens
     text_per_m: float | None = None  # list price, $ per million prompt tokens
     per_image: float | None = None  # what a picture cost here on average (image models we drew with)
+    seconds_per_image: float | None = None  # how long a picture took here on average
     pinned: bool = False  # kept on the menu, at the top, however old
 
 

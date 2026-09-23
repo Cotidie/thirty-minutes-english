@@ -13,7 +13,7 @@ from app.config.settings import SPEC_BY_KEY, Settings
 from app.config.skills import host_skills
 from app.generation.generator import ClaudeGenerator, Generator
 from app.pictures.illustrator import Illustrator
-from app.pictures.painters import OnCost, painter_for
+from app.pictures.painters import PictureLog, painter_for
 from app.pictures.scenes import SceneWriter
 from app.topics.daily import ClaudeTopicSource, TopicSource
 from app.voice.assessor import AzureAssessor
@@ -67,12 +67,12 @@ def build_services(
     agent_dirs: dict[str, Path],
     image_dir: Path | None = None,
     efforts_of: EffortsOf = lambda _: None,
-    on_cost: OnCost | None = None,
+    pictures: PictureLog | None = None,
 ) -> Services:
     """`agent_dirs` maps read-aloud / phrase / example to their folders; `image_dir` is
     where the vocabulary pictures land (none: no pictures); `efforts_of` gives a Claude
-    model's effort levels as Claude Code reported them (None: not known); `on_cost`
-    keeps what each picture cost."""
+    model's effort levels as Claude Code reported them (None: not known); `pictures`
+    keeps how long each picture took and what it cost."""
     return Services(
         generator=ClaudeGenerator(
             model=settings.get("CLAUDE_MODEL"),
@@ -86,7 +86,7 @@ def build_services(
         agents=_live_agents(settings, agent_dirs),
         extractor=_extractor(settings, agent_dirs["phrase"]),
         example_coach=_example_coach(settings, agent_dirs["example"], effort(settings, "EXAMPLE_EFFORT", efforts_of)),
-        illustrator=_illustrator(settings, image_dir, on_cost),
+        illustrator=_illustrator(settings, image_dir, pictures),
         scene_writer=SceneWriter.with_cli(settings.get("EXAMPLE_MODEL")),
         phrasing=_phrasing(settings, agent_dirs["read-aloud"], effort(settings, "EXAMPLE_EFFORT", efforts_of)),
         assessor=_assessor(settings),
@@ -155,12 +155,12 @@ def _example_coach(settings: Settings, agent_dir: Path, example_effort: str | No
     return ExampleCoach.with_cli(agent_dir, settings.get("EXAMPLE_MODEL"), example_effort)
 
 
-def _illustrator(settings: Settings, image_dir: Path | None, on_cost: OnCost | None) -> Illustrator | None:
+def _illustrator(settings: Settings, image_dir: Path | None, pictures: PictureLog | None) -> Illustrator | None:
     """Pictures for the words, once a provider is chosen, its key is set, and there is a folder for them."""
     if image_dir is None:
         return None
     keys = {"openrouter": settings.get("OPENROUTER_API_KEY"), "comfy": settings.get("COMFY_API_KEY")}
-    painter = painter_for(settings.get("IMAGE_PROVIDER"), settings.get("IMAGE_MODEL"), keys, on_cost)
+    painter = painter_for(settings.get("IMAGE_PROVIDER"), settings.get("IMAGE_MODEL"), keys, pictures)
     if painter is None and settings.get("IMAGE_PROVIDER") != "off":
         log.warning("pictures are off: no key for IMAGE_PROVIDER=%s", settings.get("IMAGE_PROVIDER"))
     return Illustrator(painter, image_dir, settings.get("IMAGE_STYLE")) if painter else None

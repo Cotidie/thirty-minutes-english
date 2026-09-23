@@ -33,6 +33,9 @@ class FakePainter:
                 on_drawn(i + 1)
         return [None if i in self.blank else f"PNG{i}".encode() for i in range(len(prompts))]
 
+    def expected_seconds(self, count: int) -> float | None:
+        return None
+
 
 def test_every_word_with_a_scene_gets_its_picture_file(tmp_path):
     content = sample_content()
@@ -270,11 +273,41 @@ def test_a_cancel_during_the_wait_cancels_every_comfy_job():
     assert [c[1] for c in server.calls if c[0] == "cancel_job"] == [{"prompt_id": "j0"}, {"prompt_id": "j1"}]
 
 
-def test_openrouter_reports_what_each_picture_cost():
+class Log:
+    """A PictureLog that keeps what it hears and knows `known` seconds per picture."""
+
+    def __init__(self, known: float | None = None) -> None:
+        self.records: list[tuple[str, float | None, float | None]] = []
+        self.known = known
+
+    def record(self, model, seconds, cost=None):
+        self.records.append((model, seconds, cost))
+
+    def seconds(self, model):
+        return self.known
+
+
+def test_openrouter_times_each_picture_and_keeps_what_it_cost():
     png = base64.b64encode(b"PNG").decode()
     billed = CallToolResult(content=[ImageContent(type="image", data=png, mime_type="image/png"), TextContent(type="text", text="(model: m, cost: $0.134, total tokens: 1120)")])
     unbilled = CallToolResult(content=[ImageContent(type="image", data=png, mime_type="image/png")])
-    server = FakeServer({"generate-image": {"a": billed, "b": unbilled}})
-    costs: list[tuple[str, float]] = []
-    OpenRouterPainter(server, "google/gemini-3-pro-image", lambda model, cost: costs.append((model, cost))).paint(["a", "b"])
-    assert costs == [("google/gemini-3-pro-image", 0.134)]
+    blank = CallToolResult(content=[TextContent(type="text", text="refused, cost: $0.002")])
+    server = FakeServer({"generate-image": {"a": billed, "b": unbilled, "c": blank}})
+    log = Log()
+    OpenRouterPainter(server, "m", log).paint(["a", "b", "c"])
+    by_cost = sorted(log.records, key=lambda r: r[2] or 0)
+    assert [(m, s is not None, c) for m, s, c in by_cost] == [("m", True, None), ("m", False, 0.002), ("m", True, 0.134)]
+
+
+def test_comfy_shares_the_batch_time_over_the_pictures_that_came_back():
+    server = comfy_server([text({"timed_out": False, "summary": {"ready": 1, "failed": 1}})], ["j0"])
+    log = Log()
+    ComfyPainter(server, "m", log, fetch=fetch_ok).paint(["a", "b"])
+    assert [(m, c) for m, _, c in log.records] == [("m", None)]
+    assert log.records[0][1] >= 0
+
+
+def test_the_wait_foreseen_for_a_batch_follows_how_each_provider_draws():
+    assert OpenRouterPainter(FakeServer({}), "m", Log(20)).expected_seconds(10) == 20  # side by side
+    assert ComfyPainter(FakeServer({}), "m", Log(20)).expected_seconds(10) == 200  # one after another
+    assert ComfyPainter(FakeServer({}), "m").expected_seconds(10) is None  # nothing drawn yet

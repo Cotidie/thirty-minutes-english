@@ -19,6 +19,7 @@ from app.config.keycheck import KEYS, check_key
 from app.config.settings import GROUPS, SPEC_BY_KEY, SPECS, InvalidSetting, Settings, Spec, split_list
 from app.config.skills import host_skills
 from app.db import Database
+from app.db.pictures import PictureStat
 
 router = APIRouter(prefix="/api/settings")
 
@@ -35,7 +36,7 @@ class ModelMenus:
     def __init__(self, catalog: Catalog, settings: Settings, db: Database) -> None:
         self._catalog = catalog
         self._keys = keys_of(settings)
-        self._costs = db.costs.per_picture()
+        self._pictures = db.pictures.stats()
         self._pins = db.pins
 
     def listed(self, source: str, default: str, saved: str = "", everything: bool = False) -> list[Option]:
@@ -50,7 +51,8 @@ class ModelMenus:
 
     def _option(self, model: str, listed: ModelOption | None, pinned: bool) -> Option:
         details = asdict(listed) if listed else {"id": model}
-        return Option(**details, per_image=self._costs.get(model), pinned=pinned)
+        here = self._pictures.get(model, PictureStat())
+        return Option(**details, per_image=here.cost, seconds_per_image=here.seconds, pinned=pinned)
 
 
 def skill_options(saved: str) -> list[Option]:

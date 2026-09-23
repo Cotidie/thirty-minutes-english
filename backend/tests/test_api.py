@@ -121,9 +121,13 @@ def test_job_reports_failure_when_generator_fails(tmp_path):
 
 
 class FakeIllustrator:
-    def __init__(self, error: Exception | None = None):
+    def __init__(self, error: Exception | None = None, seconds: float | None = None):
         self.error = error
+        self.seconds = seconds
         self.job_ids: list[str] = []
+
+    def expected_seconds(self, count: int) -> float | None:
+        return None if self.seconds is None else self.seconds * count
 
     def illustrate(self, job_id: str, content, on_drawn=None):
         self.job_ids.append(job_id)
@@ -362,6 +366,14 @@ def test_a_fresh_job_expects_the_default_time_of_every_stage(tmp_path):
         job = c.post("/api/sessions", json={"topic": "X"}).json()
     assert job["expected_seconds"] == sum(DEFAULT_STAGE_SECONDS.values())
     assert job["stage_expected_seconds"] == DEFAULT_STAGE_SECONDS[Stage.STARTING]
+
+
+def test_a_job_foresees_its_pictures_from_the_picture_model_time_here(tmp_path):
+    app = create_app(Database(tmp_path / "s.db"), Services(FakeGenerator(), illustrator=FakeIllustrator(seconds=7)), DeferredExecutor())
+    with TestClient(app) as c:
+        job = c.post("/api/sessions", json={"topic": "X"}).json()
+    others = sum(s for stage, s in DEFAULT_STAGE_SECONDS.items() if stage != Stage.ILLUSTRATING)
+    assert job["expected_seconds"] == others + 7 * 10
 
 
 def test_stage_times_of_a_finished_run_become_the_next_estimate():

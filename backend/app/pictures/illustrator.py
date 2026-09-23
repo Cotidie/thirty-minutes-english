@@ -44,6 +44,10 @@ class Illustrator:
         self._dir = image_dir
         self._style = STYLES.get(style, STYLES["photo"])
 
+    def expected_seconds(self, count: int) -> float | None:
+        """How long `count` pictures usually take with the configured model; None until it drew one here."""
+        return self._painter.expected_seconds(count)
+
     def prompt(self, scene: str, style: str = "") -> str:
         """`style` is a STYLES key to draw this one in; blank means the configured style."""
         return f"{STYLES.get(style, self._style)} {IMAGE_RULES} {scene}"

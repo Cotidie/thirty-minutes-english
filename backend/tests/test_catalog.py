@@ -1,3 +1,4 @@
+import sqlite3
 import json
 from contextlib import asynccontextmanager
 
@@ -10,7 +11,7 @@ from app.config import catalog as catalog_module
 from app.config.catalog import Catalog, ModelOption, claude_models, newest_first, comfy_images, gemini_live, openai_text, openai_voice, openrouter_images
 from app.config.settings import Settings
 from app.db import Database
-from app.db.costs import CostRepo
+from app.db.pictures import PictureRepo, PictureStat
 from app.main import create_app
 from app.wiring import Services, effort
 from tests.test_api import FakeGenerator, InlineExecutor
@@ -158,13 +159,16 @@ def test_comfy_lists_text_to_image_partner_models(monkeypatch):
     ]
 
 
-def test_image_models_carry_what_a_picture_cost_here(tmp_path):
+def test_image_models_carry_what_a_picture_cost_and_took_here(tmp_path):
     db = Database(tmp_path / "s.db")
-    for cost in (0.10, 0.20):
-        db.costs.record("z/img", cost)
-    for cost in [9.0] + [0.01] * CostRepo.RECENT:  # only the latest pictures count
-        db.costs.record("a/img", cost)
-    assert db.costs.per_picture() == {"z/img": pytest.approx(0.15), "a/img": pytest.approx(0.01)}
+    for seconds, cost in ((10, 0.10), (None, 0.20), (20, None)):
+        db.pictures.record("z/img", seconds, cost)
+    for cost in [9.0] + [0.01] * PictureRepo.RECENT:  # only the latest pictures count
+        db.pictures.record("a/img", 5, cost)
+    assert db.pictures.stats() == {
+        "z/img": PictureStat(pytest.approx(15), pytest.approx(0.15)),
+        "a/img": PictureStat(5, pytest.approx(0.01)),
+    }
 
     cat = Catalog(db.caches, {"openrouter_images": lambda _: [ModelOption("z/img", image_per_m=120.0)]}, background=False)
     cat.refresh({})
@@ -172,7 +176,17 @@ def test_image_models_carry_what_a_picture_cost_here(tmp_path):
     with TestClient(app) as c:
         image = {f["key"]: f for f in c.get("/api/settings").json()["fields"]}["IMAGE_MODEL"]
     z = next(o for o in image["variants"]["openrouter"]["options"] if o["id"] == "z/img")
-    assert (z["image_per_m"], z["per_image"]) == (120.0, pytest.approx(0.15))
+    assert (z["image_per_m"], z["per_image"], z["seconds_per_image"]) == (120.0, pytest.approx(0.15), pytest.approx(15))
+
+
+def test_costs_kept_before_seconds_were_move_into_the_picture_stats(tmp_path):
+    path = tmp_path / "s.db"
+    with sqlite3.connect(path) as conn:
+        conn.execute("CREATE TABLE image_costs (id INTEGER PRIMARY KEY AUTOINCREMENT, created_at TEXT NOT NULL, model TEXT NOT NULL, cost REAL NOT NULL)")
+        conn.execute("INSERT INTO image_costs (created_at, model, cost) VALUES ('t', 'z/img', 0.06)")
+    db = Database(path)
+    assert db.pictures.stats() == {"z/img": PictureStat(None, pytest.approx(0.06))}
+    assert Database(path).pictures.stats() == db.pictures.stats()  # once only
 
 
 def test_the_modal_gets_the_cached_models_with_the_default_kept_and_can_refresh(tmp_path):

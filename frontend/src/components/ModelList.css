@@ -70,7 +70,7 @@
   text-transform: uppercase;
 }
 
-/* One line per model: pick, name | cost here | list price | pin. */
+/* One line per model: pick, name | cost and time here | list price | pin. */
 .model-list-row {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto 5.5rem 2.25rem;
@@ -81,7 +81,11 @@
   font-variant-numeric: tabular-nums;
 }
 
-.model-list-rows.is-unpriced .model-list-row {
+.model-list-rows.no-list .model-list-row {
+  grid-template-columns: minmax(0, 1fr) auto 2.25rem;
+}
+
+.model-list-rows.no-figures .model-list-row {
   grid-template-columns: minmax(0, 1fr) 2.25rem;
 }
 

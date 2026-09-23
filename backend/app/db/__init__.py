@@ -4,7 +4,7 @@ import sqlite3
 from pathlib import Path
 
 from app.db.caches import CacheRepo
-from app.db.costs import CostRepo
+from app.db.pictures import PictureRepo
 from app.db.pins import PinRepo
 from app.db.records import RecordRepo
 from app.db.sessions import SessionRepo
@@ -60,11 +60,12 @@ CREATE TABLE IF NOT EXISTS phrasings (
     paragraph TEXT PRIMARY KEY,
     breaks_json TEXT NOT NULL
 );
-CREATE TABLE IF NOT EXISTS image_costs (
+CREATE TABLE IF NOT EXISTS image_stats (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     created_at TEXT NOT NULL,
     model TEXT NOT NULL,
-    cost REAL NOT NULL
+    seconds REAL,
+    cost REAL
 );
 CREATE TABLE IF NOT EXISTS model_pins (
     source TEXT NOT NULL,
@@ -89,10 +90,11 @@ class Database:
         self.path.parent.mkdir(parents=True, exist_ok=True)
         with self.connect() as conn:
             conn.executescript(SCHEMA)
+            _carry_over_costs(conn)
         self.sessions = SessionRepo(self)
         self.records = RecordRepo(self)
         self.caches = CacheRepo(self)
-        self.costs = CostRepo(self)
+        self.pictures = PictureRepo(self)
         self.pins = PinRepo(self)
         self.settings = SettingsRepo(self)
 
@@ -101,3 +103,10 @@ class Database:
         conn = sqlite3.connect(self.path)
         conn.row_factory = sqlite3.Row
         return conn
+
+
+def _carry_over_costs(conn: sqlite3.Connection) -> None:
+    """Moves the costs of the table before seconds were kept into image_stats, once."""
+    if conn.execute("SELECT 1 FROM sqlite_master WHERE name = 'image_costs'").fetchone():
+        conn.execute("INSERT INTO image_stats (created_at, model, cost) SELECT created_at, model, cost FROM image_costs ORDER BY id")
+        conn.execute("DROP TABLE image_costs")

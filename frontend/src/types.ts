@@ -121,6 +121,8 @@ export interface SettingOption {
   text_per_m?: number | null
   /** Image models: what a picture cost here on average, over its latest pictures. */
   per_image?: number | null
+  /** Image models: how long a picture took here on average. */
+  seconds_per_image?: number | null
   /** Kept at the top of the menu however old it gets. */
   pinned?: boolean
 }

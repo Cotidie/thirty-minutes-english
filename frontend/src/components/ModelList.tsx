@@ -3,7 +3,22 @@ import type { SettingOption } from '../types'
 import { PinIcon } from './Choice'
 import './ModelList.css'
 
-type Sort = 'newest' | 'cheapest'
+/** Each sort's order (stable, so ties keep the provider's newest-first) and whether a model has its figure. */
+const SORTS = {
+  newest: { label: 'Newest', key: () => 0, has: () => true },
+  /** What a picture cost here, else the list price; unpriced models last. */
+  cheapest: {
+    label: 'Cheapest',
+    key: (o: SettingOption) => o.per_image ?? (o.image_per_m != null ? o.image_per_m / 1000 : Infinity),
+    has: (o: SettingOption) => o.per_image != null || o.image_per_m != null,
+  },
+  fastest: {
+    label: 'Fastest',
+    key: (o: SettingOption) => o.seconds_per_image ?? Infinity,
+    has: (o: SettingOption) => o.seconds_per_image != null,
+  },
+}
+type Sort = keyof typeof SORTS
 
 function dollars(n: number): string {
   if (n === 0) return 'free'
@@ -11,17 +26,16 @@ function dollars(n: number): string {
   return `$${n.toFixed(n >= 0.1 ? 2 : 3)}`
 }
 
-/** What a picture cost here, when we drew with the model; the provider's list price otherwise. */
+/** What a picture cost and took here, when we drew with the model; the provider's list price beside it. */
 export function priceOf(option: SettingOption): { perPicture: string; list: string } {
+  const here = [
+    option.per_image != null ? dollars(option.per_image) : '',
+    option.seconds_per_image != null ? `${Math.round(option.seconds_per_image)}s` : '',
+  ].filter(Boolean)
   return {
-    perPicture: option.per_image != null ? `≈ ${dollars(option.per_image)} / picture` : 'no picture yet',
+    perPicture: here.length ? `≈ ${here.join(' · ')} / picture` : 'no picture yet',
     list: option.image_per_m != null ? `${dollars(option.image_per_m)} / 1M tok` : '',
   }
-}
-
-/** Cheapest first: what a picture cost here, else the list price; unpriced models last. */
-function cost(o: SettingOption): number {
-  return o.per_image ?? (o.image_per_m != null ? o.image_per_m / 1000 : Infinity)
 }
 
 interface Props {
@@ -37,23 +51,28 @@ interface Props {
 
 /**
  * An image model picked from a list in the panel: pinned models first, then the provider's
- * newest (or cheapest), each with what a picture cost here and the list price. A model the
- * provider does not list goes in the id field under the list.
+ * newest (or cheapest, or fastest), each with what a picture cost and took here and the list
+ * price. A model the provider does not list goes in the id field under the list.
  */
 export function ModelList({ name, labelledBy, options, value, default: fallback, onChange, onPin }: Props) {
-  // A provider that reports no prices (comfy) gets no price columns and no cost sort.
-  const priced = options.some((o) => o.image_per_m != null || o.per_image != null)
-  const [sort, setSort] = useState<Sort>('newest')
+  // A column or a sort shows only when some model has its figure: comfy has no list prices.
+  const listed = options.some((o) => o.image_per_m != null)
+  const measured = options.some((o) => o.per_image != null || o.seconds_per_image != null)
+  const sorts = (Object.keys(SORTS) as Sort[]).filter((s) => options.some(SORTS[s].has))
+  const [picked, setSort] = useState<Sort>('newest')
+  const sort = sorts.includes(picked) ? picked : 'newest'
+  const columns = listed ? '' : measured ? ' no-list' : ' no-figures'
   const [filter, setFilter] = useState('')
   const chosen = value || fallback
   const needle = filter.trim().toLowerCase()
   const matching = options.filter((o) => !needle || `${o.id} ${o.label}`.toLowerCase().includes(needle))
-  const ordered = priced && sort === 'cheapest' ? [...matching].sort((a, b) => cost(a) - cost(b)) : matching
+  const key = SORTS[sort].key
+  const ordered = [...matching].sort((a, b) => (key(a) === key(b) ? 0 : key(a) < key(b) ? -1 : 1)) // Infinity - Infinity is NaN
   const sections = [
     { title: 'Pinned', rows: ordered.filter((o) => o.pinned) },
-    { title: priced && sort === 'cheapest' ? 'Cheapest' : 'Newest', rows: ordered.filter((o) => !o.pinned) },
+    { title: SORTS[sort].label, rows: ordered.filter((o) => !o.pinned) },
   ].filter((s) => s.rows.length > 0)
-  const listed = options.some((o) => o.id === value)
+  const known = options.some((o) => o.id === value)
 
   return (
     <div className="model-list">
@@ -65,17 +84,17 @@ export function ModelList({ name, labelledBy, options, value, default: fallback,
           value={filter}
           onChange={(e) => setFilter(e.target.value)}
         />
-        {priced && (
+        {sorts.length > 1 && (
           <div className="model-list-sort" role="group" aria-label="Sort models">
-            {(['newest', 'cheapest'] as const).map((s) => (
+            {sorts.map((s) => (
               <button key={s} type="button" aria-pressed={sort === s} onClick={() => setSort(s)}>
-                {s === 'newest' ? 'Newest' : 'Cheapest'}
+                {SORTS[s].label}
               </button>
             ))}
           </div>
         )}
       </div>
-      <div className={`model-list-rows${priced ? '' : ' is-unpriced'}`} role="radiogroup" aria-labelledby={labelledBy}>
+      <div className={`model-list-rows${columns}`} role="radiogroup" aria-labelledby={labelledBy}>
         {sections.map((section) => (
           <div key={section.title} className="model-list-section">
             <p className="model-list-head">{section.title}</p>
@@ -87,12 +106,10 @@ export function ModelList({ name, labelledBy, options, value, default: fallback,
                     <input type="radio" name={name} checked={o.id === chosen} onChange={() => onChange(o.id)} />
                     <span className="model-list-name">{o.label || o.id}</span>
                   </label>
-                  {priced && (
-                    <>
-                      <span className={`model-list-cost${o.per_image != null ? ' is-measured' : ''}`}>{price.perPicture}</span>
-                      <span className="model-list-price">{price.list}</span>
-                    </>
+                  {(listed || measured) && (
+                    <span className={`model-list-cost${price.perPicture.startsWith('≈') ? ' is-measured' : ''}`}>{price.perPicture}</span>
                   )}
+                  {listed && <span className="model-list-price">{price.list}</span>}
                   <button
                     type="button"
                     className={`model-list-pin${o.pinned ? ' is-on' : ''}`}
@@ -116,7 +133,7 @@ export function ModelList({ name, labelledBy, options, value, default: fallback,
           type="text"
           autoComplete="off"
           placeholder="Not in the list? Type its id"
-          value={listed ? '' : value}
+          value={known ? '' : value}
           onChange={(e) => onChange(e.target.value)}
         />
       </label>
