@@ -1,6 +1,6 @@
-"""The three voice coaches, the pronunciation assessor, and the text runs behind them."""
+"""The three voice coaches, the pronunciation assessor, reading aloud, and the text runs behind them."""
 
-from fastapi import APIRouter
+from fastapi import APIRouter, Response
 
 from app.api.deps import Db, Svc, failed, off
 from app.api.schemas import (
@@ -12,6 +12,7 @@ from app.api.schemas import (
     Phrasing,
     PhrasingRequest,
     ReadAloudRequest,
+    SpeechRequest,
 )
 from app.llm import GenerationError
 from app.models import ExampleFeedback
@@ -83,3 +84,15 @@ def phrasing(body: PhrasingRequest, db: Db, services: Svc) -> Phrasing:
         raise failed("phrasing", e) from e
     db.caches.set_phrasing(body.paragraph, breaks)
     return Phrasing(breaks=breaks)
+
+
+@router.post("/speech", response_class=Response)
+def speech(body: SpeechRequest, services: Svc) -> Response:
+    """The sentence read aloud in the voice provider's voice; a sentence read before comes from disk."""
+    if services.speaker is None:
+        raise off(f"reading aloud is off: set {services.voice_key_name} in Settings")
+    try:
+        audio = services.speaker.read(body.text)
+    except GenerationError as e:
+        raise failed("reading aloud", e) from e
+    return Response(audio, media_type=services.speaker.media_type, headers={"Cache-Control": "private, max-age=86400"})

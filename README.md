@@ -58,7 +58,9 @@ docker compose up -d --build
 
 같은 프롬프트가 `synonyms`(학습자가 이미 아는 더 쉬운 말 1~2개, 예문 속 그 자리에 들어가는 것만)도 쓴다. 규칙은 앱 스킬 `plugin/skills/session-writing/SKILL.md`의 Synonyms 절. 표현은 뜻 아래에, 단어는 뜻을 눌러 펼쳤을 때 뜻 아래에 `≈ a, b` 한 줄로 나온다(`components/Synonyms.tsx`). 단어 카드에서 항상 보이게 하면 뜻을 떠올리기 전에 힌트가 되므로 뜻과 함께 숨긴다. `synonyms`가 없는 예전 세션은 그 줄이 없다.
 
-그림마다 `caption`(누가 무엇을 해서 왜 그 단어인지 한 문장, 20단어 이하, 단어를 그대로 넣고 배경 묘사는 뺌)이 붙는다. 세션 생성 프롬프트가 scene과 함께 쓰고, ↻ redraw는 `SceneWriter`가 새 scene과 함께 다시 쓴다(`app/pictures/scenes.py`의 `CAPTION_RULES`, 결과는 `Scene(text, caption)`). 평소에는 숨겨 두고, 그림 왼쪽 아래 `Scene`을 누르면 그림이 흐려지며 그 위로 문장이 떠오른다(`VocabularyTab.tsx`의 `SceneCaption`). 문장 속 단어는 형광펜으로 칠하고, 문장이나 `Hide`를 누르면 닫힌다. 카드의 뜻은 열리지 않는다. `caption`이 없는 예전 세션은 버튼이 없다. 19번 세션에는 손으로 채워 넣었다. 그림 칸은 4:3으로 꽉 채우므로(`object-fit: cover`) 다른 비율(3:2, 1:1, 16:9)로 온 그림은 가장자리가 잘린다. 덜 잘리도록 이미지 프롬프트가 가로 4:3을 요청한다(OpenRouter `generate-image`는 비율 인자가 없다).
+그림마다 `caption`(누가 무엇을 해서 왜 그 단어인지 한 문장, 20단어 이하, 단어를 그대로 넣고 배경 묘사는 뺌)이 붙는다. 세션 생성 프롬프트가 scene과 함께 쓰고, ↻ redraw는 `SceneWriter`가 새 scene과 함께 다시 쓴다(`app/pictures/scenes.py`의 `CAPTION_RULES`, 결과는 `Scene(text, caption)`). 평소에는 숨겨 두고, 그림 왼쪽 아래 `Scene`을 누르면 그림이 흐려지며 그 위로 문장이 떠오른다(`VocabularyTab.tsx`의 `SceneCaption`). 문장 속 단어는 형광펜으로 칠하고, 문장이나 `Hide`를 누르면 닫힌다. 카드의 뜻은 열리지 않는다. `caption`이 없는 예전 세션은 버튼이 없다.
+
+단어 카드의 예문은 그 단어(활용형 포함, `retract` → `retracted`)를 형광펜으로 칠하고(`components/Marked.tsx`), 끝의 스피커 버튼(`components/SpeakButton.tsx`)을 누르면 예문을 읽어 준다. 다시 누르면 멈춘다. `POST /api/speech`가 `VOICE_PROVIDER`를 따라 Gemini TTS(`gemini-3.8-flash-tts`, 음성은 `VOICE_NAME`, WAV)나 OpenAI TTS(`gpt-4o-mini-tts`, 음성 `marin`, MP3)로 읽고(`app/voice/speech.py`), 한 번 읽은 문장은 `data/speech/`에 음성·모델·문장의 해시로 남겨 다시 돈을 내지 않는다. 첫 재생은 5~7초 걸리고 그 뒤로는 바로 나온다. 버튼을 눌러도 카드의 뜻은 열리지 않는다. 19번 세션에는 손으로 채워 넣었다. 그림 칸은 4:3으로 꽉 채우므로(`object-fit: cover`) 다른 비율(3:2, 1:1, 16:9)로 온 그림은 가장자리가 잘린다. 덜 잘리도록 이미지 프롬프트가 가로 4:3을 요청한다(OpenRouter `generate-image`는 비율 인자가 없다).
 
 ## Vocabulary 그림
 

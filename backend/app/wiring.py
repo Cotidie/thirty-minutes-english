@@ -17,6 +17,7 @@ from app.pictures.painters import PictureLog, painter_for
 from app.pictures.scenes import SceneWriter
 from app.topics.daily import ClaudeTopicSource, TopicSource
 from app.voice.assessor import AzureAssessor
+from app.voice.speech import Speaker, speaker_for
 from app.voice.live import (
     AgentDefinition,
     GeminiVoice,
@@ -46,6 +47,7 @@ class Services:
     scene_writer: SceneWriter | None = None
     phrasing: PhrasingMarker | None = None
     assessor: AzureAssessor | None = None
+    speaker: Speaker | None = None
     voice_key_name: str = "OPENAI_API_KEY"
 
 
@@ -68,11 +70,13 @@ def build_services(
     image_dir: Path | None = None,
     efforts_of: EffortsOf = lambda _: None,
     pictures: PictureLog | None = None,
+    speech_dir: Path | None = None,
 ) -> Services:
     """`agent_dirs` maps read-aloud / phrase / example to their folders; `image_dir` is
     where the vocabulary pictures land (none: no pictures); `efforts_of` gives a Claude
     model's effort levels as Claude Code reported them (None: not known); `pictures`
-    keeps how long each picture took and what it cost."""
+    keeps how long each picture took and what it cost; `speech_dir` keeps sentences
+    read aloud (none: no reading aloud)."""
     return Services(
         generator=ClaudeGenerator(
             model=settings.get("CLAUDE_MODEL"),
@@ -90,6 +94,12 @@ def build_services(
         scene_writer=SceneWriter.with_cli(settings.get("EXAMPLE_MODEL")),
         phrasing=_phrasing(settings, agent_dirs["read-aloud"], effort(settings, "EXAMPLE_EFFORT", efforts_of)),
         assessor=_assessor(settings),
+        speaker=speaker_for(
+            settings.get("VOICE_PROVIDER"),
+            {"openai": settings.get("OPENAI_API_KEY"), "gemini": settings.get("GEMINI_API_KEY")},
+            settings.get("VOICE_NAME"),
+            speech_dir,
+        ),
         voice_key_name=settings.voice_api_key_name,
     )
 

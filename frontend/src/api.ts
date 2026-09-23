@@ -48,6 +48,15 @@ export const api = {
   redrawPicture: (sessionId: number, index: number, style = '') =>
     request<VocabularyItem>(`/api/sessions/${sessionId}/pictures/${index}`, { method: 'POST', body: JSON.stringify({ style }) }),
   /** The picture styles on offer and the configured one, from the IMAGE_STYLE setting. */
+  /** The sentence read aloud by the voice provider, as audio. */
+  speak: async (text: string): Promise<Blob> => {
+    const res = await fetch('/api/speech', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ text }) })
+    if (!res.ok) {
+      const body = await res.json().catch(() => null)
+      throw new Error(body && typeof body.detail === 'string' ? body.detail : `${res.status} ${res.statusText}`)
+    }
+    return res.blob()
+  },
   pictureStyles: async (): Promise<PictureStyles> => {
     const { fields } = await request<SettingsView>('/api/settings')
     const f = fields.find((x) => x.key === 'IMAGE_STYLE')

@@ -9,6 +9,7 @@ vi.mock('../api', () => ({
   api: {
     addExample: vi.fn(),
     redrawPicture: vi.fn(),
+    speak: vi.fn(async () => new Blob(['WAV'])),
     pictureStyles: vi.fn(async () => ({
       current: 'photo',
       options: [
@@ -108,13 +109,38 @@ describe('VocabularyTab', () => {
     expect(screen.getAllByRole('img')).toHaveLength(1)
   })
 
+  it('reads the example aloud on the speaker button without opening the meaning, and stops on a second press', async () => {
+    const play = vi.fn(async () => undefined)
+    const pause = vi.fn()
+    vi.stubGlobal(
+      'Audio',
+      class {
+        play = play
+        pause = pause
+        onended = null
+      },
+    )
+    URL.createObjectURL = vi.fn(() => 'blob:x')
+    render(<VocabularyTab items={items} sessionId={3} onPicture={vi.fn()} starred={[]} onToggleStar={vi.fn()} examples={none} onExample={vi.fn()} />)
+
+    await userEvent.click(screen.getAllByRole('button', { name: 'Read the sentence aloud' })[1])
+    expect(api.speak).toHaveBeenCalledWith('We mitigated the risk.')
+    expect(play).toHaveBeenCalled()
+    expect(screen.getAllByText('Tap to check the meaning')).toHaveLength(2)
+
+    await userEvent.click(screen.getByRole('button', { name: 'Stop reading' }))
+    expect(pause).toHaveBeenCalled()
+    vi.unstubAllGlobals()
+  })
+
   it('shows the word and example but hides the definition until clicked', async () => {
     render(<VocabularyTab items={items} sessionId={3} onPicture={vi.fn()} starred={[]} onToggleStar={vi.fn()} examples={none} onExample={vi.fn()} />)
-    expect(screen.getByText('ubiquitous')).toBeInTheDocument()
-    expect(screen.getByText('Phones are ubiquitous.')).toBeInTheDocument()
+    const [word, marked] = screen.getAllByText('ubiquitous')
+    expect(marked.tagName).toBe('MARK') // the word, marked in its example
+    expect(marked.parentElement).toHaveTextContent('Phones are ubiquitous.')
     expect(screen.queryByText('present everywhere')).not.toBeInTheDocument()
 
-    await userEvent.click(screen.getByText('ubiquitous'))
+    await userEvent.click(word)
     expect(screen.getByText('present everywhere')).toBeInTheDocument()
     expect(screen.queryByText('make less severe')).not.toBeInTheDocument()
   })

@@ -5,6 +5,8 @@ import { Practice } from './Practice'
 import { StarButton } from './StarButton'
 import { KoreanChip } from './KoreanChip'
 import { Synonyms } from './Synonyms'
+import { Marked } from './Marked'
+import { SpeakButton } from './SpeakButton'
 import './VocabularyTab.css'
 
 /** A redraw is one request (new scene, then the picture), so there is no true progress:
@@ -33,13 +35,6 @@ function Drawing({ seconds }: { seconds: number }) {
       </span>
     </span>
   )
-}
-
-/** The caption with the word (in whatever form it takes there) marked. */
-function Marked({ text, word }: { text: string; word: string }) {
-  const stem = word.replace(/e$/, '').replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
-  const parts = text.split(new RegExp(`(\\b${stem}\\w*)`, 'i'))
-  return <>{parts.map((part, i) => (i % 2 ? <mark key={i}>{part}</mark> : part))}</>
 }
 
 /** Why the picture is the word: the picture blurs and the caption rises over it; a click on it closes. */
@@ -95,7 +90,10 @@ function VocabCard({ item, drawing }: { item: VocabularyItem; drawing: boolean }
         <span className="vocab-word-text">{item.word}</span> <em className="vocab-pos">{item.pos}</em>
         {item.korean && <KoreanChip korean={item.korean} of={item.word} />}
       </span>
-      <span className="vocab-example">{item.example}</span>
+      <span className="vocab-example">
+        <Marked text={item.example} word={item.word} />
+        <SpeakButton text={item.example} />
+      </span>
       <button
         type="button"
         className="vocab-definition"

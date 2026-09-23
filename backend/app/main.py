@@ -54,7 +54,7 @@ def default_app() -> FastAPI:
     catalog = Catalog(db.caches)
 
     def rebuild(settings: Settings) -> Services:
-        return build_services(settings, dirs, image_dir, catalog.efforts_of, db.pictures)
+        return build_services(settings, dirs, image_dir, catalog.efforts_of, db.pictures, db.path.parent / "speech")
 
     return create_app(
         db,

@@ -1,0 +1,51 @@
+.speak {
+  display: inline-grid;
+  place-items: center;
+  width: 1.75rem;
+  height: 1.75rem;
+  margin-left: 0.35rem;
+  padding: 0;
+  border: 1px solid var(--line);
+  border-radius: 50%;
+  background: var(--paper);
+  color: var(--muted);
+  vertical-align: -0.3rem;
+  cursor: pointer;
+}
+
+.speak:hover,
+.speak.is-playing {
+  border-color: var(--ink);
+  color: var(--ink);
+}
+
+.speak.is-playing {
+  background: var(--marker-soft);
+}
+
+.speak.is-loading {
+  cursor: progress;
+  animation: speak-pulse 1s ease-in-out infinite;
+}
+
+.speak.is-failed {
+  border-color: var(--wrong);
+  color: var(--wrong);
+}
+
+.speak:focus-visible {
+  outline: 2px solid var(--phrase);
+  outline-offset: 2px;
+}
+
+@keyframes speak-pulse {
+  50% {
+    opacity: 0.4;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .speak.is-loading {
+    animation: none;
+  }
+}

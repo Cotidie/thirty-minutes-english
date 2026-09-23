@@ -2,7 +2,7 @@
 
 from typing import Literal
 
-from pydantic import BaseModel, ConfigDict, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from app.generation.jobs import Status
 from app.generation.progress import Stage
@@ -110,6 +110,13 @@ class PhrasingRequest(BaseModel):
     paragraph: str
 
     _check = field_validator("paragraph")(_not_blank)
+
+
+class SpeechRequest(BaseModel):
+    """One sentence to read aloud."""
+
+    text: str = Field(max_length=600)
+    _check = field_validator("text")(_not_blank)
 
 
 class RedrawRequest(BaseModel):

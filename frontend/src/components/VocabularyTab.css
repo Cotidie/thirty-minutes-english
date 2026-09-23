@@ -149,11 +149,6 @@
   color: var(--ink);
 }
 
-.vocab-caption-text mark {
-  background: linear-gradient(transparent 40%, var(--marker) 40%, var(--marker) 92%, transparent 92%);
-  color: inherit;
-}
-
 .vocab-caption-toggle {
   position: absolute;
   left: 0.45rem;
