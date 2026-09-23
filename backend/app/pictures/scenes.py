@@ -14,7 +14,7 @@ weather, time of day, what is going on in the background. Physical and specific 
 on a wide highway at dusk, a line of cars backed up behind it, a driver leaning out of a window, a cyclist \
 slipping past on the shoulder"), never abstract, and nothing that needs written words in the picture"""
 # The line the learner opens over the picture when it is unclear why it shows the word.
-CAPTION_RULES = """one or two short sentences, at most 30 words, in plain B2 English, saying what is going on in the scene and why it shows the word; use the word itself, in the form the sentence needs"""
+CAPTION_RULES = """one short sentence, at most 15 words, in plain B2 English: who does what, and how that shows the word. Use the word itself, in the form the sentence needs. Leave out background details"""
 
 SCENE_SCHEMA: dict = {
     "type": "object",
