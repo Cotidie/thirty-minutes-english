@@ -38,8 +38,8 @@ function renderList(value = '', onChange = vi.fn(), onPin = vi.fn()) {
 
 describe('priceOf', () => {
   it('leads with what a picture cost and took here, then the list price', () => {
-    expect(priceOf(OPTIONS[0])).toEqual({ perPicture: '≈ $0.13 · 17.6s', list: '$120 / 1M tok' })
-    expect(priceOf(OPTIONS[1])).toEqual({ perPicture: '≈ 40.0s', list: '$1.68 / 1M tok' })
+    expect(priceOf(OPTIONS[0])).toEqual({ perPicture: '≈ $0.13 · 18s', list: '$120 / 1M tok' })
+    expect(priceOf(OPTIONS[1])).toEqual({ perPicture: '≈ 40s', list: '$1.68 / 1M tok' })
     expect(priceOf(OPTIONS[2])).toEqual({ perPicture: 'no picture yet', list: '$30 / 1M tok' })
   })
 })
@@ -118,7 +118,7 @@ describe('ModelList without prices', () => {
         onPin={vi.fn()}
       />,
     )
-    expect(screen.getByText('≈ 30.0s')).toBeInTheDocument()
+    expect(screen.getByText('≈ 30s')).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Fastest' })).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Cheapest' })).not.toBeInTheDocument()
   })

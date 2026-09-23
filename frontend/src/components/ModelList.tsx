@@ -30,7 +30,7 @@ function dollars(n: number): string {
 export function priceOf(option: SettingOption): { perPicture: string; list: string } {
   const here = [
     option.per_image != null ? dollars(option.per_image) : '',
-    option.seconds_per_image != null ? `${option.seconds_per_image.toFixed(1)}s` : '',
+    option.seconds_per_image != null ? `${Math.round(option.seconds_per_image)}s` : '',
   ].filter(Boolean)
   return {
     perPicture: here.length ? `≈ ${here.join(' · ')}` : 'no picture yet',
