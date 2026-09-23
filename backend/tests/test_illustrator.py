@@ -268,3 +268,13 @@ def test_a_cancel_during_the_wait_cancels_every_comfy_job():
     with pytest.raises(KeyError):
         ComfyPainter(server, "m", fetch=fetch_ok).paint(["a", "b"], cancel)
     assert [c[1] for c in server.calls if c[0] == "cancel_job"] == [{"prompt_id": "j0"}, {"prompt_id": "j1"}]
+
+
+def test_openrouter_reports_what_each_picture_cost():
+    png = base64.b64encode(b"PNG").decode()
+    billed = CallToolResult(content=[ImageContent(type="image", data=png, mime_type="image/png"), TextContent(type="text", text="(model: m, cost: $0.134, total tokens: 1120)")])
+    unbilled = CallToolResult(content=[ImageContent(type="image", data=png, mime_type="image/png")])
+    server = FakeServer({"generate-image": {"a": billed, "b": unbilled}})
+    costs: list[tuple[str, float]] = []
+    OpenRouterPainter(server, "google/gemini-3-pro-image", lambda model, cost: costs.append((model, cost))).paint(["a", "b"])
+    assert costs == [("google/gemini-3-pro-image", 0.134)]

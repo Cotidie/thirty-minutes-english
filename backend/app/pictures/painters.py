@@ -3,12 +3,13 @@
 import asyncio
 import base64
 import logging
+import re
 from collections.abc import Callable
 from typing import Protocol
 
 import httpx2
 
-from app.mcp_client import McpError, McpHttp, Session, payload
+from app.mcp_client import McpError, McpHttp, Session, payload, text_of
 
 log = logging.getLogger(__name__)
 
@@ -19,6 +20,8 @@ DEFAULT_MODEL = {"openrouter": "google/gemini-3-pro-image", "comfy": "vertexai/n
 
 
 OnDrawn = Callable[[int], None]  # pictures finished so far; raising from it stops the painter
+OnCost = Callable[[str, float], None]  # (model, dollars) for one picture, as the provider billed it
+COST = re.compile(r"cost: \$([\d.]+)")
 
 
 class Painter(Protocol):
@@ -42,23 +45,26 @@ class Counter:
         self._on_drawn(self.done)
 
 
-def painter_for(provider: str, model: str, keys: dict[str, str]) -> Painter | None:
-    """The painter for `provider` ("openrouter" / "comfy"), or None when it is off or its key is missing."""
+def painter_for(provider: str, model: str, keys: dict[str, str], on_cost: OnCost | None = None) -> Painter | None:
+    """The painter for `provider` ("openrouter" / "comfy"), or None when it is off or its key is missing.
+    `on_cost` hears what each picture cost where the provider says (OpenRouter)."""
     key = keys.get(provider, "")
     if provider not in DEFAULT_MODEL or not key:
         return None
     model = model or DEFAULT_MODEL[provider]
     if provider == "comfy":
         return ComfyPainter(McpHttp(COMFY_MCP, key), model)
-    return OpenRouterPainter(McpHttp(OPENROUTER_MCP, key), model)
+    return OpenRouterPainter(McpHttp(OPENROUTER_MCP, key), model, on_cost)
 
 
 class OpenRouterPainter:
-    """One generate-image call per picture, all in flight on one session; the PNG comes back inline as base64."""
+    """One generate-image call per picture, all in flight on one session; the PNG comes back inline
+    as base64, beside a text block that names the charge ("cost: $0.007")."""
 
-    def __init__(self, server: McpHttp, model: str) -> None:
+    def __init__(self, server: McpHttp, model: str, on_cost: OnCost | None = None) -> None:
         self._server = server
         self._model = model
+        self._on_cost = on_cost or (lambda _model, _cost: None)
 
     def paint(self, prompts: list[str], on_drawn: OnDrawn | None = None) -> list[bytes | None]:
         return asyncio.run(self._paint(prompts, Counter(on_drawn)))
@@ -82,6 +88,8 @@ class OpenRouterPainter:
         except McpError as e:
             log.warning("openrouter could not draw a picture: %s", e)
             return None
+        if cost := COST.search(text_of(result)):
+            self._on_cost(self._model, float(cost.group(1)))
         for block in result.content:
             if block.type == "image" and block.data:
                 return base64.b64decode(block.data)

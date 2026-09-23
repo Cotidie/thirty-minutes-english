@@ -112,6 +112,12 @@ export interface SettingOption {
   description: string
   /** A Claude model's effort levels; [] = it takes none; null = not a Claude model. */
   efforts: string[] | null
+  /** Image models: list price in dollars per million image-output / prompt tokens. */
+  image_per_m?: number | null
+  text_per_m?: number | null
+  /** Image models: what a picture cost here on average, over `per_image_count` pictures. */
+  per_image?: number | null
+  per_image_count?: number
 }
 
 export interface SettingVariant {

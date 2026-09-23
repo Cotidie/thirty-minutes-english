@@ -26,9 +26,19 @@ def keys_of(settings: Settings) -> dict[str, str]:
     return {spec.key: settings.get(spec.key) for spec in SPECS if spec.secret}
 
 
-def listed(catalog: Catalog, source: str, settings: Settings, default: str) -> list[Option]:
-    """A provider's models; the default first when the list lacks it (or is not fetched yet)."""
-    options = [Option(**asdict(o)) for o in catalog.options(source, keys_of(settings))]
+Costs = dict[str, tuple[float, int]]  # model -> (average dollars per picture here, pictures)
+
+
+def listed(
+    catalog: Catalog, source: str, settings: Settings, default: str, saved: str = "", costs: Costs | None = None
+) -> list[Option]:
+    """A provider's newest models plus the default and the saved one, each with what a picture
+    cost here when we drew with it; the default goes first when the provider does not list it."""
+    costs = costs or {}
+    options = [
+        Option(**asdict(o), per_image=costs.get(o.id, (None, 0))[0], per_image_count=costs.get(o.id, (None, 0))[1])
+        for o in catalog.options(source, keys_of(settings), keep=(default, saved))
+    ]
     if default and default not in {o.id for o in options}:
         options.insert(0, Option(id=default, description="Default"))
     return options
@@ -45,12 +55,12 @@ def options_of(spec: Spec, settings: Settings, catalog: Catalog) -> list[Option]
     if spec.multi:
         return skill_options(settings.get(spec.key))
     if spec.catalog:
-        return listed(catalog, spec.catalog, settings, spec.default)
+        return listed(catalog, spec.catalog, settings, spec.default, settings.get(spec.key))
     labels = spec.labels or {}
     return [Option(id=c, description=labels.get(c, "")) for c in spec.choices or ()]
 
 
-def field_of(spec: Spec, settings: Settings, catalog: Catalog) -> SettingField:
+def field_of(spec: Spec, settings: Settings, catalog: Catalog, costs: Costs) -> SettingField:
     return SettingField(
         key=spec.key,
         group=spec.group,
@@ -62,7 +72,7 @@ def field_of(spec: Spec, settings: Settings, catalog: Catalog) -> SettingField:
         testable=spec.key in KEYS,
         follows=spec.follows,
         variants={
-            value: Variant(default=v.default, options=listed(catalog, v.catalog, settings, v.default))
+            value: Variant(default=v.default, options=listed(catalog, v.catalog, settings, v.default, settings.get(spec.key), costs))
             for value, v in (spec.variants or {}).items()
         },
         effort_of=spec.effort_of,
@@ -73,10 +83,10 @@ def field_of(spec: Spec, settings: Settings, catalog: Catalog) -> SettingField:
     )
 
 
-def view(settings: Settings, catalog: Catalog) -> SettingsView:
+def view(settings: Settings, catalog: Catalog, costs: Costs) -> SettingsView:
     return SettingsView(
         groups=[SettingGroup(id=g, title=title) for g, title in GROUPS.items()],
-        fields=[field_of(spec, settings, catalog) for spec in SPECS],
+        fields=[field_of(spec, settings, catalog, costs) for spec in SPECS],
     )
 
 
@@ -91,15 +101,15 @@ def check_multi(values: dict[str, str]) -> None:
 
 
 @router.get("", response_model=SettingsView)
-def get_settings(settings: CurrentSettings, catalog: Models) -> SettingsView:
-    return view(settings, catalog)
+def get_settings(settings: CurrentSettings, catalog: Models, db: Db) -> SettingsView:
+    return view(settings, catalog, db.costs.per_picture())
 
 
 @router.post("/models/refresh", response_model=SettingsView)
-def refresh_models(settings: CurrentSettings, catalog: Models) -> SettingsView:
-    """Fetches every model list now (the ↻ in the modal); a failed one keeps its last copy."""
+def refresh_models(settings: CurrentSettings, catalog: Models, db: Db) -> SettingsView:
+    """Fetches every model list now (the modal's Refresh model lists); a failed one keeps its last copy."""
     catalog.refresh(keys_of(settings))
-    return view(settings, catalog)
+    return view(settings, catalog, db.costs.per_picture())
 
 
 @router.put("", response_model=SettingsView)
@@ -116,7 +126,7 @@ def put_settings(body: SettingsUpdate, db: Db, catalog: Models, request: Request
     rebuild: Rebuild | None = request.app.state.rebuild
     if rebuild is not None:
         request.app.state.services = rebuild(settings)
-    return view(settings, catalog)
+    return view(settings, catalog, db.costs.per_picture())
 
 
 @router.post("/test-key", response_model=KeyTestResult)

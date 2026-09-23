@@ -4,6 +4,7 @@ import sqlite3
 from pathlib import Path
 
 from app.db.caches import CacheRepo
+from app.db.costs import CostRepo
 from app.db.records import RecordRepo
 from app.db.sessions import SessionRepo
 from app.db.settings import SettingsRepo
@@ -58,6 +59,12 @@ CREATE TABLE IF NOT EXISTS phrasings (
     paragraph TEXT PRIMARY KEY,
     breaks_json TEXT NOT NULL
 );
+CREATE TABLE IF NOT EXISTS image_costs (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    created_at TEXT NOT NULL,
+    model TEXT NOT NULL,
+    cost REAL NOT NULL
+);
 CREATE TABLE IF NOT EXISTS model_lists (
     source TEXT PRIMARY KEY,
     list_json TEXT NOT NULL
@@ -78,6 +85,7 @@ class Database:
         self.sessions = SessionRepo(self)
         self.records = RecordRepo(self)
         self.caches = CacheRepo(self)
+        self.costs = CostRepo(self)
         self.settings = SettingsRepo(self)
 
     def connect(self) -> sqlite3.Connection:

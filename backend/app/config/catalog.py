@@ -30,6 +30,8 @@ class ModelOption:
     efforts: tuple[str, ...] | None = None  # Claude only: the effort levels it takes; () = none
     created: float | None = None  # release time (unix) when the provider says; sorts the list
     resolved: str = ""  # the dated model an alias points at (Claude Code's resolvedModel); sorts the list
+    image_per_m: float | None = None  # list price, dollars per million image-output tokens
+    text_per_m: float | None = None  # list price, dollars per million prompt tokens
 
 
 NEWEST = 10  # a list keeps its newest models only (a saved older one still works)
@@ -52,8 +54,8 @@ def recency(o: ModelOption) -> tuple:
 
 
 def newest_first(options: list[ModelOption]) -> list[ModelOption]:
-    """The newest `NEWEST`, newest first; ties keep the provider's order."""
-    return sorted(options, key=recency, reverse=True)[:NEWEST]
+    """Newest first; ties keep the provider's order."""
+    return sorted(options, key=recency, reverse=True)
 
 
 Keys = Mapping[str, str]
@@ -115,7 +117,25 @@ def gemini_live(keys: Keys) -> list[ModelOption]:
 
 def openrouter_images(_: Keys) -> list[ModelOption]:
     data = get_json("https://openrouter.ai/api/v1/models?output_modalities=image")["data"]
-    return [ModelOption(m["id"], m.get("name", ""), first_sentence(m.get("description", "")), created=m.get("created")) for m in data]
+    return [
+        ModelOption(
+            m["id"],
+            m.get("name", ""),
+            first_sentence(m.get("description", "")),
+            created=m.get("created"),
+            image_per_m=per_million((m.get("pricing") or {}).get("image_output")),
+            text_per_m=per_million((m.get("pricing") or {}).get("prompt")),
+        )
+        for m in data
+    ]
+
+
+def per_million(per_token: str | None) -> float | None:
+    """OpenRouter quotes dollars per token as a string; the menu reads dollars per million."""
+    try:
+        return round(float(per_token) * 1_000_000, 4) if per_token is not None else None
+    except ValueError:
+        return None
 
 
 def comfy_images(keys: Keys) -> list[ModelOption]:
@@ -164,14 +184,17 @@ class Catalog:
         self._running: set[str] = set()
         self._lock = threading.Lock()
 
-    def options(self, source: str, keys: Keys) -> list[ModelOption]:
+    def options(self, source: str, keys: Keys, keep: tuple[str, ...] = ()) -> list[ModelOption]:
+        """The newest `NEWEST` models, plus any in `keep` (the default, the saved one) that are
+        older, so they keep their name and price; the cache holds the whole list."""
         cached = self._caches.get_model_list(source)
         if cached is None or self._clock() - cached["at"] > self.TTL_S:
             self.refresh_later(keys, [source])
-        return [
+        every = [
             ModelOption(**{**o, "efforts": None if o.get("efforts") is None else tuple(o["efforts"])})
             for o in (cached or {}).get("options", [])
         ]
+        return every[:NEWEST] + [o for o in every[NEWEST:] if o.id in keep]
 
     def efforts_of(self, model: str) -> tuple[str, ...] | None:
         """A Claude model's effort levels from the cached list; None when the model is not listed."""

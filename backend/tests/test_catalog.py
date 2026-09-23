@@ -1,6 +1,8 @@
 import json
 from contextlib import asynccontextmanager
 
+import pytest
+
 from fastapi.testclient import TestClient
 from mcp.types import CallToolResult, TextContent
 
@@ -8,6 +10,7 @@ from app.config import catalog as catalog_module
 from app.config.catalog import Catalog, ModelOption, claude_models, newest_first, comfy_images, gemini_live, openai_text, openai_voice, openrouter_images
 from app.config.settings import Settings
 from app.db import Database
+from app.db.costs import CostRepo
 from app.main import create_app
 from app.wiring import Services, effort
 from tests.test_api import FakeGenerator, InlineExecutor
@@ -120,8 +123,14 @@ def test_gemini_lists_live_models_only(http):
 
 
 def test_openrouter_lists_image_models_by_id(http):
-    http.json = {"data": [{"id": "z/img", "name": "Z", "description": "Draws. Well."}, {"id": "a/img", "name": "A"}]}
-    assert [o.id for o in openrouter_images({})] == ["z/img", "a/img"]
+    http.json = {"data": [
+        {"id": "z/img", "name": "Z", "description": "Draws. Well.", "pricing": {"prompt": "0.000002", "image_output": "0.00012"}},
+        {"id": "a/img", "name": "A"},
+    ]}
+    z, a = openrouter_images({})
+    assert [z.id, a.id] == ["z/img", "a/img"]
+    assert (z.image_per_m, z.text_per_m) == (120.0, 2.0)
+    assert (a.image_per_m, a.text_per_m) == (None, None)
     assert "output_modalities=image" in str(http.requests[0].url)
 
 
@@ -149,6 +158,23 @@ def test_comfy_lists_text_to_image_partner_models(monkeypatch):
     ]
 
 
+def test_image_models_carry_what_a_picture_cost_here(tmp_path):
+    db = Database(tmp_path / "s.db")
+    for cost in (0.10, 0.20):
+        db.costs.record("z/img", cost)
+    for cost in [9.0] + [0.01] * CostRepo.RECENT:  # only the latest pictures count
+        db.costs.record("a/img", cost)
+    assert db.costs.per_picture() == {"z/img": (pytest.approx(0.15), 2), "a/img": (pytest.approx(0.01), CostRepo.RECENT)}
+
+    cat = Catalog(db.caches, {"openrouter_images": lambda _: [ModelOption("z/img", image_per_m=120.0)]}, background=False)
+    cat.refresh({})
+    app = create_app(db, Services(FakeGenerator()), InlineExecutor(), env={}, catalog=cat)
+    with TestClient(app) as c:
+        image = {f["key"]: f for f in c.get("/api/settings").json()["fields"]}["IMAGE_MODEL"]
+    z = next(o for o in image["variants"]["openrouter"]["options"] if o["id"] == "z/img")
+    assert (z["image_per_m"], z["per_image"], z["per_image_count"]) == (120.0, pytest.approx(0.15), 2)
+
+
 def test_the_modal_gets_the_cached_models_with_the_default_kept_and_can_refresh(tmp_path):
     lists = {"claude": [ModelOption("sonnet", "Sonnet 5"), ModelOption("haiku", "Haiku 4.5", efforts=())]}
     db = Database(tmp_path / "s.db")
@@ -165,12 +191,12 @@ def test_the_modal_gets_the_cached_models_with_the_default_kept_and_can_refresh(
         assert [o["label"] for o in refreshed["options"]] == ["Opus 5.5"]
 
 
-def test_dated_lists_keep_their_newest_ten_and_undated_ones_keep_the_provider_order(tmp_path):
+def test_the_menu_shows_the_newest_ten_plus_older_ones_asked_for(tmp_path):
     dated = [ModelOption(f"m{i}", created=float(i)) for i in range(12)]
-    cat = catalog_with(tmp_path, {"x": lambda _: dated, "undated": lambda _: [ModelOption("b"), ModelOption("a")]})
+    cat = catalog_with(tmp_path, {"x": lambda _: dated})
     cat.refresh({})
     assert [o.id for o in cat.options("x", {})] == [f"m{i}" for i in range(11, 1, -1)]
-    assert [o.id for o in cat.options("undated", {})] == ["b", "a"]
+    assert [o.id for o in cat.options("x", {}, keep=("m0",))][-1] == "m0"  # the default or the saved one, with its details
 
 
 def test_undated_lists_go_by_the_version_in_the_name_with_aliases_on_top():

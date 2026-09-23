@@ -149,6 +149,10 @@ class Option(BaseModel):
     efforts: list[str] | None = None  # a Claude model's effort levels; [] = takes none
     created: float | None = None  # release time (unix), when the provider says
     resolved: str = ""  # the model an alias points at
+    image_per_m: float | None = None  # list price, $ per million image tokens
+    text_per_m: float | None = None  # list price, $ per million prompt tokens
+    per_image: float | None = None  # what a picture cost here on average (image models we drew with)
+    per_image_count: int = 0  # how many pictures that average covers
 
 
 class Variant(BaseModel):
