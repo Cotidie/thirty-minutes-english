@@ -5,7 +5,8 @@ import { connectAsk } from '../lib/liveClient'
 import type { LiveState } from '../lib/liveSession'
 import { useMicLevel } from '../lib/micLevel'
 import { hasBothLines, useLiveRound } from '../lib/useLiveRound'
-import { MicMeter } from './MicMeter'
+import { Slip } from './Slip'
+import './AskWidget.css'
 
 const STATUS_LABEL: Record<LiveState['status'], string> = {
   connecting: 'Connecting…',
@@ -71,17 +72,34 @@ export function AskWidget() {
           <span className="ask-start-label">Ask<kbd>a</kbd></span>
         </button>
       ) : (
-        <div className="ask-slip" role="dialog" aria-label="Ask the coach">
-          <div className="ask-bar">
-            {state.status === 'listening' && <MicMeter level={level} />}
-            <span className="ask-status" role="status">
-              {saved ? 'Saved' : STATUS_LABEL[state.status]}
-            </span>
-            {state.seconds > 0 && <span className="ask-seconds">{state.seconds}s</span>}
-          </div>
-
-          {state.error && <p className="ask-error">{state.error}</p>}
-
+        <Slip
+          label="Ask the coach"
+          state={state}
+          level={level}
+          status={saved ? 'Saved' : STATUS_LABEL[state.status]}
+          hint={hintFor(state, saved)}
+          actions={
+            <>
+              <button type="button" onClick={() => void start()}>
+                Retry <kbd>r</kbd>
+              </button>
+              {state.status === 'listening' ? (
+                <button type="button" onClick={close}>
+                  Done
+                </button>
+              ) : (
+                <button type="button" onClick={dismiss}>
+                  {saved ? 'Close' : 'Discard'}
+                </button>
+              )}
+              {state.status === 'closed' && !saved && (
+                <button type="button" className="ask-save" onClick={() => void save()} disabled={!hasBothLines(state)}>
+                  Save
+                </button>
+              )}
+            </>
+          }
+        >
           {(state.user || state.coach) && (
             <dl className="ask-captions">
               <dt>You</dt>
@@ -90,28 +108,7 @@ export function AskWidget() {
               <dd>{state.coach}</dd>
             </dl>
           )}
-
-          <div className="ask-actions">
-            <span className="ask-hint">{hintFor(state, saved)}</span>
-            <button type="button" onClick={() => void start()}>
-              Retry <kbd>r</kbd>
-            </button>
-            {state.status === 'listening' ? (
-              <button type="button" onClick={close}>
-                Done
-              </button>
-            ) : (
-              <button type="button" onClick={dismiss}>
-                {saved ? 'Close' : 'Discard'}
-              </button>
-            )}
-            {state.status === 'closed' && !saved && (
-              <button type="button" className="ask-save" onClick={() => void save()} disabled={!hasBothLines(state)}>
-                Save
-              </button>
-            )}
-          </div>
-        </div>
+        </Slip>
       )}
     </div>
   )

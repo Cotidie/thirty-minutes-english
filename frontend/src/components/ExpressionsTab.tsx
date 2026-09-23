@@ -3,6 +3,7 @@ import { practiceExpression, type Example, type Expression } from '../types'
 import { Practice } from './Practice'
 import { StarButton } from './StarButton'
 import { KoreanChip } from './KoreanChip'
+import './ExpressionsTab.css'
 
 interface Props {
   items: Expression[]

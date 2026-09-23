@@ -4,6 +4,7 @@ import { startAzureAssessor, type Assessor } from '../lib/assessor/azure'
 import { Judge, type AzureWord, type Shown } from '../lib/assessor/judge'
 import { connectReadAloud, type LiveConnection } from '../lib/liveClient'
 import { FindingCard } from './FindingCard'
+import './ReadAloud.css'
 
 interface Options {
   paragraph: string

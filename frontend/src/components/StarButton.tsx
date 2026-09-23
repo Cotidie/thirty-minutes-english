@@ -1,3 +1,4 @@
+import './StarButton.css'
 interface Props {
   label: string
   on: boolean

@@ -1,0 +1,47 @@
+.reading-card {
+  margin: 0.5rem 0 0;
+  padding: 0.5rem 0.8rem 0.6rem;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: var(--paper);
+  font-size: 0.9rem;
+}
+
+.reading-card-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.5rem;
+  margin: 0;
+}
+
+.reading-card-head b {
+  font-size: 1rem;
+}
+
+.reading-ipa {
+  font-family: var(--serif);
+  font-size: 1.02rem;
+  letter-spacing: 0.06em;
+}
+
+.reading-ipa .is-weak {
+  color: var(--wrong);
+  font-weight: 700;
+}
+
+.reading-card .read-aloud-ok {
+  color: var(--right);
+  font-size: 0.82rem;
+}
+
+.reading-note {
+  margin: 0.3rem 0 0;
+  line-height: 1.5;
+}
+
+.reading-tip {
+  margin: 0.2rem 0 0;
+  color: var(--muted);
+  line-height: 1.5;
+}

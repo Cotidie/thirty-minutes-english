@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { api } from '../api'
 import type { JobStatus } from './progress'
 
-export const JOB_POLL_MS = 1000
+const JOB_POLL_MS = 1000
 
 /**
  * The session being written, if any. The server owns the job, so on mount we

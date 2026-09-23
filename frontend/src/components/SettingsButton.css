@@ -1,0 +1,25 @@
+.settings-open {
+  position: fixed;
+  top: 1rem;
+  right: 1rem;
+  z-index: 20;
+  width: 2.5rem;
+  height: 2.5rem;
+  display: grid;
+  place-items: center;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--paper);
+  color: var(--muted);
+  cursor: pointer;
+  box-shadow: 0 1px 3px rgb(27 36 49 / 10%);
+  transition:
+    color 120ms ease,
+    border-color 120ms ease;
+}
+
+.settings-open:hover,
+.settings-open:focus-visible {
+  color: var(--ink);
+  border-color: var(--ink);
+}

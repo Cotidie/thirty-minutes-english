@@ -1,0 +1,85 @@
+.expression-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  counter-reset: expr;
+}
+
+.expression {
+  counter-increment: expr;
+  padding: 1.75rem 0;
+  border-top: 1px solid var(--line);
+}
+
+/* Phrase, chip and star share one centre line; the row carries the gap below. */
+.expression-head {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  margin-bottom: 0.4rem;
+}
+
+.expression-head .expression-phrase {
+  flex: 1;
+  margin: 0;
+}
+
+.expression-head .star {
+  margin-left: auto;
+}
+
+.expression-head .korean-chip + .star {
+  margin-left: 0;
+}
+
+.expression-phrase {
+  font-family: var(--serif);
+  font-weight: 500;
+  font-size: 1.85rem;
+  line-height: 1.15;
+  margin: 0 0 0.4rem;
+}
+
+.expression-phrase::before {
+  content: counter(expr) ". ";
+  color: var(--muted);
+  font-weight: 400;
+}
+
+.expression-meaning {
+  font-family: var(--serif);
+  font-size: 1.2rem;
+  margin: 0 0 0.5rem;
+}
+
+.expression-note {
+  display: block;
+  width: 100%;
+  border: 0;
+  background: transparent;
+  padding: 0;
+  text-align: left;
+  color: var(--muted);
+  font-size: 0.95rem;
+  line-height: 1.45;
+  margin: 0 0 0.9rem;
+  cursor: pointer;
+}
+
+.expression-note.is-clamped {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow: hidden;
+}
+
+.expression-examples {
+  margin: 0 0 1rem;
+  padding-left: 1.2rem;
+  font-family: var(--serif);
+  font-size: 1.2rem;
+}
+
+.expression-examples li {
+  margin-bottom: 0.3rem;
+}

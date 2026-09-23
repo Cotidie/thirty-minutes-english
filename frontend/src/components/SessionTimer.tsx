@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { PHASES, SESSION_SECONDS, formatClock, phaseIndexAt } from '../lib/phases'
+import './SessionTimer.css'
 
 interface Props {
   onPhaseChange: (index: number) => void

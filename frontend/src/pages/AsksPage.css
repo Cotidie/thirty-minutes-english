@@ -1,0 +1,17 @@
+.asks {
+  max-width: var(--measure);
+  margin: 0 auto;
+  padding: 2.5rem 1.25rem 6rem;
+}
+
+.asks-head a {
+  color: var(--muted);
+  text-decoration: none;
+  border-bottom: 1px solid var(--line);
+}
+
+.asks-head h1 {
+  font-family: var(--serif);
+  font-weight: 500;
+  margin: 0.9rem 0 1.6rem;
+}

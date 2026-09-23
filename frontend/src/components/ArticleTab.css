@@ -1,0 +1,95 @@
+.article {
+  font-family: var(--serif);
+  font-size: 1.28rem;
+  line-height: 1.6;
+}
+
+.article-title {
+  font-weight: 500;
+  font-size: 2.3rem;
+  line-height: 1.1;
+  letter-spacing: -0.01em;
+  margin: 0 0 1.5rem;
+}
+
+.article p {
+  margin: 0 0 1.1em;
+}
+
+.questions {
+  margin-top: 2.5rem;
+  border-top: 1px solid var(--line);
+  padding-top: 1rem;
+}
+
+.questions h3 {
+  margin: 0;
+  font-size: 1rem;
+  font-weight: 600;
+  padding: 0.4rem 0;
+}
+
+.questions ol {
+  font-family: var(--serif);
+  font-size: 1.2rem;
+  padding-left: 1.4rem;
+  margin: 0.75rem 0 0;
+}
+
+.questions li {
+  margin-bottom: 0.75rem;
+}
+
+.question {
+  display: block;
+  width: 100%;
+  border: 0;
+  background: transparent;
+  padding: 0.15rem 0.35rem;
+  margin-left: -0.35rem;
+  text-align: left;
+  font: inherit;
+  line-height: inherit;
+}
+
+.sources {
+  margin-top: 1rem;
+  font-size: 0.92rem;
+}
+
+.sources summary {
+  cursor: pointer;
+  color: var(--muted);
+}
+
+.sources ul {
+  margin: 0.5rem 0 0;
+  padding-left: 1.2rem;
+}
+
+.sources li {
+  margin-bottom: 0.3rem;
+}
+
+.source-host {
+  margin-left: 0.5rem;
+  color: var(--muted);
+}
+
+.question.is-open {
+  display: inline-flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.question-tag {
+  font-family: var(--sans);
+  font-size: 0.7rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--muted);
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  padding: 0 0.45rem;
+}

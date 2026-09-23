@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { api } from '../api'
 import type { ApiKeyName, KeyTestResult, SettingField, SettingGroup, SettingsUpdate } from '../types'
+import './SettingsModal.css'
 
 interface Props {
   open: boolean

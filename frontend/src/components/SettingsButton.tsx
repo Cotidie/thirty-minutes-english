@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { SettingsModal } from './SettingsModal'
+import './SettingsButton.css'
 
 /** The gear in the corner of every page. `,` opens it, like most editors. */
 export function SettingsButton() {

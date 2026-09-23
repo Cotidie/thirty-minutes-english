@@ -5,7 +5,8 @@ import type { LiveState } from '../lib/liveSession'
 import { useMicLevel } from '../lib/micLevel'
 import { useLiveRound } from '../lib/useLiveRound'
 import type { Example, ExampleFeedback, PracticeTarget } from '../types'
-import { MicMeter } from './MicMeter'
+import { Slip } from './Slip'
+import './Practice.css'
 
 const STATUS_LABEL: Record<LiveState['status'], string> = {
   connecting: 'Connecting…',
@@ -90,23 +91,38 @@ export function Practice({ target, label, sessionId, examples, onKept }: Props) 
           {label}
         </button>
       ) : (
-        <div className="ask-slip practice-slip" role="dialog" aria-label={`Practice ${target.text}`}>
-          <div className="ask-bar">
-            {state.status === 'listening' && <MicMeter level={level} />}
-            <span className="ask-status" role="status">
-              {STATUS_LABEL[state.status]}
-            </span>
-            {state.seconds > 0 && <span className="ask-seconds">{state.seconds}s</span>}
-            <button type="button" className="slip-icon" aria-label="Retry" title="Retry" onClick={() => void start()}>
-              ↻
-            </button>
-            <button type="button" className="slip-icon" aria-label="Discard" title="Discard" onClick={dismiss}>
-              ✕
-            </button>
-          </div>
-
-          {state.error && <p className="ask-error">{state.error}</p>}
-
+        <Slip
+          label={`Practice ${target.text}`}
+          className="practice-slip"
+          state={state}
+          level={level}
+          status={STATUS_LABEL[state.status]}
+          tools={
+            <>
+              <button type="button" className="slip-icon" aria-label="Retry" title="Retry" onClick={() => void start()}>
+                ↻
+              </button>
+              <button type="button" className="slip-icon" aria-label="Discard" title="Discard" onClick={dismiss}>
+                ✕
+              </button>
+            </>
+          }
+          hint={hintFor(state, writing, complete)}
+          actions={
+            <>
+              {state.status === 'listening' && (
+                <button type="button" onClick={close}>
+                  Done
+                </button>
+              )}
+              {state.status === 'closed' && (
+                <button type="button" className="ask-save" onClick={() => void keep()} disabled={!complete}>
+                  Keep
+                </button>
+              )}
+            </>
+          }
+        >
           {(state.user || answer) && (
             <dl className="ask-captions">
               <dt>You</dt>
@@ -126,21 +142,7 @@ export function Practice({ target, label, sessionId, examples, onKept }: Props) 
               )}
             </dl>
           )}
-
-          <div className="ask-actions">
-            <span className="ask-hint">{hintFor(state, writing, complete)}</span>
-            {state.status === 'listening' && (
-              <button type="button" onClick={close}>
-                Done
-              </button>
-            )}
-            {state.status === 'closed' && (
-              <button type="button" className="ask-save" onClick={() => void keep()} disabled={!complete}>
-                Keep
-              </button>
-            )}
-          </div>
-        </div>
+        </Slip>
       )}
     </div>
   )

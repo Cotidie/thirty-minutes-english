@@ -12,7 +12,7 @@ export interface Question {
   evidence: string[]
 }
 
-export interface Source {
+interface Source {
   title: string
   url: string
 }
@@ -87,14 +87,14 @@ export interface Session {
 }
 
 /** OpenAI answers the browser's WebRTC offer. */
-export interface OpenAILiveSession {
+interface OpenAILiveSession {
   provider: 'openai'
   session: { id: string }
   transport: { type: 'webrtc'; sdp: string }
 }
 
 /** Gemini hands out a one-use token in the socket URL and the setup message to send first. */
-export interface GeminiLiveSession {
+interface GeminiLiveSession {
   provider: 'gemini'
   url: string
   setup: Record<string, unknown>
@@ -148,7 +148,7 @@ export interface AssessorSession {
   break_confidence: number
 }
 
-export interface PhraseCard {
+interface PhraseCard {
   asked: string
   english: string
   alternatives: string[]

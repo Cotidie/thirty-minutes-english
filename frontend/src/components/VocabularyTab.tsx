@@ -4,6 +4,7 @@ import { practiceWord, type Example, type PictureStyles, type VocabularyItem } f
 import { Practice } from './Practice'
 import { StarButton } from './StarButton'
 import { KoreanChip } from './KoreanChip'
+import './VocabularyTab.css'
 
 /** A redraw is one request (new scene, then the picture), so there is no true progress:
  * the ring creeps toward a typical wait and holds short of full. */

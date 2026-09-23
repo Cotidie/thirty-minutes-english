@@ -3,7 +3,7 @@
 // or spacing between deltas); Gemini's silence markers are dropped once the
 // pieces have joined, since they arrive split across deltas.
 
-export type LiveStatus = 'connecting' | 'listening' | 'closing' | 'closed' | 'failed'
+type LiveStatus = 'connecting' | 'listening' | 'closing' | 'closed' | 'failed'
 
 export interface LiveState {
   status: LiveStatus

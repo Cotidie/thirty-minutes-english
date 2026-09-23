@@ -1,0 +1,18 @@
+.star {
+  flex: none;
+  border: 0;
+  background: transparent;
+  padding: 0.1rem 0.3rem;
+  font-size: 1.4rem;
+  line-height: 1;
+  color: var(--muted);
+  cursor: pointer;
+}
+
+.star:hover {
+  color: var(--ink);
+}
+
+.star.is-on {
+  color: #c9a100;
+}

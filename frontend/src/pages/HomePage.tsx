@@ -6,6 +6,7 @@ import { TopicPicker } from '../components/TopicPicker'
 import { useGenerationJob } from '../lib/useGenerationJob'
 import { useTopics } from '../lib/useTopics'
 import type { SessionSummary } from '../types'
+import './HomePage.css'
 
 export function HomePage() {
   const navigate = useNavigate()

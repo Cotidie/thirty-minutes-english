@@ -3,6 +3,7 @@ import { markedSpans } from "../lib/highlight";
 import { pairSentences } from "../lib/sentences";
 import type { Article, Question } from "../types";
 import { Paragraph } from "./Paragraph";
+import './ArticleTab.css'
 
 export function ArticleTab({
   article,

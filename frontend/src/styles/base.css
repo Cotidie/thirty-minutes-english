@@ -1,0 +1,122 @@
+:root {
+  --ground: #f3f5f2;
+  --paper: #fbfcfa;
+  --ink: #1b2431;
+  --muted: #66707c;
+  --line: #d6dbd3;
+  --marker: #ffe45c;
+  --marker-soft: #fff4b8;
+  --error: #9c2b1e;
+  --wrong: #8f3a2a;
+  --wrong-soft: #fbeeea;
+  --right: #35633c;
+  --right-soft: #ebf4ec;
+  --phrase: #2f5580;
+  --serif: "Newsreader", "Iowan Old Style", "Palatino Linotype", Georgia, serif;
+  --sans: "Public Sans", "Helvetica Neue", Arial, sans-serif;
+  --measure: 66ch;
+  --rail: 15rem;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html {
+  background: var(--ground);
+  color: var(--ink);
+  font-family: var(--sans);
+  font-size: 17px;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+}
+
+body {
+  margin: 0;
+}
+
+button,
+input {
+  font: inherit;
+  color: inherit;
+}
+
+a {
+  color: inherit;
+}
+
+:focus-visible {
+  outline: 2px solid var(--ink);
+  outline-offset: 3px;
+}
+
+.btn {
+  border: 1px solid var(--ink);
+  border-radius: 999px;
+  background: transparent;
+  padding: 0.55rem 1.1rem;
+  cursor: pointer;
+  font-weight: 500;
+  transition:
+    background 120ms ease,
+    color 120ms ease;
+}
+
+.btn:disabled {
+  cursor: default;
+  opacity: 0.55;
+}
+
+.btn-primary {
+  background: var(--ink);
+  color: var(--paper);
+}
+
+.btn-primary:not(:disabled):hover {
+  background: #0f151e;
+}
+
+.btn-ghost:not(:disabled):hover {
+  background: var(--paper);
+}
+
+.btn-link {
+  border: 0;
+  padding: 0.3rem 0.4rem;
+  color: var(--muted);
+  text-decoration: underline;
+  text-underline-offset: 0.2em;
+}
+
+.btn-link:hover {
+  color: var(--ink);
+}
+
+.error {
+  color: var(--error);
+  font-weight: 500;
+}
+
+.empty {
+  color: var(--muted);
+}
+
+button.question {
+  cursor: pointer;
+  border-left: 3px solid transparent;
+}
+
+button.question:hover {
+  border-left-color: var(--line);
+}
+
+button.question.is-active {
+  border-left-color: var(--marker);
+  background: var(--marker-soft);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .btn {
+    transition: none;
+  }
+}

@@ -1,5 +1,6 @@
 import type { Shown, Sound } from '../lib/assessor/judge'
 import { nameSound, soundGuide } from '../lib/assessor/sounds'
+import './FindingCard.css'
 
 /**
  * One clicked mark, in text: what was said, what it should be, and at most

@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import './KoreanChip.css'
 
 /** A dashed blank pill; a tap turns it over to the Korean, another hides it again.
  * A button of its own, so it works inside a row whose parent has a click of its own. */

@@ -2,6 +2,7 @@ import { Fragment, useState, type KeyboardEvent, type ReactNode } from 'react'
 import type { Shown } from '../lib/assessor/judge'
 import { segmentsIn, type Span } from '../lib/highlight'
 import { atoms, type Atom, type Marks } from '../lib/words'
+import './Sentence.css'
 
 type Phase = 'still' | 'sinking' | 'rising'
 

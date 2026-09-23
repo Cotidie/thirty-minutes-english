@@ -1,0 +1,184 @@
+.topic-picker {
+  margin-bottom: 3.5rem;
+}
+
+.topic-head {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.5rem;
+}
+
+.topic-label {
+  display: block;
+  font-weight: 600;
+}
+
+.topic-refresh {
+  border: 1px solid var(--line);
+  border-radius: 50%;
+  width: 1.6rem;
+  height: 1.6rem;
+  padding: 0;
+  background: var(--paper);
+  color: var(--muted);
+  font-size: 1rem;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.topic-refresh:hover:not(:disabled) {
+  border-color: var(--ink);
+  color: var(--ink);
+}
+
+.topic-refresh:disabled {
+  cursor: default;
+}
+
+.topic-refresh.is-pending {
+  animation: topic-spin 1.2s linear infinite;
+}
+
+@keyframes topic-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.topic-notice {
+  margin: 0 0 0.6rem;
+  font-size: 0.85rem;
+  color: var(--error);
+}
+
+.topic-row {
+  display: flex;
+  gap: 0.6rem;
+  flex-wrap: wrap;
+}
+
+.topic-input {
+  flex: 1 1 18rem;
+  border: 0;
+  border-bottom: 2px solid var(--ink);
+  background: transparent;
+  padding: 0.55rem 0.1rem;
+  font-family: var(--serif);
+  font-size: 1.3rem;
+}
+
+.topic-input::placeholder {
+  color: var(--muted);
+  opacity: 1;
+}
+
+.topic-input:focus-visible {
+  outline: none;
+  border-bottom-color: var(--ink);
+  box-shadow: 0 2px 0 0 var(--marker);
+}
+
+.chips {
+  list-style: none;
+  padding: 0;
+  margin: 1rem 0 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+}
+
+.chip {
+  border: 1px solid var(--cat-line, var(--line));
+  border-radius: 999px;
+  background: var(--cat-fill, var(--paper));
+  color: var(--cat-ink, inherit);
+  padding: 0.3rem 0.8rem;
+  font-size: 0.92rem;
+  cursor: pointer;
+}
+
+.chip:not(:disabled):hover {
+  border-color: var(--cat-ink, var(--ink));
+}
+
+/* One hue per topic category; the key below the chips names them. */
+[data-category="news"] {
+  --cat-line: #d9a29a;
+  --cat-fill: #fbeeea;
+  --cat-ink: #8f3a2a;
+}
+
+[data-category="cs"] {
+  --cat-line: #a8bdd8;
+  --cat-fill: #eaf1f9;
+  --cat-ink: #2f5580;
+}
+
+[data-category="ie"] {
+  --cat-line: #efb27f;
+  --cat-fill: #fdf0e4;
+  --cat-ink: #9a4d0b;
+}
+
+[data-category="ai"] {
+  --cat-line: #a9b0e6;
+  --cat-fill: #eceefb;
+  --cat-ink: #363f9a;
+}
+
+[data-category="literature"] {
+  --cat-line: #c3aed2;
+  --cat-fill: #f3eef8;
+  --cat-ink: #5f3f7a;
+}
+
+[data-category="history"] {
+  --cat-line: #d6be8d;
+  --cat-fill: #f8f1e1;
+  --cat-ink: #7a561a;
+}
+
+[data-category="world"] {
+  --cat-line: #a4c5a7;
+  --cat-fill: #ebf4ec;
+  --cat-ink: #35633c;
+}
+
+[data-category="korea"] {
+  --cat-line: #8fc4c6;
+  --cat-fill: #e4f3f3;
+  --cat-ink: #1f5f66;
+}
+
+[data-category="research"] {
+  --cat-line: #d9a0bd;
+  --cat-fill: #f9ecf3;
+  --cat-ink: #86335f;
+}
+
+.chip-key {
+  list-style: none;
+  padding: 0;
+  margin: 0.7rem 0 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.2rem 1rem;
+  font-size: 0.78rem;
+  color: var(--muted);
+}
+
+.chip-key li {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+/* Solid ink, not the chip's pale fill: a dot this small needs the dark colour to be telling. */
+.chip-key li::before {
+  content: "";
+  width: 0.6rem;
+  height: 0.6rem;
+  border-radius: 50%;
+  background: var(--cat-ink);
+}

@@ -1,0 +1,114 @@
+.session {
+  display: grid;
+  grid-template-columns: var(--rail) minmax(0, 1fr);
+  min-height: 100vh;
+}
+
+.rail {
+  position: sticky;
+  top: 0;
+  align-self: start;
+  height: 100vh;
+  padding: 1.5rem 1.25rem 6.5rem;
+  border-right: 1px solid var(--line);
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+.rail-back {
+  font-size: 0.92rem;
+  color: var(--muted);
+  text-decoration: none;
+}
+
+.rail-back:hover {
+  color: var(--ink);
+  text-decoration: underline;
+}
+
+.rail-topic {
+  font-family: var(--serif);
+  font-size: 1.15rem;
+  line-height: 1.3;
+  margin: 0;
+}
+
+.content {
+  padding: 3rem clamp(1.25rem, 5vw, 4rem) 6rem;
+}
+
+.tab-panel {
+  max-width: var(--measure);
+}
+
+/* Two word cards side by side, each wide enough for a practice slip. */
+.tab-panel.is-wide {
+  max-width: calc(var(--measure) * 1.3);
+}
+
+.tab-brief {
+  color: var(--muted);
+  margin: 0 0 2rem;
+  padding-left: 0.9rem;
+  border-left: 3px solid var(--marker);
+}
+
+.tabs {
+  display: flex;
+  flex-direction: column;
+  border-top: 1px solid var(--line);
+}
+
+.tab {
+  display: grid;
+  grid-template-columns: 1.5rem 1fr auto;
+  align-items: baseline;
+  gap: 0.5rem;
+  border: 0;
+  border-bottom: 1px solid var(--line);
+  background: transparent;
+  padding: 0.8rem 0.25rem;
+  text-align: left;
+  cursor: pointer;
+}
+
+.tab:hover {
+  background: var(--paper);
+}
+
+.tab.is-active .tab-label {
+  background: linear-gradient(transparent 45%, var(--marker) 45%, var(--marker) 92%, transparent 92%);
+}
+
+.tab-index {
+  font-family: var(--serif);
+  color: var(--muted);
+}
+
+.tab-label {
+  font-weight: 600;
+}
+
+.tab-minutes {
+  font-size: 0.85rem;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+
+@media (max-width: 720px) {
+  .session {
+    grid-template-columns: 1fr;
+  }
+
+  .rail {
+    position: static;
+    height: auto;
+    border-right: 0;
+    border-bottom: 1px solid var(--line);
+  }
+
+  .content {
+    padding-top: 1.5rem;
+  }
+}

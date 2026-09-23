@@ -1,4 +1,4 @@
-export type Stage = 'starting' | 'skills' | 'searching' | 'writing' | 'finalizing' | 'illustrating'
+type Stage = 'starting' | 'skills' | 'searching' | 'writing' | 'finalizing' | 'illustrating'
 
 export interface JobStatus {
   id: string

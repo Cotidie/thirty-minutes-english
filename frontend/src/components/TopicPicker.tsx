@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import type { Category, Topic } from '../types'
+import './TopicPicker.css'
 
 interface Props {
   suggestions: Topic[]

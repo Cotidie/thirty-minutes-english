@@ -1,0 +1,45 @@
+/* The Korean waits at the right of the word or phrase row as a blank pill; a tap turns it over. */
+.korean-chip {
+  margin-left: auto;
+  align-self: center;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 3.2rem;
+  height: 1.9rem;
+  padding: 0 0.75rem;
+  border: 1px dashed var(--line);
+  border-radius: 999px;
+  background: transparent;
+  font-family: var(--sans);
+  font-size: 0.8rem;
+  line-height: 1;
+  color: var(--line);
+  cursor: pointer;
+  transition:
+    background 0.15s,
+    border-color 0.15s,
+    color 0.15s;
+}
+
+.korean-chip:hover {
+  border-color: var(--muted);
+  color: var(--muted);
+}
+
+.korean-chip.is-shown {
+  border: 1px solid transparent;
+  background: var(--marker-soft);
+  color: var(--ink);
+  font-size: 0.95rem;
+  font-weight: 500;
+  letter-spacing: 0.01em;
+  animation: korean-turn 0.2s ease-out;
+}
+
+@keyframes korean-turn {
+  from {
+    transform: scaleX(0.6);
+    opacity: 0;
+  }
+}

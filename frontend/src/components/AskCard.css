@@ -1,0 +1,70 @@
+.ask-cards {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  border-top: 1px solid var(--line);
+}
+
+.ask-card {
+  display: grid;
+  grid-template-columns: 9rem 1fr;
+  gap: 0 1.3rem;
+  padding: 0.95rem 0;
+  border-bottom: 1px solid var(--line);
+}
+
+.ask-card-body {
+  display: grid;
+  justify-items: start;
+}
+
+.ask-card-asked {
+  text-align: right;
+  color: var(--muted);
+  font-size: 0.88rem;
+  margin: 0.2rem 0 0;
+}
+
+.ask-card-english {
+  font-family: var(--serif);
+  font-size: 1.24rem;
+  line-height: 1.3;
+  margin: 0;
+  justify-self: start;
+}
+
+/* Inline so the marker follows each line rather than pooling under the paragraph. */
+.ask-card-english mark {
+  color: inherit;
+  background: linear-gradient(transparent 64%, var(--marker-soft) 64%);
+  -webkit-box-decoration-break: clone;
+  box-decoration-break: clone;
+}
+
+.ask-card-english.is-missing {
+  font-size: 1rem;
+  color: var(--muted);
+}
+
+.ask-card-alt {
+  margin: 0.3rem 0 0;
+  font-size: 0.92rem;
+}
+
+.ask-card-note {
+  margin: 0.3rem 0 0;
+  color: var(--muted);
+  font-size: 0.88rem;
+}
+
+@media (max-width: 620px) {
+  .ask-card {
+    grid-template-columns: 1fr;
+    gap: 0.25rem;
+  }
+
+  .ask-card-asked {
+    text-align: left;
+    margin: 0;
+  }
+}

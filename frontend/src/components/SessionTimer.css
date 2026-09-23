@@ -1,0 +1,57 @@
+.timer {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+}
+
+.timer-clock {
+  font-family: var(--serif);
+  font-size: 2.6rem;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.02em;
+}
+
+.timer-bar {
+  display: flex;
+  gap: 3px;
+  height: 0.5rem;
+}
+
+.timer-segment {
+  position: relative;
+  background: var(--line);
+  overflow: hidden;
+}
+
+.timer-fill {
+  position: absolute;
+  inset: 0 auto 0 0;
+  background: var(--ink);
+  transition: width 1s linear;
+}
+
+.timer-segment.is-active .timer-fill {
+  background: var(--marker);
+}
+
+.timer-segment.is-active {
+  background: var(--marker-soft);
+}
+
+.timer-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  flex-wrap: wrap;
+}
+
+.timer-done {
+  font-weight: 600;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .timer-fill {
+    transition: none;
+  }
+}

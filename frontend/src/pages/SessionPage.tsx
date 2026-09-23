@@ -10,6 +10,7 @@ import { PHASES } from '../lib/phases'
 import { useExamples } from '../lib/useExamples'
 import { useStars } from '../lib/useStars'
 import type { Session } from '../types'
+import './SessionPage.css'
 
 /** Sits after the timed phases; the timer never sends you here. */
 const SUMMARY_TAB = PHASES.length

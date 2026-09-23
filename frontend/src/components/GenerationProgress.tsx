@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { formatClock } from '../lib/phases'
 import { labelFor, percentFor, type JobStatus } from '../lib/progress'
+import './GenerationProgress.css'
 
 interface Props {
   job: JobStatus

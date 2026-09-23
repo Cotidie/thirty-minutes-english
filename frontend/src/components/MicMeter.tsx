@@ -1,4 +1,5 @@
 import { LEVEL_STEPS } from '../lib/micLevel'
+import './MicMeter.css'
 
 /** Five bars that fill with how loud the microphone is, so silence is visible. */
 export function MicMeter({ level }: { level: number }) {

@@ -4,7 +4,7 @@
 // later read of the same word came out right. Nothing here speaks: the reader
 // asks for a correction by clicking a finding.
 
-export interface AzurePhoneme {
+interface AzurePhoneme {
   Phoneme: string
   PronunciationAssessment: { AccuracyScore: number; NBestPhonemes?: { Phoneme: string; Score: number }[] }
 }

@@ -5,6 +5,7 @@ import type { Piece } from '../lib/sentences'
 import { wordStarts, type Marks } from '../lib/words'
 import { ReadAloudBar, useReadAloud } from './ReadAloud'
 import { Run, Sentence } from './Sentence'
+import './Paragraph.css'
 
 /** The paragraph's slashes: asked for, shown or hidden. */
 interface Phrasing {

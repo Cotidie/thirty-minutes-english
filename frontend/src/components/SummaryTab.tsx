@@ -1,6 +1,8 @@
-import { useEffect, useState } from 'react'
+import { type ReactNode, useEffect, useState } from 'react'
 import { api } from '../api'
 import type { Ask, Correction, Example, Reading, SessionContent, Stars } from '../types'
+import { AskCard, AskedCard } from './AskCard'
+import './SummaryTab.css'
 
 interface Props {
   sessionId: number
@@ -47,11 +49,7 @@ export function SummaryTab({ sessionId, content, stars }: Props) {
       {error && <p className="error">Could not read the session back: {error}</p>}
       {loading && <p className="empty">Reading it back…</p>}
 
-      <section className="summary-section">
-        <h2 className="summary-title">
-          Starred
-          <span className="summary-count">{starredCount}</span>
-        </h2>
+      <Section title="Starred" count={starredCount}>
         {starredCount === 0 && <p className="empty">Nothing starred. Tap ☆ on an expression or word card.</p>}
         {starredCount > 0 && (
           <ul className="starred-list">
@@ -71,94 +69,69 @@ export function SummaryTab({ sessionId, content, stars }: Props) {
             ))}
           </ul>
         )}
-      </section>
+      </Section>
 
-      <section className="summary-section">
-        <h2 className="summary-title">
-          Sentences you made
-          {examples !== null && <span className="summary-count">{examples.length}</span>}
-        </h2>
+      <Section title="Sentences you made" count={examples?.length}>
         {examples?.length === 0 && <p className="empty">No sentences yet. Each expression has a Your turn button.</p>}
         <ol className="ask-cards">
           {examples?.map((ex) => (
-            <li key={ex.id} className="ask-card">
-              <p className="ask-card-asked">{ex.expression}</p>
-              <div className="ask-card-body">
-                <p className="ask-card-english">
-                  <mark>{ex.user_text}</mark>
-                </p>
-                <p className="ask-card-note">{ex.coach_text}</p>
-              </div>
-            </li>
+            <AskCard key={ex.id} asked={ex.expression} english={ex.user_text} note={ex.coach_text} />
           ))}
         </ol>
-      </section>
+      </Section>
 
-      <section className="summary-section">
-        <h2 className="summary-title">
-          Expressions you asked for
-          {asks !== null && <span className="summary-count">{asks.length}</span>}
-        </h2>
+      <Section title="Expressions you asked for" count={asks?.length}>
         {asks?.length === 0 && <p className="empty">Nothing asked yet. Press A to ask the coach for one.</p>}
         <ol className="ask-cards">
           {asks?.map((ask) => (
-            <li key={ask.id} className="ask-card">
-              <p className="ask-card-asked">{ask.card?.asked || ask.user_text}</p>
-              <div className="ask-card-body">
-                {ask.card?.english ? (
-                  <p className="ask-card-english">
-                    <mark>{ask.card.english}</mark>
-                  </p>
-                ) : (
-                  <p className="ask-card-english is-missing">No answer landed in this round.</p>
-                )}
-                {ask.card?.alternatives.map((alt) => (
-                  <p key={alt} className="ask-card-alt">
-                    {alt}
-                  </p>
-                ))}
-                {ask.card?.note && <p className="ask-card-note">{ask.card.note}</p>}
-              </div>
-            </li>
+            <AskedCard key={ask.id} ask={ask} />
           ))}
         </ol>
-      </section>
+      </Section>
 
-      <section className="summary-section">
-        <h2 className="summary-title">
-          Reading to fix
-          {readings !== null && <span className="summary-count">{corrections.length}</span>}
-        </h2>
+      <Section title="Reading to fix" count={readings === null ? undefined : corrections.length}>
         {readings?.length === 0 && <p className="empty">No paragraph read aloud yet. The Article tab has the button.</p>}
         {readings !== null && readings.length > 0 && corrections.length === 0 && (
           <p className="empty">The coach let every word through. Clean read.</p>
         )}
         <ol className="ask-cards">
           {corrections.map((c, i) => (
-            <CorrectionRow key={`${c.word}-${i}`} correction={c} />
+            <CorrectionCard key={`${c.word}-${i}`} correction={c} />
           ))}
         </ol>
-      </section>
+      </Section>
     </section>
   )
 }
 
-function CorrectionRow({ correction }: { correction: Correction }) {
+function Section({ title, count, children }: { title: string; count?: number; children: ReactNode }) {
   return (
-    <li className="ask-card">
-      <p className="ask-card-asked">
-        {correction.kind === 'phrasing' && <span className="correction-kind">phrasing</span>}
-        {correction.heard}
-      </p>
-      <div className="ask-card-body">
-        <p className="ask-card-english">
-          <mark>{correction.word}</mark>
-        </p>
-        <p className="ask-card-note">
+    <section className="summary-section">
+      <h2 className="summary-title">
+        {title}
+        {count !== undefined && <span className="summary-count">{count}</span>}
+      </h2>
+      {children}
+    </section>
+  )
+}
+
+function CorrectionCard({ correction }: { correction: Correction }) {
+  return (
+    <AskCard
+      asked={
+        <>
+          {correction.kind === 'phrasing' && <span className="correction-kind">phrasing</span>}
+          {correction.heard}
+        </>
+      }
+      english={correction.word}
+      note={
+        <>
           {correction.fix}
           {correction.repeated_ok && <span className="summary-ok">got it on the retry</span>}
-        </p>
-      </div>
-    </li>
+        </>
+      }
+    />
   )
 }
