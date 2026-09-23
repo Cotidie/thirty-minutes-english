@@ -28,6 +28,17 @@ class ModelOption:
     label: str = ""
     description: str = ""
     efforts: tuple[str, ...] | None = None  # Claude only: the effort levels it takes; () = none
+    created: float | None = None  # release time (unix) when the provider says; sorts and ages the list
+
+
+NEWEST = 10  # a dated list keeps its newest models only (a saved older one still works)
+
+
+def newest_first(options: list[ModelOption]) -> list[ModelOption]:
+    """Dated lists: the newest `NEWEST`, newest first. Undated lists keep the provider's order."""
+    if not any(o.created for o in options):
+        return options
+    return sorted(options, key=lambda o: o.created or 0, reverse=True)[:NEWEST]
 
 
 Keys = Mapping[str, str]
@@ -54,25 +65,23 @@ def claude_models(_: Keys) -> list[ModelOption]:
     ]
 
 
-def openai_ids(keys: Keys) -> list[str]:
+def openai_models(keys: Keys) -> list[ModelOption]:
     key = keys.get("OPENAI_API_KEY", "")
     if not key:
         return []
     data = get_json("https://api.openai.com/v1/models", {"Authorization": f"Bearer {key}"})["data"]
-    return sorted(m["id"] for m in data if not DATED.search(m["id"]))
+    return [ModelOption(m["id"], created=m.get("created")) for m in data if not DATED.search(m["id"])]
 
 
 def openai_voice(keys: Keys) -> list[ModelOption]:
     """Speech-to-speech models: GPT-Live and the realtime line, minus transcription and translation."""
-    return [
-        ModelOption(i) for i in openai_ids(keys) if ("live" in i or "realtime" in i) and not re.search(r"transcribe|translate", i)
-    ]
+    return [o for o in openai_models(keys) if ("live" in o.id or "realtime" in o.id) and not re.search(r"transcribe|translate", o.id)]
 
 
 def openai_text(keys: Keys) -> list[ModelOption]:
     """GPT text models for the Summary tab: no audio, image, realtime, search or code variants."""
     skip = re.compile(r"audio|realtime|live|image|tts|transcribe|search|codex|embedding|moderation|instruct")
-    return [ModelOption(i) for i in openai_ids(keys) if i.startswith("gpt-") and not skip.search(i)]
+    return [o for o in openai_models(keys) if o.id.startswith("gpt-") and not skip.search(o.id)]
 
 
 def gemini_live(keys: Keys) -> list[ModelOption]:
@@ -90,10 +99,7 @@ def gemini_live(keys: Keys) -> list[ModelOption]:
 
 def openrouter_images(_: Keys) -> list[ModelOption]:
     data = get_json("https://openrouter.ai/api/v1/models?output_modalities=image")["data"]
-    return sorted(
-        (ModelOption(m["id"], m.get("name", ""), first_sentence(m.get("description", ""))) for m in data),
-        key=lambda o: o.id,
-    )
+    return [ModelOption(m["id"], m.get("name", ""), first_sentence(m.get("description", "")), created=m.get("created")) for m in data]
 
 
 def comfy_images(keys: Keys) -> list[ModelOption]:
@@ -162,7 +168,7 @@ class Catalog:
         errors: dict[str, str] = {}
         for source in sources if sources is not None else list(self._fetchers):
             try:
-                found = self._fetchers[source](keys)
+                found = newest_first(self._fetchers[source](keys))
             except Exception as e:  # a provider down or a key refused must not break the modal
                 log.warning("model list %s: %s", source, e)
                 errors[source] = str(e) or type(e).__name__

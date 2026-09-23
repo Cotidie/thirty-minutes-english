@@ -147,6 +147,7 @@ class Option(BaseModel):
     label: str = ""
     description: str = ""
     efforts: list[str] | None = None  # a Claude model's effort levels; [] = takes none
+    created: float | None = None  # release time (unix), when the provider says
 
 
 class Variant(BaseModel):

@@ -104,7 +104,7 @@ def test_openai_lists_split_voice_from_text_and_drop_snapshots(http):
         "gpt-5.6-luna", "gpt-5-codex", "gpt-image-2", "gpt-5-2025-08-07", "gpt-3.5-turbo-0125", "text-embedding-3", "o3",
     ]]}
     keys = {"OPENAI_API_KEY": "sk"}
-    assert [o.id for o in openai_voice(keys)] == ["gpt-live-1", "gpt-realtime-2"]
+    assert {o.id for o in openai_voice(keys)} == {"gpt-live-1", "gpt-realtime-2"}
     assert [o.id for o in openai_text(keys)] == ["gpt-5.6-luna"]
     assert http.requests[0].headers["Authorization"] == "Bearer sk"
     assert openai_voice({}) == []  # no key, no call
@@ -121,7 +121,7 @@ def test_gemini_lists_live_models_only(http):
 
 def test_openrouter_lists_image_models_by_id(http):
     http.json = {"data": [{"id": "z/img", "name": "Z", "description": "Draws. Well."}, {"id": "a/img", "name": "A"}]}
-    assert [o.id for o in openrouter_images({})] == ["a/img", "z/img"]
+    assert [o.id for o in openrouter_images({})] == ["z/img", "a/img"]
     assert "output_modalities=image" in str(http.requests[0].url)
 
 
@@ -163,3 +163,11 @@ def test_the_modal_gets_the_cached_models_with_the_default_kept_and_can_refresh(
         lists["claude"] = [ModelOption("opus", "Opus 5.5")]
         refreshed = {f["key"]: f for f in c.post("/api/settings/models/refresh").json()["fields"]}["CLAUDE_MODEL"]
         assert [o["label"] for o in refreshed["options"]] == ["Opus 5.5"]
+
+
+def test_dated_lists_keep_their_newest_ten_and_undated_ones_keep_the_provider_order(tmp_path):
+    dated = [ModelOption(f"m{i}", created=float(i)) for i in range(12)]
+    cat = catalog_with(tmp_path, {"x": lambda _: dated, "undated": lambda _: [ModelOption("b"), ModelOption("a")]})
+    cat.refresh({})
+    assert [o.id for o in cat.options("x", {})] == [f"m{i}" for i in range(11, 1, -1)]
+    assert [o.id for o in cat.options("undated", {})] == ["b", "a"]
