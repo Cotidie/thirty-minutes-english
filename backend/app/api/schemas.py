@@ -162,6 +162,7 @@ class SettingField(BaseModel):
     follows: str | None = None  # the setting whose value picks one of `variants`
     variants: dict[str, Variant] = {}
     shown_when: tuple[str, str] | None = None  # (key, value): hidden otherwise
+    used_when: tuple[str, str] | None = None  # (key, value): the key sits idle otherwise
 
 
 class SettingGroup(BaseModel):

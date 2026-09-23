@@ -93,14 +93,15 @@ class Spec:
     follows: str | None = None  # the setting whose value picks a Variant below
     variants: Mapping[str, Variant] | None = None
     shown_when: tuple[str, str] | None = None  # (key, value): the field only matters then
+    used_when: tuple[str, str] | None = None  # (key, value): a key the app only calls then; shown, marked idle otherwise
 
 
 SPECS: tuple[Spec, ...] = (
     Spec("OPENAI_API_KEY", "keys", secret=True),
-    Spec("GEMINI_API_KEY", "keys", secret=True),
+    Spec("GEMINI_API_KEY", "keys", secret=True, used_when=("VOICE_PROVIDER", "gemini")),
     Spec("AZURE_SPEECH_KEY", "keys", secret=True),
-    Spec("OPENROUTER_API_KEY", "keys", secret=True),
-    Spec("COMFY_API_KEY", "keys", secret=True),
+    Spec("OPENROUTER_API_KEY", "keys", secret=True, used_when=("IMAGE_PROVIDER", "openrouter")),
+    Spec("COMFY_API_KEY", "keys", secret=True, used_when=("IMAGE_PROVIDER", "comfy")),
     Spec("FIRECRAWL_API_KEY", "keys", secret=True),  # optional: search works keyless, rate limited
     Spec("VOICE_PROVIDER", "voice", "openai", choices=("openai", "gemini")),
     Spec("VOICE_MODEL", "voice", follows="VOICE_PROVIDER", variants=variants(VOICE_MODELS)),

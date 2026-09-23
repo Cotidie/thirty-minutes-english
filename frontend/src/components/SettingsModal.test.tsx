@@ -19,6 +19,7 @@ function field(partial: Partial<SettingField> & Pick<SettingField, 'key' | 'grou
     follows: null,
     variants: {},
     shown_when: null,
+    used_when: null,
     ...partial,
   }
 }
@@ -73,25 +74,36 @@ beforeEach(() => {
   vi.mocked(api.testKey).mockReset()
 })
 
-async function open() {
-  render(<SettingsModal open onClose={() => undefined} />)
-  await screen.findByLabelText(/VOICE_PROVIDER/)
+async function open(onClose = () => undefined) {
+  render(<SettingsModal open onClose={onClose} />)
+  await screen.findByLabelText(/OPENAI_API_KEY/)
+}
+
+async function showTab(title: string) {
+  await userEvent.click(screen.getByRole('tab', { name: new RegExp(title) }))
+}
+
+function rowOf(label: RegExp): HTMLElement {
+  return screen.getByLabelText(label).closest<HTMLElement>('.settings-row')!
 }
 
 describe('SettingsModal', () => {
-  it('shows the effective value and masks secrets as placeholders', async () => {
+  it('shows one group at a time, secrets masked, the saved value as the placeholder', async () => {
     await open()
+    expect(screen.getAllByRole('tab').map((t) => t.textContent)).toEqual(GROUPS.map((g) => g.title))
     const key = screen.getByLabelText(/OPENAI_API_KEY/) as HTMLInputElement
     expect(key.type).toBe('password')
     expect(key.value).toBe('')
-    expect(key.placeholder).toBe('…1234')
+    expect(key.placeholder).toBe('Saved: …1234. Type to replace.')
+    expect(screen.queryByLabelText(/CLAUDE_MODEL/)).not.toBeInTheDocument()
+
+    await showTab('Claude generation')
     expect((screen.getByLabelText(/CLAUDE_MODEL/) as HTMLInputElement).value).toBe('sonnet')
-    const legends = Array.from(document.querySelectorAll('legend')).map((l) => l.textContent)
-    expect(legends).toEqual(GROUPS.map((g) => g.title))
   })
 
   it('hides the Gemini-only fields under OpenAI and shows them once the provider flips', async () => {
     await open()
+    await showTab('Voice coach')
     expect(screen.queryByLabelText(/VOICE_NAME/)).not.toBeInTheDocument()
     expect(screen.queryByLabelText(/VOICE_THINKING/)).not.toBeInTheDocument()
 
@@ -108,43 +120,91 @@ describe('SettingsModal', () => {
     expect(options).toEqual(['gemini-3.8-live-extended-thinking', 'gemini-3.8-live'])
   })
 
-  it('saves only what changed, including a typed secret', async () => {
+  it('saves only what changed across groups, counts the edits, and discards on request', async () => {
     await open()
-    expect(screen.getByRole('button', { name: 'Save' })).toBeDisabled()
+    const save = screen.getByRole('button', { name: 'Save' })
+    expect(save).toBeDisabled()
+    expect(screen.getByText('No changes')).toBeInTheDocument()
 
-    await userEvent.selectOptions(screen.getByLabelText(/VOICE_PROVIDER/), 'gemini')
     await userEvent.type(screen.getByLabelText(/GEMINI_API_KEY/), 'AIza-new')
-    await userEvent.click(screen.getByRole('button', { name: 'Save' }))
+    await showTab('Voice coach')
+    await userEvent.selectOptions(screen.getByLabelText(/VOICE_PROVIDER/), 'gemini')
+    expect(screen.getByText('2 unsaved changes')).toBeInTheDocument()
+    expect(screen.getByRole('tab', { name: /API keys/ })).toHaveTextContent('edited')
 
+    await userEvent.click(save)
     await waitFor(() => expect(api.putSettings).toHaveBeenCalledTimes(1))
     expect(vi.mocked(api.putSettings).mock.calls[0][0]).toEqual({
       VOICE_PROVIDER: 'gemini',
       GEMINI_API_KEY: 'AIza-new',
     })
-    expect(await screen.findByRole('status')).toHaveTextContent('Saved')
+    expect(await screen.findByText('Saved. The next round uses these.')).toBeInTheDocument()
+
+    await userEvent.selectOptions(screen.getByLabelText(/VOICE_PROVIDER/), 'gemini')
+    await userEvent.click(screen.getByRole('button', { name: 'Discard' }))
+    expect(screen.getByText('No changes')).toBeInTheDocument()
   })
 
-  it('tests the typed key and shows the verdict beside it', async () => {
+  it('tests the typed key and shows the verdict on its name line', async () => {
     vi.mocked(api.testKey).mockResolvedValueOnce({ ok: false, message: '401: Incorrect API key provided' })
     await open()
-    const row = screen.getByLabelText(/OPENAI_API_KEY/).closest<HTMLElement>('.settings-row')!
+    const row = rowOf(/OPENAI_API_KEY/)
+    expect(row).toHaveTextContent('Not checked')
     await userEvent.type(screen.getByLabelText(/OPENAI_API_KEY/), 'sk-typed')
     await userEvent.click(within(row).getByRole('button', { name: 'Test' }))
 
     expect(api.testKey).toHaveBeenCalledWith('OPENAI_API_KEY', 'sk-typed')
     expect(await within(row).findByRole('status')).toHaveTextContent('✗ 401: Incorrect API key provided')
+    expect(screen.getByRole('tab', { name: /API keys/ })).toHaveTextContent('1 refused')
 
     vi.mocked(api.testKey).mockResolvedValueOnce({ ok: true, message: 'key works' })
     await userEvent.click(within(row).getByRole('button', { name: 'Test' }))
     expect(await within(row).findByRole('status')).toHaveTextContent('✓ key works')
   })
 
+  it('marks a key idle while its provider is not selected', async () => {
+    vi.mocked(api.getSettings).mockResolvedValue({
+      groups: GROUPS,
+      fields: FIELDS.map((f) => (f.key === 'GEMINI_API_KEY' ? { ...f, used_when: ['VOICE_PROVIDER', 'gemini'] } : f)),
+    })
+    await open()
+    expect(rowOf(/GEMINI_API_KEY/)).toHaveTextContent('Not in use now')
+    expect(rowOf(/OPENAI_API_KEY/)).not.toHaveTextContent('Not in use now')
+  })
+
   it('shows the backend error when saving fails', async () => {
     vi.mocked(api.putSettings).mockRejectedValueOnce(new Error('VOICE_PROVIDER must be one of openai, gemini'))
     await open()
+    await showTab('Voice coach')
     await userEvent.selectOptions(screen.getByLabelText(/VOICE_PROVIDER/), 'gemini')
     await userEvent.click(screen.getByRole('button', { name: 'Save' }))
-    expect(await screen.findByRole('status')).toHaveTextContent('must be one of')
+    expect(await screen.findByText(/must be one of/)).toBeInTheDocument()
+  })
+})
+
+describe('SettingsModal closing', () => {
+  it('closes at once with nothing edited', async () => {
+    const onClose = vi.fn()
+    await open(onClose)
+    await userEvent.click(screen.getByRole('button', { name: 'Close settings' }))
+    expect(onClose).toHaveBeenCalledOnce()
+  })
+
+  it('asks before dropping unsaved edits', async () => {
+    const onClose = vi.fn()
+    await open(onClose)
+    await userEvent.type(screen.getByLabelText(/OPENAI_API_KEY/), 'sk-new')
+    await userEvent.click(screen.getByRole('button', { name: 'Close settings' }))
+    expect(onClose).not.toHaveBeenCalled()
+    expect(screen.getByRole('alertdialog')).toHaveTextContent('1 unsaved change will be dropped.')
+
+    await userEvent.click(screen.getByRole('button', { name: 'Keep editing' }))
+    expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument()
+    expect(screen.getByLabelText(/OPENAI_API_KEY/)).toHaveValue('sk-new')
+
+    await userEvent.click(screen.getByRole('button', { name: 'Close settings' }))
+    await userEvent.click(screen.getByRole('button', { name: 'Discard and close' }))
+    expect(onClose).toHaveBeenCalledOnce()
   })
 })
 
@@ -152,11 +212,11 @@ describe('SettingsModal assessor', () => {
   it('shows the assessor group and a Test button beside the Azure key', async () => {
     vi.mocked(api.testKey).mockResolvedValueOnce({ ok: true, message: 'key works' })
     await open()
-    expect(screen.getByText('Read aloud assessor')).toBeInTheDocument()
-    expect(screen.getByLabelText(/AZURE_SPEECH_REGION/)).toHaveValue('koreacentral')
-    const row = screen.getByLabelText(/AZURE_SPEECH_KEY/).closest<HTMLElement>('.settings-row')!
+    const row = rowOf(/AZURE_SPEECH_KEY/)
     await userEvent.click(within(row).getByRole('button', { name: 'Test' }))
     expect(api.testKey).toHaveBeenCalledWith('AZURE_SPEECH_KEY', '')
     expect(await within(row).findByRole('status')).toHaveTextContent('✓ key works')
+    await showTab('Read aloud assessor')
+    expect(screen.getByLabelText(/AZURE_SPEECH_REGION/)).toHaveValue('koreacentral')
   })
 })

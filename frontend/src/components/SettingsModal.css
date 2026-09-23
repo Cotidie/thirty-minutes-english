@@ -1,6 +1,6 @@
 .settings {
-  width: min(38rem, calc(100vw - 2rem));
-  max-height: calc(100vh - 2rem);
+  width: min(52rem, calc(100vw - 2rem));
+  height: min(44rem, calc(100vh - 2rem));
   margin: auto;
   padding: 0;
   border: 1px solid var(--line);
@@ -19,69 +19,168 @@
   background: rgb(27 36 49 / 35%);
 }
 
+/* Header, body and footer stack; only the group panel scrolls. */
 .settings-form {
+  position: relative;
+  height: 100%;
   display: grid;
+  grid-template-rows: auto minmax(0, 1fr) auto;
+}
+
+.settings-head {
+  display: flex;
+  align-items: flex-start;
   gap: 1rem;
-  padding: 1.1rem 1.25rem 1rem;
+  padding: 1.1rem 1rem 0.9rem 1.5rem;
+  border-bottom: 1px solid var(--line);
+}
+
+.settings-head > div {
+  flex: 1;
 }
 
 .settings-head h2 {
   margin: 0;
   font-family: var(--serif);
   font-weight: 500;
-  font-size: 1.4rem;
+  font-size: 1.6rem;
+  line-height: 1.1;
 }
 
 .settings-lede,
 .settings-loading {
-  margin: 0.2rem 0 0;
+  margin: 0.25rem 0 0;
   color: var(--muted);
 }
 
-.settings-group {
-  margin: 0;
-  padding: 0.6rem 0 0;
-  border: 0;
-  border-top: 1px solid var(--line);
-  display: grid;
-  gap: 0.45rem;
+.settings-loading {
+  padding: 1.25rem 1.5rem;
 }
 
-.settings-group legend {
-  padding: 0 0 0.35rem;
+.settings-close {
+  display: grid;
+  place-items: center;
+  width: 2.75rem;
+  height: 2.75rem;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--ink);
+  cursor: pointer;
+}
+
+.settings-close:hover {
+  background: var(--ground);
+}
+
+.settings-body {
+  display: grid;
+  grid-template-columns: 13rem minmax(0, 1fr);
+  min-height: 0;
+}
+
+.settings-nav {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 0.9rem 0.6rem;
+  border-right: 1px solid var(--line);
+  background: var(--ground);
+  overflow-y: auto;
+}
+
+.settings-tab {
+  display: grid;
+  gap: 1px;
+  min-height: 2.75rem;
+  padding: 0.45rem 0.75rem;
+  border: 0;
+  background: transparent;
+  color: var(--ink);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.settings-tab:hover {
+  background: rgb(255 255 255 / 55%);
+}
+
+.settings-tab[aria-selected='true'] {
+  background: var(--paper);
+  box-shadow: inset 3px 0 0 var(--ink);
+}
+
+.settings-tab-title {
   font-weight: 600;
-  letter-spacing: 0.02em;
+}
+
+.settings-tab-note {
+  font-size: 0.78rem;
+  color: var(--muted);
+}
+
+.settings-panel {
+  min-height: 0;
+  overflow-y: auto;
+  padding: 1.1rem 1.5rem 0.5rem;
+}
+
+.settings-panel-title {
+  margin: 0 0 0.25rem;
+  font-size: 1.1rem;
+  font-weight: 600;
 }
 
 .settings-row {
   display: grid;
-  grid-template-columns: minmax(11rem, 1fr) minmax(0, 1.4fr);
-  align-items: center;
-  gap: 0.6rem;
+  gap: 0.45rem;
+  padding: 0.85rem 0;
+  border-bottom: 1px solid var(--line);
 }
 
-.settings-row label {
+.settings-row:last-child {
+  border-bottom: 0;
+}
+
+.settings-row-head {
   display: flex;
   align-items: baseline;
-  gap: 0.45rem;
+  gap: 0.75rem;
+  min-width: 0;
+}
+
+.settings-row-head label {
+  flex: 1;
   min-width: 0;
 }
 
 .settings-row code {
-  font-size: 0.8rem;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  font-size: 0.85rem;
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+
+/* The field and its Test button share one line. */
+.settings-row-control {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
 }
 
 .settings-row input,
 .settings-row select {
+  flex: 1;
   width: 100%;
   min-width: 0;
-  padding: 0.35rem 0.5rem;
+  min-height: 2.75rem;
+  box-sizing: border-box;
+  padding: 0.35rem 0.75rem;
   border: 1px solid var(--line);
   border-radius: 4px;
   background: #fff;
   font: inherit;
+  font-size: 0.95rem;
   color: inherit;
 }
 
@@ -89,52 +188,70 @@
   color: var(--muted);
 }
 
-.settings-keytest {
-  grid-column: 2;
-  display: flex;
-  align-items: baseline;
-  gap: 0.5rem;
-  min-width: 0;
-  font-size: 0.8rem;
-}
-
 .settings-test {
-  padding: 0.15rem 0.55rem;
-  border: 1px solid var(--line);
+  flex: none;
+  min-width: 5.5rem;
+  min-height: 2.75rem;
+  padding: 0 1rem;
+  border: 1px solid var(--ink);
   border-radius: 999px;
   background: transparent;
-  font-size: 0.75rem;
+  color: var(--ink);
+  font: inherit;
+  font-weight: 500;
   cursor: pointer;
 }
 
 .settings-test:hover:not(:disabled) {
-  border-color: var(--ink);
+  background: var(--ground);
 }
 
-.settings-keytest-result {
+.settings-test:disabled {
+  border-color: var(--line);
+  color: var(--muted);
+  cursor: progress;
+}
+
+/* Key status on the name line, so a result never changes the row's height. */
+.settings-chip {
+  flex: none;
+  max-width: 60%;
+  padding: 0.15rem 0.6rem;
+  border-radius: 999px;
+  background: #eceee9;
+  color: #4f5965;
+  font-size: 0.78rem;
+  font-weight: 600;
   overflow-wrap: anywhere;
 }
 
-.settings-keytest-result.is-ok {
+.settings-chip.is-testing {
+  background: var(--marker-soft);
+  color: #5b4a00;
+}
+
+.settings-chip.is-ok {
+  background: var(--right-soft);
   color: var(--right);
 }
 
-.settings-keytest-result.is-error {
-  color: var(--error);
+.settings-chip.is-error {
+  background: var(--wrong-soft);
+  color: var(--wrong);
 }
 
 .settings-foot {
   display: flex;
   align-items: center;
-  justify-content: flex-end;
   gap: 0.6rem;
-  padding-top: 0.6rem;
+  padding: 0.8rem 1rem 0.8rem 1.5rem;
   border-top: 1px solid var(--line);
 }
 
 .settings-notice {
-  margin: 0 auto 0 0;
-  font-size: 0.85rem;
+  flex: 1;
+  margin: 0;
+  color: var(--muted);
 }
 
 .settings-notice.is-ok {
@@ -145,16 +262,71 @@
   color: var(--error);
 }
 
+.settings-confirm {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  background: rgb(251 252 250 / 82%);
+}
+
+.settings-confirm-card {
+  width: min(24rem, calc(100% - 2rem));
+  display: grid;
+  gap: 0.6rem;
+  padding: 1.4rem;
+  border: 1px solid var(--line);
+  background: var(--paper);
+  box-shadow: 0 12px 32px rgb(27 36 49 / 18%);
+}
+
+.settings-confirm-card h3 {
+  margin: 0;
+  font-size: 1.05rem;
+}
+
+.settings-confirm-card p {
+  margin: 0;
+  color: var(--muted);
+}
+
+.settings-confirm-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.5rem;
+  padding-top: 0.3rem;
+}
+
+.btn-danger {
+  border-color: var(--wrong);
+  background: var(--wrong);
+  color: #fff;
+}
+
+/* Phones: the groups become a scrolling row above the panel. */
 @media (max-width: 40rem) {
-  .settings-row {
+  .settings-body {
     grid-template-columns: 1fr;
+    grid-template-rows: auto minmax(0, 1fr);
   }
 
-  .settings-keytest {
-    grid-column: 1;
+  .settings-nav {
+    flex-direction: row;
+    padding: 0.4rem 0.6rem;
+    border-right: 0;
+    border-bottom: 1px solid var(--line);
+    overflow-x: auto;
   }
 
-  .settings-row label {
-    grid-column: 1 / -1;
+  .settings-tab {
+    flex: none;
+  }
+
+  .settings-tab[aria-selected='true'] {
+    box-shadow: inset 0 -3px 0 var(--ink);
+  }
+
+  .settings-panel {
+    padding: 0.9rem 1rem 0.5rem;
   }
 }

@@ -31,6 +31,7 @@ def view(settings: Settings) -> SettingsView:
             follows=spec.follows,
             variants={value: Variant(default=v.default, suggestions=list(v.suggestions)) for value, v in (spec.variants or {}).items()},
             shown_when=spec.shown_when,
+            used_when=spec.used_when,
         )
         for spec in SPECS
     ]

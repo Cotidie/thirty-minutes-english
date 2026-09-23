@@ -80,6 +80,8 @@ def test_get_masks_secrets_and_carries_the_rules_the_modal_applies(tmp_path):
     assert model["follows"] == "VOICE_PROVIDER"
     assert model["variants"]["gemini"]["default"] == model["variants"]["gemini"]["suggestions"][0]
     assert fields["VOICE_NAME"]["shown_when"] == ["VOICE_PROVIDER", "gemini"]
+    assert fields["COMFY_API_KEY"]["used_when"] == ["IMAGE_PROVIDER", "comfy"]
+    assert fields["OPENAI_API_KEY"]["used_when"] is None
     assert {f["group"] for f in view["fields"]} == {g["id"] for g in view["groups"]}
 
 

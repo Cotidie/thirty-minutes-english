@@ -129,6 +129,8 @@ export interface SettingField {
   variants: Record<string, SettingVariant>
   /** [key, value]: the field only shows while that setting holds that value. */
   shown_when: [string, string] | null
+  /** [key, value]: a key the app only calls while that setting holds that value. */
+  used_when: [string, string] | null
 }
 
 export interface SettingGroup {
