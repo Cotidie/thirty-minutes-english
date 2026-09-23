@@ -5,7 +5,7 @@ from fastapi.testclient import TestClient
 from mcp.types import CallToolResult, TextContent
 
 from app.config import catalog as catalog_module
-from app.config.catalog import Catalog, ModelOption, claude_models, comfy_images, gemini_live, openai_text, openai_voice, openrouter_images
+from app.config.catalog import Catalog, ModelOption, claude_models, newest_first, comfy_images, gemini_live, openai_text, openai_voice, openrouter_images
 from app.config.settings import Settings
 from app.db import Database
 from app.main import create_app
@@ -87,13 +87,13 @@ def test_claude_models_come_from_claude_code(monkeypatch):
 
         async def get_server_info(self):
             return {"models": [
-                {"value": "opus", "displayName": "Opus 5.5", "description": "Most capable", "supportsEffort": True, "supportedEffortLevels": ["low", "max"]},
+                {"value": "opus", "displayName": "Opus 5.5", "description": "Most capable", "supportsEffort": True, "supportedEffortLevels": ["low", "max"], "resolvedModel": "claude-opus-5-5"},
                 {"value": "haiku", "displayName": "Haiku 4.5", "description": "Fastest"},
             ]}
 
     monkeypatch.setattr(catalog_module, "ClaudeSDKClient", FakeClient)
     assert claude_models({}) == [
-        ModelOption("opus", "Opus 5.5", "Most capable", ("low", "max")),
+        ModelOption("opus", "Opus 5.5", "Most capable", ("low", "max"), resolved="claude-opus-5-5"),
         ModelOption("haiku", "Haiku 4.5", "Fastest", ()),
     ]
 
@@ -137,7 +137,7 @@ def test_comfy_lists_text_to_image_partner_models(monkeypatch):
         async def call(self, tool, args):
             data = {"data": [
                 {"model_name": "vertexai/nano-banana-pro", "tags": ["text-to-image"]},
-                {"model_name": "xai/grok-image-generate", "tags": ["text-to-image"], "tiers": ["grok-imagine-image", "grok-imagine-image-pro"]},
+                {"model_name": "xai/grok-image-generate", "tags": ["text-to-image"], "description": "Generates an image. Fast."},
                 {"model_name": "bfl/flux-pro-fill", "tags": ["inpaint", "edit"]},
             ]}
             return CallToolResult(content=[TextContent(type="text", text=json.dumps(data))])
@@ -145,7 +145,7 @@ def test_comfy_lists_text_to_image_partner_models(monkeypatch):
     monkeypatch.setattr(catalog_module, "McpHttp", FakeServer)
     assert comfy_images({"COMFY_API_KEY": "c"}) == [
         ModelOption("vertexai/nano-banana-pro"),
-        ModelOption("xai/grok-image-generate", description="Tiers: grok-imagine-image, grok-imagine-image-pro"),
+        ModelOption("xai/grok-image-generate", description="Generates an image"),
     ]
 
 
@@ -171,3 +171,25 @@ def test_dated_lists_keep_their_newest_ten_and_undated_ones_keep_the_provider_or
     cat.refresh({})
     assert [o.id for o in cat.options("x", {})] == [f"m{i}" for i in range(11, 1, -1)]
     assert [o.id for o in cat.options("undated", {})] == ["b", "a"]
+
+
+def test_undated_lists_go_by_the_version_in_the_name_with_aliases_on_top():
+    claude = [
+        ModelOption("sonnet", "Sonnet", resolved="claude-sonnet-5"),
+        ModelOption("haiku", "Haiku", resolved="claude-haiku-4-5-20251001"),
+        ModelOption("opus", "Opus", resolved="claude-opus-5-5"),
+        ModelOption("claude-fable-5-1", "Fable", resolved="claude-fable-5-1"),
+    ]
+    assert [o.id for o in newest_first(claude)] == ["opus", "claude-fable-5-1", "sonnet", "haiku"]
+    gemini = [
+        ModelOption("gemini-2.5-flash-native-audio-preview-09-2025"),
+        ModelOption("gemini-3.8-live"),
+        ModelOption("gemini-2.5-flash-native-audio-preview-12-2025"),
+    ]
+    assert [o.id for o in newest_first(gemini)] == [
+        "gemini-3.8-live",
+        "gemini-2.5-flash-native-audio-preview-12-2025",
+        "gemini-2.5-flash-native-audio-preview-09-2025",
+    ]
+    comfy = [ModelOption("bfl/flux-pro-1.1-ultra"), ModelOption("qwen/qwen-image-3"), ModelOption("vertexai/nano-banana-pro")]
+    assert [o.id for o in newest_first(comfy)] == ["vertexai/nano-banana-pro", "qwen/qwen-image-3", "bfl/flux-pro-1.1-ultra"]

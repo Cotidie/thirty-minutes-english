@@ -28,17 +28,32 @@ class ModelOption:
     label: str = ""
     description: str = ""
     efforts: tuple[str, ...] | None = None  # Claude only: the effort levels it takes; () = none
-    created: float | None = None  # release time (unix) when the provider says; sorts and ages the list
+    created: float | None = None  # release time (unix) when the provider says; sorts the list
+    resolved: str = ""  # the dated model an alias points at (Claude Code's resolvedModel); sorts the list
 
 
-NEWEST = 10  # a dated list keeps its newest models only (a saved older one still works)
+NEWEST = 10  # a list keeps its newest models only (a saved older one still works)
+VERSION = re.compile(r"(?<![\d.])(\d+)(?:[.-](\d{1,2})(?!\d))?")  # 3.8, 5-5 (Claude ids), 2
+MONTH_YEAR = re.compile(r"(\d{2})-(\d{4})")
+
+
+def recency(o: ModelOption) -> tuple:
+    """Newer sorts higher. With a release time, that; else the version in the name ("Opus 5.5",
+    "gemini-3.8-live", "flux-2-pro"), a month-year ("preview-09-2025") breaking ties. A name
+    without a number is an alias for the latest release ("default", "nano-banana-pro"): on top."""
+    if o.created:
+        return (2, o.created)
+    name = o.resolved or o.label or o.id.split("/")[-1]
+    version = VERSION.search(name)
+    if not version:
+        return (3,)
+    month_year = MONTH_YEAR.search(o.id)
+    return (1, float(f"{version.group(1)}.{version.group(2) or 0}"), (int(month_year.group(2)), int(month_year.group(1))) if month_year else (0, 0))
 
 
 def newest_first(options: list[ModelOption]) -> list[ModelOption]:
-    """Dated lists: the newest `NEWEST`, newest first. Undated lists keep the provider's order."""
-    if not any(o.created for o in options):
-        return options
-    return sorted(options, key=lambda o: o.created or 0, reverse=True)[:NEWEST]
+    """The newest `NEWEST`, newest first; ties keep the provider's order."""
+    return sorted(options, key=recency, reverse=True)[:NEWEST]
 
 
 Keys = Mapping[str, str]
@@ -60,6 +75,7 @@ def claude_models(_: Keys) -> list[ModelOption]:
             m.get("displayName", ""),
             m.get("description", ""),
             tuple(m.get("supportedEffortLevels") or ()) if m.get("supportsEffort") else (),
+            resolved=m.get("resolvedModel", ""),
         )
         for m in asyncio.run(fetch())
     ]
@@ -110,10 +126,10 @@ def comfy_images(keys: Keys) -> list[ModelOption]:
 
     async def fetch() -> dict:
         async with McpHttp(COMFY_MCP, key).session() as session:
-            return payload(await session.call("search_models", {"source": "partner", "type": "image", "limit": 100}))
+            return payload(await session.call("search_models", {"source": "partner", "type": "image", "limit": 100, "detail": "full"}))
 
     return [
-        ModelOption(m["model_name"], description=f"Tiers: {', '.join(m['tiers'])}" if m.get("tiers") else "")
+        ModelOption(m["model_name"], description=first_sentence(m.get("description", "")))
         for m in asyncio.run(fetch()).get("data", [])
         if "text-to-image" in m.get("tags", [])
     ]
