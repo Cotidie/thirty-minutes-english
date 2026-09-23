@@ -32,6 +32,11 @@ describe('ExpressionsTab', () => {
     expect(screen.getByText('something that keeps changing')).toHaveTextContent('something that keeps changing≈ a shifting goal')
   })
 
+  it('marks the expression where each example uses it', () => {
+    render(<ExpressionsTab items={items} sessionId={1} starred={[]} onToggleStar={vi.fn()} examples={[]} onExample={vi.fn()} />)
+    expect(screen.getAllByText('a moving target', { selector: 'mark' })).toHaveLength(2)
+  })
+
   it('clamps the usage note until it is clicked', async () => {
     render(<ExpressionsTab items={items} sessionId={3} starred={[]} onToggleStar={vi.fn()} examples={none} onExample={vi.fn()} />)
     const note = screen.getByRole('button', { name: /Neutral to workplace register/ })

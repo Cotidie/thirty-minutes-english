@@ -1,8 +1,10 @@
+import { phrasePattern } from '../lib/phraseMatch'
 import './Marked.css'
 
-/** `text` with `word` marked wherever it appears, in whatever form it takes there (retract → retracted). */
+/** `text` with the word or expression marked wherever it is used, in whatever form it takes there. */
 export function Marked({ text, word }: { text: string; word: string }) {
-  const stem = word.replace(/e$/, '').replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
-  const parts = text.split(new RegExp(`(\\b${stem}\\w*)`, 'i'))
+  const found = phrasePattern(word, text)
+  if (!found) return <>{text}</>
+  const parts = text.split(found)
   return <>{parts.map((part, i) => (i % 2 ? <mark key={i} className="marked">{part}</mark> : part))}</>
 }

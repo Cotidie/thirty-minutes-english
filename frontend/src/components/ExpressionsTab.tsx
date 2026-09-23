@@ -4,6 +4,7 @@ import { Practice } from './Practice'
 import { StarButton } from './StarButton'
 import { KoreanChip } from './KoreanChip'
 import { Synonyms } from './Synonyms'
+import { Marked } from './Marked'
 import './ExpressionsTab.css'
 
 interface Props {
@@ -42,7 +43,9 @@ export function ExpressionsTab({ items, sessionId, starred, onToggleStar, exampl
             <UsageNote text={item.usage_note} />
             <ul className="expression-examples">
               {item.examples.map((ex) => (
-                <li key={ex}>{ex}</li>
+                <li key={ex}>
+                  <Marked text={ex} word={item.phrase} />
+                </li>
               ))}
             </ul>
             <Practice
