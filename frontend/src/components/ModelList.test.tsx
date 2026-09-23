@@ -13,7 +13,7 @@ const model = (id: string, extra: Partial<SettingOption> = {}): SettingOption =>
 })
 
 const OPTIONS = [
-  model('google/gemini-3-pro-image', { label: 'Nano Banana Pro', image_per_m: 120, per_image: 0.134, per_image_count: 12, pinned: true }),
+  model('google/gemini-3-pro-image', { label: 'Nano Banana Pro', image_per_m: 120, per_image: 0.134, pinned: true }),
   model('recraft/v4-flash', { label: 'Recraft V4.1 Flash', image_per_m: 1.68 }),
   model('openai/gpt-image-2.5', { label: 'GPT Image 2.5', image_per_m: 30 }),
 ]
@@ -38,7 +38,7 @@ function renderList(value = '', onChange = vi.fn(), onPin = vi.fn()) {
 
 describe('priceOf', () => {
   it('leads with what a picture cost here, then the list price', () => {
-    expect(priceOf(OPTIONS[0])).toEqual({ perPicture: '≈ $0.13 / picture · 12 drawn', list: '$120 / 1M tok' })
+    expect(priceOf(OPTIONS[0])).toEqual({ perPicture: '≈ $0.13 / picture', list: '$120 / 1M tok' })
     expect(priceOf(OPTIONS[1])).toEqual({ perPicture: 'no picture yet', list: '$1.68 / 1M tok' })
   })
 })

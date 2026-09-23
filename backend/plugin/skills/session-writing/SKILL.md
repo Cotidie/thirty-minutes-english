@@ -43,6 +43,12 @@ Keep a listed word only when it is the exact right word and nothing plain replac
 - Different from the article's sentence, in a different setting.
 - One sentence, 10 to 20 words.
 
+## Synonyms
+
+- One or two, plainer and more common than the item itself, so they help the learner place the meaning.
+- Each must fit the item's own example sentence in its place, in the same sense and register. Skip a near-miss rather than add a second one.
+- A word or short phrase, no explanation, no repeat of words from the definition.
+
 ## Discussion questions
 
 - Ask the way a friend would across a table: short, plain, one question per sentence.

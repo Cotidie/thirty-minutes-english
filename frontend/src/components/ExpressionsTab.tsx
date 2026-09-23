@@ -3,6 +3,7 @@ import { practiceExpression, type Example, type Expression } from '../types'
 import { Practice } from './Practice'
 import { StarButton } from './StarButton'
 import { KoreanChip } from './KoreanChip'
+import { Synonyms } from './Synonyms'
 import './ExpressionsTab.css'
 
 interface Props {
@@ -34,7 +35,10 @@ export function ExpressionsTab({ items, sessionId, starred, onToggleStar, exampl
                 onToggle={() => onToggleStar(item.phrase)}
               />
             </div>
-            <p className="expression-meaning">{item.meaning}</p>
+            <p className="expression-meaning">
+              {item.meaning}
+              <Synonyms words={item.synonyms} />
+            </p>
             <UsageNote text={item.usage_note} />
             <ul className="expression-examples">
               {item.examples.map((ex) => (

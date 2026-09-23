@@ -13,9 +13,8 @@ function dollars(n: number): string {
 
 /** What a picture cost here, when we drew with the model; the provider's list price otherwise. */
 export function priceOf(option: SettingOption): { perPicture: string; list: string } {
-  const count = option.per_image_count ?? 0
   return {
-    perPicture: option.per_image != null ? `≈ ${dollars(option.per_image)} / picture · ${count} drawn` : 'no picture yet',
+    perPicture: option.per_image != null ? `≈ ${dollars(option.per_image)} / picture` : 'no picture yet',
     list: option.image_per_m != null ? `${dollars(option.image_per_m)} / 1M tok` : '',
   }
 }

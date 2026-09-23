@@ -21,13 +21,13 @@ class CostRepo:
                 (datetime.now(UTC).isoformat(), model, cost),
             )
 
-    def per_picture(self) -> dict[str, tuple[float, int]]:
-        """Model -> (average cost of its latest pictures, how many that average covers)."""
+    def per_picture(self) -> dict[str, float]:
+        """Model -> average cost of its latest pictures."""
         with self._db.connect() as conn:
             rows = conn.execute(
-                """SELECT model, AVG(cost), COUNT(*) FROM (
+                """SELECT model, AVG(cost) FROM (
                        SELECT model, cost, ROW_NUMBER() OVER (PARTITION BY model ORDER BY id DESC) AS n FROM image_costs
                    ) WHERE n <= ? GROUP BY model""",
                 (self.RECENT,),
             ).fetchall()
-        return {model: (avg, count) for model, avg, count in rows}
+        return dict(rows)

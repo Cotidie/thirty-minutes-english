@@ -4,6 +4,7 @@ import { practiceWord, type Example, type PictureStyles, type VocabularyItem } f
 import { Practice } from './Practice'
 import { StarButton } from './StarButton'
 import { KoreanChip } from './KoreanChip'
+import { Synonyms } from './Synonyms'
 import './VocabularyTab.css'
 
 /** A redraw is one request (new scene, then the picture), so there is no true progress:
@@ -59,7 +60,14 @@ function VocabCard({ item, drawing }: { item: VocabularyItem; drawing: boolean }
           setRevealed((r) => !r)
         }}
       >
-        {revealed ? item.definition : 'Tap to check the meaning'}
+        {revealed ? (
+          <>
+            {item.definition}
+            <Synonyms words={item.synonyms} />
+          </>
+        ) : (
+          'Tap to check the meaning'
+        )}
       </button>
     </div>
   )

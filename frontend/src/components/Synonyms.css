@@ -1,0 +1,11 @@
+.synonyms {
+  display: block;
+  margin-top: 0.25rem;
+  color: var(--muted);
+  font-size: 0.9rem;
+  font-style: italic;
+}
+
+.synonyms-mark {
+  font-style: normal;
+}

@@ -49,9 +49,8 @@ class ModelMenus:
         return [self._option(i, found.get(i), i in pins) for i in ids]
 
     def _option(self, model: str, listed: ModelOption | None, pinned: bool) -> Option:
-        per_image, count = self._costs.get(model, (None, 0))
         details = asdict(listed) if listed else {"id": model}
-        return Option(**details, per_image=per_image, per_image_count=count, pinned=pinned)
+        return Option(**details, per_image=self._costs.get(model), pinned=pinned)
 
 
 def skill_options(saved: str) -> list[Option]:

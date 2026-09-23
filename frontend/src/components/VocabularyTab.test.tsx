@@ -73,6 +73,17 @@ describe('VocabularyTab', () => {
     expect(screen.queryByText('어디에나 있는')).not.toBeInTheDocument()
   })
 
+  it('shows the synonyms only with the definition, and no line when a word has none', async () => {
+    const withSynonyms = [{ ...items[0], synonyms: ['everywhere', 'common'] }, items[1]]
+    render(<VocabularyTab items={withSynonyms} sessionId={3} onPicture={vi.fn()} starred={[]} onToggleStar={vi.fn()} examples={none} onExample={vi.fn()} />)
+    expect(screen.queryByText(/everywhere, common/)).not.toBeInTheDocument()
+    const [first, second] = screen.getAllByRole('button', { name: 'Tap to check the meaning' })
+    await userEvent.click(first)
+    expect(first).toHaveTextContent('present everywhere≈ everywhere, common')
+    await userEvent.click(second)
+    expect(second).toHaveTextContent(/^make less severe$/)
+  })
+
   it('shows the picture drawn for a word, and nothing where there is none', () => {
     const drawn = [{ ...items[0], scene: 'a phone in every hand on a train', image: 'job-0.png' }, items[1]]
     render(<VocabularyTab items={drawn} sessionId={3} onPicture={vi.fn()} starred={[]} onToggleStar={vi.fn()} examples={none} onExample={vi.fn()} />)

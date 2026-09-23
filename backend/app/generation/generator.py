@@ -38,10 +38,11 @@ SESSION_SCHEMA: dict = {
             "items": {
                 "type": "object",
                 "additionalProperties": False,
-                "required": ["phrase", "meaning", "usage_note", "examples", "korean"],
+                "required": ["phrase", "meaning", "synonyms", "usage_note", "examples", "korean"],
                 "properties": {
                     "phrase": {"type": "string"},
                     "meaning": {"type": "string"},
+                    "synonyms": {"type": "array", "minItems": 1, "maxItems": 2, "items": {"type": "string"}},
                     "usage_note": {"type": "string"},
                     "examples": {"type": "array", "minItems": 2, "maxItems": 2, "items": {"type": "string"}},
                     "korean": {"type": "string"},
@@ -99,11 +100,12 @@ SESSION_SCHEMA: dict = {
             "items": {
                 "type": "object",
                 "additionalProperties": False,
-                "required": ["word", "pos", "definition", "example", "korean", "scene"],
+                "required": ["word", "pos", "definition", "synonyms", "example", "korean", "scene"],
                 "properties": {
                     "word": {"type": "string"},
                     "pos": {"type": "string"},
                     "definition": {"type": "string"},
+                    "synonyms": {"type": "array", "minItems": 1, "maxItems": 2, "items": {"type": "string"}},
                     "example": {"type": "string"},
                     "korean": {"type": "string"},
                     "scene": {"type": "string"},
@@ -127,7 +129,8 @@ workplace, and academic conversation: phrasal verbs, collocations, idioms, and d
 Target CEFR B2 to C1+: common enough that a native speaker uses them weekly, yet ones a B2 learner \
 would not produce on their own. Avoid topic-specific jargon, dated idioms, and slang that ages fast. \
 The expressions need not relate to the article topic. Mix registers (casual, workplace, discussion). \
-For each give the phrase, a plain-English meaning, a usage note of at most 20 words (register and the \
+For each give the phrase, a plain-English meaning, synonyms (1 or 2 words or phrases a B2 learner \
+already knows that could replace it in its example sentences), a usage note of at most 20 words (register and the \
 one thing learners get wrong; no full sentences needed), 2 example sentences that sound like real speech, \
 and korean: the natural Korean equivalent of the expression, a short phrase, no explanation.
 
@@ -156,7 +159,8 @@ with its neighbors in mind so the Korean reads well in sequence; keep names, fig
 article body where it offers strong candidates, and fill the rest with words a well-read speaker would \
 use when discussing this subject even if they do not appear in the article. Prefer words useful across \
 academic and professional English over topic-specific jargon; no proper nouns. \
-For each give the word, part of speech, a concise learner-dictionary definition, one example \
+For each give the word, part of speech, a concise learner-dictionary definition, synonyms (1 or 2 more common words \
+that could replace it in this sense), one example \
 sentence different from the article, korean (the Korean equivalent in the sense used here, one or two \
 words, no explanation), and a scene: {scene_rules}. Vary the scenes across the words: \
 different places, times of day, and kinds of people, so no two look alike.

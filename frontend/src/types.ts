@@ -1,6 +1,8 @@
 export interface Expression {
   phrase: string
   meaning: string
+  /** Plainer words for the same meaning; absent on older sessions. */
+  synonyms?: string[]
   usage_note: string
   examples: string[]
   /** The Korean equivalent, hidden behind a chip until tapped. */
@@ -35,6 +37,8 @@ export interface VocabularyItem {
   word: string
   pos: string
   definition: string
+  /** Plainer words for the same sense, shown with the definition. */
+  synonyms?: string[]
   example: string
   /** The Korean equivalent, hidden on the card until tapped. */
   korean?: string | null
@@ -115,9 +119,8 @@ export interface SettingOption {
   /** Image models: list price in dollars per million image-output / prompt tokens. */
   image_per_m?: number | null
   text_per_m?: number | null
-  /** Image models: what a picture cost here on average, over `per_image_count` pictures. */
+  /** Image models: what a picture cost here on average, over its latest pictures. */
   per_image?: number | null
-  per_image_count?: number
   /** Kept at the top of the menu however old it gets. */
   pinned?: boolean
 }

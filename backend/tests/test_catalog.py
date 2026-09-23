@@ -164,7 +164,7 @@ def test_image_models_carry_what_a_picture_cost_here(tmp_path):
         db.costs.record("z/img", cost)
     for cost in [9.0] + [0.01] * CostRepo.RECENT:  # only the latest pictures count
         db.costs.record("a/img", cost)
-    assert db.costs.per_picture() == {"z/img": (pytest.approx(0.15), 2), "a/img": (pytest.approx(0.01), CostRepo.RECENT)}
+    assert db.costs.per_picture() == {"z/img": pytest.approx(0.15), "a/img": pytest.approx(0.01)}
 
     cat = Catalog(db.caches, {"openrouter_images": lambda _: [ModelOption("z/img", image_per_m=120.0)]}, background=False)
     cat.refresh({})
@@ -172,7 +172,7 @@ def test_image_models_carry_what_a_picture_cost_here(tmp_path):
     with TestClient(app) as c:
         image = {f["key"]: f for f in c.get("/api/settings").json()["fields"]}["IMAGE_MODEL"]
     z = next(o for o in image["variants"]["openrouter"]["options"] if o["id"] == "z/img")
-    assert (z["image_per_m"], z["per_image"], z["per_image_count"]) == (120.0, pytest.approx(0.15), 2)
+    assert (z["image_per_m"], z["per_image"]) == (120.0, pytest.approx(0.15))
 
 
 def test_the_modal_gets_the_cached_models_with_the_default_kept_and_can_refresh(tmp_path):

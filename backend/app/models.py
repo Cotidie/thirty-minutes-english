@@ -43,6 +43,8 @@ class Topic(BaseModel):
 class Expression(BaseModel):
     phrase: str
     meaning: str
+    """Plainer words for the same meaning; empty on sessions made before they were asked for."""
+    synonyms: list[str] = []
     usage_note: str
     examples: list[str]
     """The Korean equivalent, hidden behind a chip until tapped."""
@@ -84,6 +86,8 @@ class VocabularyItem(BaseModel):
     word: str
     pos: str
     definition: str
+    """Plainer words for the same sense; shown with the definition."""
+    synonyms: list[str] = []
     example: str
     """The Korean equivalent in the sense used here; hidden on the card until tapped."""
     korean: str | None = None

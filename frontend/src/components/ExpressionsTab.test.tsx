@@ -27,6 +27,11 @@ describe('ExpressionsTab', () => {
     expect(screen.getByRole('button', { name: `Hide the Korean for ${items[0].phrase}` })).toHaveTextContent('일부러 반대 입장을 취하다')
   })
 
+  it('shows the synonyms under the meaning', () => {
+    render(<ExpressionsTab items={[{ ...items[0], synonyms: ['a shifting goal'] }]} sessionId={1} starred={[]} onToggleStar={vi.fn()} examples={[]} onExample={vi.fn()} />)
+    expect(screen.getByText('something that keeps changing')).toHaveTextContent('something that keeps changing≈ a shifting goal')
+  })
+
   it('clamps the usage note until it is clicked', async () => {
     render(<ExpressionsTab items={items} sessionId={3} starred={[]} onToggleStar={vi.fn()} examples={none} onExample={vi.fn()} />)
     const note = screen.getByRole('button', { name: /Neutral to workplace register/ })
