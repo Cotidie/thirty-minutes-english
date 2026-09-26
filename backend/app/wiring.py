@@ -28,7 +28,7 @@ from app.voice.live import (
 
 log = logging.getLogger(__name__)
 
-# Each coach: the env var that points at its definition folder, and the folder next to this app by default.
+# Each coach: the env var that points at its definition folder, and its folder under agents/ by default.
 AGENTS: dict[str, tuple[str, str]] = {
     "read-aloud": ("READ_ALOUD_AGENT_DIR", "read-aloud-coach"),
     "phrase": ("PHRASE_AGENT_DIR", "phrase-coach"),
@@ -51,8 +51,8 @@ class Services:
     voice_key_name: str = "OPENAI_API_KEY"
 
 
-def agent_dirs(env: Mapping[str, str], apps_dir: Path) -> dict[str, Path]:
-    return {name: Path(env.get(var) or apps_dir / folder) for name, (var, folder) in AGENTS.items()}
+def agent_dirs(env: Mapping[str, str], agents_dir: Path) -> dict[str, Path]:
+    return {name: Path(env.get(var) or agents_dir / folder) for name, (var, folder) in AGENTS.items()}
 
 
 EffortsOf = Callable[[str], tuple[str, ...] | None]

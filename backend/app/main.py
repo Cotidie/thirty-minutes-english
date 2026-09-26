@@ -49,7 +49,7 @@ def create_app(
 def default_app() -> FastAPI:
     logging.basicConfig(level=logging.INFO, format="%(levelname)s %(name)s: %(message)s")
     db = Database(os.environ.get("DB_PATH", ROOT / "data" / "sessions.db"))
-    dirs = agent_dirs(os.environ, ROOT.parent.parent)
+    dirs = agent_dirs(os.environ, ROOT.parent / "agents")
     image_dir = db.path.parent / "images"
     catalog = Catalog(db.caches)
 

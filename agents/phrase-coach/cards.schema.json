@@ -1,0 +1,28 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "PhraseCards",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["cards"],
+  "properties": {
+    "cards": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "asked", "english", "alternatives", "note"],
+        "properties": {
+          "id": { "type": "integer", "description": "the round id from the input" },
+          "asked": { "type": "string", "description": "what the user wanted to say, their words" },
+          "english": { "type": "string", "description": "the expression the coach recommended" },
+          "alternatives": {
+            "type": "array",
+            "items": { "type": "string" },
+            "description": "other expressions the coach offered, with its distinction attached"
+          },
+          "note": { "type": "string", "description": "one line on when it fits" }
+        }
+      }
+    }
+  }
+}

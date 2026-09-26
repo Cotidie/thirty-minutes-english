@@ -1,0 +1,19 @@
+{
+  "model": "gpt-live-1",
+  "instructions": "<contents of prompts/live.md>",
+  "audio": { "output": { "voice": "gleam" } },
+  "delegation": { "type": "client" },
+  "store": false,
+  "input": [
+    {
+      "type": "message",
+      "role": "developer",
+      "content": [
+        {
+          "type": "input_text",
+          "text": "The expression or word the user is practicing: {{expression}}\nMeaning: {{meaning}}\nNote: {{usage_note}}"
+        }
+      ]
+    }
+  ]
+}
