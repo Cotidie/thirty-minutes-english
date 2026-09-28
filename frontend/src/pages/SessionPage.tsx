@@ -3,7 +3,7 @@ import { Link, useLocation, useNavigate, useParams } from 'react-router-dom'
 import { api } from '../api'
 import { ArticleTab } from '../components/ArticleTab'
 import { ExpressionsTab } from '../components/ExpressionsTab'
-import { NoteBox } from '../components/NoteBox'
+import { NotesPrototype } from '../components/notes-prototype/NotesVariants'
 import { SessionTimer } from '../components/SessionTimer'
 import { SummaryTab } from '../components/SummaryTab'
 import { VocabularyTab } from '../components/VocabularyTab'
@@ -26,7 +26,7 @@ export function SessionPage() {
   const note = useNote(Number(id))
   const [session, setSession] = useState<Session | null>(null)
   const [error, setError] = useState<string | null>(null)
-  const { hash } = useLocation()
+  const { hash, search } = useLocation()
   const navigate = useNavigate()
   const tab = Math.max(0, TAB_KEYS.indexOf(hash.slice(1)))
 
@@ -36,10 +36,10 @@ export function SessionPage() {
 
   const showTab = useCallback(
     (index: number) => {
-      navigate({ hash: TAB_KEYS[index] }, { replace: true })
+      navigate({ search, hash: TAB_KEYS[index] }, { replace: true })
       window.scrollTo({ top: 0 })
     },
-    [navigate],
+    [navigate, search],
   )
 
   if (error) {
@@ -84,8 +84,8 @@ export function SessionPage() {
             <span className="tab-minutes">after</span>
           </button>
         </nav>
-        <NoteBox note={note} />
       </aside>
+      <NotesPrototype note={note} variant={new URLSearchParams(search).get('variant') ?? 'A'} />
       <div className="content">
         {tab === 0 && (
           <ExpressionsTab
