@@ -1,0 +1,55 @@
+/* Takes whatever height the rail has left, never less than six lines:
+   on a short screen the rail scrolls instead. */
+.note {
+  flex: 1 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.note-label {
+  font-family: var(--sans);
+  font-size: 0.78rem;
+  font-weight: 500;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.note-text {
+  flex: 1 1 auto;
+  min-height: calc(9em + 1.2rem);
+  resize: none;
+  /* Korean wraps between words, not inside one. */
+  word-break: keep-all;
+  overflow-wrap: anywhere;
+  font-family: var(--sans);
+  font-size: 0.92rem;
+  line-height: 1.5;
+  color: var(--ink);
+  background: var(--paper);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 0.55rem 0.65rem;
+}
+
+.note-text::placeholder {
+  color: var(--muted);
+  opacity: 1;
+}
+
+.note-text:focus-visible {
+  outline: none;
+  border-color: var(--ink);
+  box-shadow: 0 0 0 2px var(--marker);
+}
+
+.note-status {
+  margin: 0;
+  font-size: 0.8rem;
+  color: var(--muted);
+}
+
+.note-status.is-failed {
+  color: var(--error);
+}

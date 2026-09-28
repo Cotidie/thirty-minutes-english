@@ -6,7 +6,7 @@ from app.api.deps import Db, Jobs, Svc, failed, off, require_session
 from app.api.schemas import CreateSessionRequest, JobStatus, RedrawRequest
 from app.generation.jobs import Job, JobRunner
 from app.llm import GenerationError
-from app.models import Session, SessionSummary, Stars, VocabularyItem
+from app.models import Note, Session, SessionSummary, Stars, VocabularyItem
 from app.topics.pool import pick_topic
 
 router = APIRouter(prefix="/api")
@@ -111,3 +111,15 @@ def get_stars(session_id: int, db: Db) -> Stars:
 def set_stars(session_id: int, body: Stars, db: Db) -> Stars:
     require_session(db, session_id)
     return db.sessions.set_stars(session_id, body)
+
+
+@router.get("/sessions/{session_id}/note", response_model=Note)
+def get_note(session_id: int, db: Db) -> Note:
+    require_session(db, session_id)
+    return db.sessions.get_note(session_id)
+
+
+@router.put("/sessions/{session_id}/note", response_model=Note)
+def set_note(session_id: int, body: Note, db: Db) -> Note:
+    require_session(db, session_id)
+    return db.sessions.set_note(session_id, body)

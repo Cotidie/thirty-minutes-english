@@ -1,7 +1,8 @@
-import { render, screen } from '@testing-library/react'
+import { render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom'
 import { describe, expect, it, vi } from 'vitest'
+import { api } from '../api'
 import { SessionPage } from './SessionPage'
 
 const session = {
@@ -22,6 +23,10 @@ vi.mock('../api', () => ({
     getSession: vi.fn(async () => session),
     getStars: vi.fn(async () => ({ expressions: [], words: [] })),
     listExamples: vi.fn(async () => []),
+    getNote: vi.fn(async () => ({ text: '' })),
+    setNote: vi.fn(async (_id: number, text: string) => ({ text })),
+    askCards: vi.fn(async () => []),
+    listReadings: vi.fn(async () => []),
     pictureStyles: vi.fn(async () => ({ current: '', options: [] })),
   },
 }))
@@ -53,5 +58,21 @@ describe('SessionPage', () => {
     expect(await screen.findByText('a moving target')).toBeInTheDocument()
     await userEvent.click(screen.getByRole('button', { name: /Article/ }))
     expect(screen.getByLabelText('hash')).toHaveTextContent('#article')
+  })
+
+  it('keeps one note on every tab, saves it, and brings it to Summary', async () => {
+    renderAt('/s/3')
+    await screen.findByText('a moving target')
+
+    await userEvent.type(screen.getByRole('textbox', { name: 'Notes' }), 'hedge 발음')
+    expect(await screen.findByText('Saved', {}, { timeout: 2000 })).toBeInTheDocument()
+    expect(vi.mocked(api.setNote)).toHaveBeenLastCalledWith(3, 'hedge 발음', false)
+
+    await userEvent.click(screen.getByRole('button', { name: /Article/ }))
+    expect(screen.getByRole('textbox', { name: 'Notes' })).toHaveValue('hedge 발음')
+
+    await userEvent.click(screen.getByRole('button', { name: /Summary/ }))
+    const content = document.querySelector('.content') as HTMLElement
+    expect(within(content).getByText('hedge 발음')).toBeInTheDocument()
   })
 })

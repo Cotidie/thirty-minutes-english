@@ -277,6 +277,18 @@ def test_stars_endpoint_round_trips_and_404s_on_unknown_session(client):
     assert client.put("/api/sessions/999/stars", json=body).status_code == 404
 
 
+def test_note_endpoint_round_trips_and_404s_on_unknown_session(client):
+    sid = create(client, "X")["session_id"]
+    assert client.get(f"/api/sessions/{sid}/note").json() == {"text": ""}
+
+    body = {"text": "hedge 발음 다시\nask about 'moving target'"}
+    assert client.put(f"/api/sessions/{sid}/note", json=body).json() == body
+    assert client.get(f"/api/sessions/{sid}/note").json() == body
+
+    assert client.get("/api/sessions/999/note").status_code == 404
+    assert client.put("/api/sessions/999/note", json=body).status_code == 404
+
+
 def test_examples_stack_under_a_session_in_the_order_made(client):
     sid = create(client, "X")["session_id"]
     assert client.get("/api/examples", params={"session_id": sid}).json() == []

@@ -64,6 +64,10 @@ export interface Topic {
 }
 
 /** Phrases and words starred in a session. */
+export interface Note {
+  text: string
+}
+
 export interface Stars {
   expressions: string[]
   words: string[]

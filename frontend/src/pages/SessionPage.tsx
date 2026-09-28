@@ -3,11 +3,13 @@ import { Link, useLocation, useNavigate, useParams } from 'react-router-dom'
 import { api } from '../api'
 import { ArticleTab } from '../components/ArticleTab'
 import { ExpressionsTab } from '../components/ExpressionsTab'
+import { NoteBox } from '../components/NoteBox'
 import { SessionTimer } from '../components/SessionTimer'
 import { SummaryTab } from '../components/SummaryTab'
 import { VocabularyTab } from '../components/VocabularyTab'
 import { PHASES } from '../lib/phases'
 import { useExamples } from '../lib/useExamples'
+import { useNote } from '../lib/useNote'
 import { useStars } from '../lib/useStars'
 import type { Session } from '../types'
 import './SessionPage.css'
@@ -21,6 +23,7 @@ export function SessionPage() {
   const { id } = useParams()
   const { stars, toggle } = useStars(Number(id))
   const { examples, add: addExample } = useExamples(Number(id))
+  const note = useNote(Number(id))
   const [session, setSession] = useState<Session | null>(null)
   const [error, setError] = useState<string | null>(null)
   const { hash } = useLocation()
@@ -81,6 +84,7 @@ export function SessionPage() {
             <span className="tab-minutes">after</span>
           </button>
         </nav>
+        <NoteBox note={note} />
       </aside>
       <div className="content">
         {tab === 0 && (
@@ -109,7 +113,7 @@ export function SessionPage() {
             onExample={addExample}
           />
         )}
-        {tab === SUMMARY_TAB && <SummaryTab sessionId={session.id} content={content} stars={stars} />}
+        {tab === SUMMARY_TAB && <SummaryTab sessionId={session.id} content={content} stars={stars} note={note.text} />}
       </div>
     </main>
   )

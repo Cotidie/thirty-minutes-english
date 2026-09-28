@@ -11,7 +11,7 @@ Thirty minutes of English speaking practice for two people, a new session every 
 | Expressions | 10 min | Read 5 expressions aloud, then make one sentence each |
 | Article | 10 min | Read a short article, summarize it, discuss 3 questions |
 | Vocabulary | 10 min | Explain 10 words in English, then check the meaning |
-| Summary | after | Review starred items, your sentences, and corrections |
+| Summary | after | Review your notes, starred items, your sentences, and corrections |
 
 Press `Start 30 min` and the tabs move on every 10 minutes.
 
@@ -21,7 +21,8 @@ Press `Start 30 min` and the tabs move on every 10 minutes.
 - 🎙️ **Voice coaches**: Read aloud marks mispronounced words and bad pauses. Ask finds the English for what you mean. Practice fixes your sentences.
 - 🖼️ **Word pictures**: each word gets a picture in the style you pick.
 - 🇰🇷 **Korean hints**: one tap shows the Korean meaning or a translation of the article.
-- ⭐ **Summary**: everything you starred, said, or got corrected, on one page.
+- 📝 **Notes**: a notepad under the tabs, open on every part. It saves as you type.
+- ⭐ **Summary**: your notes and everything you starred, said, or got corrected, on one page.
 
 ![Vocabulary: word cards with pictures](docs/images/vocabulary.png)
 

@@ -127,6 +127,12 @@ class Stars(BaseModel):
     words: list[str] = []
 
 
+class Note(BaseModel):
+    """The pair's free-form notes on a session, saved whole on every edit."""
+
+    text: str = ""
+
+
 class TopicListing(BaseModel):
     """The day's suggestions, whether the news half is still on its way, and why the last fetch failed."""
 

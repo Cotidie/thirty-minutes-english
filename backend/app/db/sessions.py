@@ -1,16 +1,16 @@
-"""Sessions, the stars on them, and what earlier sessions already taught."""
+"""Sessions, the stars and notes on them, and what earlier sessions already taught."""
 
 from datetime import UTC, datetime
 from typing import TYPE_CHECKING
 
 from app.generation.exclusions import Exclusions
-from app.models import Session, SessionContent, SessionSummary, Stars, VocabularyItem
+from app.models import Note, Session, SessionContent, SessionSummary, Stars, VocabularyItem
 
 if TYPE_CHECKING:
     from app.db import Database
 
 # Rows that belong to a session and go with it.
-OWNED_TABLES = ("asks", "readings", "stars", "examples")
+OWNED_TABLES = ("asks", "readings", "stars", "notes", "examples")
 
 
 class SessionRepo:
@@ -87,6 +87,20 @@ class SessionRepo:
             conn.execute("DELETE FROM stars WHERE session_id = ?", (session_id,))
             conn.executemany("INSERT INTO stars (session_id, kind, item) VALUES (?, ?, ?)", rows)
         return self.get_stars(session_id)
+
+    def get_note(self, session_id: int) -> Note:
+        with self._db.connect() as conn:
+            row = conn.execute("SELECT text FROM notes WHERE session_id = ?", (session_id,)).fetchone()
+        return Note(text=row["text"] if row else "")
+
+    def set_note(self, session_id: int, note: Note) -> Note:
+        with self._db.connect() as conn:
+            conn.execute(
+                "INSERT INTO notes (session_id, text) VALUES (?, ?)"
+                " ON CONFLICT (session_id) DO UPDATE SET text = excluded.text",
+                (session_id, note.text),
+            )
+        return self.get_note(session_id)
 
     def recent_topics(self, limit: int) -> list[str]:
         with self._db.connect() as conn:

@@ -9,6 +9,7 @@
   top: 0;
   align-self: start;
   height: 100vh;
+  overflow-y: auto;
   padding: 1.5rem 1.25rem 6.5rem;
   border-right: 1px solid var(--line);
   display: flex;

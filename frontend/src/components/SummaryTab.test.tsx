@@ -68,7 +68,7 @@ beforeEach(() => {
 
 describe('SummaryTab', () => {
   it('shows both what was asked and what was corrected, for this session only', async () => {
-    render(<SummaryTab sessionId={3} content={content} stars={none} />)
+    render(<SummaryTab sessionId={3} content={content} stars={none} note="" />)
 
     expect(await screen.findByText('Read the room.')).toBeInTheDocument()
     expect(screen.getByText('Take a hint (blunter)')).toBeInTheDocument()
@@ -84,8 +84,23 @@ describe('SummaryTab', () => {
     expect(vi.mocked(api.listReadings)).toHaveBeenCalledWith(3)
   })
 
+  it('puts the note first, line breaks and all', async () => {
+    render(<SummaryTab sessionId={3} content={content} stars={none} note={'hedge 발음 다시\nask about pauses'} />)
+    await screen.findByText('Read the room.')
+
+    const first = document.querySelector('.summary-section')!
+    expect(first).toHaveTextContent('Notes')
+    expect(first.querySelector('.summary-note')!.textContent).toBe('hedge 발음 다시\nask about pauses')
+  })
+
+  it('points to the Notes box while the note is blank', async () => {
+    render(<SummaryTab sessionId={3} content={content} stars={none} note={'  \n'} />)
+    expect(await screen.findByText(/Nothing noted/)).toBeInTheDocument()
+    expect(document.querySelector('.summary-note')).toBeNull()
+  })
+
   it('counts each section', async () => {
-    render(<SummaryTab sessionId={3} content={content} stars={none} />)
+    render(<SummaryTab sessionId={3} content={content} stars={none} note="" />)
     await screen.findByText('Read the room.')
     const counts = document.querySelectorAll('.summary-count')
     expect([...counts].map((c) => c.textContent)).toEqual(['0', '1', '1', '2'])
@@ -94,24 +109,24 @@ describe('SummaryTab', () => {
   it('tells a clean read apart from never having read aloud', async () => {
     vi.mocked(api.askCards).mockResolvedValue([])
     vi.mocked(api.listReadings).mockResolvedValue([])
-    const { unmount } = render(<SummaryTab sessionId={3} content={content} stars={none} />)
+    const { unmount } = render(<SummaryTab sessionId={3} content={content} stars={none} note="" />)
     expect(await screen.findByText(/No paragraph read aloud yet/)).toBeInTheDocument()
     unmount()
 
     vi.mocked(api.listReadings).mockResolvedValue([{ ...reading, corrections: [] }])
-    render(<SummaryTab sessionId={3} content={content} stars={none} />)
+    render(<SummaryTab sessionId={3} content={content} stars={none} note="" />)
     expect(await screen.findByText(/Clean read/)).toBeInTheDocument()
   })
 
   it('reports a failure instead of an empty summary', async () => {
     vi.mocked(api.askCards).mockRejectedValueOnce(new Error('database is locked'))
-    render(<SummaryTab sessionId={3} content={content} stars={none} />)
+    render(<SummaryTab sessionId={3} content={content} stars={none} note="" />)
     expect(await screen.findByText(/database is locked/)).toBeInTheDocument()
   })
 
   it('lists starred expressions and words in short form, and only those', async () => {
     const stars: Stars = { expressions: ['on the fence'], words: ['mitigate'] }
-    render(<SummaryTab sessionId={3} content={content} stars={stars} />)
+    render(<SummaryTab sessionId={3} content={content} stars={stars} note="" />)
     await screen.findByText('Read the room.')
 
     const list = document.querySelector('.starred-list')!

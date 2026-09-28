@@ -24,6 +24,10 @@ CREATE TABLE IF NOT EXISTS stars (
     item TEXT NOT NULL,
     PRIMARY KEY (session_id, kind, item)
 );
+CREATE TABLE IF NOT EXISTS notes (
+    session_id INTEGER PRIMARY KEY,
+    text TEXT NOT NULL
+);
 CREATE TABLE IF NOT EXISTS asks (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     created_at TEXT NOT NULL,

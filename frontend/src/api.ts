@@ -7,6 +7,7 @@ import type {
   ExampleFeedback,
   KeyTestResult,
   LiveSession,
+  Note,
   PictureStyles,
   PracticeTarget,
   Reading,
@@ -65,6 +66,10 @@ export const api = {
   getStars: (id: number) => request<Stars>(`/api/sessions/${id}/stars`),
   setStars: (id: number, stars: Stars) =>
     request<Stars>(`/api/sessions/${id}/stars`, { method: 'PUT', body: JSON.stringify(stars) }),
+  getNote: (id: number) => request<Note>(`/api/sessions/${id}/note`),
+  /** `keepalive` lets the save finish after the page closes. */
+  setNote: (id: number, text: string, keepalive = false) =>
+    request<Note>(`/api/sessions/${id}/note`, { method: 'PUT', body: JSON.stringify({ text }), keepalive }),
   getSettings: () => request<SettingsView>('/api/settings'),
   /** Fetches every provider's model list now; the settings as they then read. */
   refreshModels: () => request<SettingsView>('/api/settings/models/refresh', { method: 'POST' }),

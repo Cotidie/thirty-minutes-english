@@ -2,7 +2,7 @@ import pytest
 
 from app.db import Database
 from app.generation.generator import EXPRESSION_COUNT, VOCABULARY_COUNT
-from app.models import PhraseCard, Stars
+from app.models import Note, PhraseCard, Stars
 from tests.conftest import sample_content
 
 
@@ -108,6 +108,19 @@ def test_stars_replace_as_a_set_and_go_with_the_session(store):
 
     store.sessions.delete(session.id)
     assert store.sessions.get_stars(session.id) == Stars()
+
+
+def test_a_note_is_rewritten_whole_and_goes_with_the_session(store):
+    session = store.sessions.create(sample_content())
+    assert store.sessions.get_note(session.id) == Note(text="")
+
+    store.sessions.set_note(session.id, Note(text="hedge: stress on first syllable"))
+    saved = store.sessions.set_note(session.id, Note(text="line one\nline two"))
+    assert saved == Note(text="line one\nline two")
+    assert store.sessions.get_note(session.id) == Note(text="line one\nline two")
+
+    store.sessions.delete(session.id)
+    assert store.sessions.get_note(session.id) == Note(text="")
 
 
 def test_replacing_one_word_keeps_what_another_redraw_stored_meanwhile(store):

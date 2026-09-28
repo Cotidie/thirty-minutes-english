@@ -8,15 +8,17 @@ interface Props {
   sessionId: number
   content: SessionContent
   stars: Stars
+  /** What the pair typed in the Notes box, as typed. */
+  note: string
 }
 
 /**
- * What the session left behind: what the pair starred, the sentences they
- * made, the expressions the coach handed over, and the words it stopped the
- * reader on. The last two are extracted from transcripts the first time this
+ * What the session left behind: the pair's notes, what they starred, the
+ * sentences they made, the expressions the coach handed over, and the words it
+ * stopped the reader on. The last two are extracted from transcripts the first time this
  * tab is opened, then kept.
  */
-export function SummaryTab({ sessionId, content, stars }: Props) {
+export function SummaryTab({ sessionId, content, stars, note }: Props) {
   const [asks, setAsks] = useState<Ask[] | null>(null)
   const [examples, setExamples] = useState<Example[] | null>(null)
   const [readings, setReadings] = useState<Reading[] | null>(null)
@@ -48,6 +50,14 @@ export function SummaryTab({ sessionId, content, stars }: Props) {
     <section className="tab-panel">
       {error && <p className="error">Could not read the session back: {error}</p>}
       {loading && <p className="empty">Reading it back…</p>}
+
+      <Section title="Notes">
+        {note.trim() ? (
+          <p className="summary-note">{note}</p>
+        ) : (
+          <p className="empty">Nothing noted. Type in the Notes box under the tabs.</p>
+        )}
+      </Section>
 
       <Section title="Starred" count={starredCount}>
         {starredCount === 0 && <p className="empty">Nothing starred. Tap ☆ on an expression or word card.</p>}
