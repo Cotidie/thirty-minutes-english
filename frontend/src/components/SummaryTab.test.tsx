@@ -4,7 +4,7 @@ import { api } from '../api'
 import type { Example, Reading, SessionContent, Stars } from '../types'
 import { SummaryTab } from './SummaryTab'
 
-vi.mock('../api', () => ({ api: { listExamples: vi.fn(), listReadings: vi.fn() } }))
+vi.mock('../api', () => ({ api: { listExamples: vi.fn(), listReadings: vi.fn(), listSummaries: vi.fn() } }))
 
 const reading: Reading = {
   id: 5,
@@ -47,6 +47,7 @@ const example: Example = {
 beforeEach(() => {
   vi.mocked(api.listExamples).mockResolvedValue([example])
   vi.mocked(api.listReadings).mockResolvedValue([reading])
+  vi.mocked(api.listSummaries).mockResolvedValue([])
 })
 
 describe('SummaryTab', () => {
@@ -82,7 +83,7 @@ describe('SummaryTab', () => {
     render(<SummaryTab sessionId={3} content={content} stars={none} note="" />)
     await screen.findByText("I'm on the fence about the offer.")
     const counts = document.querySelectorAll('.summary-count')
-    expect([...counts].map((c) => c.textContent)).toEqual(['0', '1', '2'])
+    expect([...counts].map((c) => c.textContent)).toEqual(['0', '1', '0', '2'])
   })
 
   it('tells a clean read apart from never having read aloud', async () => {

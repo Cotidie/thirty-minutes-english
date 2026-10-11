@@ -1,0 +1,108 @@
+.summarize {
+  font-family: var(--sans);
+  font-size: 0.86rem;
+  line-height: 1.45;
+  display: grid;
+  gap: 0.4rem;
+  justify-items: start;
+}
+
+.summarize audio {
+  display: none;
+}
+
+/* Open, the slip takes the row to itself. */
+.summarize.is-open {
+  justify-items: stretch;
+}
+
+.summarize-start {
+  border: 1px solid var(--line);
+  background: transparent;
+  border-radius: 999px;
+  padding: 0.15rem 0.7rem;
+  cursor: pointer;
+  color: var(--muted);
+}
+
+.summarize-start:hover:not(:disabled) {
+  border-color: var(--ink);
+  color: var(--ink);
+}
+
+.summarize-start:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+/* Summaries already kept: what was said, then the better one. */
+.summaries {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 0.5rem;
+}
+
+.summary-kept p {
+  margin: 0;
+}
+
+.summary-kept-said {
+  color: var(--muted);
+}
+
+.summary-feedback {
+  display: grid;
+  gap: 0.6rem;
+}
+
+.summary-feedback p {
+  margin: 0;
+}
+
+.summary-missed,
+.summary-fixes {
+  margin: 0;
+  padding-left: 1.1rem;
+  display: grid;
+  gap: 0.35rem;
+}
+
+.summary-missed {
+  color: var(--wrong);
+}
+
+.summary-better {
+  font-family: var(--serif);
+  font-size: 1.02rem;
+  line-height: 1.5;
+  border-left: 3px solid var(--marker);
+  padding-left: 0.75rem;
+}
+
+.summary-heading {
+  display: block;
+  font: 600 0.7rem var(--sans);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.summary-better .speak {
+  margin-left: 0.3rem;
+  vertical-align: middle;
+}
+
+.summary-fix-line,
+.summary-fix-why {
+  display: block;
+}
+
+.summary-fix-line s {
+  color: var(--muted);
+}
+
+.summary-fix-why {
+  color: var(--muted);
+}

@@ -7,6 +7,8 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 from app.coaching.example_feedback import TEMPLATES, ExampleCoach
+from app.coaching.summary_feedback import TEMPLATE as SUMMARY_TEMPLATE
+from app.coaching.summary_feedback import SummaryCoach
 from app.config.settings import SPEC_BY_KEY, Settings
 from app.config.skills import host_skills
 from app.generation.generator import ClaudeGenerator, Generator
@@ -30,6 +32,7 @@ log = logging.getLogger(__name__)
 AGENTS: dict[str, tuple[str, str]] = {
     "read-aloud": ("READ_ALOUD_AGENT_DIR", "read-aloud-coach"),
     "example": ("EXAMPLE_AGENT_DIR", "example-coach"),
+    "summary": ("SUMMARY_AGENT_DIR", "summary-coach"),
 }
 
 
@@ -39,6 +42,7 @@ class Services:
     topic_source: TopicSource | None = None
     agents: dict[str, LiveAgent] = field(default_factory=dict)
     example_coach: ExampleCoach | None = None
+    summary_coach: SummaryCoach | None = None
     illustrator: Illustrator | None = None
     scene_writer: SceneWriter | None = None
     assessor: AzureAssessor | None = None
@@ -67,7 +71,7 @@ def build_services(
     pictures: PictureLog | None = None,
     speech_dir: Path | None = None,
 ) -> Services:
-    """`agent_dirs` maps read-aloud / example to their folders; `image_dir` is
+    """`agent_dirs` maps read-aloud / example / summary to their folders; `image_dir` is
     where the vocabulary pictures land (none: no pictures); `efforts_of` gives a Claude
     model's effort levels as Claude Code reported them (None: not known); `pictures`
     keeps how long each picture took and what it cost; `speech_dir` keeps sentences
@@ -84,6 +88,7 @@ def build_services(
         ),
         agents=_live_agents(settings, agent_dirs),
         example_coach=_example_coach(settings, agent_dirs["example"], effort(settings, "EXAMPLE_EFFORT", efforts_of)),
+        summary_coach=_summary_coach(settings, agent_dirs["summary"], effort(settings, "EXAMPLE_EFFORT", efforts_of)),
         illustrator=_illustrator(settings, image_dir, pictures),
         scene_writer=SceneWriter.with_cli(settings.get("EXAMPLE_MODEL")),
         assessor=_assessor(settings),
@@ -135,6 +140,14 @@ def _example_coach(settings: Settings, agent_dir: Path, example_effort: str | No
         log.warning("example-coach feedback prompts not found: %s", agent_dir)
         return None
     return ExampleCoach.with_cli(agent_dir, settings.get("EXAMPLE_MODEL"), example_effort)
+
+
+def _summary_coach(settings: Settings, agent_dir: Path, example_effort: str | None) -> SummaryCoach | None:
+    """The text half of the summary coach; it shares the example coach's model and effort."""
+    if not (agent_dir / "prompts" / SUMMARY_TEMPLATE).is_file():
+        log.warning("summary-coach feedback prompt not found: %s", agent_dir)
+        return None
+    return SummaryCoach.with_cli(agent_dir, settings.get("EXAMPLE_MODEL"), example_effort)
 
 
 def _illustrator(settings: Settings, image_dir: Path | None, pictures: PictureLog | None) -> Illustrator | None:

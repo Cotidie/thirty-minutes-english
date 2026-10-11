@@ -1,10 +1,10 @@
-"""What the coaches leave behind: sentences made with an expression, paragraphs read aloud."""
+"""What the coaches leave behind: sentences made with an expression, paragraphs read aloud or summed up."""
 
 import json
 from datetime import UTC, datetime
 from typing import TYPE_CHECKING
 
-from app.models import Correction, Example, Reading
+from app.models import Correction, Example, Reading, Summary, SummaryFeedback
 
 if TYPE_CHECKING:
     from app.db import Database
@@ -38,6 +38,18 @@ class RecordRepo:
     def list_examples(self, session_id: int) -> list[Example]:
         """In the order they were made, so they stack under each expression."""
         return [Example(**dict(row)) for row in self._select("examples", session_id, "ASC")]
+
+    # One paragraph summed up out loud, and the coach's judgment of it.
+
+    def add_summary(self, session_id: int, paragraph: str, user_text: str, feedback: SummaryFeedback, seconds: float) -> Summary:
+        fields = dict(session_id=session_id, paragraph=paragraph, user_text=user_text, seconds=seconds)
+        summary_id, created_at = self._insert("summaries", **fields, feedback_json=feedback.model_dump_json())
+        return Summary(id=summary_id, created_at=created_at, feedback=feedback, **fields)
+
+    def list_summaries(self, session_id: int) -> list[Summary]:
+        """In the order they were made, so they stack under each paragraph."""
+        rows = [dict(row) for row in self._select("summaries", session_id, "ASC")]
+        return [Summary(**row, feedback=SummaryFeedback.model_validate_json(row.pop("feedback_json"))) for row in rows]
 
     # One paragraph read aloud, and what the assessor stopped the reader on.
 

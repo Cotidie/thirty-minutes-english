@@ -10,7 +10,7 @@ if TYPE_CHECKING:
     from app.db import Database
 
 # Rows that belong to a session and go with it.
-OWNED_TABLES = ("readings", "stars", "notes", "examples")
+OWNED_TABLES = ("readings", "stars", "notes", "examples", "summaries")
 
 
 class SessionRepo:

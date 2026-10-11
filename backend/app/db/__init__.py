@@ -46,6 +46,15 @@ CREATE TABLE IF NOT EXISTS examples (
     coach_text TEXT NOT NULL,
     seconds REAL NOT NULL DEFAULT 0
 );
+CREATE TABLE IF NOT EXISTS summaries (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    created_at TEXT NOT NULL,
+    session_id INTEGER NOT NULL,
+    paragraph TEXT NOT NULL,
+    user_text TEXT NOT NULL,
+    feedback_json TEXT NOT NULL,
+    seconds REAL NOT NULL DEFAULT 0
+);
 CREATE TABLE IF NOT EXISTS topic_days (
     day TEXT PRIMARY KEY,
     topics_json TEXT NOT NULL

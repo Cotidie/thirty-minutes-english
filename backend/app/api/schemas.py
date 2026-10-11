@@ -6,7 +6,7 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from app.generation.jobs import Status
 from app.generation.progress import Stage
-from app.models import Correction
+from app.models import Correction, SummaryFeedback
 
 
 class CreateSessionRequest(BaseModel):
@@ -39,7 +39,8 @@ def _not_blank(value: str) -> str:
 
 
 class ReadAloudRequest(BaseModel):
-    """`sdp` is the browser's WebRTC offer; only the OpenAI provider needs one."""
+    """A live round on one paragraph, read aloud or summed up. `sdp` is the browser's WebRTC offer;
+    only the OpenAI provider needs one."""
 
     paragraph: str
     sdp: str | None = None
@@ -79,6 +80,21 @@ class ExampleRequest(BaseModel):
     seconds: float = 0
 
     _check = field_validator("expression", "user_text", "coach_text")(_not_blank)
+
+
+class SummaryFeedbackRequest(BaseModel):
+    """What a reader said a paragraph was about, for the coach to judge against it."""
+
+    paragraph: str
+    user_text: str
+
+    _check = field_validator("paragraph", "user_text")(_not_blank)
+
+
+class SummaryRequest(SummaryFeedbackRequest):
+    session_id: int
+    feedback: SummaryFeedback
+    seconds: float = 0
 
 
 class ReadingRequest(BaseModel):

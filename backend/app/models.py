@@ -150,6 +150,26 @@ class ExampleFeedback(BaseModel):
     feedback: list[str]
 
 
+class SummaryFix(BaseModel):
+    """One weakness in how the reader said it: their words, the better ones, and why."""
+
+    said: str
+    better: str
+    why: str
+
+
+class SummaryFeedback(BaseModel):
+    """A spoken summary judged against its paragraph."""
+
+    """Whether they got the paragraph's main point."""
+    verdict: str
+    """Key points left out or got wrong; empty when the summary holds."""
+    missed: list[str]
+    """How a skilled speaker would sum the paragraph up, free of the reader's wording."""
+    summary: str
+    fixes: list[SummaryFix]
+
+
 class Correction(BaseModel):
     """One word the assessor stopped the reader on, and the sound heard in its place."""
 
@@ -167,6 +187,18 @@ class Reading(BaseModel):
     user_text: str
     seconds: float
     corrections: list[Correction] | None = None
+
+
+class Summary(BaseModel):
+    """One paragraph the reader summed up out loud, and what the coach made of it."""
+
+    id: int
+    created_at: datetime
+    session_id: int
+    paragraph: str
+    user_text: str
+    feedback: SummaryFeedback
+    seconds: float
 
 
 class Example(BaseModel):

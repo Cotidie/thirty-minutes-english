@@ -8,6 +8,8 @@ import type {
   LiveSession,
   Note,
   PictureFace,
+  Summary,
+  SummaryFeedback,
   PictureStyles,
   PracticeTarget,
   Reading,
@@ -113,6 +115,14 @@ export const api = {
   addExample: (example: { session_id: number; expression: string; user_text: string; coach_text: string; seconds: number }) =>
     request<Example>('/api/examples', { method: 'POST', body: JSON.stringify(example) }),
   listExamples: (sessionId: number) => request<Example[]>(`/api/examples?session_id=${sessionId}`),
+  startSummary: (paragraph: string, sdp?: string) =>
+    request<LiveSession>('/api/summary/sessions', { method: 'POST', body: JSON.stringify({ paragraph, sdp }) }),
+  /** A spoken summary judged against its paragraph: the verdict, a better summary, the wording fixed. */
+  summaryFeedback: (paragraph: string, userText: string) =>
+    request<SummaryFeedback>('/api/summary/feedback', { method: 'POST', body: JSON.stringify({ paragraph, user_text: userText }) }),
+  addSummary: (summary: { session_id: number; paragraph: string; user_text: string; feedback: SummaryFeedback; seconds: number }) =>
+    request<Summary>('/api/summaries', { method: 'POST', body: JSON.stringify(summary) }),
+  listSummaries: (sessionId: number) => request<Summary[]>(`/api/summaries?session_id=${sessionId}`),
   addReading: (reading: {
     session_id: number
     paragraph: string

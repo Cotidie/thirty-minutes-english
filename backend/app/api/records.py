@@ -1,10 +1,10 @@
-"""What a session leaves behind: sentences made, paragraphs read."""
+"""What a session leaves behind: sentences made, paragraphs read and summed up."""
 
 from fastapi import APIRouter
 
 from app.api.deps import Db, require_session
-from app.api.schemas import ExampleRequest, ReadingRequest
-from app.models import Example, Reading
+from app.api.schemas import ExampleRequest, ReadingRequest, SummaryRequest
+from app.models import Example, Reading, Summary
 
 router = APIRouter(prefix="/api")
 
@@ -18,6 +18,17 @@ def add_example(body: ExampleRequest, db: Db) -> Example:
 @router.get("/examples", response_model=list[Example])
 def list_examples(session_id: int, db: Db) -> list[Example]:
     return db.records.list_examples(session_id)
+
+
+@router.post("/summaries", response_model=Summary, status_code=201)
+def add_summary(body: SummaryRequest, db: Db) -> Summary:
+    require_session(db, body.session_id)
+    return db.records.add_summary(body.session_id, body.paragraph, body.user_text, body.feedback, body.seconds)
+
+
+@router.get("/summaries", response_model=list[Summary])
+def list_summaries(session_id: int, db: Db) -> list[Summary]:
+    return db.records.list_summaries(session_id)
 
 
 @router.post("/readings", response_model=Reading, status_code=201)

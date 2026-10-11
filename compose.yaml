@@ -14,10 +14,12 @@ services:
     environment:
       READ_ALOUD_AGENT_DIR: /agents/read-aloud-coach
       EXAMPLE_AGENT_DIR: /agents/example-coach
+      SUMMARY_AGENT_DIR: /agents/summary-coach
     volumes:
       - ./backend/data:/data
       - ./agents/read-aloud-coach:/agents/read-aloud-coach:ro
       - ./agents/example-coach:/agents/example-coach:ro
+      - ./agents/summary-coach:/agents/summary-coach:ro
       - ${HOME}/.claude/skills:${HOME}/.claude/skills:ro
       # Skill managers link ~/.claude/skills/<name> to ../../.agents/skills/<name>; mount the target so the links resolve.
       - ${HOME}/.agents/skills:${HOME}/.agents/skills:ro

@@ -1,6 +1,6 @@
 import { type ReactNode, useEffect, useState } from 'react'
 import { api } from '../api'
-import type { Correction, Example, Reading, SessionContent, Stars } from '../types'
+import type { Correction, Example, Reading, SessionContent, Stars, Summary } from '../types'
 import { SummaryCard } from './SummaryCard'
 import './SummaryTab.css'
 
@@ -13,21 +13,23 @@ interface Props {
 }
 
 /**
- * What the session left behind: the pair's notes, what they starred, the
- * sentences they made, and the words the assessor stopped the reader on.
+ * What the session left behind: the pair's notes, what they starred, the sentences
+ * they made, the paragraphs they summed up, and the words the assessor stopped the reader on.
  */
 export function SummaryTab({ sessionId, content, stars, note }: Props) {
   const [examples, setExamples] = useState<Example[] | null>(null)
   const [readings, setReadings] = useState<Reading[] | null>(null)
+  const [summaries, setSummaries] = useState<Summary[] | null>(null)
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
     let live = true
-    Promise.all([api.listExamples(sessionId), api.listReadings(sessionId)])
-      .then(([e, r]) => {
+    Promise.all([api.listExamples(sessionId), api.listReadings(sessionId), api.listSummaries(sessionId)])
+      .then(([e, r, s]) => {
         if (!live) return
         setExamples(e)
         setReadings(r)
+        setSummaries(s)
       })
       .catch((e: Error) => live && setError(e.message))
     return () => {
@@ -82,6 +84,15 @@ export function SummaryTab({ sessionId, content, stars, note }: Props) {
         <ol className="summary-cards">
           {examples?.map((ex) => (
             <SummaryCard key={ex.id} label={ex.expression} line={ex.user_text} note={ex.coach_text} />
+          ))}
+        </ol>
+      </Section>
+
+      <Section title="Paragraphs you summed up" count={summaries?.length}>
+        {summaries?.length === 0 && <p className="empty">No summaries yet. Each paragraph in the Article tab has a Summarize button.</p>}
+        <ol className="summary-cards">
+          {summaries?.map((s) => (
+            <SummaryCard key={s.id} label={`${s.paragraph.split(/\s+/).slice(0, 4).join(' ')}…`} line={s.user_text} note={s.feedback.summary} />
           ))}
         </ol>
       </Section>

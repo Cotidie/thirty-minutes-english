@@ -8,6 +8,7 @@ export type Keep = (round: LiveState) => Promise<void>
 /**
  * Runs once per round, when the coach first speaks (the sentence is in). The
  * round stays open until it settles; `say` has the coach read text aloud.
+ * A round without one only listens, and ends when the caller closes it.
  */
 export type OnTurn = (round: LiveState, say: (text: string) => void) => Promise<void>
 
@@ -28,15 +29,15 @@ export interface LiveRound {
 }
 
 /**
- * One GPT-Live round behind a button: open, listen, close on its own once the
- * coach has been quiet, then wait to be told whether to keep the transcript.
+ * One live round behind a button: open, listen, close on its own once the coach has
+ * answered and gone quiet, then wait to be told whether to keep the transcript.
  * The component owns the <audio> element the coach's voice plays through.
  */
 export function useLiveRound(
   audio: RefObject<HTMLAudioElement | null>,
   connect: Connect,
   keep: Keep,
-  onTurn: OnTurn,
+  onTurn?: OnTurn,
 ): LiveRound {
   const [state, setState] = useState<LiveState | null>(null)
   const [microphone, setMicrophone] = useState<MediaStream | null>(null)
@@ -96,7 +97,7 @@ export function useLiveRound(
     (round: LiveState) => {
       turn.current = 'pending'
       handlers.current
-        .onTurn(round, (text) => connRef.current?.say(text))
+        .onTurn!(round, (text) => connRef.current?.say(text))
         .catch((e: unknown) => apply((s) => ({ ...s, error: e instanceof Error ? e.message : String(e) })))
         .finally(() => {
           if (turn.current !== 'pending') return
@@ -120,7 +121,7 @@ export function useLiveRound(
         audio: audio.current!,
         onEvent: (event) => {
           apply((s) => applyLiveEvent(s, event))
-          if (event.type !== 'session.output_transcript.delta') return
+          if (event.type !== 'session.output_transcript.delta' || !handlers.current.onTurn) return
           if (turn.current === 'open') takeTurn(latest.current!)
           else if (turn.current === 'done') armSilence()
         },

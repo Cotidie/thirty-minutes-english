@@ -6,6 +6,7 @@ import { ArticleTab } from './ArticleTab'
 vi.mock('../api', () => ({
   api: {
     addReading: vi.fn(async () => ({})),
+    listSummaries: vi.fn(async () => []),
     assessorToken: vi.fn(async () => ({ token: 't', region: 'koreacentral', word_score: 60 })),
   },
 }))

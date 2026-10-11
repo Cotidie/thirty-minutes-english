@@ -6,3 +6,30 @@
 .article .paragraph > p {
   margin: 0;
 }
+
+/* Read aloud and Summarize side by side; whichever is running takes the row. */
+.paragraph-tools {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: 0.4rem;
+  margin-top: 0.35rem;
+}
+
+.paragraph-tools .read-aloud {
+  margin-top: 0;
+}
+
+.paragraph-tools .read-aloud.is-shown,
+.paragraph-tools .summarize.is-open,
+.paragraph-tools .summarize:has(.summaries) {
+  flex: 1 0 100%;
+}
+
+/* Being summed up from memory: the words are there but not readable. */
+.article .paragraph > p.is-veiled {
+  filter: blur(6px);
+  cursor: pointer;
+  user-select: none;
+  transition: filter 0.3s ease;
+}

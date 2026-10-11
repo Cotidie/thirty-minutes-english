@@ -1,4 +1,4 @@
-"""The two voice coaches, the pronunciation assessor, reading aloud, and the text run behind Your turn."""
+"""The voice coaches, the pronunciation assessor, reading aloud, and the text runs behind Your turn and Summarize."""
 
 from fastapi import APIRouter, Response
 
@@ -10,9 +10,10 @@ from app.api.schemas import (
     LiveSession,
     ReadAloudRequest,
     SpeechRequest,
+    SummaryFeedbackRequest,
 )
 from app.llm import GenerationError
-from app.models import ExampleFeedback
+from app.models import ExampleFeedback, SummaryFeedback
 from app.net import HttpError
 from app.wiring import Services
 
@@ -32,6 +33,23 @@ def start_live(services: Services, name: str, sdp: str | None, **values: str) ->
 @router.post("/read-aloud/sessions", response_model=LiveSession, status_code=201)
 def start_read_aloud(body: ReadAloudRequest, services: Svc) -> dict:
     return start_live(services, "read-aloud", body.sdp, paragraph=body.paragraph)
+
+
+@router.post("/summary/sessions", response_model=LiveSession, status_code=201)
+def start_summary(body: ReadAloudRequest, services: Svc) -> dict:
+    """A round that only listens: the reader says what the paragraph was about."""
+    return start_live(services, "summary", body.sdp, paragraph=body.paragraph)
+
+
+@router.post("/summary/feedback", response_model=SummaryFeedback)
+def summary_feedback(body: SummaryFeedbackRequest, services: Svc) -> SummaryFeedback:
+    coach = services.summary_coach
+    if coach is None:
+        raise off("summary coach is off: the summary-coach folder is missing")
+    try:
+        return coach.feedback(body.paragraph, body.user_text)
+    except GenerationError as e:
+        raise failed("feedback", e) from e
 
 
 @router.post("/example/sessions", response_model=LiveSession, status_code=201)
