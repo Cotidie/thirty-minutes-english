@@ -13,12 +13,10 @@ services:
         required: false
     environment:
       READ_ALOUD_AGENT_DIR: /agents/read-aloud-coach
-      PHRASE_AGENT_DIR: /agents/phrase-coach
       EXAMPLE_AGENT_DIR: /agents/example-coach
     volumes:
       - ./backend/data:/data
       - ./agents/read-aloud-coach:/agents/read-aloud-coach:ro
-      - ./agents/phrase-coach:/agents/phrase-coach:ro
       - ./agents/example-coach:/agents/example-coach:ro
       - ${HOME}/.claude/skills:${HOME}/.claude/skills:ro
       # Skill managers link ~/.claude/skills/<name> to ../../.agents/skills/<name>; mount the target so the links resolve.

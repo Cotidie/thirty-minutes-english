@@ -202,13 +202,6 @@ export interface AssessorSession {
   break_confidence: number
 }
 
-interface PhraseCard {
-  asked: string
-  english: string
-  alternatives: string[]
-  note: string
-}
-
 export interface Correction {
   kind: 'pronunciation' | 'phrasing'
   word: string
@@ -256,16 +249,6 @@ export interface Example {
   user_text: string
   coach_text: string
   seconds: number
-}
-
-export interface Ask {
-  id: number
-  created_at: string
-  session_id: number | null
-  user_text: string
-  coach_text: string
-  seconds: number
-  card: PhraseCard | null
 }
 
 /** A sentence said back the native way, and one line on the change that matters most. */

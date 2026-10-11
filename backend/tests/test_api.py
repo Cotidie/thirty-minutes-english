@@ -234,37 +234,6 @@ def test_second_generation_receives_items_from_the_first(client):
     assert set(second.words) <= {f"word{i}" for i in range(VOCABULARY_COUNT)}
 
 
-def test_ask_is_saved_and_listed(client):
-    session_id = client.post("/api/sessions", json={"topic": "Digital twins"}).json()["session_id"]
-
-    created = client.post(
-        "/api/asks",
-        json={"session_id": session_id, "user_text": "눈치 좀 챙겨", "coach_text": "Read the room.", "seconds": 11},
-    )
-    assert created.status_code == 201
-    assert created.json()["card"] is None
-
-    assert [a["user_text"] for a in client.get("/api/asks").json()] == ["눈치 좀 챙겨"]
-    assert client.get("/api/asks", params={"session_id": session_id}).json()[0]["id"] == created.json()["id"]
-    assert client.get("/api/asks", params={"session_id": session_id + 1}).json() == []
-
-
-def test_ask_without_a_session_is_allowed(client):
-    res = client.post("/api/asks", json={"user_text": "q", "coach_text": "a"})
-    assert res.status_code == 201
-    assert res.json()["session_id"] is None
-    assert res.json()["seconds"] == 0
-
-
-def test_ask_for_a_missing_session_is_404(client):
-    res = client.post("/api/asks", json={"session_id": 999, "user_text": "q", "coach_text": "a"})
-    assert res.status_code == 404
-
-
-def test_ask_rejects_empty_transcripts(client):
-    assert client.post("/api/asks", json={"user_text": " ", "coach_text": "a"}).status_code == 422
-
-
 def test_stars_endpoint_round_trips_and_404s_on_unknown_session(client):
     sid = create(client, "X")["session_id"]
     assert client.get(f"/api/sessions/{sid}/stars").json() == {"expressions": [], "words": []}

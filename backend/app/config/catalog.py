@@ -94,12 +94,6 @@ def openai_voice(keys: Keys) -> list[ModelOption]:
     return [o for o in openai_models(keys) if ("live" in o.id or "realtime" in o.id) and not re.search(r"transcribe|translate", o.id)]
 
 
-def openai_text(keys: Keys) -> list[ModelOption]:
-    """GPT text models for the Summary tab: no audio, image, realtime, search or code variants."""
-    skip = re.compile(r"audio|realtime|live|image|tts|transcribe|search|codex|embedding|moderation|instruct")
-    return [o for o in openai_models(keys) if o.id.startswith("gpt-") and not skip.search(o.id)]
-
-
 def gemini_live(keys: Keys) -> list[ModelOption]:
     key = keys.get("GEMINI_API_KEY", "")
     if not key:
@@ -155,7 +149,6 @@ def comfy_images(keys: Keys) -> list[ModelOption]:
 FETCHERS: dict[str, Fetcher] = {
     "claude": claude_models,
     "openai_voice": openai_voice,
-    "openai_text": openai_text,
     "gemini_live": gemini_live,
     "openrouter_images": openrouter_images,
     "comfy_images": comfy_images,

@@ -47,11 +47,6 @@ class ReadAloudRequest(BaseModel):
     _check = field_validator("paragraph")(_not_blank)
 
 
-class PhraseRequest(BaseModel):
-    sdp: str | None = None
-    topic: str | None = None
-
-
 class ExampleSessionRequest(BaseModel):
     sdp: str | None = None
     expression: str
@@ -84,15 +79,6 @@ class ExampleRequest(BaseModel):
     seconds: float = 0
 
     _check = field_validator("expression", "user_text", "coach_text")(_not_blank)
-
-
-class AskRequest(BaseModel):
-    session_id: int | None = None
-    user_text: str
-    coach_text: str
-    seconds: float = 0
-
-    _check = field_validator("user_text", "coach_text")(_not_blank)
 
 
 class ReadingRequest(BaseModel):

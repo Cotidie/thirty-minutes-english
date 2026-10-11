@@ -8,7 +8,7 @@ from fastapi.testclient import TestClient
 from mcp.types import CallToolResult, TextContent
 
 from app.config import catalog as catalog_module
-from app.config.catalog import Catalog, ModelOption, claude_models, newest_first, comfy_images, gemini_live, openai_text, openai_voice, openrouter_images
+from app.config.catalog import Catalog, ModelOption, claude_models, newest_first, comfy_images, gemini_live, openai_voice, openrouter_images
 from app.config.settings import Settings
 from app.db import Database
 from app.db.pictures import PictureRepo, PictureStat
@@ -102,14 +102,13 @@ def test_claude_models_come_from_claude_code(monkeypatch):
     ]
 
 
-def test_openai_lists_split_voice_from_text_and_drop_snapshots(http):
+def test_openai_voice_lists_live_models_and_drops_snapshots(http):
     http.json = {"data": [{"id": i} for i in [
         "gpt-live-1", "gpt-realtime-2", "gpt-live-transcribe", "gpt-realtime-2025-08-28",
         "gpt-5.6-luna", "gpt-5-codex", "gpt-image-2", "gpt-5-2025-08-07", "gpt-3.5-turbo-0125", "text-embedding-3", "o3",
     ]]}
     keys = {"OPENAI_API_KEY": "sk"}
     assert {o.id for o in openai_voice(keys)} == {"gpt-live-1", "gpt-realtime-2"}
-    assert [o.id for o in openai_text(keys)] == ["gpt-5.6-luna"]
     assert http.requests[0].headers["Authorization"] == "Bearer sk"
     assert openai_voice({}) == []  # no key, no call
 

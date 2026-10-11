@@ -149,15 +149,6 @@ class ExampleFeedback(BaseModel):
     feedback: list[str]
 
 
-class PhraseCard(BaseModel):
-    """One reviewable answer, pulled out of a round's transcripts."""
-
-    asked: str
-    english: str
-    alternatives: list[str] = []
-    note: str = ""
-
-
 class Correction(BaseModel):
     """One thing the coach stopped the reader on: a word's sound, or a pause inside a phrase."""
 
@@ -190,12 +181,3 @@ class Example(BaseModel):
     coach_text: str
     seconds: float
 
-
-class Ask(BaseModel):
-    id: int
-    created_at: datetime
-    session_id: int | None
-    user_text: str
-    coach_text: str
-    seconds: float
-    card: PhraseCard | None = None

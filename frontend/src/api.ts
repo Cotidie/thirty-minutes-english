@@ -1,6 +1,5 @@
 import type { JobStatus } from './lib/progress'
 import type {
-  Ask,
   AssessorSession,
   Correction,
   Example,
@@ -93,8 +92,6 @@ export const api = {
   assessorToken: () => request<AssessorSession>('/api/assessor/token'),
   phrasing: (paragraph: string) =>
     request<{ breaks: number[] }>('/api/phrasing', { method: 'POST', body: JSON.stringify({ paragraph }) }),
-  startPhrase: (topic: string | null, sdp?: string) =>
-    request<LiveSession>('/api/phrase/sessions', { method: 'POST', body: JSON.stringify({ topic, sdp }) }),
   startExample: (target: PracticeTarget, sdp?: string) =>
     request<LiveSession>('/api/example/sessions', {
       method: 'POST',
@@ -116,12 +113,6 @@ export const api = {
   addExample: (example: { session_id: number; expression: string; user_text: string; coach_text: string; seconds: number }) =>
     request<Example>('/api/examples', { method: 'POST', body: JSON.stringify(example) }),
   listExamples: (sessionId: number) => request<Example[]>(`/api/examples?session_id=${sessionId}`),
-  addAsk: (ask: { session_id: number | null; user_text: string; coach_text: string; seconds: number }) =>
-    request<Ask>('/api/asks', { method: 'POST', body: JSON.stringify(ask) }),
-  listAsks: (sessionId?: number) => request<Ask[]>(asksPath('/api/asks', sessionId)),
-  /** Asks with their review cards, extracting any that do not have one yet. */
-  askCards: (sessionId?: number) =>
-    request<Ask[]>(asksPath('/api/asks/cards', sessionId), { method: 'POST' }),
   addReading: (reading: {
     session_id: number | null
     paragraph: string
@@ -131,9 +122,5 @@ export const api = {
     corrections: Correction[]
   }) => request<Reading>('/api/readings', { method: 'POST', body: JSON.stringify(reading) }),
   /** Read-aloud rounds with the findings the assessor made, newest first. */
-  listReadings: (sessionId?: number) => request<Reading[]>(asksPath('/api/readings', sessionId)),
-}
-
-function asksPath(base: string, sessionId?: number): string {
-  return sessionId === undefined ? base : `${base}?session_id=${sessionId}`
+  listReadings: (sessionId: number) => request<Reading[]>(`/api/readings?session_id=${sessionId}`),
 }

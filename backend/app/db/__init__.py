@@ -28,15 +28,6 @@ CREATE TABLE IF NOT EXISTS notes (
     session_id INTEGER PRIMARY KEY,
     text TEXT NOT NULL
 );
-CREATE TABLE IF NOT EXISTS asks (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    created_at TEXT NOT NULL,
-    session_id INTEGER,
-    user_text TEXT NOT NULL,
-    coach_text TEXT NOT NULL,
-    seconds REAL NOT NULL DEFAULT 0,
-    card_json TEXT
-);
 CREATE TABLE IF NOT EXISTS readings (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     created_at TEXT NOT NULL,

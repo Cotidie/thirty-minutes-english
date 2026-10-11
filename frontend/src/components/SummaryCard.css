@@ -1,11 +1,11 @@
-.ask-cards {
+.summary-cards {
   list-style: none;
   margin: 0;
   padding: 0;
   border-top: 1px solid var(--line);
 }
 
-.ask-card {
+.summary-card {
   display: grid;
   grid-template-columns: 9rem 1fr;
   gap: 0 1.3rem;
@@ -13,19 +13,19 @@
   border-bottom: 1px solid var(--line);
 }
 
-.ask-card-body {
+.summary-card-body {
   display: grid;
   justify-items: start;
 }
 
-.ask-card-asked {
+.summary-card-label {
   text-align: right;
   color: var(--muted);
   font-size: 0.88rem;
   margin: 0.2rem 0 0;
 }
 
-.ask-card-english {
+.summary-card-line {
   font-family: var(--serif);
   font-size: 1.24rem;
   line-height: 1.3;
@@ -34,36 +34,26 @@
 }
 
 /* Inline so the marker follows each line rather than pooling under the paragraph. */
-.ask-card-english mark {
+.summary-card-line mark {
   color: inherit;
   background: linear-gradient(transparent 64%, var(--marker-soft) 64%);
   -webkit-box-decoration-break: clone;
   box-decoration-break: clone;
 }
 
-.ask-card-english.is-missing {
-  font-size: 1rem;
-  color: var(--muted);
-}
-
-.ask-card-alt {
-  margin: 0.3rem 0 0;
-  font-size: 0.92rem;
-}
-
-.ask-card-note {
+.summary-card-note {
   margin: 0.3rem 0 0;
   color: var(--muted);
   font-size: 0.88rem;
 }
 
 @media (max-width: 620px) {
-  .ask-card {
+  .summary-card {
     grid-template-columns: 1fr;
     gap: 0.25rem;
   }
 
-  .ask-card-asked {
+  .summary-card-label {
     text-align: left;
     margin: 0;
   }

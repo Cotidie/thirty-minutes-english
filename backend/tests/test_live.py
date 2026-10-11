@@ -98,7 +98,6 @@ def test_start_returns_upstream_answer(tmp_path, agent_dir):
     "path,body",
     [
         ("/api/read-aloud/sessions", {"paragraph": PARAGRAPH, "sdp": "v=0"}),
-        ("/api/phrase/sessions", {"sdp": "v=0"}),
         ("/api/example/sessions", {"sdp": "v=0", "expression": "x", "meaning": "y"}),
     ],
 )
@@ -179,58 +178,6 @@ def test_gemini_round_needs_no_offer(tmp_path, agent_dir, http):
     assert res.status_code == 201
     assert res.json()["provider"] == "gemini"
     assert "setup" in res.json() and "url" in res.json()
-
-
-@pytest.fixture
-def phrase_agent_dir(tmp_path):
-    directory = tmp_path / "phrase"
-    (directory / "prompts").mkdir(parents=True)
-    (directory / "prompts" / "live.md").write_text("You are Phrase.\n")
-    (directory / "session.json").write_text(
-        json.dumps(
-            {
-                "model": "gpt-live-1",
-                "instructions": "<contents of prompts/live.md>",
-                "input": [
-                    {
-                        "type": "message",
-                        "role": "developer",
-                        "content": [{"type": "input_text", "text": "Topic: {{topic}}"}],
-                    }
-                ],
-            }
-        )
-    )
-    return directory
-
-
-def phrase(agent_dir, sessions=None):
-    return {"phrase": LiveAgent("phrase", AgentDefinition(agent_dir), sessions or FakeLiveSessions())}
-
-
-def test_phrase_session_carries_the_topic(tmp_path, phrase_agent_dir):
-    sessions = FakeLiveSessions()
-    with make_client(tmp_path, phrase(phrase_agent_dir, sessions)) as c:
-        res = c.post("/api/phrase/sessions", json={"sdp": "v=0 offer", "topic": "Digital twins"})
-    assert res.status_code == 201
-    session, sdp = sessions.calls[0]
-    assert sdp == "v=0 offer"
-    assert session["input"][0]["content"][0]["text"] == "Topic: Digital twins"
-    assert session["instructions"] == "You are Phrase.\n"
-
-
-def test_phrase_session_without_a_topic_still_starts(tmp_path, phrase_agent_dir):
-    sessions = FakeLiveSessions()
-    with make_client(tmp_path, phrase(phrase_agent_dir, sessions)) as c:
-        assert c.post("/api/phrase/sessions", json={"sdp": "v=0 offer"}).status_code == 201
-    assert "{{topic}}" not in sessions.calls[0][0]["input"][0]["content"][0]["text"]
-
-
-def test_agents_are_independent(tmp_path, agent_dir, phrase_agent_dir):
-    agents = read_aloud(agent_dir) | phrase(phrase_agent_dir)
-    with make_client(tmp_path, agents) as c:
-        assert c.post("/api/read-aloud/sessions", json={"paragraph": PARAGRAPH, "sdp": "v=0"}).status_code == 201
-        assert c.post("/api/phrase/sessions", json={"sdp": "v=0"}).status_code == 201
 
 
 @pytest.fixture

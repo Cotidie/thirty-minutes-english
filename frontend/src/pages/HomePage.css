@@ -34,24 +34,7 @@
   max-width: 34rem;
 }
 
-.history-aside {
-  font-family: var(--sans);
-  font-size: 0.86rem;
-  font-weight: 400;
-  color: var(--muted);
-  text-decoration: none;
-  border-bottom: 1px solid var(--line);
-}
-
-.history-aside:hover {
-  color: var(--ink);
-}
-
 .history-title {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: 1rem;
   font-family: var(--serif);
   font-weight: 500;
   font-size: 1.5rem;

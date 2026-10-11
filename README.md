@@ -18,7 +18,7 @@ Press `Start 30 min` and the tabs move on every 10 minutes.
 ## Features
 
 - 📰 **Fresh sessions**: Claude searches the web and writes expressions, an article, and words on your topic. It skips items from recent sessions.
-- 🎙️ **Voice coaches**: Read aloud marks mispronounced words and bad pauses. Ask finds the English for what you mean. Practice fixes your sentences.
+- 🎙️ **Voice coaches**: Read aloud marks mispronounced words and bad pauses. Practice fixes your sentences.
 - 🖼️ **Word pictures**: each word gets a picture in the style you pick.
 - 🇰🇷 **Korean hints**: one tap shows the Korean meaning or a translation of the article.
 - 📝 **Notes**: a notepad under the tabs, open on every part. It saves as you type.

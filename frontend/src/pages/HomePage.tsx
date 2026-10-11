@@ -48,12 +48,7 @@ export function HomePage() {
       {loadError && <p className="error">Could not load past sessions: {loadError}</p>}
 
       <section className="history">
-        <h2 className="history-title">
-          Past sessions
-          <Link to="/asks" className="history-aside">
-            Asks
-          </Link>
-        </h2>
+        <h2 className="history-title">Past sessions</h2>
         {sessions.length === 0 ? (
           <p className="empty">Nothing yet. Generate the first session above.</p>
         ) : (

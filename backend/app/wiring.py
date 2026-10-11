@@ -6,7 +6,6 @@ from collections.abc import Callable, Mapping
 from dataclasses import dataclass, field
 from pathlib import Path
 
-from app.coaching.cards import SCHEMA_FILE, Extractor, PhraseCardExtractor
 from app.coaching.example_feedback import TEMPLATES, ExampleCoach
 from app.coaching.phrasing import PhrasingMarker
 from app.config.settings import SPEC_BY_KEY, Settings
@@ -31,7 +30,6 @@ log = logging.getLogger(__name__)
 # Each coach: the env var that points at its definition folder, and its folder under agents/ by default.
 AGENTS: dict[str, tuple[str, str]] = {
     "read-aloud": ("READ_ALOUD_AGENT_DIR", "read-aloud-coach"),
-    "phrase": ("PHRASE_AGENT_DIR", "phrase-coach"),
     "example": ("EXAMPLE_AGENT_DIR", "example-coach"),
 }
 
@@ -41,7 +39,6 @@ class Services:
     generator: Generator
     topic_source: TopicSource | None = None
     agents: dict[str, LiveAgent] = field(default_factory=dict)
-    extractor: Extractor | None = None
     example_coach: ExampleCoach | None = None
     illustrator: Illustrator | None = None
     scene_writer: SceneWriter | None = None
@@ -72,7 +69,7 @@ def build_services(
     pictures: PictureLog | None = None,
     speech_dir: Path | None = None,
 ) -> Services:
-    """`agent_dirs` maps read-aloud / phrase / example to their folders; `image_dir` is
+    """`agent_dirs` maps read-aloud / example to their folders; `image_dir` is
     where the vocabulary pictures land (none: no pictures); `efforts_of` gives a Claude
     model's effort levels as Claude Code reported them (None: not known); `pictures`
     keeps how long each picture took and what it cost; `speech_dir` keeps sentences
@@ -88,7 +85,6 @@ def build_services(
             settings.get("TOPICS_MODEL"), effort(settings, "TOPICS_EFFORT", efforts_of), settings.get("FIRECRAWL_API_KEY")
         ),
         agents=_live_agents(settings, agent_dirs),
-        extractor=_extractor(settings, agent_dirs["phrase"]),
         example_coach=_example_coach(settings, agent_dirs["example"], effort(settings, "EXAMPLE_EFFORT", efforts_of)),
         illustrator=_illustrator(settings, image_dir, pictures),
         scene_writer=SceneWriter.with_cli(settings.get("EXAMPLE_MODEL")),
@@ -139,14 +135,6 @@ def _live_agents(settings: Settings, agent_dirs: dict[str, Path]) -> dict[str, L
         else:
             log.warning("%s agent folder not found: %s", name, agent_dir)
     return agents
-
-
-def _extractor(settings: Settings, agent_dir: Path) -> Extractor | None:
-    """Ask cards, once an OpenAI key and the phrase-coach schema exist."""
-    key = settings.get("OPENAI_API_KEY")
-    if not key or not (agent_dir / SCHEMA_FILE).is_file():
-        return None
-    return PhraseCardExtractor(key, agent_dir, settings.get("SUMMARY_MODEL"))
 
 
 def _phrasing(settings: Settings, agent_dir: Path, example_effort: str | None) -> PhrasingMarker | None:

@@ -1,10 +1,10 @@
-"""What the coaches leave behind: asks, sentences made with an expression, paragraphs read aloud."""
+"""What the coaches leave behind: sentences made with an expression, paragraphs read aloud."""
 
 import json
 from datetime import UTC, datetime
 from typing import TYPE_CHECKING
 
-from app.models import Ask, Correction, Example, PhraseCard, Reading
+from app.models import Correction, Example, Reading
 
 if TYPE_CHECKING:
     from app.db import Database
@@ -31,24 +31,6 @@ class RecordRepo:
             sql, params = sql + " WHERE session_id = ?", (session_id,)
         with self._db.connect() as conn:
             return conn.execute(f"{sql} ORDER BY id {order}", params).fetchall()
-
-    # One question asked aloud mid-conversation, and its answer.
-
-    def add_ask(self, session_id: int | None, user_text: str, coach_text: str, seconds: float) -> Ask:
-        fields = dict(session_id=session_id, user_text=user_text, coach_text=coach_text, seconds=seconds)
-        ask_id, created_at = self._insert("asks", **fields)
-        return Ask(id=ask_id, created_at=created_at, **fields)
-
-    def list_asks(self, session_id: int | None = None) -> list[Ask]:
-        """Newest first."""
-        return [
-            Ask(**{**dict(row), "card": PhraseCard.model_validate_json(row["card_json"]) if row["card_json"] else None})
-            for row in self._select("asks", session_id, "DESC")
-        ]
-
-    def set_ask_card(self, ask_id: int, card: PhraseCard) -> None:
-        with self._db.connect() as conn:
-            conn.execute("UPDATE asks SET card_json = ? WHERE id = ?", (card.model_dump_json(), ask_id))
 
     # A sentence made with an expression, and the coach's echo.
 

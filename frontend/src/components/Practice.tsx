@@ -116,7 +116,7 @@ export function Practice({ target, label, sessionId, examples, onKept }: Props) 
                 </button>
               )}
               {state.status === 'closed' && (
-                <button type="button" className="ask-save" onClick={() => void keep()} disabled={!complete}>
+                <button type="button" className="slip-save" onClick={() => void keep()} disabled={!complete}>
                   Keep
                 </button>
               )}
@@ -124,7 +124,7 @@ export function Practice({ target, label, sessionId, examples, onKept }: Props) 
           }
         >
           {(state.user || answer) && (
-            <dl className="ask-captions">
+            <dl className="slip-captions">
               <dt>You</dt>
               <dd>{state.user}</dd>
               {answer && (

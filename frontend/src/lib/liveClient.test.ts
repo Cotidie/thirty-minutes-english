@@ -1,9 +1,9 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { api } from '../api'
-import { connectAsk, connectReadAloud } from './liveClient'
+import { connectReadAloud } from './liveClient'
 
 vi.mock('../api', () => ({
-  api: { startReadAloud: vi.fn(), startPhrase: vi.fn(), voiceProvider: vi.fn(async () => 'openai') },
+  api: { startReadAloud: vi.fn(), voiceProvider: vi.fn(async () => 'openai') },
 }))
 
 // Minimal WebRTC stand-ins: enough to run the offer path and fire channel events.
@@ -99,27 +99,5 @@ describe('connectReadAloud', () => {
     )
     await new Promise((r) => setTimeout(r, 0))
     expect(onDisconnect).not.toHaveBeenCalled()
-  })
-})
-
-describe('connectAsk', () => {
-  it('starts a phrase session with the topic and shares the round plumbing', async () => {
-    vi.mocked(api.startPhrase).mockResolvedValueOnce({
-      provider: 'openai',
-      session: { id: 'live_2' },
-      transport: { type: 'webrtc', sdp: 'v=0 answer' },
-    })
-    const onEvent = vi.fn()
-    const audio = { play: async () => undefined } as unknown as HTMLAudioElement
-
-    const conn = await connectAsk('Digital twins', { audio, onEvent, onDisconnect: vi.fn() })
-    expect(vi.mocked(api.startPhrase)).toHaveBeenCalledWith('Digital twins', 'v=0 offer')
-
-    const channel = lastPeer.channel
-    channel.dispatchEvent(new MessageEvent('message', { data: JSON.stringify({ type: 'session.started' }) }))
-    expect(onEvent).toHaveBeenCalledWith({ type: 'session.started' })
-
-    conn.close()
-    expect(JSON.parse(channel.send.mock.calls[0][0]).type).toBe('session.close')
   })
 })

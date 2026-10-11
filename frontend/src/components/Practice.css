@@ -24,8 +24,8 @@
   background: var(--marker);
 }
 
-/* Doubled so it beats .ask-slip's fixed width below: in a card the slip fills its column. */
-.ask-slip.practice-slip {
+/* Doubled so it beats .slip's fixed width below: in a card the slip fills its column. */
+.slip.practice-slip {
   width: min(34rem, 100%);
   box-shadow: none;
   font-family: var(--sans);
@@ -68,11 +68,11 @@
   color: var(--ink);
 }
 
-.ask-seconds + .slip-icon {
+.slip-seconds + .slip-icon {
   margin-left: 0.2rem;
 }
 
-.ask-status + .slip-icon {
+.slip-status + .slip-icon {
   margin-left: auto;
 }
 

@@ -16,7 +16,6 @@ GROUPS: dict[str, str] = {
     "voice": "Voice coach",
     "assess": "Read aloud assessor",
     "claude": "Claude generation",
-    "text": "Summary text model",
     "images": "Vocabulary pictures",
 }
 
@@ -99,7 +98,7 @@ IMAGE_VARIANTS = {
 
 SPECS: tuple[Spec, ...] = (
     Spec("OPENAI_API_KEY", "keys", secret=True,
-         help="Runs the OpenAI voice coaches and writes the Summary tab."),
+         help="Runs the voice coaches when the voice provider is OpenAI."),
     Spec("GEMINI_API_KEY", "keys", secret=True, used_when=("VOICE_PROVIDER", "gemini"),
          help="Runs the voice coaches when the voice provider is Gemini."),
     Spec("AZURE_SPEECH_KEY", "keys", secret=True,
@@ -111,7 +110,7 @@ SPECS: tuple[Spec, ...] = (
     Spec("FIRECRAWL_API_KEY", "keys", secret=True,
          help="Optional. Web search for sessions and daily topics works without a key, at a lower rate limit."),
     Spec("VOICE_PROVIDER", "voice", "openai", choices=("openai", "gemini"),
-         help="Which live voice model the three coaches (Read aloud, Phrasing, Your turn) talk through."),
+         help="Which live voice model the two coaches (Read aloud, Your turn) talk through."),
     Spec("VOICE_MODEL", "voice", follows="VOICE_PROVIDER", variants=VOICE_VARIANTS,
          help="The live model. Blank uses the provider's default."),
     Spec("VOICE_THINKING", "voice", "low", choices=THINKING_LEVELS, shown_when=("VOICE_PROVIDER", "gemini"),
@@ -144,8 +143,6 @@ SPECS: tuple[Spec, ...] = (
          help="The image model. Blank uses the provider's default."),
     Spec("IMAGE_STYLE", "images", "photo", choices=tuple(STYLES), labels=STYLE_LABELS,
          help="The look of new pictures. A photo gives the most to describe."),
-    Spec("SUMMARY_MODEL", "text", "gpt-5.6-luna", catalog="openai_text",
-         help="The OpenAI text model that turns the session transcript into the Summary tab."),
 )
 SPEC_BY_KEY = {spec.key: spec for spec in SPECS}
 

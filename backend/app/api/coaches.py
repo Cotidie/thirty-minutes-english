@@ -1,4 +1,4 @@
-"""The three voice coaches, the pronunciation assessor, reading aloud, and the text runs behind them."""
+"""The two voice coaches, the pronunciation assessor, reading aloud, and the text runs behind them."""
 
 from fastapi import APIRouter, Response
 
@@ -8,7 +8,6 @@ from app.api.schemas import (
     ExampleFeedbackRequest,
     ExampleSessionRequest,
     LiveSession,
-    PhraseRequest,
     Phrasing,
     PhrasingRequest,
     ReadAloudRequest,
@@ -35,11 +34,6 @@ def start_live(services: Services, name: str, sdp: str | None, **values: str) ->
 @router.post("/read-aloud/sessions", response_model=LiveSession, status_code=201)
 def start_read_aloud(body: ReadAloudRequest, services: Svc) -> dict:
     return start_live(services, "read-aloud", body.sdp, paragraph=body.paragraph)
-
-
-@router.post("/phrase/sessions", response_model=LiveSession, status_code=201)
-def start_phrase(body: PhraseRequest, services: Svc) -> dict:
-    return start_live(services, "phrase", body.sdp, topic=body.topic or "an English conversation")
 
 
 @router.post("/example/sessions", response_model=LiveSession, status_code=201)

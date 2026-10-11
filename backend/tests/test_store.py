@@ -2,7 +2,7 @@ import pytest
 
 from app.db import Database
 from app.generation.generator import EXPRESSION_COUNT, VOCABULARY_COUNT
-from app.models import Note, PhraseCard, Stars
+from app.models import Note, Stars
 from tests.conftest import sample_content
 
 
@@ -63,37 +63,6 @@ def test_used_items_collects_distinct_phrases_and_words_newest_first(tmp_path):
 
 def test_used_items_is_empty_on_fresh_store(tmp_path):
     assert not Database(tmp_path / "s.db").sessions.used_items()
-
-
-def test_asks_round_trip_newest_first(store, content):
-    session = store.sessions.create(content)
-    store.records.add_ask(session.id, "눈치 좀 챙겨", "Read the room.", 12.5)
-    store.records.add_ask(None, "I have much work", "I'm swamped.", 9)
-
-    everything = store.records.list_asks()
-    assert [a.user_text for a in everything] == ["I have much work", "눈치 좀 챙겨"]
-    assert everything[0].session_id is None
-    assert everything[1].seconds == 12.5
-    assert [a.user_text for a in store.records.list_asks(session.id)] == ["눈치 좀 챙겨"]
-
-
-def test_cards_are_stored_per_ask(store):
-    ask = store.records.add_ask(None, "눈치 좀 챙겨", "Read the room.", 12)
-    assert store.records.list_asks()[0].card is None
-
-    store.records.set_ask_card(ask.id, PhraseCard(asked="눈치 좀 챙겨", english="Read the room.", note="friends or coworkers"))
-    saved = store.records.list_asks()[0].card
-    assert saved is not None and saved.english == "Read the room."
-    assert saved.alternatives == []
-
-
-def test_deleting_a_session_takes_its_asks(store, content):
-    session = store.sessions.create(content)
-    store.records.add_ask(session.id, "q", "a", 1)
-    store.records.add_ask(None, "loose", "a", 1)
-
-    store.sessions.delete(session.id)
-    assert [a.user_text for a in store.records.list_asks()] == ["loose"]
 
 
 def test_stars_replace_as_a_set_and_go_with_the_session(store):

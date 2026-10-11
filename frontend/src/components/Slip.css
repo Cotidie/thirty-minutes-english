@@ -1,4 +1,4 @@
-.ask-slip {
+.slip {
   width: min(30rem, calc(100vw - 2.5rem));
   background: var(--paper);
   border: 1px solid var(--line);
@@ -11,45 +11,45 @@
     0 14px 36px rgb(27 36 49 / 8%);
 }
 
-.ask-bar {
+.slip-bar {
   display: flex;
   align-items: center;
   gap: 0.55rem;
 }
 
-.ask-status {
+.slip-status {
   color: var(--muted);
 }
 
-.ask-seconds {
+.slip-seconds {
   margin-left: auto;
   color: var(--muted);
   font-variant-numeric: tabular-nums;
 }
 
-.ask-error {
+.slip-error {
   color: var(--error);
   margin: 0;
 }
 
-.ask-captions {
+.slip-captions {
   display: grid;
   grid-template-columns: 2.9rem 1fr;
   gap: 0.2rem 0.7rem;
   margin: 0;
 }
 
-.ask-captions dt {
+.slip-captions dt {
   color: var(--muted);
   font-size: 0.78rem;
   padding-top: 0.1rem;
 }
 
-.ask-captions dd {
+.slip-captions dd {
   margin: 0;
 }
 
-.ask-actions {
+.slip-actions {
   display: flex;
   align-items: center;
   gap: 0.4rem;
@@ -57,13 +57,13 @@
   padding-top: 0.55rem;
 }
 
-.ask-hint {
+.slip-hint {
   margin-right: auto;
   color: var(--muted);
   font-size: 0.78rem;
 }
 
-.ask-actions button {
+.slip-actions button {
   display: inline-flex;
   align-items: center;
   gap: 0.3rem;
@@ -74,16 +74,16 @@
   cursor: pointer;
 }
 
-.ask-actions button:hover:not(:disabled) {
+.slip-actions button:hover:not(:disabled) {
   border-color: var(--ink);
 }
 
-.ask-save {
+.slip-save {
   border-color: var(--ink);
   font-weight: 500;
 }
 
-.ask-save:disabled {
+.slip-save:disabled {
   opacity: 0.45;
   cursor: default;
 }

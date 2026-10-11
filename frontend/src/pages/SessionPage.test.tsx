@@ -25,7 +25,6 @@ vi.mock('../api', () => ({
     listExamples: vi.fn(async () => []),
     getNote: vi.fn(async () => ({ text: '' })),
     setNote: vi.fn(async (_id: number, text: string) => ({ text })),
-    askCards: vi.fn(async () => []),
     listReadings: vi.fn(async () => []),
     pictureStyles: vi.fn(async () => ({ current: '', options: [] })),
   },
