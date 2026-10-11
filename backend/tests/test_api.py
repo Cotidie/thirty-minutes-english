@@ -155,17 +155,15 @@ class FakeIllustrator:
     def count(self, content) -> int:
         return 2 * len(content.vocabulary)
 
-    def illustrate(self, job_id: str, content, on_drawn=None):
+    def illustrate(self, job_id: str, content, on_drawn=None, on_picture=None):
         self.job_ids.append(job_id)
         if on_drawn:
             on_drawn(self.count(content))
         if self.error:
             raise self.error
-        words = [
-            v.model_copy(update={"scene": f"a scene for {v.word}", "image": f"{job_id}-{i}.png", "example_image": f"{job_id}-{i}-example.png"})
-            for i, v in enumerate(content.vocabulary)
-        ]
-        return content.model_copy(update={"vocabulary": words})
+        for i in range(len(content.vocabulary)):
+            on_picture(i, "image", f"{job_id}-{i}.png")
+            on_picture(i, "example_image", f"{job_id}-{i}-example.png")
 
 
 def test_pictures_are_drawn_after_the_text_and_saved_with_the_session(tmp_path):
@@ -178,7 +176,24 @@ def test_pictures_are_drawn_after_the_text_and_saved_with_the_session(tmp_path):
     assert job["stage"] == "illustrating"
     assert job["pictures_done"] == 20  # the fake reports both pictures of every word drawn
     assert session["content"]["vocabulary"][0]["image"] == f"{job['id']}-0.png"
-    assert session["content"]["vocabulary"][0]["scene"] == "a scene for word0"
+    assert session["content"]["vocabulary"][9]["example_image"] == f"{job['id']}-9-example.png"
+
+
+def test_the_session_can_be_opened_while_its_pictures_are_drawn(tmp_path):
+    seen: dict = {}
+
+    class Watched(FakeIllustrator):
+        def illustrate(self, job_id, content, on_drawn=None, on_picture=None):
+            on_picture(0, "example_image", "first.png")
+            job = c.get(f"/api/jobs/{job_id}").json()
+            seen.update(job=job, session=c.get(f"/api/sessions/{job['session_id']}").json())
+
+    app = create_app(Database(tmp_path / "s.db"), Services(FakeGenerator(), illustrator=Watched()), InlineExecutor())
+    with TestClient(app) as c:
+        c.post("/api/sessions", json={"topic": "X"})
+    assert (seen["job"]["status"], seen["job"]["stage"]) == ("running", "illustrating")
+    words = seen["session"]["content"]["vocabulary"]
+    assert (words[0]["example_image"], words[0]["image"], words[1]["example_image"]) == ("first.png", None, None)
 
 
 def test_a_session_still_goes_out_when_the_pictures_fail(tmp_path):

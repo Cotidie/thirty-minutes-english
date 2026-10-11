@@ -53,9 +53,10 @@ class SessionRepo:
                 conn.execute(f"DELETE FROM {table} WHERE session_id = ?", (session_id,))
         return cur.rowcount > 0
 
-    def replace_vocabulary_item(self, session_id: int, index: int, item: VocabularyItem) -> VocabularyItem | None:
-        """The item that was stored at `index`, now replaced by `item`; None when there is no such word.
-        Read and write share one write lock, so two redraws finishing at once do not undo each other."""
+    def update_vocabulary_item(self, session_id: int, index: int, changes: dict) -> VocabularyItem | None:
+        """The item that was stored at `index`, now with `changes` on it; None when there is no such word.
+        Only the named fields move and read and write share one write lock, so pictures arriving
+        for the same word at once, or a redraw beside them, do not undo each other."""
         with self._db.connect() as conn:
             conn.execute("BEGIN IMMEDIATE")
             row = conn.execute("SELECT content_json FROM sessions WHERE id = ?", (session_id,)).fetchone()
@@ -65,7 +66,8 @@ class SessionRepo:
             if not 0 <= index < len(content.vocabulary):
                 return None
             vocabulary = list(content.vocabulary)
-            previous, vocabulary[index] = vocabulary[index], item
+            previous = vocabulary[index]
+            vocabulary[index] = previous.model_copy(update=changes)
             content = content.model_copy(update={"vocabulary": vocabulary})
             conn.execute("UPDATE sessions SET content_json = ? WHERE id = ?", (content.model_dump_json(), session_id))
         return previous

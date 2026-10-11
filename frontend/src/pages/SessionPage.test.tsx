@@ -21,6 +21,7 @@ const session = {
 vi.mock('../api', () => ({
   api: {
     getSession: vi.fn(async () => session),
+    listJobs: vi.fn(async () => []),
     getStars: vi.fn(async () => ({ expressions: [], words: [] })),
     listExamples: vi.fn(async () => []),
     getNote: vi.fn(async () => ({ text: '' })),

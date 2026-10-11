@@ -94,16 +94,15 @@ def test_a_note_is_rewritten_whole_and_goes_with_the_session(store):
     assert store.sessions.get_note(session.id) == Note(text="")
 
 
-def test_replacing_one_word_keeps_what_another_redraw_stored_meanwhile(store):
+def test_a_picture_landing_on_a_word_keeps_what_landed_on_it_meanwhile(store):
     session = store.sessions.create(sample_content())
-    first = session.content.vocabulary[1].model_copy(update={"image": "1-new.png"})
-    second = session.content.vocabulary[4].model_copy(update={"image": "4-new.png", "korean": "넷"})
-    assert store.sessions.replace_vocabulary_item(session.id, 1, first).image is None
-    assert store.sessions.replace_vocabulary_item(session.id, 4, second).word == "word4"
+    assert store.sessions.update_vocabulary_item(session.id, 1, {"image": "1.png"}).image is None
+    assert store.sessions.update_vocabulary_item(session.id, 1, {"example_image": "1-example.png"}).image == "1.png"
+    assert store.sessions.update_vocabulary_item(session.id, 4, {"image": "4.png", "scene": "new"}).word == "word4"
     words = store.sessions.get(session.id).content.vocabulary
-    assert (words[1].image, words[4].image, words[4].korean) == ("1-new.png", "4-new.png", "넷")
-    assert store.sessions.replace_vocabulary_item(session.id, 99, first) is None
-    assert store.sessions.replace_vocabulary_item(999, 1, first) is None
+    assert (words[1].image, words[1].example_image, words[4].image, words[4].scene) == ("1.png", "1-example.png", "4.png", "new")
+    assert store.sessions.update_vocabulary_item(session.id, 99, {"image": "x.png"}) is None
+    assert store.sessions.update_vocabulary_item(999, 1, {"image": "x.png"}) is None
 
 
 def test_an_older_file_loses_what_removed_features_left_and_keeps_its_readings(tmp_path):

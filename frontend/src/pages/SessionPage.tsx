@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { Link, useLocation, useNavigate, useParams } from 'react-router-dom'
 import { api } from '../api'
+import { useArrivingPictures } from '../lib/useArrivingPictures'
 import { ArticleTab } from '../components/ArticleTab'
 import { ExpressionsTab } from '../components/ExpressionsTab'
 import { NoteBox } from '../components/NoteBox'
@@ -33,6 +34,7 @@ export function SessionPage() {
   useEffect(() => {
     api.getSession(Number(id)).then(setSession).catch((e: Error) => setError(e.message))
   }, [id])
+  const arriving = useArrivingPictures(Number(id), setSession)
 
   const showTab = useCallback(
     (index: number) => {
@@ -102,6 +104,7 @@ export function SessionPage() {
           <VocabularyTab
             items={content.vocabulary}
             sessionId={session.id}
+            arriving={arriving}
             onPicture={(index, item) =>
               setSession((s) =>
                 s && { ...s, content: { ...s.content, vocabulary: s.content.vocabulary.map((v, i) => (i === index ? item : v)) } },

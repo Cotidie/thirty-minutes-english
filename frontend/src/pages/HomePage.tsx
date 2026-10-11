@@ -43,7 +43,7 @@ export function HomePage() {
         onGenerate={generate}
         onRefresh={refresh}
       />
-      {job && <GenerationProgress job={job} onClose={close} />}
+      {job && <GenerationProgress job={job} onClose={close} onOpen={open} />}
       {error && <p className="error">Could not create the session: {error}</p>}
       {loadError && <p className="error">Could not load past sessions: {loadError}</p>}
 

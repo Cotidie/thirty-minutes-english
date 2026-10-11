@@ -141,14 +141,22 @@ class JobRunner:
         return total
 
     def _run(self, job: Job, generator: Generator, illustrator: Illustrator | None) -> None:
+        """The session is saved, and `job.session_id` set, as soon as its text is written; the
+        pictures land on it one by one after that, so it can be opened while they are drawn."""
         try:
             used = self._sessions.used_items()
             exclude = used.thin(1 - self.REPEAT_ALLOWANCE, random.Random())
             log.info("job %s: banning %d/%d expressions, %d/%d words", job.id,
                      len(exclude.expressions), len(used.expressions), len(exclude.words), len(used.words))
             content = generator.generate(job.topic, on_progress=job.apply, exclude=exclude)
+            leaked = exclude.taught([e.phrase for e in content.expressions], [v.word for v in content.vocabulary])
+            if leaked:
+                log.warning("job %s: %d banned items came back anyway: %s", job.id, len(leaked), leaked)
+            if job.status == "cancelled":
+                return
+            job.session_id = self._sessions.create(content).id
             if illustrator:
-                content = self._illustrate(job, illustrator, content)
+                self._illustrate(job, illustrator, content)
         except Cancelled:
             log.info("job %s: cancelled", job.id)
             return
@@ -160,17 +168,11 @@ class JobRunner:
             job.status = "failed"
             log.warning("job %s: failed after %.0fs in %s: %s", job.id, job.elapsed_seconds, job.stage, e)
             return
-        leaked = exclude.taught([e.phrase for e in content.expressions], [v.word for v in content.vocabulary])
-        if leaked:
-            log.warning("job %s: %d banned items came back anyway: %s", job.id, len(leaked), leaked)
-        if job.status == "cancelled":
-            return
-        session = self._sessions.create(content)
         job.finish()
         with self._lock:
             for stage in Stage:
                 self._stage_history[stage].append(job.stage_seconds.get(stage, 0.0))
-        job.session_id = session.id
+        log.info("job %s: done in %.0fs: %s", job.id, job.elapsed_seconds, {s.value: round(t) for s, t in job.stage_seconds.items()})
         job.status = "done"
 
     @staticmethod
@@ -179,13 +181,19 @@ class JobRunner:
         if seconds is not None:
             job.foreseen[Stage.ILLUSTRATING] = seconds
 
-    def _illustrate(self, job: Job, illustrator: Illustrator, content: SessionContent) -> SessionContent:
-        """Pictures on the words; a painter failure sends the session out without them."""
+    def _illustrate(self, job: Job, illustrator: Illustrator, content: SessionContent) -> None:
+        """Each picture onto the saved session as it is drawn; a painter failure leaves the session without the rest."""
+        session_id = job.session_id
+        assert session_id is not None
         total = illustrator.count(content)
         self._foresee_pictures(job, illustrator, total)
         job.apply(with_pictures(job.progress, 0, total))
         try:
-            return illustrator.illustrate(job.id, content, lambda done: job.apply(with_pictures(job.progress, done, total)))
+            illustrator.illustrate(
+                job.id,
+                content,
+                lambda done: job.apply(with_pictures(job.progress, done, total)),
+                lambda index, field, name: self._sessions.update_vocabulary_item(session_id, index, {field: name}),
+            )
         except GenerationError as e:
-            log.warning("job %s: the session goes out without pictures: %s", job.id, e)
-            return content
+            log.warning("job %s: the session stays without the pictures not yet drawn: %s", job.id, e)

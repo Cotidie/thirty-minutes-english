@@ -92,18 +92,17 @@ def redraw_picture(session_id: int, index: int, body: RedrawRequest, db: Db, ser
     item = session.content.vocabulary[index]
     try:
         if body.face == "example":
-            drawn = illustrator.redraw_example(session_id, index, item, body.style)
+            changes = {"example_image": illustrator.redraw_example(session_id, index, item, body.style).example_image}
         else:
             drawn = illustrator.redraw(session_id, index, item, writer.write(item), body.style)
+            changes = {"scene": drawn.scene, "caption": drawn.caption, "image": drawn.image}
     except GenerationError as e:
         raise failed("redraw", e) from e
-    previous = db.sessions.replace_vocabulary_item(session_id, index, drawn)
+    previous = db.sessions.update_vocabulary_item(session_id, index, changes)
     if previous is None:
         raise HTTPException(status_code=404, detail="the session went away while drawing")
-    for old, new in ((previous.image, drawn.image), (previous.example_image, drawn.example_image)):
-        if old != new:
-            illustrator.discard(old)
-    return drawn
+    illustrator.discard(previous.example_image if body.face == "example" else previous.image)
+    return previous.model_copy(update=changes)
 
 
 @router.get("/sessions/{session_id}/stars", response_model=Stars)

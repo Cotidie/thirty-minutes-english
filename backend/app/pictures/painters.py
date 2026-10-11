@@ -21,6 +21,7 @@ DEFAULT_MODEL = {"openrouter": "google/gemini-3-pro-image", "comfy": "vertexai/n
 
 
 OnDrawn = Callable[[int], None]  # pictures finished so far; raising from it stops the painter
+OnPicture = Callable[[int, bytes], None]  # a prompt's index and its picture, the moment it is drawn
 COST = re.compile(r"cost: \$([\d.]+)")
 
 
@@ -40,7 +41,7 @@ class NoLog:
 
 
 class Painter(Protocol):
-    def paint(self, prompts: list[str], on_drawn: OnDrawn | None = None) -> list[bytes | None]: ...
+    def paint(self, prompts: list[str], on_drawn: OnDrawn | None = None, on_picture: OnPicture | None = None) -> list[bytes | None]: ...
     def expected_seconds(self, count: int) -> float | None:
         """How long `count` pictures usually take with this model here; None until one was drawn."""
 
@@ -87,18 +88,20 @@ class OpenRouterPainter:
     def expected_seconds(self, count: int) -> float | None:
         return self._pictures.seconds(self._model)
 
-    def paint(self, prompts: list[str], on_drawn: OnDrawn | None = None) -> list[bytes | None]:
-        return asyncio.run(self._paint(prompts, Counter(on_drawn)))
+    def paint(self, prompts: list[str], on_drawn: OnDrawn | None = None, on_picture: OnPicture | None = None) -> list[bytes | None]:
+        return asyncio.run(self._paint(prompts, Counter(on_drawn), on_picture))
 
-    async def _paint(self, prompts: list[str], counter: Counter) -> list[bytes | None]:
-        async def one(session: Session, prompt: str) -> bytes | None:
+    async def _paint(self, prompts: list[str], counter: Counter, on_picture: OnPicture | None) -> list[bytes | None]:
+        async def one(session: Session, index: int, prompt: str) -> bytes | None:
             png = await self._one(session, prompt)
+            if png and on_picture:
+                on_picture(index, png)
             counter.tick()
             return png
 
         try:
             async with self._server.session() as session:
-                return list(await asyncio.gather(*(one(session, p) for p in prompts)))
+                return list(await asyncio.gather(*(one(session, i, p) for i, p in enumerate(prompts))))
         except McpError as e:
             log.warning("openrouter could not draw the pictures: %s", e)
             return [None] * len(prompts)
@@ -140,12 +143,15 @@ class ComfyPainter:
         seconds = self._pictures.seconds(self._model)
         return seconds * count if seconds is not None else None
 
-    def paint(self, prompts: list[str], on_drawn: OnDrawn | None = None) -> list[bytes | None]:
-        return asyncio.run(self._paint(prompts, Counter(on_drawn)))
+    def paint(self, prompts: list[str], on_drawn: OnDrawn | None = None, on_picture: OnPicture | None = None) -> list[bytes | None]:
+        return asyncio.run(self._paint(prompts, Counter(on_drawn), on_picture))
 
-    async def _paint(self, prompts: list[str], counter: Counter) -> list[bytes | None]:
+    async def _paint(self, prompts: list[str], counter: Counter, on_picture: OnPicture | None) -> list[bytes | None]:
         started = time.monotonic()
         pictures = await self._batch(prompts, counter)
+        for index, png in enumerate(pictures):  # a batch hands its pictures over together, at the end
+            if png and on_picture:
+                on_picture(index, png)
         if drawn := sum(1 for png in pictures if png is not None):
             for _ in range(drawn):
                 self._pictures.record(self._model, (time.monotonic() - started) / drawn)

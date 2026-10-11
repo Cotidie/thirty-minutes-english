@@ -26,12 +26,15 @@ class FakePainter:
         self.blank = blank
         self.prompts: list[str] = []
 
-    def paint(self, prompts: list[str], on_drawn=None) -> list[bytes | None]:
+    def paint(self, prompts: list[str], on_drawn=None, on_picture=None) -> list[bytes | None]:
         self.prompts = prompts
-        for i in range(len(prompts)):
+        pictures = [None if i in self.blank else f"PNG{i}".encode() for i in range(len(prompts))]
+        for i, png in enumerate(pictures):
+            if png and on_picture:
+                on_picture(i, png)
             if on_drawn:
                 on_drawn(i + 1)
-        return [None if i in self.blank else f"PNG{i}".encode() for i in range(len(prompts))]
+        return pictures
 
     def expected_seconds(self, count: int) -> float | None:
         return None
@@ -233,9 +236,12 @@ def test_scene_writer_names_the_word_the_scene_to_avoid_and_a_rolled_spark():
 
 def test_the_illustrator_reports_each_finished_picture(tmp_path):
     counts: list[int] = []
+    kept: list[tuple] = []
     content = sample_content()
-    Illustrator(FakePainter(), tmp_path / "images").illustrate("job1", content, counts.append)
+    Illustrator(FakePainter(), tmp_path / "images").illustrate("job1", content, counts.append, lambda *picture: kept.append(picture))
     assert counts == list(range(1, 2 * len(content.vocabulary) + 1))
+    assert kept[:3] == [(0, "example_image", "job1-0-example.png"), (0, "image", "job1-0.png"), (1, "example_image", "job1-1-example.png")]
+    assert (tmp_path / "images" / "job1-0.png").exists()
 
 
 def test_a_batch_without_a_summary_is_counted_from_its_jobs():

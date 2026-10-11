@@ -77,7 +77,17 @@ function SceneCaption({ caption, word }: { caption: string; word: string }) {
 
 /** The word's two pictures, one at a time: the example sentence drawn, and behind the flip
  * button the scene to describe in Practice, which alone carries the Scene caption. */
-function VocabPicture({ item, face, onFlip, drawing }: { item: VocabularyItem; face: PictureFace; onFlip: () => void; drawing: boolean }) {
+interface PictureProps {
+  item: VocabularyItem
+  face: PictureFace
+  onFlip: () => void
+  /** A redraw of this word is under way. */
+  drawing: boolean
+  /** The session's first pictures are still landing; a face without one is waiting for its own. */
+  arriving: boolean
+}
+
+function VocabPicture({ item, face, onFlip, drawing, arriving }: PictureProps) {
   const seconds = useElapsed(drawing)
   const practice = face === 'practice'
   const image = practice ? item.image : item.example_image
@@ -90,7 +100,7 @@ function VocabPicture({ item, face, onFlip, drawing }: { item: VocabularyItem; f
           alt={practice ? (item.scene ?? item.word) : item.example}
         />
       ) : (
-        <span className="vocab-picture is-empty">{!drawing && 'No picture yet. ↻ draws one.'}</span>
+        <span className="vocab-picture is-empty">{!drawing && (arriving ? 'Drawing…' : 'No picture yet. ↻ draws one.')}</span>
       )}
       {drawing ? (
         <Drawing seconds={seconds} />
@@ -154,6 +164,7 @@ function VocabCard({ item, picture }: { item: VocabularyItem; picture: React.Rea
 interface CellProps {
   item: VocabularyItem
   drawing: boolean
+  arriving: boolean
   /** Why the last redraw failed. */
   failed?: string
   /** The style a redraw draws in, for the button's hint. */
@@ -163,15 +174,17 @@ interface CellProps {
 }
 
 /** One word: its card, with the picture face it shows, and the redraw button for that face. */
-function VocabCell({ item, drawing, failed, style, onRedraw, children }: CellProps) {
-  const [face, setFace] = useState<PictureFace>(item.example_image ? 'example' : 'practice')
-  const pictured = Boolean(item.image || item.example_image)
+function VocabCell({ item, drawing, arriving, failed, style, onRedraw, children }: CellProps) {
+  /** The face the learner flipped to; until then the example, wherever one is drawn or on its way. */
+  const [flipped, setFlipped] = useState<PictureFace | null>(null)
+  const face = flipped ?? (item.example_image || arriving ? 'example' : 'practice')
+  const pictured = Boolean(item.image || item.example_image || arriving)
   const hint = face === 'example' ? 'The example sentence, drawn again' : 'New scene, new picture'
   return (
     <div className={`vocab-cell${pictured ? '' : ' is-bare'}`}>
       <VocabCard
         item={item}
-        picture={pictured && <VocabPicture item={item} face={face} onFlip={() => setFace(face === 'example' ? 'practice' : 'example')} drawing={drawing} />}
+        picture={pictured && <VocabPicture item={item} face={face} onFlip={() => setFlipped(face === 'example' ? 'practice' : 'example')} drawing={drawing} arriving={arriving} />}
       />
       {(item.scene || face === 'example') && (
         <button
@@ -194,6 +207,8 @@ function VocabCell({ item, drawing, failed, style, onRedraw, children }: CellPro
 interface Props {
   items: VocabularyItem[]
   sessionId: number
+  /** The session's first pictures are still being drawn. */
+  arriving?: boolean
   /** A word's picture was redrawn; the session holds the new item. */
   onPicture: (index: number, item: VocabularyItem) => void
   starred: string[]
@@ -203,7 +218,7 @@ interface Props {
   onExample: (example: Example) => void
 }
 
-export function VocabularyTab({ items, sessionId, onPicture, starred, onToggleStar, examples, onExample }: Props) {
+export function VocabularyTab({ items, sessionId, arriving = false, onPicture, starred, onToggleStar, examples, onExample }: Props) {
   const [drawing, setDrawing] = useState<Set<number>>(new Set())
   const [failed, setFailed] = useState<Record<number, string>>({})
   const [styles, setStyles] = useState<PictureStyles>({ current: '', options: [] })
@@ -267,6 +282,7 @@ export function VocabularyTab({ items, sessionId, onPicture, starred, onToggleSt
             key={item.word}
             item={item}
             drawing={drawing.has(index)}
+            arriving={arriving}
             failed={failed[index]}
             style={style}
             onRedraw={(face) => void redraw(index, face)}

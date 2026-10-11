@@ -119,6 +119,15 @@ describe('VocabularyTab', () => {
     expect(screen.getByRole('img', { name: 'Phones are ubiquitous.' })).toBeInTheDocument()
   })
 
+  it('holds a place for pictures still on their way and shows each as it lands', () => {
+    const props = { sessionId: 3, onPicture: vi.fn(), starred: [], onToggleStar: vi.fn(), examples: none, onExample: vi.fn() }
+    const { rerender } = render(<VocabularyTab items={items} arriving {...props} />)
+    expect(screen.getAllByText('Drawing…')).toHaveLength(2)
+    rerender(<VocabularyTab items={[{ ...items[0], example_image: 'e.png' }, items[1]]} arriving {...props} />)
+    expect(screen.getByRole('img', { name: 'Phones are ubiquitous.' })).toHaveAttribute('src', '/api/images/e.png')
+    expect(screen.getAllByText('Drawing…')).toHaveLength(1)
+  })
+
   it('shows the picture drawn for a word, and nothing where there is none', () => {
     const drawn = [{ ...items[0], scene: 'a phone in every hand on a train', image: 'job-0.png' }, items[1]]
     render(<VocabularyTab items={drawn} sessionId={3} onPicture={vi.fn()} starred={[]} onToggleStar={vi.fn()} examples={none} onExample={vi.fn()} />)

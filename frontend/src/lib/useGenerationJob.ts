@@ -9,8 +9,10 @@ const JOB_POLL_MS = 1000
  * the job, so on mount we ask it for one still open: leaving the page and coming
  * back, or a reload, shows the same progress bar. A failed job stays, error and
  * all, until `close`. `error` is for requests that did not get through.
+ * `onSession` fires once, when the job saves its session: the text is written
+ * then, and the pictures go on landing on it while the job runs.
  */
-export function useGenerationJob(onDone: (sessionId: number) => void) {
+export function useGenerationJob(onSession: (sessionId: number) => void) {
   const [job, setJob] = useState<JobStatus | null>(null)
   const [error, setError] = useState<string | null>(null)
   const running = job !== null && job.status === 'running'
@@ -34,8 +36,8 @@ export function useGenerationJob(onDone: (sessionId: number) => void) {
       api
         .getJob(job.id)
         .then((next) => {
-          setJob(next.status === 'cancelled' ? null : next)
-          if (next.status === 'done' && next.session_id !== null) onDone(next.session_id)
+          setJob(next.status === 'cancelled' || next.status === 'done' ? null : next)
+          if (next.session_id !== null && job.session_id === null) onSession(next.session_id)
         })
         .catch((e: Error) => {
           setError(e.message)
@@ -43,7 +45,7 @@ export function useGenerationJob(onDone: (sessionId: number) => void) {
         })
     }, JOB_POLL_MS)
     return () => clearInterval(timer)
-  }, [running, job, onDone])
+  }, [running, job, onSession])
 
   async function start(topic: string | null) {
     setError(null)

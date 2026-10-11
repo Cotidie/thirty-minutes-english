@@ -4,7 +4,9 @@ generator wrote for it, which the learner describes with the word in Practice.""
 
 import logging
 import uuid
+from collections.abc import Callable
 from pathlib import Path
+from typing import Literal
 
 from app.llm import GenerationError
 from app.models import SessionContent, VocabularyItem
@@ -12,6 +14,9 @@ from app.pictures.painters import OnDrawn, Painter
 from app.pictures.scenes import Scene
 
 log = logging.getLogger(__name__)
+
+PictureField = Literal["image", "example_image"]
+OnPicture = Callable[[int, PictureField, str], None]  # the word's index, the field the picture fills, its file name
 
 # Picture styles the learner can pick in Settings; the key is the setting value.
 # A realistic photo gives the most to describe; flat vector was too bare for a sentence.
@@ -71,20 +76,28 @@ class Illustrator:
     def count(self, content: SessionContent) -> int:
         return len(self._wanted(content))
 
-    def illustrate(self, job_id: str, content: SessionContent, on_drawn: OnDrawn | None = None) -> SessionContent:
+    def illustrate(
+        self, job_id: str, content: SessionContent, on_drawn: OnDrawn | None = None, on_picture: OnPicture | None = None
+    ) -> SessionContent:
         """The content with the pictures that got drawn: the example on every word, the scene
-        on every word that has one. A picture that failed leaves its field as it is."""
+        on every word that has one. A picture that failed leaves its field as it is.
+        `on_picture` hears of each picture as soon as its file is there."""
         wanted = self._wanted(content)
-        pictures = self._painter.paint([prompt for _, _, prompt in wanted], on_drawn)
-        self._dir.mkdir(parents=True, exist_ok=True)
         vocabulary = list(content.vocabulary)
-        for (i, field, _), png in zip(wanted, pictures):
-            if png is None:
-                log.warning("job %s: no %s for %r", job_id, field, vocabulary[i].word)
-                continue
+        self._dir.mkdir(parents=True, exist_ok=True)
+
+        def keep(n: int, png: bytes) -> None:
+            i, field, _ = wanted[n]
             name = f"{job_id}-{i}{'-example' if field == 'example_image' else ''}.png"
             (self._dir / name).write_bytes(png)
             vocabulary[i] = vocabulary[i].model_copy(update={field: name})
+            if on_picture:
+                on_picture(i, field, name)
+
+        pictures = self._painter.paint([prompt for _, _, prompt in wanted], on_drawn, keep)
+        for (i, field, _), png in zip(wanted, pictures):
+            if png is None:
+                log.warning("job %s: no %s for %r", job_id, field, vocabulary[i].word)
         return content.model_copy(update={"vocabulary": vocabulary})
 
     def redraw(self, session_id: int, index: int, item: VocabularyItem, scene: Scene, style: str = "") -> VocabularyItem:

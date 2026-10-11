@@ -7,10 +7,12 @@ interface Props {
   job: JobStatus
   /** Cancels a running job; dismisses a failed one. */
   onClose: () => void
+  /** Opens the session the job has saved; its pictures may still be on their way. */
+  onOpen: (sessionId: number) => void
 }
 
 /** A failed job keeps its bar where it stopped and shows the error until the user closes it. */
-export function GenerationProgress({ job, onClose }: Props) {
+export function GenerationProgress({ job, onClose, onOpen }: Props) {
   const [percent, setPercent] = useState(() => percentFor(job))
   useEffect(() => setPercent((prev) => percentFor(job, prev)), [job])
   const failed = job.status === 'failed'
@@ -42,6 +44,11 @@ export function GenerationProgress({ job, onClose }: Props) {
       )}
       <div className="gen-row">
         <span className="gen-meta">{metaFor(job)}</span>
+        {job.session_id !== null && (
+          <button type="button" className="btn btn-link" onClick={() => onOpen(job.session_id as number)}>
+            Open session
+          </button>
+        )}
         {(failed || job.status === 'running') && (
           <button type="button" className="btn btn-link" onClick={onClose}>
             {failed ? 'Close' : 'Cancel'}
