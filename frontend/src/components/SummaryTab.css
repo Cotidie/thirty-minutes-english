@@ -70,13 +70,6 @@
   }
 }
 
-.correction-kind {
-  display: block;
-  font-size: 0.7rem;
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
-}
-
 .summary-ok {
   margin-left: 0.5rem;
   font-size: 0.8rem;

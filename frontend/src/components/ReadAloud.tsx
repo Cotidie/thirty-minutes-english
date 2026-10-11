@@ -8,8 +8,6 @@ import './ReadAloud.css'
 
 interface Options {
   paragraph: string
-  /** Thought-group breaks; a pause there is not a finding. */
-  breaks: number[]
   /** Where a finished round is filed, when the reading happens inside a session. */
   sessionId: number | null
   onStart: () => void
@@ -70,7 +68,7 @@ interface Call {
  * as the reader goes; a clicked mark opens the full account in text, and the
  * coach is dialled to say its two beats and hang up.
  */
-export function useReadAloud({ paragraph, breaks, sessionId, onStart, onEnd }: Options): ReadAloudRound {
+export function useReadAloud({ paragraph, sessionId, onStart, onEnd }: Options): ReadAloudRound {
   const [phase, setPhase] = useState<Phase | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [heard, setHeard] = useState('')
@@ -103,7 +101,7 @@ export function useReadAloud({ paragraph, breaks, sessionId, onStart, onEnd }: O
       const round: Round = {
         microphone,
         assessor: null,
-        judge: new Judge({ wordScore: session.word_score, breakConfidence: session.break_confidence }, paragraph, breaks),
+        judge: new Judge(session.word_score, paragraph),
         findings: [],
         heard: '',
         startedAt: Date.now(),
@@ -128,7 +126,7 @@ export function useReadAloud({ paragraph, breaks, sessionId, onStart, onEnd }: O
   const judged = (round: Round, words: AzureWord[], text: string) => {
     const { findings: fresh, confirmed } = round.judge.segment(words)
     round.findings = [
-      ...round.findings.map((f) => (confirmed.some((c) => c.at === f.at && c.kind === f.kind) ? { ...f, repeated_ok: true } : f)),
+      ...round.findings.map((f) => (confirmed.some((c) => c.at === f.at) ? { ...f, repeated_ok: true } : f)),
       ...fresh.map((f) => ({ ...f, repeated_ok: false })),
     ]
     setFindings(round.findings)
@@ -214,7 +212,7 @@ export function useReadAloud({ paragraph, breaks, sessionId, onStart, onEnd }: O
         user_text: round.heard,
         coach_text: '',
         seconds: elapsed,
-        corrections: round.findings.map(({ kind, word, heard, fix, repeated_ok }) => ({ kind, word, heard, fix, repeated_ok })),
+        corrections: round.findings.map(({ word, heard, fix, repeated_ok }) => ({ word, heard, fix, repeated_ok })),
       })
       .catch(() => undefined)
   }

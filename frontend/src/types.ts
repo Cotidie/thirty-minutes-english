@@ -194,16 +194,14 @@ export interface KeyTestResult {
   message: string
 }
 
-/** A ten-minute Azure token plus how the round judges with it. */
+/** A ten-minute Azure token plus the score the round judges with. */
 export interface AssessorSession {
   token: string
   region: string
   word_score: number
-  break_confidence: number
 }
 
 export interface Correction {
-  kind: 'pronunciation' | 'phrasing'
   word: string
   heard: string
   fix: string

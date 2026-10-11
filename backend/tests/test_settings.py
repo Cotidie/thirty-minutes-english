@@ -140,11 +140,11 @@ def test_key_test_without_any_key(tmp_path):
         assert c.post("/api/settings/test-key", json={"key": "NOPE"}).status_code == 422
 
 
-def test_threshold_settings_reject_non_numbers(store):
+def test_the_threshold_setting_rejects_non_numbers_and_numbers_out_of_range(store):
     with pytest.raises(InvalidSetting):
         store.settings.save({"ASSESS_WORD_SCORE": "sixty"})
     with pytest.raises(InvalidSetting):
-        store.settings.save({"ASSESS_BREAK_CONFIDENCE": "1.5"})
+        store.settings.save({"ASSESS_WORD_SCORE": "150"})
 
 
 def test_key_test_for_azure_needs_a_region():

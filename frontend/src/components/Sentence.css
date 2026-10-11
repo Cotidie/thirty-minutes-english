@@ -56,13 +56,7 @@
   color: inherit;
 }
 
-/* Drawn on the paragraph's words: a slash where a fluent reader pauses, a finding on its word. */
-.reading-break {
-  color: var(--phrase);
-  font-weight: 600;
-  margin: 0 0.05em;
-}
-
+/* A finding, drawn on its word. */
 .reading-hit {
   all: unset;
   cursor: pointer;
@@ -70,14 +64,6 @@
   background: var(--wrong-soft);
   border-radius: 2px;
   padding: 0 0.1em;
-}
-
-.reading-hit.is-phrasing {
-  color: var(--wrong);
-  font-weight: 600;
-  margin: 0 0.15em;
-  padding: 0 0.2em;
-  background: none;
 }
 
 .reading-hit.is-ok {

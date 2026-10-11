@@ -150,9 +150,8 @@ class ExampleFeedback(BaseModel):
 
 
 class Correction(BaseModel):
-    """One thing the coach stopped the reader on: a word's sound, or a pause inside a phrase."""
+    """One word the assessor stopped the reader on, and the sound heard in its place."""
 
-    kind: Literal["pronunciation", "phrasing"]
     word: str
     heard: str
     fix: str

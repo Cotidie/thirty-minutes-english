@@ -90,8 +90,6 @@ export const api = {
     request<LiveSession>('/api/read-aloud/sessions', { method: 'POST', body: JSON.stringify({ paragraph, sdp }) }),
   /** Azure token for the assessor; 503 until AZURE_SPEECH_KEY is set. */
   assessorToken: () => request<AssessorSession>('/api/assessor/token'),
-  phrasing: (paragraph: string) =>
-    request<{ breaks: number[] }>('/api/phrasing', { method: 'POST', body: JSON.stringify({ paragraph }) }),
   startExample: (target: PracticeTarget, sdp?: string) =>
     request<LiveSession>('/api/example/sessions', {
       method: 'POST',

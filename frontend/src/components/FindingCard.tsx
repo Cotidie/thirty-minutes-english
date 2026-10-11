@@ -14,7 +14,7 @@ export function FindingCard({ finding }: { finding: Shown }) {
         <b>{finding.word}</b>
         {finding.repeated_ok && <span className="read-aloud-ok">✓ read right on the retry</span>}
       </p>
-      {finding.kind === 'pronunciation' ? <Said sounds={finding.sounds} /> : <Pause word={finding.word} />}
+      <Said sounds={finding.sounds} />
     </div>
   )
 }
@@ -49,14 +49,5 @@ function Ipa({ sounds, said = false }: { sounds: Sound[]; said?: boolean }) {
       ))}
       /
     </span>
-  )
-}
-
-function Pause({ word }: { word: string }) {
-  const [a, b] = word.split(' ')
-  return (
-    <p className="reading-note">
-      You paused between "{a}" and "{b}". It's "{word}" in one breath.
-    </p>
   )
 }

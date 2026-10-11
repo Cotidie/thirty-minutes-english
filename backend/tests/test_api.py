@@ -317,7 +317,7 @@ def test_readings_keep_their_corrections_and_list_per_session(client):
         "coach_text": "Berify. Verify. Go on.",
         "seconds": 31,
         "corrections": [
-            {"kind": "pronunciation", "word": "verified", "heard": "b for v", "fix": "vɛrɪfaɪd", "repeated_ok": True}
+            {"word": "verified", "heard": "b for v", "fix": "vɛrɪfaɪd", "repeated_ok": True}
         ],
     }
     created = client.post("/api/readings", json=body)

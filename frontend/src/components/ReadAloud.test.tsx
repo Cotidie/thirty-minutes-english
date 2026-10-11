@@ -10,7 +10,7 @@ import { pairSentences } from '../lib/sentences'
 import { COACH_SILENCE_MS } from './ReadAloud'
 import { Paragraph } from './Paragraph'
 
-const session = { token: 'eyJ.t', region: 'koreacentral', word_score: 60, break_confidence: 0.75 }
+const session = { token: 'eyJ.t', region: 'koreacentral', word_score: 60 }
 vi.mock('../api', () => ({
   api: {
     addReading: vi.fn(async () => ({})),
@@ -50,12 +50,10 @@ vi.mock('../lib/liveClient', () => ({
 
 const berified: AzureWord = {
   Word: 'verified',
-  Offset: 0,
-  Duration: 1,
   PronunciationAssessment: { AccuracyScore: 41, ErrorType: 'Mispronunciation' },
   Phonemes: [{ Phoneme: 'v', PronunciationAssessment: { AccuracyScore: 8, NBestPhonemes: [{ Phoneme: 'b', Score: 80 }] } }],
 }
-const verified: AzureWord = { Word: 'verified', Offset: 0, Duration: 1, PronunciationAssessment: { AccuracyScore: 88, ErrorType: 'None' } }
+const verified: AzureWord = { Word: 'verified', PronunciationAssessment: { AccuracyScore: 88, ErrorType: 'None' } }
 
 const paragraph = 'Researchers verified it.'
 
@@ -117,7 +115,7 @@ describe('ReadAloud round', () => {
           paragraph: 'Researchers verified it.',
           user_text: 'Researchers berified it.',
           coach_text: '',
-          corrections: [{ kind: 'pronunciation', word: 'verified', heard: 'b for v', fix: 'v', repeated_ok: false }],
+          corrections: [{ word: 'verified', heard: 'b for v', fix: 'v', repeated_ok: false }],
         }),
       ),
     )
@@ -186,7 +184,7 @@ describe('ReadAloud marks', () => {
     await startRound()
     act(() => segment([berified], 'berified'))
     const hit = screen.getByRole('button', { name: 'verified: b for v' })
-    expect(hit).toHaveClass('is-pronunciation')
+    expect(hit).toHaveClass('reading-hit')
     expect(connect).not.toHaveBeenCalled()
 
     act(() => segment([verified], 'verified'))

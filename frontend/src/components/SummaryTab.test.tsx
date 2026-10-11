@@ -15,8 +15,8 @@ const reading: Reading = {
   coach_text: 'Quick one: that was berified.',
   seconds: 31,
   corrections: [
-    { kind: 'pronunciation', word: 'verified', heard: 'berified', fix: 'V, teeth on the lip', repeated_ok: true },
-    { kind: 'phrasing', word: 'twice as long', heard: 'twice as / long', fix: 'one piece', repeated_ok: false },
+    { word: 'verified', heard: 'berified', fix: 'V, teeth on the lip', repeated_ok: true },
+    { word: 'production', heard: 'PRO-duction', fix: 'prəˈdʌkʃən', repeated_ok: false },
   ],
 }
 
@@ -58,8 +58,7 @@ describe('SummaryTab', () => {
     expect(screen.getByText(/That's how a native speaker would say it/)).toBeInTheDocument()
     expect(vi.mocked(api.listExamples)).toHaveBeenCalledWith(3)
     expect(screen.getByText('verified')).toBeInTheDocument()
-    expect(screen.getByText('twice as long')).toBeInTheDocument()
-    expect(screen.getByText('phrasing')).toBeInTheDocument()
+    expect(screen.getByText('production')).toBeInTheDocument()
     expect(screen.getByText(/got it on the retry/)).toBeInTheDocument()
 
     expect(vi.mocked(api.listReadings)).toHaveBeenCalledWith(3)

@@ -1,15 +1,13 @@
-"""The two voice coaches, the pronunciation assessor, reading aloud, and the text runs behind them."""
+"""The two voice coaches, the pronunciation assessor, reading aloud, and the text run behind Your turn."""
 
 from fastapi import APIRouter, Response
 
-from app.api.deps import Db, Svc, failed, off
+from app.api.deps import Svc, failed, off
 from app.api.schemas import (
     AssessorSession,
     ExampleFeedbackRequest,
     ExampleSessionRequest,
     LiveSession,
-    Phrasing,
-    PhrasingRequest,
     ReadAloudRequest,
     SpeechRequest,
 )
@@ -62,22 +60,6 @@ def example_feedback(body: ExampleFeedbackRequest, services: Svc) -> ExampleFeed
         return coach.feedback(body.expression, body.meaning, body.usage_note, body.user_text, body.kind, body.scene)
     except GenerationError as e:
         raise failed("feedback", e) from e
-
-
-@router.post("/phrasing", response_model=Phrasing)
-def phrasing(body: PhrasingRequest, db: Db, services: Svc) -> Phrasing:
-    """Where a fluent reader pauses in the paragraph; marked once, cached after."""
-    cached = db.caches.get_phrasing(body.paragraph)
-    if cached is not None:
-        return Phrasing(breaks=cached)
-    if services.phrasing is None:
-        raise off("phrasing is off: the read-aloud-coach folder has no phrasing prompt")
-    try:
-        breaks = services.phrasing.mark(body.paragraph)
-    except GenerationError as e:
-        raise failed("phrasing", e) from e
-    db.caches.set_phrasing(body.paragraph, breaks)
-    return Phrasing(breaks=breaks)
 
 
 @router.post("/speech", response_class=Response)

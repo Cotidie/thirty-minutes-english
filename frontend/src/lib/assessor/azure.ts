@@ -6,7 +6,7 @@ import type { AssessorSession } from '../../types'
 import type { AzureWord } from './judge'
 
 const LOCALE = 'en-US'
-/** Silence that ends a segment. Short, so findings arrive at phrase pauses. */
+/** Silence that ends a segment. Short, so findings arrive soon after the word. */
 const SEGMENT_SILENCE_MS = '400'
 
 export interface AssessorOptions {
@@ -39,7 +39,6 @@ export async function startAzureAssessor(opts: AssessorOptions): Promise<Assesso
       enableMiscue: false,
     }),
   )
-  assessment.enableProsodyAssessment = true
   assessment.applyTo(recognizer)
 
   recognizer.recognized = (_, e) => {

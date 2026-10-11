@@ -1,9 +1,7 @@
 import type { Shown } from './assessor/judge'
 
-/** What is drawn on a paragraph's words: slashes, and the findings a reader can click. */
+/** What is drawn on a paragraph's words: the findings a reader can click. */
 export interface Marks {
-  /** Word indices a fluent reader starts a new thought group on: a slash goes before each. */
-  breaks: number[]
   findings: Shown[]
   /** Index into `findings` of the one whose card is open. */
   open: number | null

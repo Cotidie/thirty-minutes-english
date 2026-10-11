@@ -1,7 +1,7 @@
 """Structured text runs of Claude through the Agent SDK. The SDK bundles the
 Claude Code CLI, which signs in with CLAUDE_CODE_OAUTH_TOKEN (`claude
 setup-token`), so the runs bill the Claude subscription. Every caller (session generator, topic
-fetcher, feedback, phrasing, scenes) goes through `Claude.run`."""
+fetcher, feedback, scenes) goes through `Claude.run`."""
 
 import asyncio
 import logging

@@ -33,10 +33,7 @@ export interface LiveOptions {
 export const sayInstruction = (text: string) => `Now say exactly this, word for word, then stop: ${text}`
 
 /** The finding the reader clicked; the prompt says how to say it. */
-export const correctionInstruction = (f: Finding) =>
-  f.kind === 'pronunciation'
-    ? `Correction: "${f.word}", heard ${f.heard}.`
-    : `Correction: "${f.word}", paused between "${f.word.split(' ')[0]}" and "${f.word.split(' ')[1]}".`
+export const correctionInstruction = (f: Finding) => `Correction: "${f.word}", heard ${f.heard}.`
 
 export async function connectLive(opts: LiveOptions): Promise<LiveConnection> {
   const provider = await api.voiceProvider()

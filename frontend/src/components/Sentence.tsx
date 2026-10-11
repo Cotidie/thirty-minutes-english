@@ -1,5 +1,4 @@
-import { Fragment, useState, type KeyboardEvent, type ReactNode } from 'react'
-import type { Shown } from '../lib/assessor/judge'
+import { Fragment, useState, type KeyboardEvent } from 'react'
 import { segmentsIn, type Span } from '../lib/highlight'
 import { atoms, type Atom, type Marks } from '../lib/words'
 import './Sentence.css'
@@ -59,7 +58,7 @@ export function Sentence({ ko, ...run }: RunProps & { ko: string }) {
   )
 }
 
-/** Article text word by word: evidence marked, a slash where a fluent reader pauses, findings on their words. */
+/** Article text word by word: evidence marked, findings on their words. */
 export function Run({ text, start, spans, starts, marks }: RunProps) {
   return (
     <>
@@ -70,47 +69,24 @@ export function Run({ text, start, spans, starts, marks }: RunProps) {
   )
 }
 
+/** A mispronounced word is a button that opens its finding. Green once read right. */
 function Word({ atom, spans, marks }: { atom: Atom; spans: Span[]; marks: Marks }) {
   const inner = segmentsIn(atom.text, spans, atom.offset).map((seg, j) =>
     seg.marked ? <mark key={j}>{seg.text}</mark> : <Fragment key={j}>{seg.text}</Fragment>,
   )
-  const i = atom.word
-  if (i === null) return <>{inner}</>
-  const at = (kind: Shown['kind']) => marks.findings.findIndex((f) => f.kind === kind && f.at === i)
-  const pause = at('phrasing')
-  const said = at('pronunciation')
-  const hit = (index: number, children: ReactNode) => (
-    <Hit finding={marks.findings[index]} open={marks.open === index} onClick={() => marks.onOpen(index)}>
-      {children}
-    </Hit>
-  )
-  return (
-    <>
-      {marks.breaks.includes(i) && (
-        <>
-          <span className="reading-break" aria-label="pause">
-            /
-          </span>{' '}
-        </>
-      )}
-      {pause >= 0 && <>{hit(pause, '|')} </>}
-      {said >= 0 ? hit(said, inner) : inner}
-    </>
-  )
-}
-
-/** A mispronounced word, or a pause bar inside a phrase: a button that opens the finding. Green once read right. */
-function Hit({ finding, open, onClick, children }: { finding: Shown; open: boolean; onClick: () => void; children: ReactNode }) {
-  const title = finding.kind === 'phrasing' ? `pause inside "${finding.word}"` : `${finding.word}: ${finding.heard}`
+  const index = atom.word === null ? -1 : marks.findings.findIndex((f) => f.at === atom.word)
+  if (index < 0) return <>{inner}</>
+  const finding = marks.findings[index]
+  const title = `${finding.word}: ${finding.heard}`
   return (
     <button
       type="button"
-      className={`reading-hit is-${finding.kind}${finding.repeated_ok ? ' is-ok' : ''}${open ? ' is-open' : ''}`}
+      className={`reading-hit${finding.repeated_ok ? ' is-ok' : ''}${marks.open === index ? ' is-open' : ''}`}
       title={title}
       aria-label={title}
-      onClick={onClick}
+      onClick={() => marks.onOpen(index)}
     >
-      {children}
+      {inner}
     </button>
   )
 }

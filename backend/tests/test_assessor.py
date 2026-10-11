@@ -9,10 +9,10 @@ from app.wiring import Services
 from tests.test_api import FakeGenerator, InlineExecutor
 
 
-def test_session_carries_the_token_region_and_thresholds(http):
+def test_session_carries_the_token_region_and_threshold(http):
     http.json = "eyJ.token"
-    assessor = AzureAssessor("az-key", "koreacentral", word_score=60, break_confidence=0.75)
-    assert assessor.session() == {"token": "eyJ.token", "region": "koreacentral", "word_score": 60, "break_confidence": 0.75}
+    assessor = AzureAssessor("az-key", "koreacentral", word_score=60)
+    assert assessor.session() == {"token": "eyJ.token", "region": "koreacentral", "word_score": 60}
     req = http.requests[0]
     assert (req.method, str(req.url)) == ("POST", "https://koreacentral.api.cognitive.microsoft.com/sts/v1.0/issueToken")
     assert req.headers["Ocp-Apim-Subscription-Key"] == "az-key"
@@ -21,7 +21,7 @@ def test_session_carries_the_token_region_and_thresholds(http):
 def test_azure_errors_become_http_errors(http):
     http.status, http.json = 401, {"error": {"message": "bad key"}}
     with pytest.raises(HttpError) as e:
-        AzureAssessor("az-key", "koreacentral", 60, 0.75).session()
+        AzureAssessor("az-key", "koreacentral", 60).session()
     assert (e.value.status, e.value.message) == (401, "bad key")
 
 
@@ -34,7 +34,7 @@ def test_token_endpoint_is_503_until_azure_is_configured(tmp_path):
 
 
 def token_client(tmp_path) -> TestClient:
-    services = Services(FakeGenerator(), assessor=AzureAssessor("k", "koreacentral", 55, 0.8))
+    services = Services(FakeGenerator(), assessor=AzureAssessor("k", "koreacentral", 55))
     return TestClient(create_app(Database(tmp_path / "s.db"), services, InlineExecutor()))
 
 
@@ -42,7 +42,7 @@ def test_token_endpoint_returns_the_azure_session(tmp_path, http):
     http.json = "eyJ.t"
     with token_client(tmp_path) as c:
         body = c.get("/api/assessor/token").json()
-    assert body == {"token": "eyJ.t", "region": "koreacentral", "word_score": 55, "break_confidence": 0.8}
+    assert body == {"token": "eyJ.t", "region": "koreacentral", "word_score": 55}
 
 
 def test_token_endpoint_relays_azure_failures_as_502(tmp_path, http):

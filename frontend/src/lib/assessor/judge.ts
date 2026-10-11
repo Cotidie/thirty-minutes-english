@@ -11,25 +11,8 @@ interface AzurePhoneme {
 
 export interface AzureWord {
   Word: string
-  Offset: number
-  Duration: number
-  PronunciationAssessment: {
-    AccuracyScore: number
-    ErrorType: string
-    Feedback?: {
-      Prosody?: {
-        Break?: { UnexpectedBreak?: { Confidence: number }; MissingBreak?: { Confidence: number }; BreakLength?: number }
-      }
-    }
-  }
+  PronunciationAssessment: { AccuracyScore: number; ErrorType: string }
   Phonemes?: AzurePhoneme[]
-}
-
-export interface Thresholds {
-  /** A word scored below this is a mispronunciation. */
-  wordScore: number
-  /** An unexpected-break confidence above this is a pause inside a phrase. */
-  breakConfidence: number
 }
 
 /** One sound of a word as Azure scored it. */
@@ -44,19 +27,18 @@ export interface Sound {
   heard?: string
 }
 
+/** A word scored below the threshold: a mispronunciation. */
 export interface Finding {
-  kind: 'pronunciation' | 'phrasing'
-  /** The word, or for phrasing the two words that stay together. */
   word: string
-  /** What was heard: "b for v", or "as / long". */
+  /** What was heard: "b for v". */
   heard: string
-  /** The few-word fix the coach relays. */
+  /** The word in IPA, as it should sound. */
   fix: string
-  /** Index of the word in the paragraph; for phrasing, of the second word (the pause sits before it). -1 when unplaced. */
+  /** Index of the word in the paragraph. -1 when unplaced. */
   at: number
-  /** Word accuracy, 0 to 100; for phrasing, how long the pause was in milliseconds. */
+  /** Word accuracy, 0 to 100. */
   score: number
-  /** Every sound of the word in order. Empty for phrasing. */
+  /** Every sound of the word in order. */
   sounds: Sound[]
 }
 
@@ -73,44 +55,27 @@ export interface Verdict {
   confirmed: Finding[]
 }
 
-/** Every finding in a segment, in reading order, with `at` from `positions` (one per word). */
-export function findingsIn(words: AzureWord[], t: Thresholds, positions: number[] = words.map(() => -1)): Finding[] {
-  const found: Finding[] = []
-  words.forEach((w, i) => {
+/**
+ * Every finding in a segment, in reading order, with `at` from `positions` (one per word).
+ * Azure's own Mispronunciation tag sits at a fixed 60; `wordScore` is the one knob here.
+ */
+export function findingsIn(words: AzureWord[], wordScore: number, positions: number[] = words.map(() => -1)): Finding[] {
+  return words.flatMap((w, i) => {
     const pa = w.PronunciationAssessment
-    if (pa.ErrorType === 'Omission' || pa.ErrorType === 'Insertion') return
-    const brk = pa.Feedback?.Prosody?.Break
-    if (i > 0 && (brk?.UnexpectedBreak?.Confidence ?? 0) > t.breakConfidence) {
-      const prev = words[i - 1].Word
-      found.push({
-        kind: 'phrasing',
-        word: `${prev} ${w.Word}`,
-        heard: `${prev} / ${w.Word}`,
-        fix: 'keep it together',
-        at: positions[i],
-        score: Math.round((brk?.BreakLength ?? 0) / TICKS_PER_MS),
-        sounds: [],
-      })
-    }
-    // Azure's own Mispronunciation tag sits at a fixed 60; the setting is the one knob here.
-    if (pa.AccuracyScore < t.wordScore) {
-      const sounds = soundsOf(w, t.wordScore)
-      found.push({
-        kind: 'pronunciation',
+    if (pa.ErrorType === 'Omission' || pa.ErrorType === 'Insertion' || pa.AccuracyScore >= wordScore) return []
+    const sounds = soundsOf(w, wordScore)
+    return [
+      {
         word: w.Word,
         heard: heardSound(sounds),
         fix: sounds.map((s) => s.phoneme).join(''),
         at: positions[i],
         score: Math.round(pa.AccuracyScore),
         sounds,
-      })
-    }
+      },
+    ]
   })
-  return found
 }
-
-/** Azure offsets and durations are in 100 ns ticks. */
-const TICKS_PER_MS = 10_000
 
 /** Each sound scored, with what was heard instead when it fell under the threshold. */
 function soundsOf(w: AzureWord, wordScore: number): Sound[] {
@@ -130,37 +95,34 @@ function heardSound(sounds: Sound[]): string {
 }
 
 /** The paragraph split on whitespace, punctuation kept for display. */
-export const tokens = (paragraph: string): string[] => paragraph.split(/\s+/).filter(Boolean)
+const tokens = (paragraph: string): string[] => paragraph.split(/\s+/).filter(Boolean)
 
 const norm = (word: string) => word.toLowerCase().replace(/[^\p{L}\p{N}']/gu, '')
 
 /**
  * Collects findings while the reader goes, placed on the paragraph, and
- * confirms one when a later segment carries its words clean.
+ * confirms one when a later segment carries its word clean.
  */
 export class Judge {
   private open: Finding[] = []
   private readonly words: string[]
   private readonly raw: string[]
-  private readonly breaks: number[]
   private cursor = 0
-  private readonly t: Thresholds
+  private readonly wordScore: number
 
-  /** `breaks`: word indices where a pause is expected, so none is a finding there. */
-  constructor(t: Thresholds, paragraph: string, breaks: number[] = []) {
-    this.t = t
-    this.breaks = breaks
+  /** `wordScore`: a word scored below this is a mispronunciation. */
+  constructor(wordScore: number, paragraph: string) {
+    this.wordScore = wordScore
     this.raw = tokens(paragraph)
     this.words = this.raw.map(norm)
   }
 
   segment(words: AzureWord[]): Verdict {
-    const all = findingsIn(words, this.t, this.locate(words))
-      .filter((f) => f.kind !== 'phrasing' || !(this.punctuatedBefore(f.at) || this.breaks.includes(f.at)))
-      .map((f) => this.spelled(f))
-    const confirmed = this.open.filter((p) => readRight(p, words, all))
+    const all = findingsIn(words, this.wordScore, this.locate(words)).map((f) => this.spelled(f))
+    const said = words.map((w) => norm(w.Word))
+    const confirmed = this.open.filter((p) => said.includes(norm(p.word)) && !all.some((f) => f.at === p.at))
     this.open = this.open.filter((p) => !confirmed.includes(p))
-    const findings = all.filter((f) => !this.open.some((p) => p.at === f.at && p.kind === f.kind))
+    const findings = all.filter((f) => !this.open.some((p) => p.at === f.at))
     this.open = [...this.open, ...findings]
     return { findings, confirmed }
   }
@@ -175,8 +137,8 @@ export class Judge {
     const retry = words.length <= RETRY_WORDS
     return words.map((w) => {
       const target = norm(w.Word)
-      const again = retry ? this.openPosition(target) : -1
-      if (again >= 0) return again
+      const again = retry ? this.open.find((p) => norm(p.word) === target) : undefined
+      if (again) return again.at
       let i = this.words.indexOf(target, this.cursor)
       if (i < 0) i = this.words.indexOf(target)
       if (i >= 0) this.cursor = i + 1
@@ -184,42 +146,12 @@ export class Judge {
     })
   }
 
-  /** The finding in the paragraph's own spelling (Azure lowercases): "July 1969", not "july 1969". */
+  /** The finding in the paragraph's own spelling (Azure lowercases): "Verified", not "verified". */
   private spelled(f: Finding): Finding {
-    if (f.at < 0) return f
-    const w = this.word(f.at)
-    if (f.kind === 'pronunciation') return { ...f, word: w }
-    const prev = this.word(f.at - 1)
-    return { ...f, word: `${prev} ${w}`, heard: `${prev} / ${w}` }
-  }
-
-  private word(at: number): string {
-    return this.raw[at].replace(EDGE_PUNCTUATION, '')
-  }
-
-  /** A pause after a period or comma is the reader's to take. */
-  private punctuatedBefore(at: number): boolean {
-    return at > 0 && PUNCTUATED.test(this.raw[at - 1])
-  }
-
-  private openPosition(target: string): number {
-    for (const p of this.open) {
-      const parts = p.word.split(' ').map(norm)
-      const k = parts.indexOf(target)
-      if (k >= 0) return p.at - (parts.length - 1 - k)
-    }
-    return -1
+    return f.at < 0 ? f : { ...f, word: this.raw[f.at].replace(EDGE_PUNCTUATION, '') }
   }
 }
 
 /** A segment this short after a finding is a retry, not more of the paragraph. */
 const RETRY_WORDS = 3
-const PUNCTUATED = /[.,;:!?…"”')\]]$/
 const EDGE_PUNCTUATION = /^[^\p{L}\p{N}]+|[^\p{L}\p{N}]+$/gu
-
-function readRight(pending: Finding, words: AzureWord[], findings: Finding[]): boolean {
-  const said = words.map((w) => norm(w.Word))
-  const present = pending.word.split(' ').map(norm).every((t) => said.includes(t))
-  const stillWrong = findings.some((f) => f.at === pending.at && f.kind === pending.kind)
-  return present && !stillWrong
-}

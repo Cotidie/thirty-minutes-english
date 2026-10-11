@@ -121,8 +121,6 @@ SPECS: tuple[Spec, ...] = (
          help="The region of your Azure Speech resource. It must match the key."),
     Spec("ASSESS_WORD_SCORE", "assess", "60", number=(0, 100),
          help="Azure gives every word an accuracy score from 0 to 100. Words below this number get a pronunciation note. Higher is stricter."),
-    Spec("ASSESS_BREAK_CONFIDENCE", "assess", "0.75", number=(0, 1),
-         help="Azure reports how sure it is (0 to 1) that you paused where the sentence does not. Above this number, the pause gets a phrasing note. Lower flags more pauses."),
     Spec("CLAUDE_MODEL", "claude", "opus", catalog="claude",
          help="Writes each session: expressions, article, words and picture scenes. Sonnet is faster, Opus writes better."),
     Spec("CLAUDE_EFFORT", "claude", "xhigh", effort_of="CLAUDE_MODEL",
@@ -221,10 +219,6 @@ class Settings:
     @property
     def assess_word_score(self) -> int:
         return int(float(self.get("ASSESS_WORD_SCORE")))
-
-    @property
-    def assess_break_confidence(self) -> float:
-        return float(self.get("ASSESS_BREAK_CONFIDENCE"))
 
 
 def split_list(value: str) -> tuple[str, ...]:

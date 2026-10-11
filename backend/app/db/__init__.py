@@ -51,10 +51,6 @@ CREATE TABLE IF NOT EXISTS topic_days (
     day TEXT PRIMARY KEY,
     topics_json TEXT NOT NULL
 );
-CREATE TABLE IF NOT EXISTS phrasings (
-    paragraph TEXT PRIMARY KEY,
-    breaks_json TEXT NOT NULL
-);
 CREATE TABLE IF NOT EXISTS image_stats (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     created_at TEXT NOT NULL,

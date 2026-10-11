@@ -92,12 +92,6 @@ class ReadingRequest(BaseModel):
     _check = field_validator("paragraph")(_not_blank)
 
 
-class PhrasingRequest(BaseModel):
-    paragraph: str
-
-    _check = field_validator("paragraph")(_not_blank)
-
-
 class SpeechRequest(BaseModel):
     """One sentence to read aloud."""
 
@@ -109,12 +103,6 @@ class RedrawRequest(BaseModel):
     """Which style to draw this one picture in; blank means the configured IMAGE_STYLE."""
 
     style: str = ""
-
-
-class Phrasing(BaseModel):
-    """Indices of the words a fluent reader starts a new thought group on."""
-
-    breaks: list[int]
 
 
 class LiveSession(BaseModel):
@@ -132,7 +120,6 @@ class AssessorSession(BaseModel):
     token: str
     region: str
     word_score: int
-    break_confidence: float
 
 
 class Option(BaseModel):

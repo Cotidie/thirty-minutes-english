@@ -7,7 +7,6 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 from app.coaching.example_feedback import TEMPLATES, ExampleCoach
-from app.coaching.phrasing import PhrasingMarker
 from app.config.settings import SPEC_BY_KEY, Settings
 from app.config.skills import host_skills
 from app.generation.generator import ClaudeGenerator, Generator
@@ -42,7 +41,6 @@ class Services:
     example_coach: ExampleCoach | None = None
     illustrator: Illustrator | None = None
     scene_writer: SceneWriter | None = None
-    phrasing: PhrasingMarker | None = None
     assessor: AzureAssessor | None = None
     speaker: Speaker | None = None
     voice_key_name: str = "OPENAI_API_KEY"
@@ -88,7 +86,6 @@ def build_services(
         example_coach=_example_coach(settings, agent_dirs["example"], effort(settings, "EXAMPLE_EFFORT", efforts_of)),
         illustrator=_illustrator(settings, image_dir, pictures),
         scene_writer=SceneWriter.with_cli(settings.get("EXAMPLE_MODEL")),
-        phrasing=_phrasing(settings, agent_dirs["read-aloud"], effort(settings, "EXAMPLE_EFFORT", efforts_of)),
         assessor=_assessor(settings),
         speaker=speaker_for(
             settings.get("VOICE_PROVIDER"),
@@ -105,12 +102,7 @@ def _assessor(settings: Settings) -> AzureAssessor | None:
     key = settings.get("AZURE_SPEECH_KEY")
     if not key:
         return None
-    return AzureAssessor(
-        key,
-        settings.get("AZURE_SPEECH_REGION"),
-        settings.assess_word_score,
-        settings.assess_break_confidence,
-    )
+    return AzureAssessor(key, settings.get("AZURE_SPEECH_REGION"), settings.assess_word_score)
 
 
 def voice_provider(settings: Settings) -> VoiceProvider | None:
@@ -135,14 +127,6 @@ def _live_agents(settings: Settings, agent_dirs: dict[str, Path]) -> dict[str, L
         else:
             log.warning("%s agent folder not found: %s", name, agent_dir)
     return agents
-
-
-def _phrasing(settings: Settings, agent_dir: Path, example_effort: str | None) -> PhrasingMarker | None:
-    """Thought-group marking, once the read-aloud folder carries the phrasing prompt."""
-    if not (agent_dir / "prompts" / "phrasing.md").is_file():
-        log.warning("read-aloud phrasing prompt not found: %s", agent_dir)
-        return None
-    return PhrasingMarker.with_cli(agent_dir, settings.get("EXAMPLE_MODEL"), example_effort)
 
 
 def _example_coach(settings: Settings, agent_dir: Path, example_effort: str | None) -> ExampleCoach | None:

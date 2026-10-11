@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 const recognizers: FakeRecognizer[] = []
-const applied: { json: string; prosody: boolean }[] = []
+const applied: string[] = []
 const properties: Record<string, string> = {}
 
 class FakeRecognizer {
@@ -44,11 +44,7 @@ vi.mock('microsoft-cognitiveservices-speech-sdk', () => ({
   AudioConfig: { fromStreamInput: vi.fn((stream: MediaStream) => ({ stream })) },
   PronunciationAssessmentConfig: {
     fromJSON: vi.fn((json: string) => {
-      const cfg = {
-        enableProsodyAssessment: false,
-        applyTo: vi.fn(() => applied.push({ json, prosody: cfg.enableProsodyAssessment })),
-      }
-      return cfg
+      return { applyTo: vi.fn(() => applied.push(json)) }
     }),
   },
   SpeechRecognizer: FakeRecognizer,
@@ -58,7 +54,7 @@ vi.mock('microsoft-cognitiveservices-speech-sdk', () => ({
 
 import { startAzureAssessor } from './azure'
 
-const session = { token: 'eyJ.t', region: 'koreacentral', word_score: 60, break_confidence: 0.75 }
+const session = { token: 'eyJ.t', region: 'koreacentral', word_score: 60 }
 
 beforeEach(() => {
   recognizers.length = 0
@@ -76,16 +72,15 @@ describe('startAzureAssessor', () => {
     expect((reco.audioConfig as { stream: MediaStream }).stream).toBe(mic)
     expect((reco.speechConfig as { speechRecognitionLanguage: string }).speechRecognitionLanguage).toBe('en-US')
     expect(properties.segmentation).toBe('400')
-    expect(JSON.parse(applied[0].json)).toMatchObject({
+    expect(JSON.parse(applied[0])).toMatchObject({
       referenceText: 'Researchers verified it.',
       granularity: 'Phoneme',
       phonemeAlphabet: 'IPA',
       nBestPhonemeCount: 5,
       enableMiscue: false,
     })
-    expect(applied[0].prosody).toBe(true)
 
-    const words = [{ Word: 'researchers', Offset: 0, Duration: 1, PronunciationAssessment: { AccuracyScore: 90, ErrorType: 'None' } }]
+    const words = [{ Word: 'researchers', PronunciationAssessment: { AccuracyScore: 90, ErrorType: 'None' } }]
     reco.recognized?.(null, { result: { reason: 3, text: 'Researchers', properties: { getProperty: () => JSON.stringify({ NBest: [{ Words: words }] }) } } })
     expect(onSegment).toHaveBeenCalledWith(words, 'Researchers')
 

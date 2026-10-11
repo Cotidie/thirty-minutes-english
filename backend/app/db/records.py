@@ -60,10 +60,11 @@ class RecordRepo:
         return Reading(id=reading_id, created_at=created_at, corrections=corrections, **fields)
 
     def list_readings(self, session_id: int | None = None) -> list[Reading]:
-        """Newest first. Readings saved before corrections were kept carry None."""
+        """Newest first. Readings saved before corrections were kept carry None; the pause
+        findings older readings hold are left out."""
         readings = []
         for row in self._select("readings", session_id, "DESC"):
             saved = row["corrections_json"]
-            corrections = [Correction.model_validate(c) for c in json.loads(saved)] if saved else None
+            corrections = [Correction.model_validate(c) for c in json.loads(saved) if c.get("kind") != "phrasing"] if saved else None
             readings.append(Reading(**{**dict(row), "corrections": corrections}))
         return readings

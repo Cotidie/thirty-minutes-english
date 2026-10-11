@@ -7,7 +7,6 @@ describe('FindingCard', () => {
     render(
       <FindingCard
         finding={{
-          kind: 'pronunciation',
           word: 'answered',
           heard: 'ɪ for æ',
           fix: 'ænsɚd',
@@ -28,16 +27,5 @@ describe('FindingCard', () => {
     expect(card.querySelector('.reading-note')?.textContent).toBe("You said /ɪns?d/. It's /ænsɚd/.")
     expect([...card.querySelectorAll('.is-weak')].map((s) => s.textContent)).toEqual(['ɪ', '?', 'æ', 'ɚ'])
     expect(card.querySelector('.reading-tip')?.textContent).toBe('æ as in cAt: Jaw drops, mouth wide, tongue low and front. Longer than "e".')
-  })
-
-  it('explains a pause inside a phrase, and notes a retry that came out right', () => {
-    render(
-      <FindingCard
-        finding={{ kind: 'phrasing', word: 'July 1969', heard: 'July / 1969', fix: 'keep it together', at: 30, score: 640, sounds: [], repeated_ok: true }}
-      />,
-    )
-    const card = screen.getByRole('note', { name: 'July 1969' })
-    expect(card).toHaveTextContent('You paused between "July" and "1969". It\'s "July 1969" in one breath.')
-    expect(card).toHaveTextContent('read right on the retry')
   })
 })

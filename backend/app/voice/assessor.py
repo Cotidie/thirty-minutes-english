@@ -1,7 +1,7 @@
 """The pronunciation assessor the browser streams the reader's microphone to.
 Azure scores each recognised segment against the paragraph; the backend only
 mints the short-lived token so the key never leaves the server, and passes
-along the thresholds the browser judges with."""
+along the threshold the browser judges with."""
 
 from app.net import request
 
@@ -14,11 +14,10 @@ def issue_token(key: str, region: str) -> str:
 
 
 class AzureAssessor:
-    def __init__(self, key: str, region: str, word_score: int, break_confidence: float):
+    def __init__(self, key: str, region: str, word_score: int):
         self.key = key
         self.region = region
         self.word_score = word_score
-        self.break_confidence = break_confidence
 
     def session(self) -> dict:
         """A ten-minute token plus everything the browser needs to judge with it. Raises HttpError."""
@@ -26,5 +25,4 @@ class AzureAssessor:
             "token": issue_token(self.key, self.region),
             "region": self.region,
             "word_score": self.word_score,
-            "break_confidence": self.break_confidence,
         }

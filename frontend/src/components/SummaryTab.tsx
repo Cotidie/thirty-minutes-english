@@ -116,12 +116,7 @@ function Section({ title, count, children }: { title: string; count?: number; ch
 function CorrectionCard({ correction }: { correction: Correction }) {
   return (
     <SummaryCard
-      label={
-        <>
-          {correction.kind === 'phrasing' && <span className="correction-kind">phrasing</span>}
-          {correction.heard}
-        </>
-      }
+      label={correction.heard}
       line={correction.word}
       note={
         <>
