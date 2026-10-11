@@ -252,13 +252,11 @@ export interface SummaryFix {
 
 /** A spoken summary judged against its paragraph. */
 export interface SummaryFeedback {
-  /** Whether they got the paragraph's main point. */
-  verdict: string
   /** Key points left out or got wrong. */
   missed: string[]
-  /** How a skilled speaker would sum the paragraph up. */
-  summary: string
   fixes: SummaryFix[]
+  /** The reader's summary with every fix put in, word for word. */
+  summary: string
 }
 
 /** One paragraph summed up out loud, and what the coach made of it. */

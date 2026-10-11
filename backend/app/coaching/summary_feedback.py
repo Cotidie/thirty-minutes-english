@@ -1,5 +1,5 @@
-"""A paragraph the reader summed up out loud, judged against the paragraph: did they get it,
-how a skilled speaker would say it, and what was unskilled in their own wording.
+"""A paragraph the reader summed up out loud, judged against the paragraph: what they missed,
+what was unskilled in their wording, and their summary with those fixes put in.
 
 The live model only listens and transcribes; the judgment is a text run of the claude CLI
 with the prompt in the summary-coach folder.
@@ -16,9 +16,8 @@ TEMPLATE = "feedback.md"
 FEEDBACK_SCHEMA: dict = {
     "type": "object",
     "additionalProperties": False,
-    "required": ["verdict", "missed", "summary", "fixes"],
+    "required": ["missed", "fixes", "summary"],
     "properties": {
-        "verdict": {"type": "string"},
         "missed": {"type": "array", "maxItems": 2, "items": {"type": "string"}},
         "summary": {"type": "string"},
         "fixes": {

@@ -24,7 +24,6 @@ vi.mock('../api', () => ({ api: { summaryFeedback: vi.fn(), addSummary: vi.fn(),
 const paragraph = 'Seoul scrapped its trams in 1968. Now it is laying tracks again.'
 const said = 'Seoul was remove the tram at 1968 and now making again.'
 const feedback: SummaryFeedback = {
-  verdict: 'Good. You got the main point.',
   missed: ['Why: trams cost less than subways.'],
   summary: 'Seoul got rid of its trams in 1968 and is now bringing them back.',
   fixes: [{ said: 'was remove', better: 'got rid of', why: 'Use one simple past verb.' }],
@@ -71,10 +70,10 @@ it('veils the paragraph while it is summed up, judges the summary on Done, and k
   await userEvent.click(screen.getByRole('button', { name: 'Done' }))
   act(() => emit({ type: 'session.closed', usage: { seconds: 20 } }))
   expect(text).not.toHaveClass('is-veiled')
-  expect(await screen.findByText(feedback.summary)).toBeInTheDocument()
+  expect(await screen.findByText(/is now bringing them back/)).toBeInTheDocument()
   expect(api.summaryFeedback).toHaveBeenCalledExactlyOnceWith(paragraph, said)
   expect(screen.getByText('Why: trams cost less than subways.')).toBeInTheDocument()
-  expect(screen.getByText('got rid of')).toBeInTheDocument()
+  expect(screen.getAllByText('got rid of')).toHaveLength(2) // in its fix, and marked in the summary built from the fixes
 
   await userEvent.click(screen.getByRole('button', { name: 'Keep' }))
   expect(api.addSummary).toHaveBeenCalledWith({ session_id: 3, paragraph, user_text: said, feedback, seconds: 20 })

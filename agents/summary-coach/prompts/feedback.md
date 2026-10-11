@@ -6,22 +6,21 @@ The paragraph:
 What they said:
 {{summary}}
 
-Return four fields.
+Return three fields. Write fixes first in your head: the summary is built from them.
 
-verdict: one or two plain sentences on the content only. Did they get the paragraph's main point? Say what they got right first, then what is off, if anything.
+missed: a list of at most 2 short entries, each one key point of the paragraph they left out or got wrong. Say the point itself in a few words, and "you said X, the paragraph says Y" when they got it wrong. Minor details do not count. Empty when the main point and its key support are there. No praise and no comment on what they got right.
 
-missed: a list of at most 2 short entries, each one key point of the paragraph they left out or got wrong. Say the point itself in a few words, and "you said X, the paragraph says Y" when they got it wrong. Minor details do not count. Empty when the main point and its key support are there.
-
-summary: how a skilled native speaker would sum up this paragraph out loud, in one or two sentences.
-- Carry the paragraph's main point and its key support, including anything listed in missed.
-- You do not need to keep their wording or their sentence structure. When a different structure or different words say it better, use them. Keep a phrase of theirs only where it was already the best choice.
-- Spoken register a B2 to C1 learner can reuse tomorrow: natural collocations and clear structure, no rare words, no written-essay phrasing.
-- Do not copy whole clauses from the paragraph; a summary restates.
-
-fixes: a list of at most 4 entries, the weaknesses in how they said it, most useful first. Each has three fields.
+fixes: a list of at most 4 entries, the weaknesses in how they said it, in the order they said them. Each has three fields.
 - said: the words they used, quoted from the transcript, a few words to one clause.
-- better: what a native speaker would say in that spot.
+- better: what a skilled native speaker would say in that spot. You do not need to keep their wording or their structure: when different words or a different way of building the sentence say it better, use them. It may join two of their fragments into one clause, or bring in a point from missed.
 - why: one short plain sentence on what makes theirs sound off or weaker, and what to do instead next time. No grammar terms beyond the everyday ones (tense, plural, article).
 Pick what teaches the most: wrong or translated-sounding word choice, a collocation that does not exist, grammar that slips, vague words where a precise one exists, sentences strung together with "and" or "so" where one tighter sentence would do, reading the paragraph back instead of restating it. Skip slips of the tongue they corrected themselves. Empty only when it already sounded native.
 
-Everything is shown on screen next to the paragraph. No markdown, no quotation marks inside the fields, no praise beyond a plain "Good".
+summary: their summary with the fixes put in, one or two sentences a skilled native speaker would say out loud.
+- Every better from fixes appears in it word for word, so they can see their corrected pieces come together. Only the first letter's capitalization may change.
+- Join them with as little as it takes to read as natural speech: a linking word, a comma, a pronoun. What they said well stays as they said it.
+- It carries the paragraph's main point and its key support, so anything in missed is in it too.
+- Spoken register a B2 to C1 learner can reuse tomorrow. Do not copy whole clauses from the paragraph.
+- No fixes: return their summary cleaned of filler.
+
+Everything is shown on screen next to the paragraph. No markdown, no quotation marks inside the fields.

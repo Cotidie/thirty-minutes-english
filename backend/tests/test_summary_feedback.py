@@ -11,10 +11,9 @@ from tests.test_api import FakeGenerator, InlineExecutor
 AGENT_DIR = Path(__file__).parents[2] / "agents" / "summary-coach"
 PARAGRAPH = "Seoul scrapped its trams in 1968. Now it is laying tracks again."
 ANSWER = {
-    "verdict": "Good. You got the main point.",
     "missed": [],
-    "summary": "Seoul got rid of its trams in 1968 and is now bringing them back.",
     "fixes": [{"said": "was remove", "better": "got rid of", "why": "Use one simple past verb."}],
+    "summary": "Seoul got rid of its trams in 1968 and is now bringing them back.",
 }
 
 

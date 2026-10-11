@@ -117,7 +117,7 @@ export const api = {
   listExamples: (sessionId: number) => request<Example[]>(`/api/examples?session_id=${sessionId}`),
   startSummary: (paragraph: string, sdp?: string) =>
     request<LiveSession>('/api/summary/sessions', { method: 'POST', body: JSON.stringify({ paragraph, sdp }) }),
-  /** A spoken summary judged against its paragraph: the verdict, a better summary, the wording fixed. */
+  /** A spoken summary judged against its paragraph: what was missed, the wording fixed, and the summary with the fixes in. */
   summaryFeedback: (paragraph: string, userText: string) =>
     request<SummaryFeedback>('/api/summary/feedback', { method: 'POST', body: JSON.stringify({ paragraph, user_text: userText }) }),
   addSummary: (summary: { session_id: number; paragraph: string; user_text: string; feedback: SummaryFeedback; seconds: number }) =>

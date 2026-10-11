@@ -161,13 +161,11 @@ class SummaryFix(BaseModel):
 class SummaryFeedback(BaseModel):
     """A spoken summary judged against its paragraph."""
 
-    """Whether they got the paragraph's main point."""
-    verdict: str
     """Key points left out or got wrong; empty when the summary holds."""
     missed: list[str]
-    """How a skilled speaker would sum the paragraph up, free of the reader's wording."""
-    summary: str
     fixes: list[SummaryFix]
+    """The reader's summary with every fix put in, word for word."""
+    summary: str
 
 
 class Correction(BaseModel):
