@@ -314,7 +314,6 @@ def test_readings_keep_their_corrections_and_list_per_session(client):
         "session_id": session_id,
         "paragraph": "Researchers verified it.",
         "user_text": "researchers berified it",
-        "coach_text": "Berify. Verify. Go on.",
         "seconds": 31,
         "corrections": [
             {"word": "verified", "heard": "b for v", "fix": "vɛrɪfaɪd", "repeated_ok": True}
@@ -332,7 +331,7 @@ def test_readings_keep_their_corrections_and_list_per_session(client):
 
 def test_a_reading_without_corrections_is_a_clean_read(client):
     session_id = client.post("/api/sessions", json={"topic": "Digital twins"}).json()["session_id"]
-    body = {"session_id": session_id, "paragraph": "Researchers verified it.", "user_text": "researchers verified it", "coach_text": "Goodbye."}
+    body = {"session_id": session_id, "paragraph": "Researchers verified it.", "user_text": "researchers verified it"}
     assert client.post("/api/readings", json=body).json()["corrections"] == []
 
 

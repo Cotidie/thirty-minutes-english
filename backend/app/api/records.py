@@ -24,7 +24,7 @@ def list_examples(session_id: int, db: Db) -> list[Example]:
 def add_reading(body: ReadingRequest, db: Db) -> Reading:
     require_session(db, body.session_id)
     return db.records.add_reading(
-        body.session_id, body.paragraph, body.user_text, body.coach_text, body.seconds, body.corrections
+        body.session_id, body.paragraph, body.user_text, body.seconds, body.corrections
     )
 
 

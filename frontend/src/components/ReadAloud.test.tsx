@@ -114,7 +114,6 @@ describe('ReadAloud round', () => {
           session_id: 3,
           paragraph: 'Researchers verified it.',
           user_text: 'Researchers berified it.',
-          coach_text: '',
           corrections: [{ word: 'verified', heard: 'b for v', fix: 'v', repeated_ok: false }],
         }),
       ),

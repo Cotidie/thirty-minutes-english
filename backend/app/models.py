@@ -163,7 +163,6 @@ class Reading(BaseModel):
     session_id: int
     paragraph: str
     user_text: str
-    coach_text: str
     seconds: float
     corrections: list[Correction] | None = None
 

@@ -210,7 +210,6 @@ export function useReadAloud({ paragraph, sessionId, onStart, onEnd }: Options):
         session_id: sessionId,
         paragraph,
         user_text: round.heard,
-        coach_text: '',
         seconds: elapsed,
         corrections: round.findings.map(({ word, heard, fix, repeated_ok }) => ({ word, heard, fix, repeated_ok })),
       })

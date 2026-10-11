@@ -3,7 +3,7 @@ import { Link, useLocation, useNavigate, useParams } from 'react-router-dom'
 import { api } from '../api'
 import { ArticleTab } from '../components/ArticleTab'
 import { ExpressionsTab } from '../components/ExpressionsTab'
-import { NotesPrototype } from '../components/notes-prototype/NotesVariants'
+import { NoteBox } from '../components/NoteBox'
 import { SessionTimer } from '../components/SessionTimer'
 import { SummaryTab } from '../components/SummaryTab'
 import { VocabularyTab } from '../components/VocabularyTab'
@@ -85,7 +85,7 @@ export function SessionPage() {
           </button>
         </nav>
       </aside>
-      <NotesPrototype note={note} variant={new URLSearchParams(search).get('variant') ?? 'A'} />
+      <NoteBox note={note} />
       <div className="content">
         {tab === 0 && (
           <ExpressionsTab

@@ -63,6 +63,7 @@ describe('SessionPage', () => {
     renderAt('/s/3')
     await screen.findByText('a moving target')
 
+    await userEvent.click(screen.getByRole('button', { name: 'Open notes' }))
     await userEvent.type(screen.getByRole('textbox', { name: 'Notes' }), 'hedge 발음')
     expect(await screen.findByText('Saved', {}, { timeout: 2000 })).toBeInTheDocument()
     expect(vi.mocked(api.setNote)).toHaveBeenLastCalledWith(3, 'hedge 발음', false)

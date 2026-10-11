@@ -34,7 +34,6 @@ CREATE TABLE IF NOT EXISTS readings (
     session_id INTEGER,
     paragraph TEXT NOT NULL,
     user_text TEXT NOT NULL,
-    coach_text TEXT NOT NULL,
     seconds REAL NOT NULL DEFAULT 0,
     corrections_json TEXT
 );
@@ -82,6 +81,7 @@ class Database:
         with self.connect() as conn:
             conn.executescript(SCHEMA)
             _carry_over_costs(conn)
+            _drop_removed(conn)
         self.sessions = SessionRepo(self)
         self.records = RecordRepo(self)
         self.caches = CacheRepo(self)
@@ -101,3 +101,12 @@ def _carry_over_costs(conn: sqlite3.Connection) -> None:
     if conn.execute("SELECT 1 FROM sqlite_master WHERE name = 'image_costs'").fetchone():
         conn.execute("INSERT INTO image_stats (created_at, model, cost) SELECT created_at, model, cost FROM image_costs ORDER BY id")
         conn.execute("DROP TABLE image_costs")
+
+
+def _drop_removed(conn: sqlite3.Connection) -> None:
+    """What the Ask coach, phrasing and the talking read-aloud coach left in an older file."""
+    conn.execute("DROP TABLE IF EXISTS asks")
+    conn.execute("DROP TABLE IF EXISTS phrasings")
+    conn.execute("DELETE FROM settings WHERE key IN ('SUMMARY_MODEL', 'ASSESS_BREAK_CONFIDENCE')")
+    if any(column["name"] == "coach_text" for column in conn.execute("PRAGMA table_info(readings)")):
+        conn.execute("ALTER TABLE readings DROP COLUMN coach_text")

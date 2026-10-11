@@ -214,7 +214,6 @@ export interface Reading {
   session_id: number
   paragraph: string
   user_text: string
-  coach_text: string
   seconds: number
   corrections: Correction[] | null
 }

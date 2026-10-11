@@ -46,11 +46,10 @@ class RecordRepo:
         session_id: int,
         paragraph: str,
         user_text: str,
-        coach_text: str,
         seconds: float,
         corrections: list[Correction],
     ) -> Reading:
-        fields = dict(session_id=session_id, paragraph=paragraph, user_text=user_text, coach_text=coach_text, seconds=seconds)
+        fields = dict(session_id=session_id, paragraph=paragraph, user_text=user_text, seconds=seconds)
         payload = json.dumps([c.model_dump() for c in corrections])
         reading_id, created_at = self._insert("readings", **fields, corrections_json=payload)
         return Reading(id=reading_id, created_at=created_at, corrections=corrections, **fields)

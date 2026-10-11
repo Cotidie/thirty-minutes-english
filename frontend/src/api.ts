@@ -115,7 +115,6 @@ export const api = {
     session_id: number
     paragraph: string
     user_text: string
-    coach_text: string
     seconds: number
     corrections: Correction[]
   }) => request<Reading>('/api/readings', { method: 'POST', body: JSON.stringify(reading) }),

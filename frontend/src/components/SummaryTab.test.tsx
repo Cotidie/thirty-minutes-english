@@ -12,7 +12,6 @@ const reading: Reading = {
   session_id: 3,
   paragraph: 'Researchers verified it.',
   user_text: 'researchers berified it',
-  coach_text: 'Quick one: that was berified.',
   seconds: 31,
   corrections: [
     { word: 'verified', heard: 'berified', fix: 'V, teeth on the lip', repeated_ok: true },

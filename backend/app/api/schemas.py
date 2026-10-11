@@ -85,7 +85,6 @@ class ReadingRequest(BaseModel):
     session_id: int
     paragraph: str
     user_text: str
-    coach_text: str
     seconds: float = 0
     corrections: list[Correction] = []
 

@@ -1,3 +1,5 @@
+import sqlite3
+
 import pytest
 
 from app.db import Database
@@ -102,3 +104,36 @@ def test_replacing_one_word_keeps_what_another_redraw_stored_meanwhile(store):
     assert (words[1].image, words[4].image, words[4].korean) == ("1-new.png", "4-new.png", "넷")
     assert store.sessions.replace_vocabulary_item(session.id, 99, first) is None
     assert store.sessions.replace_vocabulary_item(999, 1, first) is None
+
+
+def test_an_older_file_loses_what_removed_features_left_and_keeps_its_readings(tmp_path):
+    path = tmp_path / "old.db"
+    with sqlite3.connect(path) as old:
+        old.executescript(
+            """
+            CREATE TABLE asks (id INTEGER PRIMARY KEY, user_text TEXT);
+            CREATE TABLE phrasings (paragraph TEXT PRIMARY KEY, breaks_json TEXT NOT NULL);
+            CREATE TABLE settings (key TEXT PRIMARY KEY, value TEXT NOT NULL);
+            INSERT INTO settings VALUES ('SUMMARY_MODEL', 'gpt-6-sol'), ('VOICE_PROVIDER', 'gemini');
+            CREATE TABLE readings (
+                id INTEGER PRIMARY KEY AUTOINCREMENT, created_at TEXT NOT NULL, session_id INTEGER, paragraph TEXT NOT NULL,
+                user_text TEXT NOT NULL, coach_text TEXT NOT NULL, seconds REAL NOT NULL DEFAULT 0, corrections_json TEXT
+            );
+            INSERT INTO readings (created_at, session_id, paragraph, user_text, coach_text, corrections_json) VALUES (
+                '2026-09-28T11:00:00+00:00', 1, 'It held twice as long.', 'it held twice as long', 'Keep it together.',
+                '[{"kind": "phrasing", "word": "as long", "heard": "as / long", "fix": "keep it together"},
+                  {"kind": "pronunciation", "word": "held", "heard": "e for ɛ", "fix": "hɛld"}]'
+            );
+            """
+        )
+
+    store = Database(path)
+    with store.connect() as conn:
+        tables = {row["name"] for row in conn.execute("SELECT name FROM sqlite_master WHERE type = 'table'")}
+    assert not tables & {"asks", "phrasings"}
+    assert store.settings.load() == {"VOICE_PROVIDER": "gemini"}
+
+    [reading] = store.records.list_readings(1)
+    assert [c.word for c in reading.corrections] == ["held"]  # the pause finding is left out
+    store.records.add_reading(1, "Again.", "again", 3, [])
+    assert len(store.records.list_readings(1)) == 2
