@@ -107,6 +107,6 @@ def _drop_removed(conn: sqlite3.Connection) -> None:
     """What the Ask coach, phrasing and the talking read-aloud coach left in an older file."""
     conn.execute("DROP TABLE IF EXISTS asks")
     conn.execute("DROP TABLE IF EXISTS phrasings")
-    conn.execute("DELETE FROM settings WHERE key IN ('SUMMARY_MODEL', 'ASSESS_BREAK_CONFIDENCE')")
+    conn.execute("DELETE FROM settings WHERE key IN ('SUMMARY_MODEL', 'ASSESS_BREAK_CONFIDENCE', 'ASSESS_FEEDBACK')")
     if any(column["name"] == "coach_text" for column in conn.execute("PRAGMA table_info(readings)")):
         conn.execute("ALTER TABLE readings DROP COLUMN coach_text")
