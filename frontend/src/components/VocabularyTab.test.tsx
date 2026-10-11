@@ -133,6 +133,26 @@ describe('VocabularyTab', () => {
     vi.unstubAllGlobals()
   })
 
+  it('reads the word itself aloud on the speaker button beside it, without opening the meaning', async () => {
+    const play = vi.fn(async () => undefined)
+    vi.stubGlobal(
+      'Audio',
+      class {
+        play = play
+        pause = vi.fn()
+        onended = null
+      },
+    )
+    URL.createObjectURL = vi.fn(() => 'blob:x')
+    render(<VocabularyTab items={items} sessionId={3} onPicture={vi.fn()} starred={[]} onToggleStar={vi.fn()} examples={none} onExample={vi.fn()} />)
+
+    await userEvent.click(screen.getByRole('button', { name: 'Read mitigate aloud' }))
+    expect(api.speak).toHaveBeenLastCalledWith('mitigate')
+    expect(play).toHaveBeenCalled()
+    expect(screen.getAllByText('Tap to check the meaning')).toHaveLength(2)
+    vi.unstubAllGlobals()
+  })
+
   it('shows the word and example but hides the definition until clicked', async () => {
     render(<VocabularyTab items={items} sessionId={3} onPicture={vi.fn()} starred={[]} onToggleStar={vi.fn()} examples={none} onExample={vi.fn()} />)
     const [word, marked] = screen.getAllByText('ubiquitous')

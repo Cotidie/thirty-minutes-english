@@ -88,6 +88,7 @@ function VocabCard({ item, drawing }: { item: VocabularyItem; drawing: boolean }
       )}
       <span className="vocab-word">
         <span className="vocab-word-text">{item.word}</span> <em className="vocab-pos">{item.pos}</em>
+        <SpeakButton text={item.word} what={item.word} />
         {item.korean && <KoreanChip korean={item.korean} of={item.word} />}
       </span>
       <span className="vocab-example">

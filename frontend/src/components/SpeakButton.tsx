@@ -7,8 +7,8 @@ type State = 'idle' | 'loading' | 'playing' | 'failed'
 /** Sentences already fetched on this page, so a replay starts at once. */
 const fetched = new Map<string, string>()
 
-/** Reads `text` aloud in the voice provider's voice; a second press stops it. */
-export function SpeakButton({ text }: { text: string }) {
+/** Reads `text` aloud in the voice provider's voice; a second press stops it. `what` names the text on the button's label. */
+export function SpeakButton({ text, what = 'the sentence' }: { text: string; what?: string }) {
   const [state, setState] = useState<State>('idle')
   const [error, setError] = useState('')
   const audio = useRef<HTMLAudioElement | null>(null)
@@ -39,7 +39,7 @@ export function SpeakButton({ text }: { text: string }) {
     }
   }
 
-  const label = state === 'playing' ? 'Stop reading' : state === 'loading' ? 'Getting the voice…' : 'Read the sentence aloud'
+  const label = state === 'playing' ? 'Stop reading' : state === 'loading' ? 'Getting the voice…' : `Read ${what} aloud`
   return (
     <button
       type="button"
