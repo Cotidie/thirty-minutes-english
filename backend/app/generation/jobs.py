@@ -48,6 +48,7 @@ class Job:
     foreseen: dict[Stage, float] = field(default_factory=dict)  # what this job's own setup says a stage takes
     session_id: int | None = None
     error: str | None = None
+    failed_at: float | None = None  # stops the clock, so the failure keeps its time while it waits to be read
 
     @property
     def stage(self) -> Stage:
@@ -71,7 +72,7 @@ class Job:
 
     @property
     def elapsed_seconds(self) -> float:
-        return time.monotonic() - self.started_at
+        return (self.failed_at or time.monotonic()) - self.started_at
 
     @property
     def stage_elapsed_seconds(self) -> float:
@@ -97,6 +98,7 @@ class JobRunner:
         job = Job(id=uuid.uuid4().hex[:12], topic=topic)
         self._foresee_pictures(job, illustrator, VOCABULARY_COUNT)
         with self._lock:
+            self._jobs = {id: j for id, j in self._jobs.items() if j.status != "failed"}  # a new try answers the old failure
             self._jobs[job.id] = job
         self.executor.submit(self._run, job, generator, illustrator)
         return job
@@ -105,14 +107,18 @@ class JobRunner:
         with self._lock:
             return self._jobs.get(job_id)
 
-    def running(self) -> list[Job]:
-        """Unfinished jobs, oldest first."""
+    def open(self) -> list[Job]:
+        """Jobs the user still has to see, oldest first: the running ones, and failures not yet closed."""
         with self._lock:
-            return [job for job in self._jobs.values() if job.status == "running"]
+            return [job for job in self._jobs.values() if job.status in ("running", "failed")]
 
-    def cancel(self, job_id: str) -> Job | None:
+    def close(self, job_id: str) -> Job | None:
+        """Cancels a running job; forgets a failed one, whose error the user has now read."""
         job = self.get(job_id)
-        if job:
+        if job and job.status == "failed":
+            with self._lock:
+                self._jobs.pop(job_id, None)
+        elif job:
             job.cancel()
         return job
 
@@ -150,6 +156,7 @@ class JobRunner:
             if job.status == "cancelled":
                 return
             job.error = str(e)
+            job.failed_at = time.monotonic()
             job.status = "failed"
             log.warning("job %s: failed after %.0fs in %s: %s", job.id, job.elapsed_seconds, job.stage, e)
             return

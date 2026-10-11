@@ -56,6 +56,7 @@ function stageShare(job: JobStatus): number {
 /** Bar percent: the stage sets the floor, the stage share moves toward the next stage, never past it, never backwards. */
 export function percentFor(job: JobStatus, previous = 0): number {
   if (job.status === 'done') return 100
+  if (job.status === 'failed') return Math.max(previous, floorOf(job)) // where it stopped, also after a reload
   if (job.status !== 'running') return previous
   const floor = floorOf(job)
   const ceiling = NEXT[job.stage]
@@ -65,10 +66,17 @@ export function percentFor(job: JobStatus, previous = 0): number {
 
 export function labelFor(job: JobStatus): string {
   if (job.status === 'done') return 'Done'
-  if (job.status === 'failed') return 'Failed'
+  if (job.status === 'failed') return `Failed while ${lowerFirst(stageLabel(job.stage))}`
   if (job.status === 'cancelled') return 'Cancelled'
-  if (job.activity) return job.activity
-  switch (job.stage) {
+  return job.activity || stageLabel(job.stage)
+}
+
+function lowerFirst(text: string): string {
+  return text.charAt(0).toLowerCase() + text.slice(1)
+}
+
+function stageLabel(stage: Stage): string {
+  switch (stage) {
     case 'starting':
       return 'Reading the brief'
     case 'skills':

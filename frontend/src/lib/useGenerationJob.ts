@@ -5,9 +5,10 @@ import type { JobStatus } from './progress'
 const JOB_POLL_MS = 1000
 
 /**
- * The session being written, if any. The server owns the job, so on mount we
- * ask it for one still running: leaving the page and coming back, or a reload,
- * shows the same progress bar.
+ * The session being written, or the last one that failed, if any. The server owns
+ * the job, so on mount we ask it for one still open: leaving the page and coming
+ * back, or a reload, shows the same progress bar. A failed job stays, error and
+ * all, until `close`. `error` is for requests that did not get through.
  */
 export function useGenerationJob(onDone: (sessionId: number) => void) {
   const [job, setJob] = useState<JobStatus | null>(null)
@@ -35,7 +36,6 @@ export function useGenerationJob(onDone: (sessionId: number) => void) {
         .then((next) => {
           setJob(next.status === 'cancelled' ? null : next)
           if (next.status === 'done' && next.session_id !== null) onDone(next.session_id)
-          if (next.status === 'failed') setError(next.error ?? 'generation failed')
         })
         .catch((e: Error) => {
           setError(e.message)
@@ -55,7 +55,8 @@ export function useGenerationJob(onDone: (sessionId: number) => void) {
     }
   }
 
-  async function cancel() {
+  /** Cancels the running job, or dismisses the failed one. */
+  async function close() {
     if (!job) return
     setJob(null)
     try {
@@ -65,5 +66,5 @@ export function useGenerationJob(onDone: (sessionId: number) => void) {
     }
   }
 
-  return { job, running, error, start, cancel }
+  return { job, running, error, start, close }
 }

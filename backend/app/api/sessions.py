@@ -42,8 +42,9 @@ def create_session(body: CreateSessionRequest, db: Db, jobs: Jobs, services: Svc
 
 
 @router.get("/jobs", response_model=list[JobStatus])
-def list_running_jobs(jobs: Jobs) -> list[JobStatus]:
-    return [status_of(job, jobs) for job in jobs.running()]
+def list_open_jobs(jobs: Jobs) -> list[JobStatus]:
+    """Running jobs, and failed ones until they are closed, so a reload still shows what went wrong."""
+    return [status_of(job, jobs) for job in jobs.open()]
 
 
 @router.get("/jobs/{job_id}", response_model=JobStatus)
@@ -55,9 +56,9 @@ def get_job(job_id: str, jobs: Jobs) -> JobStatus:
 
 
 @router.delete("/jobs/{job_id}", response_model=JobStatus)
-def cancel_job(job_id: str, jobs: Jobs) -> JobStatus:
-    """Stops a running job; the worker quits at its next progress report and saves nothing."""
-    job = jobs.cancel(job_id)
+def close_job(job_id: str, jobs: Jobs) -> JobStatus:
+    """Stops a running job: the worker quits at its next progress report and saves nothing. Dismisses a failed one."""
+    job = jobs.close(job_id)
     if job is None:
         raise HTTPException(status_code=404, detail="job not found")
     return status_of(job, jobs)

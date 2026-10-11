@@ -202,7 +202,7 @@ APP_SKILL = "english-session:session-writing"
 
 
 # The cutoff for a hung run, not a budget: Opus at xhigh takes about 300s on its own.
-TIMEOUT_S = 900
+TIMEOUT_S = 600
 
 
 class ClaudeGenerator:

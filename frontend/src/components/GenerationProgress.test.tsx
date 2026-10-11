@@ -24,7 +24,7 @@ const base: JobStatus = {
 
 describe('GenerationProgress', () => {
   it('shows the activity, the clock, the counts, and a progress bar', () => {
-    render(<GenerationProgress job={base} onCancel={() => undefined} />)
+    render(<GenerationProgress job={base} onClose={() => undefined} />)
     expect(screen.getByText('Searching "silk road trade"')).toBeInTheDocument()
     expect(screen.getByText('00:42 / about 02:30')).toBeInTheDocument()
     expect(screen.getByText('12.3k in · 850 out · 2 searches')).toBeInTheDocument()
@@ -32,16 +32,28 @@ describe('GenerationProgress', () => {
   })
 
   it('keeps the bar from moving backwards across updates', () => {
-    const { rerender } = render(<GenerationProgress job={{ ...base, stage: 'writing' }} onCancel={() => undefined} />)
+    const { rerender } = render(<GenerationProgress job={{ ...base, stage: 'writing' }} onClose={() => undefined} />)
     expect(Number(screen.getByRole('progressbar').getAttribute('aria-valuenow'))).toBeGreaterThanOrEqual(45)
-    rerender(<GenerationProgress job={{ ...base, stage: 'starting', searches: 0 }} onCancel={() => undefined} />)
+    rerender(<GenerationProgress job={{ ...base, stage: 'starting', searches: 0 }} onClose={() => undefined} />)
     expect(Number(screen.getByRole('progressbar').getAttribute('aria-valuenow'))).toBeGreaterThanOrEqual(45)
   })
 
   it('cancels on request', () => {
     const onCancel = vi.fn()
-    render(<GenerationProgress job={base} onCancel={onCancel} />)
+    render(<GenerationProgress job={base} onClose={onCancel} />)
     fireEvent.click(screen.getByRole('button', { name: 'Cancel' }))
+    expect(onCancel).toHaveBeenCalledOnce()
+  })
+
+  it('keeps a failed run on screen with its error until closed', () => {
+    const onCancel = vi.fn()
+    const failed: JobStatus = { ...base, status: 'failed', stage: 'writing', activity: '', elapsed_seconds: 300, error: 'claude timed out after 300s' }
+    render(<GenerationProgress job={failed} onClose={onCancel} />)
+    expect(screen.getByText('Failed while writing the article, expressions, and words')).toBeInTheDocument()
+    expect(screen.getByText('after 05:00')).toBeInTheDocument()
+    expect(screen.getByRole('alert')).toHaveTextContent('claude timed out after 300s')
+    expect(screen.queryByRole('button', { name: 'Cancel' })).not.toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'Close' }))
     expect(onCancel).toHaveBeenCalledOnce()
   })
 })

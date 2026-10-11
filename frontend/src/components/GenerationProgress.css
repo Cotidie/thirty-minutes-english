@@ -50,3 +50,27 @@
   font-family: var(--serif);
   font-style: italic;
 }
+
+.gen-failed .gen-label {
+  color: var(--error);
+}
+
+.gen-failed .gen-bar {
+  background: var(--wrong-soft);
+}
+
+.gen-failed .gen-fill {
+  background: var(--wrong);
+}
+
+.gen-error {
+  margin: 0;
+  padding: 0.6rem 0.75rem;
+  max-height: 12rem;
+  overflow: auto;
+  background: var(--wrong-soft);
+  color: var(--error);
+  font-size: 0.85rem;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}

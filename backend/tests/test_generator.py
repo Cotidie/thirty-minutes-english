@@ -74,4 +74,4 @@ def test_the_app_skill_always_runs_and_host_skills_come_after_it():
 
 def test_the_time_limit_leaves_room_for_a_five_minute_run():
     """An Opus xhigh run took 303.6s and died at a 300s limit, one tool call from done."""
-    assert ClaudeGenerator(model="opus").claude.timeout_s >= 3 * 300
+    assert ClaudeGenerator(model="opus").claude.timeout_s == 600

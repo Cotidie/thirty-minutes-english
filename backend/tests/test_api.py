@@ -129,6 +129,20 @@ def test_a_failed_job_says_why_in_the_log(tmp_path, caplog):
     assert "claude exited 1" in caplog.text
 
 
+def test_a_failed_job_stays_listed_until_it_is_dismissed(tmp_path):
+    app = create_app(Database(tmp_path / "s.db"), Services(FailingGenerator()), InlineExecutor())
+    with TestClient(app) as c:
+        job = c.post("/api/sessions", json={"topic": "X"}).json()
+        listed = c.get("/api/jobs").json()
+        assert [(j["id"], j["status"]) for j in listed] == [(job["id"], "failed")]
+        assert "claude exited 1" in listed[0]["error"]
+        assert c.get("/api/jobs").json()[0]["elapsed_seconds"] == listed[0]["elapsed_seconds"]  # the clock stopped
+
+        assert c.delete(f"/api/jobs/{job['id']}").json()["status"] == "failed"
+        assert c.get("/api/jobs").json() == []
+        assert c.get(f"/api/jobs/{job['id']}").status_code == 404
+
+
 class FakeIllustrator:
     def __init__(self, error: Exception | None = None, seconds: float | None = None):
         self.error = error
@@ -299,7 +313,7 @@ class HeldExecutor:
         self.held.clear()
 
 
-def test_jobs_endpoint_lists_only_running_jobs(tmp_path):
+def test_jobs_endpoint_drops_finished_jobs(tmp_path):
     executor = HeldExecutor()
     app = create_app(Database(tmp_path / "s.db"), Services(FakeGenerator()), executor)
     with TestClient(app) as client:
