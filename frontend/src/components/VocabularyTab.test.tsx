@@ -39,11 +39,11 @@ describe('VocabularyTab', () => {
     expect(screen.queryByRole('button', { name: 'New picture for mitigate' })).not.toBeInTheDocument() // no scene yet
     expect(await screen.findByRole('radio', { name: 'photo' })).toHaveAttribute('aria-checked', 'true') // the configured style
     await userEvent.click(screen.getByRole('button', { name: 'New picture for ubiquitous' }))
-    expect(api.redrawPicture).toHaveBeenLastCalledWith(3, 0, 'photo')
+    expect(api.redrawPicture).toHaveBeenLastCalledWith(3, 0, 'practice', 'photo')
 
     await userEvent.click(screen.getByRole('radio', { name: 'comic panel' }))
     await userEvent.click(screen.getByRole('button', { name: 'New picture for ubiquitous' }))
-    expect(api.redrawPicture).toHaveBeenLastCalledWith(3, 0, 'comic')
+    expect(api.redrawPicture).toHaveBeenLastCalledWith(3, 0, 'practice', 'comic')
     expect(onPicture).toHaveBeenCalledWith(0, fresh)
   })
 
@@ -99,6 +99,24 @@ describe('VocabularyTab', () => {
 
     await userEvent.click(note)
     expect(note).not.toHaveClass('is-shown')
+  })
+
+  it('opens on the example picture and flips to the practice picture, the only one with a Scene button', async () => {
+    const drawn = [{ ...items[0], scene: 'phones on a train', caption: 'Phones are ubiquitous here.', image: 'p.png', example_image: 'e.png' }, items[1]]
+    vi.mocked(api.redrawPicture).mockResolvedValue(drawn[0])
+    render(<VocabularyTab items={drawn} sessionId={3} onPicture={vi.fn()} starred={[]} onToggleStar={vi.fn()} examples={none} onExample={vi.fn()} />)
+    expect(screen.getByRole('img', { name: 'Phones are ubiquitous.' })).toHaveAttribute('src', '/api/images/e.png')
+    expect(screen.queryByRole('button', { name: 'What the picture for ubiquitous shows' })).not.toBeInTheDocument()
+    await userEvent.click(screen.getByRole('button', { name: 'New picture for ubiquitous' }))
+    expect(api.redrawPicture).toHaveBeenLastCalledWith(3, 0, 'example', 'photo') // the face on show
+
+    await userEvent.click(screen.getByRole('button', { name: 'Show the practice picture for ubiquitous' }))
+    expect(screen.getByRole('img', { name: 'phones on a train' })).toHaveAttribute('src', '/api/images/p.png')
+    expect(screen.getByRole('button', { name: 'What the picture for ubiquitous shows' })).toBeInTheDocument()
+    expect(screen.getAllByText('Tap to check the meaning')).toHaveLength(2) // flipping leaves the meaning shut
+
+    await userEvent.click(screen.getByRole('button', { name: 'Show the example picture for ubiquitous' }))
+    expect(screen.getByRole('img', { name: 'Phones are ubiquitous.' })).toBeInTheDocument()
   })
 
   it('shows the picture drawn for a word, and nothing where there is none', () => {

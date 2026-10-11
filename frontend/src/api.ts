@@ -7,6 +7,7 @@ import type {
   KeyTestResult,
   LiveSession,
   Note,
+  PictureFace,
   PictureStyles,
   PracticeTarget,
   Reading,
@@ -44,9 +45,10 @@ export const api = {
   /** Stops a running generation; nothing from it is saved. */
   cancelJob: (id: string) => request<JobStatus>(`/api/jobs/${id}`, { method: 'DELETE' }),
   deleteSession: (id: number) => request<void>(`/api/sessions/${id}`, { method: 'DELETE' }),
-  /** A fresh scene for one word, drawn in `style` (blank: the configured one) and saved; the item as it now is. */
-  redrawPicture: (sessionId: number, index: number, style = '') =>
-    request<VocabularyItem>(`/api/sessions/${sessionId}/pictures/${index}`, { method: 'POST', body: JSON.stringify({ style }) }),
+  /** One of a word's pictures drawn again in `style` (blank: the configured one) and saved: the example
+   * sentence as it is, or a fresh scene for Practice. The item as it now is. */
+  redrawPicture: (sessionId: number, index: number, face: PictureFace, style = '') =>
+    request<VocabularyItem>(`/api/sessions/${sessionId}/pictures/${index}`, { method: 'POST', body: JSON.stringify({ face, style }) }),
   /** The picture styles on offer and the configured one, from the IMAGE_STYLE setting. */
   /** The sentence read aloud by the voice provider, as audio. */
   speak: async (text: string): Promise<Blob> => {

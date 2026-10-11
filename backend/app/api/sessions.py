@@ -81,7 +81,8 @@ def delete_session(session_id: int, db: Db) -> Response:
 
 @router.post("/sessions/{session_id}/pictures/{index}", response_model=VocabularyItem)
 def redraw_picture(session_id: int, index: int, body: RedrawRequest, db: Db, services: Svc) -> VocabularyItem:
-    """A fresh scene for one word, drawn and saved in place of the old picture."""
+    """One of a word's pictures drawn again and saved in place of the old one: the example
+    sentence as it is, or a fresh scene for Practice."""
     session = db.sessions.get(session_id)
     if session is None or not 0 <= index < len(session.content.vocabulary):
         raise HTTPException(status_code=404, detail="no such word")
@@ -90,14 +91,18 @@ def redraw_picture(session_id: int, index: int, body: RedrawRequest, db: Db, ser
         raise off("pictures are off: set IMAGE_PROVIDER and its key in Settings")
     item = session.content.vocabulary[index]
     try:
-        drawn = illustrator.redraw(session_id, index, item, writer.write(item), body.style)
+        if body.face == "example":
+            drawn = illustrator.redraw_example(session_id, index, item, body.style)
+        else:
+            drawn = illustrator.redraw(session_id, index, item, writer.write(item), body.style)
     except GenerationError as e:
         raise failed("redraw", e) from e
     previous = db.sessions.replace_vocabulary_item(session_id, index, drawn)
     if previous is None:
         raise HTTPException(status_code=404, detail="the session went away while drawing")
-    if previous.image != drawn.image:
-        illustrator.discard(previous.image)
+    for old, new in ((previous.image, drawn.image), (previous.example_image, drawn.example_image)):
+        if old != new:
+            illustrator.discard(old)
     return drawn
 
 

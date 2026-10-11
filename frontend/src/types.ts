@@ -46,9 +46,15 @@ export interface VocabularyItem {
   scene?: string | null
   /** One or two sentences on what the picture shows and why it is the word; hidden until asked for. */
   caption?: string | null
-  /** File name under /api/images/. */
+  /** The scene drawn, for Practice: a file name under /api/images/. */
   image?: string | null
+  /** The example sentence drawn; the picture the card opens on. */
+  example_image?: string | null
 }
+
+/** A word has two pictures: its example sentence, and the scene to describe in Practice. */
+export type PictureFace = 'example' | 'practice'
+
 
 export interface SessionContent {
   topic: string

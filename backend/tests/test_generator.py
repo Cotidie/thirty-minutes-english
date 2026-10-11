@@ -59,7 +59,7 @@ def test_check_items_names_close_variants_of_taught_items():
 
 
 def test_a_full_session_fits_the_schema_the_model_answers_in():
-    jsonschema.validate(sample_content().model_dump(exclude={"vocabulary": {"__all__": {"image"}}}), SESSION_SCHEMA)
+    jsonschema.validate(sample_content().model_dump(exclude={"vocabulary": {"__all__": {"image", "example_image"}}}), SESSION_SCHEMA)
 
 
 def test_the_app_skill_always_runs_and_host_skills_come_after_it():

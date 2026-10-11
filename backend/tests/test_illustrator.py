@@ -37,14 +37,17 @@ class FakePainter:
         return None
 
 
-def test_every_word_with_a_scene_gets_its_picture_file(tmp_path):
+def test_every_word_gets_its_example_and_its_scene_drawn(tmp_path):
     content = sample_content()
     painter = FakePainter()
     done = Illustrator(painter, tmp_path / "images").illustrate("job1", content)
 
-    assert painter.prompts[0] == f"{STYLES['photo']} {IMAGE_RULES} scene 0"
+    assert 'This sentence as one moment: "ex 0" In it, "word0" (noun) means: def 0.' in painter.prompts[0]
+    assert painter.prompts[1] == f"{STYLES['photo']} {IMAGE_RULES} scene 0"
+    assert [v.example_image for v in done.vocabulary] == [f"job1-{i}-example.png" for i in range(len(content.vocabulary))]
     assert [v.image for v in done.vocabulary] == [f"job1-{i}.png" for i in range(len(content.vocabulary))]
-    assert (tmp_path / "images" / "job1-2.png").read_bytes() == b"PNG2"
+    assert (tmp_path / "images" / "job1-2-example.png").read_bytes() == b"PNG4"
+    assert (tmp_path / "images" / "job1-2.png").read_bytes() == b"PNG5"
     assert content.vocabulary[0].image is None  # the input is untouched
 
 
@@ -53,20 +56,18 @@ def test_the_chosen_style_leads_the_prompt_and_an_unknown_one_falls_back_to_phot
     assert Illustrator(FakePainter(), tmp_path, "nope").prompt("a dog").startswith(STYLES["photo"])
 
 
-def test_a_word_without_a_scene_is_skipped_and_a_failed_picture_stays_bare(tmp_path):
+def test_a_word_without_a_scene_gets_only_its_example_and_a_failed_picture_stays_bare(tmp_path):
     content = sample_content()
     words = list(content.vocabulary)
     words[1] = words[1].model_copy(update={"scene": None})
     content = content.model_copy(update={"vocabulary": words})
-    painter = FakePainter(blank={2})  # the third prompt, which is word 3 once word 1 is skipped
-    done = Illustrator(painter, tmp_path).illustrate("j", content)
+    illustrator = Illustrator(FakePainter(blank={3}), tmp_path)  # prompts: ex0, scene0, ex1, ex2, scene2
+    done = illustrator.illustrate("j", content)
 
-    assert len(painter.prompts) == len(words) - 1
-    assert done.vocabulary[0].image == "j-0.png"
-    assert done.vocabulary[1].image is None
-    assert done.vocabulary[2].image == "j-2.png"
-    assert done.vocabulary[3].image is None
-    assert not (tmp_path / "j-3.png").exists()
+    assert illustrator.count(content) == 2 * len(words) - 1
+    assert (done.vocabulary[1].example_image, done.vocabulary[1].image) == ("j-1-example.png", None)
+    assert (done.vocabulary[2].example_image, done.vocabulary[2].image) == (None, "j-2.png")
+    assert not (tmp_path / "j-2-example.png").exists()
 
 
 class FakeServer:
@@ -196,6 +197,10 @@ def test_redraw_draws_the_new_scene_in_the_asked_style_under_a_new_name_and_disc
     Illustrator(painter, tmp_path).discard(None)
     assert not (tmp_path / "old.png").exists()
 
+    again = Illustrator(painter, tmp_path).redraw_example(7, 2, drawn, "sketch")
+    assert painter.prompts[0].startswith(STYLES["sketch"]) and '"ex 2"' in painter.prompts[0]
+    assert again.example_image.startswith("7-2-") and (again.image, again.scene) == (drawn.image, "a fresh scene")
+
     with pytest.raises(GenerationError):
         Illustrator(FakePainter(blank={0}), tmp_path).redraw(7, 2, drawn, Scene("another", ""), "")
 
@@ -230,7 +235,7 @@ def test_the_illustrator_reports_each_finished_picture(tmp_path):
     counts: list[int] = []
     content = sample_content()
     Illustrator(FakePainter(), tmp_path / "images").illustrate("job1", content, counts.append)
-    assert counts == list(range(1, len(content.vocabulary) + 1))
+    assert counts == list(range(1, 2 * len(content.vocabulary) + 1))
 
 
 def test_a_batch_without_a_summary_is_counted_from_its_jobs():

@@ -1,6 +1,6 @@
-"""A picture per vocabulary word: the scene the generator wrote for it, drawn by
-a painter and kept in the images folder. The learner describes the picture
-with the word in Practice."""
+"""Two pictures per vocabulary word, drawn by a painter and kept in the images
+folder: its example sentence, which the card opens on, and the scene the
+generator wrote for it, which the learner describes with the word in Practice."""
 
 import logging
 import uuid
@@ -37,6 +37,8 @@ IMAGE_RULES = (
     "and small props a viewer could point at. "
     "No text, letters, numbers, signs, or captions anywhere in the image."
 )
+# The example picture shows the sentence the card prints under it.
+EXAMPLE_SCENE = 'This sentence as one moment: "{example}" In it, "{word}" ({pos}) means: {definition}.'
 
 
 class Illustrator:
@@ -53,33 +55,57 @@ class Illustrator:
         """`style` is a STYLES key to draw this one in; blank means the configured style."""
         return f"{STYLES.get(style, self._style)} {IMAGE_RULES} {scene}"
 
+    def example_prompt(self, item: VocabularyItem, style: str = "") -> str:
+        scene = EXAMPLE_SCENE.format(example=item.example, word=item.word, pos=item.pos, definition=item.definition)
+        return self.prompt(scene, style)
+
+    def _wanted(self, content: SessionContent) -> list[tuple[int, str, str]]:
+        """Every picture the content calls for, as (word index, the field it fills, its prompt)."""
+        wanted = []
+        for i, item in enumerate(content.vocabulary):
+            wanted.append((i, "example_image", self.example_prompt(item)))
+            if item.scene:
+                wanted.append((i, "image", self.prompt(item.scene)))
+        return wanted
+
+    def count(self, content: SessionContent) -> int:
+        return len(self._wanted(content))
+
     def illustrate(self, job_id: str, content: SessionContent, on_drawn: OnDrawn | None = None) -> SessionContent:
-        """The content with a picture on every word whose scene got drawn. A word
-        without a scene, or whose picture failed, stays as it is."""
-        drawable = [(i, item) for i, item in enumerate(content.vocabulary) if item.scene]
-        pictures = self._painter.paint([self.prompt(item.scene or "") for _, item in drawable], on_drawn)
+        """The content with the pictures that got drawn: the example on every word, the scene
+        on every word that has one. A picture that failed leaves its field as it is."""
+        wanted = self._wanted(content)
+        pictures = self._painter.paint([prompt for _, _, prompt in wanted], on_drawn)
         self._dir.mkdir(parents=True, exist_ok=True)
         vocabulary = list(content.vocabulary)
-        for (i, item), png in zip(drawable, pictures):
+        for (i, field, _), png in zip(wanted, pictures):
             if png is None:
-                log.warning("job %s: no picture for %r", job_id, item.word)
+                log.warning("job %s: no %s for %r", job_id, field, vocabulary[i].word)
                 continue
-            name = f"{job_id}-{i}.png"
+            name = f"{job_id}-{i}{'-example' if field == 'example_image' else ''}.png"
             (self._dir / name).write_bytes(png)
-            vocabulary[i] = item.model_copy(update={"image": name})
+            vocabulary[i] = vocabulary[i].model_copy(update={field: name})
         return content.model_copy(update={"vocabulary": vocabulary})
 
     def redraw(self, session_id: int, index: int, item: VocabularyItem, scene: Scene, style: str = "") -> VocabularyItem:
         """The item with `scene` (and its caption) drawn in `style` under a new file name. The old file stays until
         the caller has stored the new name and calls `discard` on whatever name it replaced.
         Raises GenerationError when no picture came back."""
-        [png] = self._painter.paint([self.prompt(scene.text, style)])
+        name = self._draw(self.prompt(scene.text, style), session_id, index)
+        return item.model_copy(update={"scene": scene.text, "caption": scene.caption or None, "image": name})
+
+    def redraw_example(self, session_id: int, index: int, item: VocabularyItem, style: str = "") -> VocabularyItem:
+        """The item with its example sentence drawn again in `style`; the old file is the caller's to `discard`."""
+        return item.model_copy(update={"example_image": self._draw(self.example_prompt(item, style), session_id, index)})
+
+    def _draw(self, prompt: str, session_id: int, index: int) -> str:
+        [png] = self._painter.paint([prompt])
         if png is None:
             raise GenerationError("no picture came back")
         self._dir.mkdir(parents=True, exist_ok=True)
         name = f"{session_id}-{index}-{uuid.uuid4().hex[:8]}.png"
         (self._dir / name).write_bytes(png)
-        return item.model_copy(update={"scene": scene.text, "caption": scene.caption or None, "image": name})
+        return name
 
     def discard(self, image: str | None) -> None:
         if image:

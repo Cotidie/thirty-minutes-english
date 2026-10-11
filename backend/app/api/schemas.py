@@ -99,8 +99,9 @@ class SpeechRequest(BaseModel):
 
 
 class RedrawRequest(BaseModel):
-    """Which style to draw this one picture in; blank means the configured IMAGE_STYLE."""
+    """Which of the word's two pictures to draw again, and in which style (blank: the configured IMAGE_STYLE)."""
 
+    face: Literal["example", "practice"] = "practice"
     style: str = ""
 
 

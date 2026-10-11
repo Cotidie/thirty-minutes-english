@@ -94,8 +94,10 @@ class VocabularyItem(BaseModel):
     scene: str | None = None
     """One or two sentences on what the picture shows and why it is the word; hidden until asked for."""
     caption: str | None = None
-    """File name under the images folder, served at /api/images/{image}."""
+    """The scene drawn, for the learner to describe in Practice: a file name under the images folder, served at /api/images/{image}."""
     image: str | None = None
+    """The example sentence drawn; the picture the card opens on."""
+    example_image: str | None = None
 
 
 class SessionContent(BaseModel):

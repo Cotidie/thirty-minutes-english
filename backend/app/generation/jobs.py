@@ -96,7 +96,7 @@ class JobRunner:
     def start(self, topic: str, generator: Generator, illustrator: Illustrator | None = None) -> Job:
         """Generates in the background; the pictures follow when an illustrator is given."""
         job = Job(id=uuid.uuid4().hex[:12], topic=topic)
-        self._foresee_pictures(job, illustrator, VOCABULARY_COUNT)
+        self._foresee_pictures(job, illustrator, 2 * VOCABULARY_COUNT)  # the example and the scene
         with self._lock:
             self._jobs = {id: j for id, j in self._jobs.items() if j.status != "failed"}  # a new try answers the old failure
             self._jobs[job.id] = job
@@ -181,7 +181,7 @@ class JobRunner:
 
     def _illustrate(self, job: Job, illustrator: Illustrator, content: SessionContent) -> SessionContent:
         """Pictures on the words; a painter failure sends the session out without them."""
-        total = sum(1 for item in content.vocabulary if item.scene)
+        total = illustrator.count(content)
         self._foresee_pictures(job, illustrator, total)
         job.apply(with_pictures(job.progress, 0, total))
         try:

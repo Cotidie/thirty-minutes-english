@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react'
 import { api } from '../api'
-import { practiceWord, type Example, type PictureStyles, type VocabularyItem } from '../types'
+import { practiceWord, type Example, type PictureFace, type PictureStyles, type VocabularyItem } from '../types'
 import { Practice } from './Practice'
 import { StarButton } from './StarButton'
 import { KoreanChip } from './KoreanChip'
@@ -75,17 +75,51 @@ function SceneCaption({ caption, word }: { caption: string; word: string }) {
   )
 }
 
-function VocabCard({ item, drawing }: { item: VocabularyItem; drawing: boolean }) {
-  const [revealed, setRevealed] = useState(false)
+/** The word's two pictures, one at a time: the example sentence drawn, and behind the flip
+ * button the scene to describe in Practice, which alone carries the Scene caption. */
+function VocabPicture({ item, face, onFlip, drawing }: { item: VocabularyItem; face: PictureFace; onFlip: () => void; drawing: boolean }) {
   const seconds = useElapsed(drawing)
+  const practice = face === 'practice'
+  const image = practice ? item.image : item.example_image
+  return (
+    <span className="vocab-picture-frame">
+      {image ? (
+        <img
+          className={`vocab-picture${drawing ? ' is-drawing' : ''}`}
+          src={`/api/images/${image}`}
+          alt={practice ? (item.scene ?? item.word) : item.example}
+        />
+      ) : (
+        <span className="vocab-picture is-empty">{!drawing && 'No picture yet. ↻ draws one.'}</span>
+      )}
+      {drawing ? (
+        <Drawing seconds={seconds} />
+      ) : (
+        practice && image && item.caption && <SceneCaption key={image} caption={item.caption} word={item.word} />
+      )}
+      <button
+        type="button"
+        className="vocab-flip"
+        aria-label={`Show the ${practice ? 'example' : 'practice'} picture for ${item.word}`}
+        onClick={(e) => {
+          e.stopPropagation()
+          onFlip()
+        }}
+      >
+        <svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.6" aria-hidden="true">
+          <path d="M3 6h10l-3-3M13 10H3l3 3" strokeLinecap="round" strokeLinejoin="round" />
+        </svg>
+        {practice ? 'Example' : 'Practice'}
+      </button>
+    </span>
+  )
+}
+
+function VocabCard({ item, picture }: { item: VocabularyItem; picture: React.ReactNode }) {
+  const [revealed, setRevealed] = useState(false)
   return (
     <div className={`vocab-card${revealed ? ' is-revealed' : ''}`} onClick={() => setRevealed((r) => !r)}>
-      {item.image && (
-        <span className="vocab-picture-frame">
-          <img className={`vocab-picture${drawing ? ' is-drawing' : ''}`} src={`/api/images/${item.image}`} alt={item.scene ?? item.word} />
-          {drawing ? <Drawing seconds={seconds} /> : item.caption && <SceneCaption key={item.image} caption={item.caption} word={item.word} />}
-        </span>
-      )}
+      {picture}
       <span className="vocab-word">
         <span className="vocab-word-text">{item.word}</span> <em className="vocab-pos">{item.pos}</em>
         <SpeakButton text={item.word} what={item.word} />
@@ -113,6 +147,46 @@ function VocabCard({ item, drawing }: { item: VocabularyItem; drawing: boolean }
           'Tap to check the meaning'
         )}
       </button>
+    </div>
+  )
+}
+
+interface CellProps {
+  item: VocabularyItem
+  drawing: boolean
+  /** Why the last redraw failed. */
+  failed?: string
+  /** The style a redraw draws in, for the button's hint. */
+  style: string
+  onRedraw: (face: PictureFace) => void
+  children: React.ReactNode
+}
+
+/** One word: its card, with the picture face it shows, and the redraw button for that face. */
+function VocabCell({ item, drawing, failed, style, onRedraw, children }: CellProps) {
+  const [face, setFace] = useState<PictureFace>(item.example_image ? 'example' : 'practice')
+  const pictured = Boolean(item.image || item.example_image)
+  const hint = face === 'example' ? 'The example sentence, drawn again' : 'New scene, new picture'
+  return (
+    <div className={`vocab-cell${pictured ? '' : ' is-bare'}`}>
+      <VocabCard
+        item={item}
+        picture={pictured && <VocabPicture item={item} face={face} onFlip={() => setFace(face === 'example' ? 'practice' : 'example')} drawing={drawing} />}
+      />
+      {(item.scene || face === 'example') && (
+        <button
+          type="button"
+          className="vocab-redraw"
+          aria-label={`New picture for ${item.word}`}
+          title={drawing ? 'Drawing…' : `${hint}${style ? ` (${style})` : ''}`}
+          disabled={drawing}
+          onClick={() => onRedraw(face)}
+        >
+          {drawing ? '…' : '↻'}
+        </button>
+      )}
+      {failed && <p className="vocab-redraw-error">{failed}</p>}
+      {children}
     </div>
   )
 }
@@ -146,12 +220,12 @@ export function VocabularyTab({ items, sessionId, onPicture, starred, onToggleSt
       .catch(() => undefined)
   }, [])
 
-  /** A new scene and picture for one word, in place, in the style picked above the cards. */
-  const redraw = async (index: number) => {
+  /** One of a word's pictures again, in place, in the style picked above the cards. */
+  const redraw = async (index: number, face: PictureFace) => {
     setDrawing((d) => new Set(d).add(index))
     setFailed(({ [index]: _, ...rest }) => rest)
     try {
-      onPicture(index, await api.redrawPicture(sessionId, index, style))
+      onPicture(index, await api.redrawPicture(sessionId, index, face, style))
     } catch (e) {
       setFailed((f) => ({ ...f, [index]: e instanceof Error ? e.message : String(e) }))
     } finally {
@@ -189,22 +263,15 @@ export function VocabularyTab({ items, sessionId, onPicture, starred, onToggleSt
       )}
       <div className="vocab-grid">
         {items.map((item, index) => (
-          <div key={item.word} className={`vocab-cell${item.image ? '' : ' is-bare'}`}>
-            <VocabCard item={item} drawing={drawing.has(index)} />
+          <VocabCell
+            key={item.word}
+            item={item}
+            drawing={drawing.has(index)}
+            failed={failed[index]}
+            style={style}
+            onRedraw={(face) => void redraw(index, face)}
+          >
             <StarButton label={item.word} on={starred.includes(item.word)} onToggle={() => onToggleStar(item.word)} />
-            {item.scene && (
-              <button
-                type="button"
-                className="vocab-redraw"
-                aria-label={`New picture for ${item.word}`}
-                title={drawing.has(index) ? 'Drawing…' : `New scene, new picture${style ? ` (${style})` : ''}`}
-                disabled={drawing.has(index)}
-                onClick={() => void redraw(index)}
-              >
-                {drawing.has(index) ? '…' : '↻'}
-              </button>
-            )}
-            {failed[index] && <p className="vocab-redraw-error">{failed[index]}</p>}
             <Practice
               target={practiceWord(item)}
               label="Practice"
@@ -212,7 +279,7 @@ export function VocabularyTab({ items, sessionId, onPicture, starred, onToggleSt
               examples={examples.filter((e) => e.expression === item.word)}
               onKept={onExample}
             />
-          </div>
+          </VocabCell>
         ))}
       </div>
     </section>

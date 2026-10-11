@@ -167,6 +167,42 @@
   cursor: pointer;
 }
 
+/* The other of the word's two pictures: the example sentence, or the scene to describe. */
+.vocab-flip {
+  position: absolute;
+  right: 0.45rem;
+  bottom: 0.45rem;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  min-height: 1.55rem;
+  padding: 0 0.55rem 0 0.45rem;
+  border: 0;
+  border-radius: 999px;
+  background: rgb(255 255 255 / 78%);
+  backdrop-filter: blur(3px);
+  font: 500 0.72rem var(--sans);
+  color: var(--ink);
+  cursor: pointer;
+}
+
+.vocab-flip:hover {
+  background: #fff;
+}
+
+.vocab-flip:focus-visible {
+  outline: 2px solid var(--phrase);
+  outline-offset: 2px;
+}
+
+/* A face nothing was drawn for yet (a session from before the example pictures). */
+.vocab-picture.is-empty {
+  display: grid;
+  place-items: center;
+  font: 0.85rem var(--sans);
+  color: var(--muted);
+}
+
 .vocab-caption-toggle:hover {
   background: #fff;
 }

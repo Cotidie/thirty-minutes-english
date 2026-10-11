@@ -152,13 +152,19 @@ class FakeIllustrator:
     def expected_seconds(self, count: int) -> float | None:
         return None if self.seconds is None else self.seconds * count
 
+    def count(self, content) -> int:
+        return 2 * len(content.vocabulary)
+
     def illustrate(self, job_id: str, content, on_drawn=None):
         self.job_ids.append(job_id)
         if on_drawn:
-            on_drawn(len(content.vocabulary))
+            on_drawn(self.count(content))
         if self.error:
             raise self.error
-        words = [v.model_copy(update={"scene": f"a scene for {v.word}", "image": f"{job_id}-{i}.png"}) for i, v in enumerate(content.vocabulary)]
+        words = [
+            v.model_copy(update={"scene": f"a scene for {v.word}", "image": f"{job_id}-{i}.png", "example_image": f"{job_id}-{i}-example.png"})
+            for i, v in enumerate(content.vocabulary)
+        ]
         return content.model_copy(update={"vocabulary": words})
 
 
@@ -170,7 +176,7 @@ def test_pictures_are_drawn_after_the_text_and_saved_with_the_session(tmp_path):
         session = c.get(f"/api/sessions/{job['session_id']}").json()
     assert illustrator.job_ids == [job["id"]]
     assert job["stage"] == "illustrating"
-    assert job["pictures_done"] == 10  # the fake reports every word drawn
+    assert job["pictures_done"] == 20  # the fake reports both pictures of every word drawn
     assert session["content"]["vocabulary"][0]["image"] == f"{job['id']}-0.png"
     assert session["content"]["vocabulary"][0]["scene"] == "a scene for word0"
 
@@ -200,6 +206,10 @@ class RedrawingIllustrator(FakeIllustrator):
         self.styles.append(style)
         return item.model_copy(update={"scene": scene.text, "caption": scene.caption, "image": f"{session_id}-{index}-new.png"})
 
+    def redraw_example(self, session_id, index, item, style=""):
+        self.styles.append(style)
+        return item.model_copy(update={"example_image": f"{session_id}-{index}-example-new.png"})
+
     def discard(self, image):
         self.discarded.append(image)
 
@@ -215,9 +225,12 @@ def test_a_word_can_be_redrawn_in_a_chosen_style_and_the_session_keeps_it(tmp_pa
         assert (res.json()["scene"], res.json()["caption"]) == ("another scene for word1", "why it is word1")
         assert res.json()["image"] == f"{sid}-1-new.png"
         assert c.get(f"/api/sessions/{sid}").json()["content"]["vocabulary"][1]["image"] == f"{sid}-1-new.png"
+        example = c.post(f"/api/sessions/{sid}/pictures/1", json={"face": "example"}).json()
+        assert (example["example_image"], example["image"]) == (f"{sid}-1-example-new.png", f"{sid}-1-new.png")
         assert c.post(f"/api/sessions/{sid}/pictures/99", json={}).status_code == 404
-    assert illustrator.styles == ["comic"]
-    assert illustrator.discarded == [f"{illustrator.job_ids[0]}-1.png"]  # the picture it replaced
+    job = illustrator.job_ids[0]
+    assert illustrator.styles == ["comic", ""]
+    assert illustrator.discarded == [f"{job}-1.png", f"{job}-1-example.png"]  # only the picture each redraw replaced
 
 
 def test_redraw_is_503_while_pictures_are_off(client):
@@ -377,7 +390,7 @@ def test_a_job_foresees_its_pictures_from_the_picture_model_time_here(tmp_path):
     with TestClient(app) as c:
         job = c.post("/api/sessions", json={"topic": "X"}).json()
     others = sum(s for stage, s in DEFAULT_STAGE_SECONDS.items() if stage != Stage.ILLUSTRATING)
-    assert job["expected_seconds"] == others + 7 * 10
+    assert job["expected_seconds"] == others + 7 * 20  # two pictures a word
 
 
 def test_stage_times_of_a_finished_run_become_the_next_estimate():
