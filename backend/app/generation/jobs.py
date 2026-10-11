@@ -151,6 +151,7 @@ class JobRunner:
                 return
             job.error = str(e)
             job.status = "failed"
+            log.warning("job %s: failed after %.0fs in %s: %s", job.id, job.elapsed_seconds, job.stage, e)
             return
         leaked = exclude.taught([e.phrase for e in content.expressions], [v.word for v in content.vocabulary])
         if leaked:

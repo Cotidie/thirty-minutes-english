@@ -121,6 +121,14 @@ def test_job_reports_failure_when_generator_fails(tmp_path):
     assert job["session_id"] is None
 
 
+def test_a_failed_job_says_why_in_the_log(tmp_path, caplog):
+    app = create_app(Database(tmp_path / "s.db"), Services(FailingGenerator()), InlineExecutor())
+    with TestClient(app) as c, caplog.at_level("WARNING", logger="app.generation.jobs"):
+        job = c.post("/api/sessions", json={"topic": "X"}).json()
+    assert f"job {job['id']}: failed after" in caplog.text
+    assert "claude exited 1" in caplog.text
+
+
 class FakeIllustrator:
     def __init__(self, error: Exception | None = None, seconds: float | None = None):
         self.error = error

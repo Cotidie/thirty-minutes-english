@@ -201,11 +201,20 @@ PLUGIN_DIR = Path(__file__).resolve().parents[2] / "plugin"
 APP_SKILL = "english-session:session-writing"
 
 
+# The cutoff for a hung run, not a budget: Opus at xhigh takes about 300s on its own.
+TIMEOUT_S = 900
+
+
 class ClaudeGenerator:
     """`skills` are host skills to load on top of the app's own, which always runs."""
 
     def __init__(
-        self, model: str = "opus", effort: str | None = "xhigh", skills: tuple[str, ...] = (), firecrawl_key: str = "", timeout_s: float = 300
+        self,
+        model: str = "opus",
+        effort: str | None = "xhigh",
+        skills: tuple[str, ...] = (),
+        firecrawl_key: str = "",
+        timeout_s: float = TIMEOUT_S,
     ) -> None:
         self._skills = (APP_SKILL, *skills)
         self.claude = Claude(
