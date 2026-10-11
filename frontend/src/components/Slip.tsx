@@ -5,22 +5,21 @@ import './Slip.css'
 
 interface Props {
   label: string
-  className?: string
   state: LiveState
   level: number
   status: string
   /** Icon buttons at the right end of the top bar. */
-  tools?: ReactNode
+  tools: ReactNode
   /** The captions between the bar and the actions. */
-  children?: ReactNode
+  children: ReactNode
   hint: string
   actions: ReactNode
 }
 
 /** The paper slip a live round runs in: meter and status on top, captions, then the hint and buttons. */
-export function Slip({ label, className, state, level, status, tools, children, hint, actions }: Props) {
+export function Slip({ label, state, level, status, tools, children, hint, actions }: Props) {
   return (
-    <div className={`slip${className ? ` ${className}` : ''}`} role="dialog" aria-label={label}>
+    <div className="slip" role="dialog" aria-label={label}>
       <div className="slip-bar">
         {state.status === 'listening' && <MicMeter level={level} />}
         <span className="slip-status" role="status">

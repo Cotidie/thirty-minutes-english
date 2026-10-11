@@ -10,7 +10,7 @@ export function ArticleTab({
   sessionId,
 }: {
   article: Article;
-  sessionId: number | null;
+  sessionId: number;
 }) {
   const [active, setActive] = useState<number | null>(null);
   /** The paragraph holding the microphone. */

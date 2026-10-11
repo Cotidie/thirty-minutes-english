@@ -29,5 +29,5 @@ def add_reading(body: ReadingRequest, db: Db) -> Reading:
 
 
 @router.get("/readings", response_model=list[Reading])
-def list_readings(db: Db, session_id: int | None = None) -> list[Reading]:
+def list_readings(session_id: int, db: Db) -> list[Reading]:
     return db.records.list_readings(session_id)

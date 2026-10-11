@@ -12,7 +12,7 @@ interface Props {
   pieces: Piece[]
   /** Evidence passages to mark, in paragraph coordinates. */
   spans: Span[]
-  sessionId: number | null
+  sessionId: number
   /** Another paragraph holds the microphone. */
   active: boolean
   onStart: () => void

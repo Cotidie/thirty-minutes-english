@@ -47,9 +47,9 @@ CurrentSettings = Annotated[Settings, Depends(_settings)]
 Models = Annotated[Catalog, Depends(_catalog)]
 
 
-def require_session(db: Database, session_id: int | None) -> None:
-    """404 unless `session_id` is None or names a stored session."""
-    if session_id is not None and not db.sessions.exists(session_id):
+def require_session(db: Database, session_id: int) -> None:
+    """404 unless `session_id` names a stored session."""
+    if not db.sessions.exists(session_id):
         raise HTTPException(status_code=404, detail="session not found")
 
 

@@ -82,7 +82,7 @@ class ExampleRequest(BaseModel):
 
 
 class ReadingRequest(BaseModel):
-    session_id: int | None = None
+    session_id: int
     paragraph: str
     user_text: str
     coach_text: str

@@ -24,15 +24,6 @@
   background: var(--marker);
 }
 
-/* Doubled so it beats .slip's fixed width below: in a card the slip fills its column. */
-.slip.practice-slip {
-  width: min(34rem, 100%);
-  box-shadow: none;
-  font-family: var(--sans);
-  font-size: 0.86rem;
-  line-height: 1.45;
-}
-
 /* The written answer: the native version, then the one line of feedback. */
 .practice-answer {
   display: grid;

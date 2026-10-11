@@ -8,8 +8,8 @@ import './ReadAloud.css'
 
 interface Options {
   paragraph: string
-  /** Where a finished round is filed, when the reading happens inside a session. */
-  sessionId: number | null
+  /** The session a finished round is filed under. */
+  sessionId: number
   onStart: () => void
   /** The microphone is free. */
   onEnd: () => void

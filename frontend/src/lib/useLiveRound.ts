@@ -16,7 +16,6 @@ export const SILENCE_MS = 5000
 
 export interface LiveRound {
   state: LiveState | null
-  saved: boolean
   microphone: MediaStream | null
   /** Opens a round. Also the retry: drops whatever was said and opens a fresh one. */
   start(): Promise<void>
@@ -37,10 +36,9 @@ export function useLiveRound(
   audio: RefObject<HTMLAudioElement | null>,
   connect: Connect,
   keep: Keep,
-  onTurn?: OnTurn,
+  onTurn: OnTurn,
 ): LiveRound {
   const [state, setState] = useState<LiveState | null>(null)
-  const [saved, setSaved] = useState(false)
   const [microphone, setMicrophone] = useState<MediaStream | null>(null)
   const connRef = useRef<LiveConnection | null>(null)
   const latest = useRef<LiveState | null>(null)
@@ -72,12 +70,10 @@ export function useLiveRound(
   const save = useCallback(async () => {
     const round = latest.current
     if (!round) return false
-    setSaved(true)
     try {
       await handlers.current.keep(round)
       return true
     } catch (e) {
-      setSaved(false)
       apply((s) => ({ ...s, error: e instanceof Error ? e.message : String(e) }))
       return false
     }
@@ -98,10 +94,9 @@ export function useLiveRound(
   /** The coach has started answering: hand the round over once, and hold it open until the answer is in. */
   const takeTurn = useCallback(
     (round: LiveState) => {
-      const { onTurn } = handlers.current
-      if (!onTurn) return armSilence()
       turn.current = 'pending'
-      onTurn(round, (text) => connRef.current?.say(text))
+      handlers.current
+        .onTurn(round, (text) => connRef.current?.say(text))
         .catch((e: unknown) => apply((s) => ({ ...s, error: e instanceof Error ? e.message : String(e) })))
         .finally(() => {
           if (turn.current !== 'pending') return
@@ -120,7 +115,6 @@ export function useLiveRound(
     turn.current = 'open'
     latest.current = initialLiveState
     setState(initialLiveState)
-    setSaved(false)
     try {
       const conn = await handlers.current.connect({
         audio: audio.current!,
@@ -152,10 +146,5 @@ export function useLiveRound(
     setState(null)
   }, [])
 
-  return { state, saved, microphone, start, close, dismiss, save }
-}
-
-/** A round with nothing on one of the two lines has nothing to keep. */
-export function hasBothLines(state: LiveState): boolean {
-  return state.user.trim() !== '' && state.coach.trim() !== ''
+  return { state, microphone, start, close, dismiss, save }
 }

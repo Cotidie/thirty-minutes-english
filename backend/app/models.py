@@ -1,6 +1,5 @@
 from datetime import datetime
 from enum import StrEnum
-from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, model_validator
 
@@ -161,7 +160,7 @@ class Correction(BaseModel):
 class Reading(BaseModel):
     id: int
     created_at: datetime
-    session_id: int | None
+    session_id: int
     paragraph: str
     user_text: str
     coach_text: str

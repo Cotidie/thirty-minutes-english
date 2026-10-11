@@ -112,13 +112,13 @@ export const api = {
     request<Example>('/api/examples', { method: 'POST', body: JSON.stringify(example) }),
   listExamples: (sessionId: number) => request<Example[]>(`/api/examples?session_id=${sessionId}`),
   addReading: (reading: {
-    session_id: number | null
+    session_id: number
     paragraph: string
     user_text: string
     coach_text: string
     seconds: number
     corrections: Correction[]
   }) => request<Reading>('/api/readings', { method: 'POST', body: JSON.stringify(reading) }),
-  /** Read-aloud rounds with the findings the assessor made, newest first. */
+  /** A session's read-aloud rounds with the findings the assessor made, newest first. */
   listReadings: (sessionId: number) => request<Reading[]>(`/api/readings?session_id=${sessionId}`),
 }

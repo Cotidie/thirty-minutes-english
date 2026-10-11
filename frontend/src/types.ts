@@ -133,7 +133,7 @@ export interface SettingOption {
   pinned?: boolean
 }
 
-export interface SettingVariant {
+interface SettingVariant {
   default: string
   /** The model list behind `options`; pins are kept per list. */
   catalog: string
@@ -211,7 +211,7 @@ export interface Correction {
 export interface Reading {
   id: number
   created_at: string
-  session_id: number | null
+  session_id: number
   paragraph: string
   user_text: string
   coach_text: string

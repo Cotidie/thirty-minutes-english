@@ -76,7 +76,6 @@ const FIELDS: SettingField[] = [
     options: [opt('opus', 'Most capable', 'Opus 5.5', ['low', 'max']), opt('sonnet', 'Efficient', 'Sonnet 5', ['low', 'high']), opt('haiku', 'Fastest', 'Haiku 4.5', [])],
   }),
   field({ key: 'CLAUDE_EFFORT', group: 'claude', value: 'high', default: 'xhigh', effort_of: 'CLAUDE_MODEL' }),
-  field({ key: 'SUMMARY_MODEL', group: 'text', value: 'gpt-5.6-luna', default: 'gpt-5.6-luna' }),
 ]
 
 const GROUPS: SettingGroup[] = [
@@ -84,7 +83,6 @@ const GROUPS: SettingGroup[] = [
   { id: 'voice', title: 'Voice coach' },
   { id: 'assess', title: 'Read aloud assessor' },
   { id: 'claude', title: 'Claude generation' },
-  { id: 'text', title: 'Summary text model' },
 ]
 
 beforeEach(() => {

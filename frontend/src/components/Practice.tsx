@@ -93,7 +93,6 @@ export function Practice({ target, label, sessionId, examples, onKept }: Props) 
       ) : (
         <Slip
           label={`Practice ${target.text}`}
-          className="practice-slip"
           state={state}
           level={level}
           status={STATUS_LABEL[state.status]}
