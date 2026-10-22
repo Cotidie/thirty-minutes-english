@@ -30,9 +30,10 @@ interface Props {
 }
 
 /**
- * A button under a paragraph. The reader says what they understood; the live model only
- * writes it down, and on Done a text model judges it against the paragraph: what was
- * missed, what was unskilled in the reader's wording, and the summary with those fixes in.
+ * A button under a paragraph. The reader says what they understood; Gemini's transcription
+ * model only writes it down, never shown the paragraph, and on Done a text model judges it
+ * against the paragraph: what was missed, what was unskilled in the reader's wording, and the
+ * summary with those fixes in.
  */
 export function Summarize({ paragraph, sessionId, kept, onKept, disabled, onStatus }: Props) {
   const audioRef = useRef<HTMLAudioElement>(null)
@@ -41,7 +42,7 @@ export function Summarize({ paragraph, sessionId, kept, onKept, disabled, onStat
   const [failure, setFailure] = useState<string | null>(null)
   const round = useLiveRound(
     audioRef,
-    (opts) => connectSummary(paragraph, opts),
+    connectSummary,
     async (r) => onKept(await api.addSummary({ session_id: sessionId, paragraph, user_text: r.user.trim(), feedback: answer!, seconds: r.seconds })),
   )
   const { state, close, save } = round
@@ -87,7 +88,7 @@ export function Summarize({ paragraph, sessionId, kept, onKept, disabled, onStat
 
   return (
     <div className={`summarize${state ? ' is-open' : ''}`}>
-      {/* The listener has nothing to say; whatever turn it produces stays unheard. */}
+      {/* The transcriber sends no sound; the transport still wants somewhere to play it. */}
       <audio ref={audioRef} autoPlay muted />
       {kept.length > 0 && (
         <ol className="summaries" aria-label="Summaries of this paragraph">

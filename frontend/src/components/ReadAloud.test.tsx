@@ -46,6 +46,7 @@ const connect = vi.fn(async (_paragraph: string, opts: RoundOptions): Promise<Li
 })
 vi.mock('../lib/liveClient', () => ({
   connectReadAloud: (paragraph: string, opts: RoundOptions) => connect(paragraph, opts),
+  connectSummary: vi.fn(),
 }))
 
 const berified: AzureWord = {

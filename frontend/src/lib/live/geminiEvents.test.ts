@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { audioChunk, decodeServerMessage, fromBase64, textTurn, toBase64 } from './geminiEvents'
+import { audioChunk, decodeServerMessage, decodeTranscription, fromBase64, textTurn, toBase64 } from './geminiEvents'
 
 describe('decodeServerMessage', () => {
   it('turns setupComplete into session.started', () => {
@@ -54,6 +54,26 @@ describe('decodeServerMessage', () => {
     expect(decodeServerMessage({ error: { message: 'quota' } }).events).toEqual([
       { type: 'error', error: { message: 'quota' } },
     ])
+  })
+})
+
+describe('decodeTranscription', () => {
+  it('sets each whole utterance apart from the one before', () => {
+    const first = decodeTranscription({ serverContent: { inputTranscription: { text: 'Most commuters nap.' } } })
+    expect(first.events).toEqual([{ type: 'session.input_transcript.delta', delta: ' Most commuters nap.' }])
+  })
+
+  it('follows the voice activity, and says nothing about it otherwise', () => {
+    expect(decodeTranscription({ voiceActivity: { type: 'ACTIVITY_START' } }).speaking).toBe(true)
+    expect(decodeTranscription({ voiceActivity: { type: 'ACTIVITY_END' } }).speaking).toBe(false)
+    expect(decodeTranscription({ serverContent: { generationComplete: true } }).speaking).toBeUndefined()
+  })
+
+  it('surfaces an error and flags goAway', () => {
+    expect(decodeTranscription({ error: { status: 'RESOURCE_EXHAUSTED' } }).events).toEqual([
+      { type: 'error', error: { message: 'RESOURCE_EXHAUSTED' } },
+    ])
+    expect(decodeTranscription({ goAway: {} }).goAway).toBe(true)
   })
 })
 

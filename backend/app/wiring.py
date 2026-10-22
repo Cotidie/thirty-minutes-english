@@ -20,6 +20,7 @@ from app.voice.assessor import AzureAssessor
 from app.voice.speech import Speaker, speaker_for
 from app.voice.live import (
     AgentDefinition,
+    GeminiTranscriber,
     GeminiVoice,
     LiveAgent,
     OpenAIVoice,
@@ -34,6 +35,8 @@ AGENTS: dict[str, tuple[str, str]] = {
     "example": ("EXAMPLE_AGENT_DIR", "example-coach"),
     "summary": ("SUMMARY_AGENT_DIR", "summary-coach"),
 }
+# The coaches that talk. Summarize is written down by the transcriber; its folder holds only the text prompt.
+LIVE_AGENTS = ("read-aloud", "example")
 
 
 @dataclass
@@ -43,6 +46,7 @@ class Services:
     agents: dict[str, LiveAgent] = field(default_factory=dict)
     example_coach: ExampleCoach | None = None
     summary_coach: SummaryCoach | None = None
+    transcriber: GeminiTranscriber | None = None
     illustrator: Illustrator | None = None
     scene_writer: SceneWriter | None = None
     assessor: AzureAssessor | None = None
@@ -89,6 +93,7 @@ def build_services(
         agents=_live_agents(settings, agent_dirs),
         example_coach=_example_coach(settings, agent_dirs["example"], effort(settings, "EXAMPLE_EFFORT", efforts_of)),
         summary_coach=_summary_coach(settings, agent_dirs["summary"], effort(settings, "EXAMPLE_EFFORT", efforts_of)),
+        transcriber=_transcriber(settings),
         illustrator=_illustrator(settings, image_dir, pictures),
         scene_writer=SceneWriter.with_cli(settings.get("EXAMPLE_MODEL")),
         assessor=_assessor(settings),
@@ -110,6 +115,12 @@ def _assessor(settings: Settings) -> AzureAssessor | None:
     return AzureAssessor(key, settings.get("AZURE_SPEECH_REGION"), settings.assess_word_score)
 
 
+def _transcriber(settings: Settings) -> GeminiTranscriber | None:
+    """Summarize's transcriber, once the Gemini key is set. It does not follow the voice provider."""
+    key = settings.get("GEMINI_API_KEY")
+    return GeminiTranscriber(key) if key else None
+
+
 def voice_provider(settings: Settings) -> VoiceProvider | None:
     """The configured provider, or None while its key is missing."""
     key = settings.voice_api_key
@@ -125,7 +136,7 @@ def _live_agents(settings: Settings, agent_dirs: dict[str, Path]) -> dict[str, L
     if provider is None:
         return {}
     agents = {}
-    for name in AGENTS:
+    for name in LIVE_AGENTS:
         agent_dir = agent_dirs[name]
         if (agent_dir / "session.json").is_file():
             agents[name] = LiveAgent(name, AgentDefinition(agent_dir), provider)

@@ -1,8 +1,8 @@
 """A paragraph the reader summed up out loud, judged against the paragraph: what they missed,
 what was unskilled in their wording, and their summary with those fixes put in.
 
-The live model only listens and transcribes; the judgment is a text run of the claude CLI
-with the prompt in the summary-coach folder.
+Gemini's transcription model writes the summary down; the judgment is a text run of the
+claude CLI with the prompt in the summary-coach folder.
 """
 
 from pathlib import Path

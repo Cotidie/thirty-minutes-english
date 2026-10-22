@@ -1,7 +1,7 @@
-"""Voice coaches. An agent (prompt, context messages) is defined in its own
-folder outside this app; a provider turns that definition into a live session
-the browser can join. OpenAI answers a WebRTC offer; Gemini hands out a
-one-use token and the setup message for its WebSocket."""
+"""Voice coaches and the summary transcriber. An agent (prompt, context messages)
+is defined in its own folder outside this app; a provider turns that definition
+into a live session the browser can join. OpenAI answers a WebRTC offer; Gemini
+hands out a one-use token and the setup message for its WebSocket."""
 
 import copy
 import json
@@ -21,6 +21,11 @@ GEMINI_LIVE_URL = (
     "wss://generativelanguage.googleapis.com/ws/"
     "google.ai.generativelanguage.v1beta.GenerativeService.BidiGenerateContentConstrained"
 )
+GEMINI_TOKEN_TTL = timedelta(minutes=30)
+GEMINI_CONNECT_WINDOW = timedelta(minutes=2)
+TRANSCRIBE_MODEL = "gemini-3.5-transcribe-live"
+# The user speaks English, with a Korean word now and then; Gemini transcribes into these two only.
+LANGUAGES = ["en-US", "ko-KR"]
 
 
 class AgentDefinition:
@@ -70,7 +75,7 @@ class AgentDefinition:
             "model": f"models/{model}",
             "generationConfig": generation,
             "systemInstruction": {"parts": [{"text": instruction}]},
-            "inputAudioTranscription": {},
+            "inputAudioTranscription": {"languageCodes": LANGUAGES},
             "outputAudioTranscription": {},
         }
 
@@ -102,14 +107,24 @@ class OpenAIVoice:
         return {"provider": self.name, **answer}
 
 
+def gemini_round(api_key: str, setup: dict) -> dict:
+    """Mints a one-use ephemeral token locked to the whole setup, and hands the
+    browser the token in the WebSocket URL plus that same setup message to send first."""
+    now = datetime.now(UTC)
+    body = {
+        "uses": 1,
+        "expireTime": _rfc3339(now + GEMINI_TOKEN_TTL),
+        "newSessionExpireTime": _rfc3339(now + GEMINI_CONNECT_WINDOW),
+        "bidiGenerateContentSetup": setup,
+    }
+    token = post_json(GEMINI_TOKENS_URL, body, {"x-goog-api-key": api_key})
+    return {"provider": "gemini", "url": f"{GEMINI_LIVE_URL}?access_token={token['name']}", "setup": setup}
+
+
 class GeminiVoice:
-    """Mints a one-use ephemeral token locked to the whole setup (model, voice,
-    system instruction), and hands the browser the token in the WebSocket URL
-    plus that same setup message to send first."""
+    """A coach on a Gemini Live model: its setup carries the model, voice and system instruction."""
 
     name = "gemini"
-    TOKEN_TTL = timedelta(minutes=30)
-    CONNECT_WINDOW = timedelta(minutes=2)
 
     def __init__(
         self,
@@ -124,16 +139,25 @@ class GeminiVoice:
         self.thinking_level = thinking_level
 
     def open(self, definition: AgentDefinition, sdp: str | None, **values: str) -> dict:
-        now = datetime.now(UTC)
-        setup = definition.gemini_setup(self.model, self.voice, self.thinking_level, **values)
-        body = {
-            "uses": 1,
-            "expireTime": _rfc3339(now + self.TOKEN_TTL),
-            "newSessionExpireTime": _rfc3339(now + self.CONNECT_WINDOW),
-            "bidiGenerateContentSetup": setup,
+        return gemini_round(self.api_key, definition.gemini_setup(self.model, self.voice, self.thinking_level, **values))
+
+
+class GeminiTranscriber:
+    """Speech to text on Gemini's transcription model, whatever the voice provider:
+    no prompt, no voice, and nothing given to read, so it writes down only what was said."""
+
+    def __init__(self, api_key: str):
+        self.api_key = api_key
+
+    def start(self) -> dict:
+        setup = {
+            "model": f"models/{TRANSCRIBE_MODEL}",
+            "generationConfig": {"responseModalities": ["TEXT"]},
+            "inputAudioTranscription": {"languageCodes": LANGUAGES},
         }
-        token = post_json(GEMINI_TOKENS_URL, body, {"x-goog-api-key": self.api_key})
-        return {"provider": self.name, "url": f"{GEMINI_LIVE_URL}?access_token={token['name']}", "setup": setup}
+        result = gemini_round(self.api_key, setup)
+        log.info("transcription opened on %s", TRANSCRIBE_MODEL)
+        return result
 
 
 def _rfc3339(moment: datetime) -> str:

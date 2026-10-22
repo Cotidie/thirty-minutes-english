@@ -115,8 +115,8 @@ export const api = {
   addExample: (example: { session_id: number; expression: string; user_text: string; coach_text: string; seconds: number }) =>
     request<Example>('/api/examples', { method: 'POST', body: JSON.stringify(example) }),
   listExamples: (sessionId: number) => request<Example[]>(`/api/examples?session_id=${sessionId}`),
-  startSummary: (paragraph: string, sdp?: string) =>
-    request<LiveSession>('/api/summary/sessions', { method: 'POST', body: JSON.stringify({ paragraph, sdp }) }),
+  /** Gemini's transcription model; it is not given the paragraph. */
+  startSummary: () => request<LiveSession>('/api/summary/sessions', { method: 'POST' }),
   /** A spoken summary judged against its paragraph: what was missed, the wording fixed, and the summary with the fixes in. */
   summaryFeedback: (paragraph: string, userText: string) =>
     request<SummaryFeedback>('/api/summary/feedback', { method: 'POST', body: JSON.stringify({ paragraph, user_text: userText }) }),

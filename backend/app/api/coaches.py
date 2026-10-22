@@ -36,9 +36,15 @@ def start_read_aloud(body: ReadAloudRequest, services: Svc) -> dict:
 
 
 @router.post("/summary/sessions", response_model=LiveSession, status_code=201)
-def start_summary(body: ReadAloudRequest, services: Svc) -> dict:
-    """A round that only listens: the reader says what the paragraph was about."""
-    return start_live(services, "summary", body.sdp, paragraph=body.paragraph)
+def start_summary(services: Svc) -> dict:
+    """A round that only writes down what the reader says the paragraph was about. It is not given the paragraph."""
+    transcriber = services.transcriber
+    if transcriber is None:
+        raise off("Summarize is off: set GEMINI_API_KEY in Settings")
+    try:
+        return transcriber.start()
+    except HttpError as e:
+        raise failed("transcription session", e) from e
 
 
 @router.post("/summary/feedback", response_model=SummaryFeedback)

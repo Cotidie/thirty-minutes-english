@@ -10,13 +10,13 @@ import { Paragraph } from './Paragraph'
 
 const connection = { microphone: {} as MediaStream, say: vi.fn(), correct: vi.fn(), close: vi.fn(), dispose: vi.fn() }
 let emit: (e: LiveEvent) => void = () => undefined
-const connect = vi.fn(async (_paragraph: string, opts: RoundOptions): Promise<LiveConnection> => {
+const connect = vi.fn(async (opts: RoundOptions): Promise<LiveConnection> => {
   emit = opts.onEvent
   return connection
 })
 
 vi.mock('../lib/liveClient', () => ({
-  connectSummary: (paragraph: string, opts: RoundOptions) => connect(paragraph, opts),
+  connectSummary: (opts: RoundOptions) => connect(opts),
   connectReadAloud: vi.fn(),
 }))
 vi.mock('../api', () => ({ api: { summaryFeedback: vi.fn(), addSummary: vi.fn(), speak: vi.fn() } }))
@@ -54,7 +54,6 @@ it('veils the paragraph while it is summed up, judges the summary on Done, and k
 
   await userEvent.click(screen.getByRole('button', { name: 'Summarize' }))
   act(() => emit({ type: 'session.started', session: { id: 'live_1' } }))
-  expect(connect.mock.calls[0][0]).toBe(paragraph)
   expect(onStart).toHaveBeenCalledOnce()
   expect(text).toHaveClass('is-veiled')
   expect(screen.getByRole('button', { name: 'Read aloud' })).toBeDisabled() // one microphone

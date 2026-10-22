@@ -45,6 +45,7 @@ Only the Claude token is required. Add the other keys in the app's ⚙ settings 
 |---|---|
 | `CLAUDE_CODE_OAUTH_TOKEN` | Session generation (required) |
 | `OPENAI_API_KEY` or `GEMINI_API_KEY` | Voice coaches |
+| `GEMINI_API_KEY` | Summarize (writes down what you say, English or Korean only) |
 | `AZURE_SPEECH_KEY` | Read aloud pronunciation check |
 | `OPENROUTER_API_KEY` or `COMFY_API_KEY` | Word pictures |
 | `FIRECRAWL_API_KEY` | Faster web search (works without it, rate-limited) |

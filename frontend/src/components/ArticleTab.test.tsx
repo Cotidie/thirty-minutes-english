@@ -17,6 +17,7 @@ Object.defineProperty(navigator, 'mediaDevices', {
 vi.mock('../lib/assessor/azure', () => ({ startAzureAssessor: vi.fn(async () => ({ stop: vi.fn(async () => undefined) })) }))
 vi.mock('../lib/liveClient', () => ({
   connectReadAloud: vi.fn(async () => ({ microphone: { getAudioTracks: () => [] }, say: vi.fn(), correct: vi.fn(), close: vi.fn(), dispose: vi.fn() })),
+  connectSummary: vi.fn(),
 }))
 
 const article = {

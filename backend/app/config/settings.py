@@ -99,8 +99,8 @@ IMAGE_VARIANTS = {
 SPECS: tuple[Spec, ...] = (
     Spec("OPENAI_API_KEY", "keys", secret=True,
          help="Runs the voice coaches when the voice provider is OpenAI."),
-    Spec("GEMINI_API_KEY", "keys", secret=True, used_when=("VOICE_PROVIDER", "gemini"),
-         help="Runs the voice coaches when the voice provider is Gemini."),
+    Spec("GEMINI_API_KEY", "keys", secret=True,
+         help="Runs the voice coaches when the voice provider is Gemini, and writes down Summarize with either provider."),
     Spec("AZURE_SPEECH_KEY", "keys", secret=True,
          help="Azure Pronunciation Assessment. Read aloud scores each word with it; without it, Read aloud is off."),
     Spec("OPENROUTER_API_KEY", "keys", secret=True, used_when=("IMAGE_PROVIDER", "openrouter"),

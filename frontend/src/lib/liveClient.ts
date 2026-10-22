@@ -1,9 +1,11 @@
 // The coaches, each a live round with its own way of starting. The
 // provider (OpenAI over WebRTC, Gemini over WebSocket) is whatever Settings
-// says at the moment the round opens; see lib/live/transport.ts.
+// says at the moment the round opens; see lib/live/transport.ts. Summarize
+// always goes to Gemini's transcription model.
 
 import { api } from '../api'
 import type { PracticeTarget } from '../types'
+import { connectGeminiTranscription } from './live/geminiWebsocket'
 import { connectLive, type LiveConnection, type LiveOptions } from './live/transport'
 
 export type { LiveConnection, LiveOptions } from './live/transport'
@@ -15,9 +17,9 @@ export function connectReadAloud(paragraph: string, opts: RoundOptions): Promise
   return connectLive({ ...opts, start: (sdp) => api.startReadAloud(paragraph, sdp) })
 }
 
-/** A listener that writes down what the user says a paragraph is about; it does not answer. */
-export function connectSummary(paragraph: string, opts: RoundOptions): Promise<LiveConnection> {
-  return connectLive({ ...opts, start: (sdp) => api.startSummary(paragraph, sdp) })
+/** Writes down what the user says a paragraph is about, in English or Korean. It is given nothing to read and never answers. */
+export function connectSummary(opts: RoundOptions): Promise<LiveConnection> {
+  return connectGeminiTranscription({ ...opts, start: () => api.startSummary() })
 }
 
 /** One sentence made with an expression or word, said back the native way with a line of feedback. */

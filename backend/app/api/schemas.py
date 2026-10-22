@@ -39,7 +39,7 @@ def _not_blank(value: str) -> str:
 
 
 class ReadAloudRequest(BaseModel):
-    """A live round on one paragraph, read aloud or summed up. `sdp` is the browser's WebRTC offer;
+    """A live round on one paragraph read aloud. `sdp` is the browser's WebRTC offer;
     only the OpenAI provider needs one."""
 
     paragraph: str

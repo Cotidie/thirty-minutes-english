@@ -31,7 +31,7 @@ vi.mock('../api', () => ({
     pictureStyles: vi.fn(async () => ({ current: '', options: [] })),
   },
 }))
-vi.mock('../lib/liveClient', () => ({ connectExample: vi.fn() }))
+vi.mock('../lib/liveClient', () => ({ connectExample: vi.fn(), connectSummary: vi.fn() }))
 
 function Hash() {
   return <output aria-label="hash">{useLocation().hash}</output>

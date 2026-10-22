@@ -6,7 +6,7 @@ from fastapi.testclient import TestClient
 from app.db import Database
 from app.main import create_app
 from app.net import HttpError
-from app.voice.live import AgentDefinition, GeminiVoice, LiveAgent, OpenAIVoice
+from app.voice.live import AgentDefinition, GeminiTranscriber, GeminiVoice, LiveAgent, OpenAIVoice
 from app.wiring import Services
 from tests.test_api import FakeGenerator, InlineExecutor
 
@@ -51,9 +51,9 @@ class FakeLiveSessions:
         return {"provider": "openai", "session": {"id": "live_123"}, "transport": {"type": "webrtc", "sdp": "v=0 answer"}}
 
 
-def make_client(tmp_path, agents):
-    app = create_app(Database(tmp_path / "s.db"), Services(FakeGenerator(), agents=agents), InlineExecutor())
-    return TestClient(app)
+def make_client(tmp_path, agents, transcriber=None):
+    services = Services(FakeGenerator(), agents=agents, transcriber=transcriber)
+    return TestClient(create_app(Database(tmp_path / "s.db"), services, InlineExecutor()))
 
 
 def read_aloud(agent_dir, sessions=None):
@@ -143,7 +143,8 @@ def test_gemini_setup_folds_context_into_the_system_instruction(agent_dir):
     assert setup["generationConfig"]["responseModalities"] == ["AUDIO"]
     assert setup["generationConfig"]["speechConfig"]["voiceConfig"]["prebuiltVoiceConfig"]["voiceName"] == "Kore"
     assert "thinkingConfig" not in setup["generationConfig"]
-    assert setup["inputAudioTranscription"] == {} and setup["outputAudioTranscription"] == {}
+    assert setup["inputAudioTranscription"] == {"languageCodes": ["en-US", "ko-KR"]}
+    assert setup["outputAudioTranscription"] == {}
 
 
 def test_gemini_setup_carries_the_thinking_level_when_given(agent_dir):
@@ -178,6 +179,35 @@ def test_gemini_round_needs_no_offer(tmp_path, agent_dir, http):
     assert res.status_code == 201
     assert res.json()["provider"] == "gemini"
     assert "setup" in res.json() and "url" in res.json()
+
+
+def test_transcriber_is_given_nothing_to_read_and_only_english_or_korean(http):
+    http.json = {"name": "auth_tokens/abc"}
+    answer = GeminiTranscriber("AIza-test").start()
+    setup = http.sent()["bidiGenerateContentSetup"]
+    assert setup == {
+        "model": "models/gemini-3.5-transcribe-live",
+        "generationConfig": {"responseModalities": ["TEXT"]},
+        "inputAudioTranscription": {"languageCodes": ["en-US", "ko-KR"]},
+    }
+    assert answer["provider"] == "gemini" and answer["setup"] == setup
+    assert answer["url"].endswith("?access_token=auth_tokens/abc")
+
+
+def test_summary_round_opens_the_transcriber_without_the_paragraph(tmp_path, http):
+    http.json = {"name": "auth_tokens/abc"}
+    with make_client(tmp_path, {}, GeminiTranscriber("AIza-test")) as c:
+        res = c.post("/api/summary/sessions")
+    assert res.status_code == 201
+    assert res.json()["provider"] == "gemini"
+    assert "systemInstruction" not in http.sent()["bidiGenerateContentSetup"]
+
+
+def test_summary_round_is_off_without_the_gemini_key(tmp_path):
+    with make_client(tmp_path, {}) as c:
+        res = c.post("/api/summary/sessions")
+    assert res.status_code == 503
+    assert "GEMINI_API_KEY" in res.json()["detail"]
 
 
 @pytest.fixture
