@@ -164,6 +164,23 @@ describe('ReadAloud round', () => {
     expect(screen.queryByRole('button', { name: 'verified: b for v' })).not.toBeInTheDocument()
   })
 
+  it('opens a clicked mark without flipping its sentence to the Korean', async () => {
+    renderIdle()
+    await startRound()
+    act(() => segment([berified], 'berified'))
+    const sentence = screen.getByRole('button', { name: paragraph })
+    const hit = screen.getByRole('button', { name: 'verified: b for v' })
+
+    await userEvent.click(hit)
+    fireEvent.animationEnd(sentence)
+    hit.focus()
+    await userEvent.keyboard('{Enter}')
+    fireEvent.animationEnd(sentence)
+
+    expect(sentence).not.toHaveTextContent('연구자들이 확인했다.')
+    expect(screen.getByRole('note', { name: 'verified' })).toBeInTheDocument()
+  })
+
   it('fails before touching the microphone when the assessor is off', async () => {
     vi.mocked(api.assessorToken).mockRejectedValueOnce(new Error('Read aloud is off: set AZURE_SPEECH_KEY in Settings'))
     renderIdle()

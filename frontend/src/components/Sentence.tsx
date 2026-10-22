@@ -69,7 +69,8 @@ export function Run({ text, start, spans, starts, marks }: RunProps) {
   )
 }
 
-/** A mispronounced word is a button that opens its finding. Green once read right. */
+/** A mispronounced word is a button that opens its finding. Green once read right.
+ * Its click and keys stop here, so the sentence around it does not flip to the Korean. */
 function Word({ atom, spans, marks }: { atom: Atom; spans: Span[]; marks: Marks }) {
   const inner = segmentsIn(atom.text, spans, atom.offset).map((seg, j) =>
     seg.marked ? <mark key={j}>{seg.text}</mark> : <Fragment key={j}>{seg.text}</Fragment>,
@@ -84,7 +85,11 @@ function Word({ atom, spans, marks }: { atom: Atom; spans: Span[]; marks: Marks 
       className={`reading-hit${finding.repeated_ok ? ' is-ok' : ''}${marks.open === index ? ' is-open' : ''}`}
       title={title}
       aria-label={title}
-      onClick={() => marks.onOpen(index)}
+      onClick={(e) => {
+        e.stopPropagation()
+        marks.onOpen(index)
+      }}
+      onKeyDown={(e) => e.stopPropagation()}
     >
       {inner}
     </button>
