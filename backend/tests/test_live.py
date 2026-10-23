@@ -1,4 +1,5 @@
 import json
+from pathlib import Path
 
 import pytest
 from fastapi.testclient import TestClient
@@ -11,6 +12,7 @@ from app.wiring import Services
 from tests.test_api import FakeGenerator, InlineExecutor
 
 PARAGRAPH = "Researchers verified that the new battery lasts twice as long."
+SUMMARY_DIR = Path(__file__).parents[2] / "agents" / "summary-coach"
 
 
 @pytest.fixture
@@ -183,7 +185,7 @@ def test_gemini_round_needs_no_offer(tmp_path, agent_dir, http):
 
 def test_transcriber_hears_only_english_or_korean_primed_with_the_paragraph_words(http):
     http.json = {"name": "auth_tokens/abc"}
-    answer = GeminiTranscriber("AIza-test").start(PARAGRAPH)
+    answer = GeminiTranscriber("AIza-test", SUMMARY_DIR).start(PARAGRAPH)
     setup = http.sent()["bidiGenerateContentSetup"]
     assert setup == {
         "model": "models/gemini-3.5-transcribe-live",
@@ -205,7 +207,7 @@ def test_vocabulary_keeps_each_term_once_and_drops_short_common_words():
 
 def test_summary_round_opens_the_transcriber_on_the_paragraph(tmp_path, http):
     http.json = {"name": "auth_tokens/abc"}
-    with make_client(tmp_path, {}, GeminiTranscriber("AIza-test")) as c:
+    with make_client(tmp_path, {}, GeminiTranscriber("AIza-test", SUMMARY_DIR)) as c:
         res = c.post("/api/summary/sessions", json={"paragraph": PARAGRAPH})
         assert c.post("/api/summary/sessions", json={"paragraph": " "}).status_code == 422
     assert res.status_code == 201

@@ -1,0 +1,5 @@
+{
+  "model": "models/gemini-3.5-transcribe-live",
+  "generationConfig": { "responseModalities": ["TEXT"] },
+  "inputAudioTranscription": { "languageCodes": ["en-US", "ko-KR"] }
+}

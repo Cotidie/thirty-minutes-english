@@ -12,7 +12,7 @@ AGENT_DIR = Path(__file__).parents[2] / "agents" / "summary-coach"
 PARAGRAPH = "Seoul scrapped its trams in 1968. Now it is laying tracks again."
 ANSWER = {
     "missed": [],
-    "fixes": [{"said": "was remove", "better": "got rid of", "why": "Use one simple past verb."}],
+    "fixes": [{"said": "was remove", "better": "got rid of"}],
     "summary": "Seoul got rid of its trams in 1968 and is now bringing them back.",
 }
 

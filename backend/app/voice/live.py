@@ -24,7 +24,6 @@ GEMINI_LIVE_URL = (
 )
 GEMINI_TOKEN_TTL = timedelta(minutes=30)
 GEMINI_CONNECT_WINDOW = timedelta(minutes=2)
-TRANSCRIBE_MODEL = "gemini-3.5-transcribe-live"
 # The user speaks English, with a Korean word now and then; Gemini transcribes into these two only.
 LANGUAGES = ["en-US", "ko-KR"]
 # Google gets its best results from custom vocabulary of up to 100 terms.
@@ -146,21 +145,19 @@ class GeminiVoice:
 
 
 class GeminiTranscriber:
-    """Speech to text on Gemini's transcription model, whatever the voice provider. It takes
-    no prompt and has no voice; the paragraph reaches it as vocabulary, so its names and
-    terms come back spelled as the paragraph spells them."""
+    """Speech to text on Gemini's transcription model, whatever the voice provider. Its setup is
+    the agent folder's transcription.json. It takes no prompt and has no voice; the paragraph
+    reaches it as vocabulary, so its names and terms come back spelled as the paragraph spells them."""
 
-    def __init__(self, api_key: str):
+    def __init__(self, api_key: str, agent_dir: Path):
         self.api_key = api_key
+        self.template = json.loads((agent_dir / "transcription.json").read_text())
 
     def start(self, paragraph: str) -> dict:
-        setup = {
-            "model": f"models/{TRANSCRIBE_MODEL}",
-            "generationConfig": {"responseModalities": ["TEXT"]},
-            "inputAudioTranscription": {"languageCodes": LANGUAGES, "customVocabulary": vocabulary(paragraph)},
-        }
+        setup = copy.deepcopy(self.template)
+        setup["inputAudioTranscription"]["customVocabulary"] = vocabulary(paragraph)
         result = gemini_round(self.api_key, setup)
-        log.info("transcription opened on %s", TRANSCRIBE_MODEL)
+        log.info("transcription opened on %s", setup["model"])
         return result
 
 

@@ -52,41 +52,43 @@
   color: var(--muted);
 }
 
+/* One fixed shape every round: a label column and its line, the model answer last. */
 .summary-feedback {
   display: grid;
-  gap: 0.6rem;
-}
-
-.summary-feedback p {
+  grid-template-columns: max-content minmax(0, 1fr);
+  gap: 0.4rem 0.75rem;
   margin: 0;
 }
 
-.summary-missed,
-.summary-fixes {
+.summary-feedback dt {
+  font: 600 0.7rem var(--sans);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted);
+  padding-top: 0.2rem;
+}
+
+.summary-feedback dd {
   margin: 0;
-  padding-left: 1.1rem;
-  display: grid;
-  gap: 0.35rem;
+  min-width: 0;
 }
 
 .summary-missed {
   color: var(--wrong);
 }
 
+.summary-fix {
+  display: block;
+}
+
+.summary-fix s {
+  color: var(--muted);
+}
+
 .summary-better {
   font-family: var(--serif);
   font-size: 1.02rem;
   line-height: 1.5;
-  border-left: 3px solid var(--marker);
-  padding-left: 0.75rem;
-}
-
-.summary-heading {
-  display: block;
-  font: 600 0.7rem var(--sans);
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  color: var(--muted);
 }
 
 .summary-better .speak {
@@ -94,15 +96,8 @@
   vertical-align: middle;
 }
 
-.summary-fix-line,
-.summary-fix-why {
-  display: block;
-}
-
-.summary-fix-line s {
-  color: var(--muted);
-}
-
-.summary-fix-why {
-  color: var(--muted);
+@media (max-width: 420px) {
+  .summary-feedback {
+    grid-template-columns: minmax(0, 1fr);
+  }
 }

@@ -26,7 +26,7 @@ const said = 'Seoul was remove the tram at 1968 and now making again.'
 const feedback: SummaryFeedback = {
   missed: ['Why: trams cost less than subways.'],
   summary: 'Seoul got rid of its trams in 1968 and is now bringing them back.',
-  fixes: [{ said: 'was remove', better: 'got rid of', why: 'Use one simple past verb.' }],
+  fixes: [{ said: 'was remove', better: 'got rid of' }],
 }
 
 it('keeps the paragraph in view while it is summed up, judges the summary on Done, and keeps it', async () => {
@@ -72,7 +72,8 @@ it('keeps the paragraph in view while it is summed up, judges the summary on Don
   expect(await screen.findByText(/is now bringing them back/)).toBeInTheDocument()
   expect(api.summaryFeedback).toHaveBeenCalledExactlyOnceWith(paragraph, said)
   expect(screen.getByText('Why: trams cost less than subways.')).toBeInTheDocument()
-  expect(screen.getByText('Model answer').parentElement).toHaveTextContent(feedback.summary)
+  expect(screen.getByText('Say it better').nextElementSibling).toHaveTextContent('was remove → got rid of')
+  expect(screen.getByText('Model answer').nextElementSibling).toHaveTextContent(feedback.summary)
 
   await userEvent.click(screen.getByRole('button', { name: 'Keep' }))
   expect(api.addSummary).toHaveBeenCalledWith({ session_id: 3, paragraph, user_text: said, feedback, seconds: 20 })

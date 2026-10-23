@@ -30,10 +30,9 @@ interface Props {
 }
 
 /**
- * A button under a paragraph. The reader says what it is about, looking at it if they like;
- * Gemini's transcription model writes it down, primed with the paragraph's words, and on Done
- * a text model judges it against the paragraph: what was missed, what was unskilled in the
- * reader's wording, and a model answer of one or two short sentences built from what they said.
+ * A button under a paragraph that runs one round of the summary coach (agents/summary-coach/AGENT.md):
+ * the reader says what the paragraph is about with it in view, Gemini's transcription model writes it
+ * down primed with the paragraph's words, and on Done the judge answers in one fixed shape.
  */
 export function Summarize({ paragraph, sessionId, kept, onKept, disabled, onStatus }: Props) {
   const audioRef = useRef<HTMLAudioElement>(null)
@@ -150,35 +149,34 @@ export function Summarize({ paragraph, sessionId, kept, onKept, disabled, onStat
   )
 }
 
-/** The judgment: what they missed, their wording fixed line by line, then the model answer. */
+/** The judgment in one fixed shape, read at a glance: the point missed, up to two wordings bettered, the model answer. */
 function Feedback({ answer }: { answer: SummaryFeedback }) {
   return (
-    <div className="summary-feedback">
+    <dl className="summary-feedback">
       {answer.missed.length > 0 && (
-        <ul className="summary-missed" aria-label="Missed">
-          {answer.missed.map((point) => (
-            <li key={point}>{point}</li>
-          ))}
-        </ul>
+        <>
+          <dt>Missed</dt>
+          <dd className="summary-missed">{answer.missed[0]}</dd>
+        </>
       )}
       {answer.fixes.length > 0 && (
-        <ul className="summary-fixes" aria-label="Your wording">
-          {answer.fixes.map((fix) => (
-            <li key={fix.said}>
-              <span className="summary-fix-line">
-                <s>{fix.said}</s> <b>{fix.better}</b>
+        <>
+          <dt>Say it better</dt>
+          <dd>
+            {answer.fixes.map((fix) => (
+              <span key={fix.said} className="summary-fix">
+                <s>{fix.said}</s> → <b>{fix.better}</b>
               </span>
-              <span className="summary-fix-why">{fix.why}</span>
-            </li>
-          ))}
-        </ul>
+            ))}
+          </dd>
+        </>
       )}
-      <p className="summary-better">
-        <span className="summary-heading">Model answer</span>
+      <dt>Model answer</dt>
+      <dd className="summary-better">
         {answer.summary}
         <SpeakButton text={answer.summary} what="the model answer" />
-      </p>
-    </div>
+      </dd>
+    </dl>
   )
 }
 

@@ -243,19 +243,19 @@ export function practiceWord(v: VocabularyItem): PracticeTarget {
   return { text: v.word, meaning: v.definition, note: `part of speech: ${v.pos}`, kind: 'word', scene: v.scene ?? undefined }
 }
 
-/** One weakness in how the reader said it: their words, the better ones, and why. */
+/** One weakness in how the reader said it: their words and the better ones. */
 export interface SummaryFix {
   said: string
   better: string
-  why: string
 }
 
-/** A spoken summary judged against its paragraph. */
+/** A spoken summary judged against its paragraph, in a shape read at a glance. */
 export interface SummaryFeedback {
-  /** Key points left out or got wrong. */
+  /** The one key point left out or got wrong, or none. */
   missed: string[]
+  /** Two at most. */
   fixes: SummaryFix[]
-  /** The reader's summary with every fix put in, word for word. */
+  /** The model answer: what the reader said, in one or two short sentences. */
   summary: string
 }
 

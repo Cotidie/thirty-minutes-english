@@ -1,0 +1,19 @@
+{
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["missed", "fixes", "summary"],
+  "properties": {
+    "missed": { "type": "array", "maxItems": 1, "items": { "type": "string" } },
+    "fixes": {
+      "type": "array",
+      "maxItems": 2,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["said", "better"],
+        "properties": { "said": { "type": "string" }, "better": { "type": "string" } }
+      }
+    },
+    "summary": { "type": "string" }
+  }
+}

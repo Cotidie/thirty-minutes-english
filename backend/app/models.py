@@ -151,17 +151,17 @@ class ExampleFeedback(BaseModel):
 
 
 class SummaryFix(BaseModel):
-    """One weakness in how the reader said it: their words, the better ones, and why."""
+    """One weakness in how the reader said it: their words and the better ones.
+    Records kept before the fixed format also carry a `why`, which is dropped on read."""
 
     said: str
     better: str
-    why: str
 
 
 class SummaryFeedback(BaseModel):
     """A spoken summary judged against its paragraph."""
 
-    """Key points left out or got wrong; empty when the summary holds."""
+    """The one key point left out or got wrong; empty when the summary holds."""
     missed: list[str]
     fixes: list[SummaryFix]
     """A model answer: what the reader said, cut to one or two short sentences."""

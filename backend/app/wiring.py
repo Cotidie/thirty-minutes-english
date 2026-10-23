@@ -7,6 +7,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 from app.coaching.example_feedback import TEMPLATES, ExampleCoach
+from app.coaching.summary_feedback import SCHEMA as SUMMARY_SCHEMA
 from app.coaching.summary_feedback import TEMPLATE as SUMMARY_TEMPLATE
 from app.coaching.summary_feedback import SummaryCoach
 from app.config.settings import SPEC_BY_KEY, Settings
@@ -92,8 +93,8 @@ def build_services(
         ),
         agents=_live_agents(settings, agent_dirs),
         example_coach=_example_coach(settings, agent_dirs["example"], effort(settings, "EXAMPLE_EFFORT", efforts_of)),
-        summary_coach=_summary_coach(settings, agent_dirs["summary"], effort(settings, "EXAMPLE_EFFORT", efforts_of)),
-        transcriber=_transcriber(settings),
+        summary_coach=_summary_coach(settings, agent_dirs["summary"], effort(settings, "SUMMARY_EFFORT", efforts_of)),
+        transcriber=_transcriber(settings, agent_dirs["summary"]),
         illustrator=_illustrator(settings, image_dir, pictures),
         scene_writer=SceneWriter.with_cli(settings.get("EXAMPLE_MODEL")),
         assessor=_assessor(settings),
@@ -115,10 +116,15 @@ def _assessor(settings: Settings) -> AzureAssessor | None:
     return AzureAssessor(key, settings.get("AZURE_SPEECH_REGION"), settings.assess_word_score)
 
 
-def _transcriber(settings: Settings) -> GeminiTranscriber | None:
+def _transcriber(settings: Settings, agent_dir: Path) -> GeminiTranscriber | None:
     """Summarize's transcriber, once the Gemini key is set. It does not follow the voice provider."""
     key = settings.get("GEMINI_API_KEY")
-    return GeminiTranscriber(key) if key else None
+    if not key:
+        return None
+    if not (agent_dir / "transcription.json").is_file():
+        log.warning("summary-coach transcription setup not found: %s", agent_dir)
+        return None
+    return GeminiTranscriber(key, agent_dir)
 
 
 def voice_provider(settings: Settings) -> VoiceProvider | None:
@@ -153,12 +159,12 @@ def _example_coach(settings: Settings, agent_dir: Path, example_effort: str | No
     return ExampleCoach.with_cli(agent_dir, settings.get("EXAMPLE_MODEL"), example_effort)
 
 
-def _summary_coach(settings: Settings, agent_dir: Path, example_effort: str | None) -> SummaryCoach | None:
-    """The text half of the summary coach; it shares the example coach's model and effort."""
-    if not (agent_dir / "prompts" / SUMMARY_TEMPLATE).is_file():
-        log.warning("summary-coach feedback prompt not found: %s", agent_dir)
+def _summary_coach(settings: Settings, agent_dir: Path, summary_effort: str | None) -> SummaryCoach | None:
+    """The judge of the summary coach, on its own model: it has to answer fast."""
+    if not all((agent_dir / "prompts" / name).is_file() for name in (SUMMARY_TEMPLATE, SUMMARY_SCHEMA)):
+        log.warning("summary-coach feedback prompt or schema not found: %s", agent_dir)
         return None
-    return SummaryCoach.with_cli(agent_dir, settings.get("EXAMPLE_MODEL"), example_effort)
+    return SummaryCoach.with_cli(agent_dir, settings.get("SUMMARY_MODEL"), summary_effort)
 
 
 def _illustrator(settings: Settings, image_dir: Path | None, pictures: PictureLog | None) -> Illustrator | None:
