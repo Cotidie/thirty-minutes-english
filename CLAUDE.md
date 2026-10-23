@@ -42,3 +42,10 @@ This project is indexed by GitNexus as **thirty-minutes-english** (3257 symbols,
 | Index, status, clean, wiki CLI commands | `.claude/skills/gitnexus-cli/SKILL.md` |
 
 <!-- gitnexus:end -->
+
+# Versioning
+
+The app version (`X.Y.Z`) lives in `frontend/package.json` and `backend/pyproject.toml`; `scripts/bump-version` moves both, commits `chore: release X.Y.Z`, and tags `vX.Y.Z`. The Settings modal shows it.
+
+- After every merge into `main`, run `scripts/bump-version patch` on `main`, then push with `--follow-tags`.
+- Never bump minor or major on your own. The owner decides those and asks for them.

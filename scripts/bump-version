@@ -1,0 +1,30 @@
+#!/usr/bin/env bash
+# Moves the app version one step, in frontend/package.json and backend/pyproject.toml together,
+# then commits the bump and tags it vX.Y.Z.
+#
+#   scripts/bump-version patch   after every merge into main
+#   scripts/bump-version minor   when the owner says so
+#   scripts/bump-version major   when the owner says so
+set -euo pipefail
+
+part=${1:-}
+case "$part" in
+  patch | minor | major) ;;
+  *) echo "usage: scripts/bump-version patch|minor|major" >&2; exit 2 ;;
+esac
+
+root=$(git rev-parse --show-toplevel)
+cd "$root"
+if ! git diff --quiet || ! git diff --cached --quiet; then
+  echo "commit or stash your changes first: the bump is its own commit" >&2
+  exit 1
+fi
+
+version=$(cd frontend && npm version "$part" --no-git-tag-version)
+version=${version#v}
+(cd backend && uv version "$version" --no-sync >/dev/null)
+
+git add frontend/package.json frontend/package-lock.json backend/pyproject.toml backend/uv.lock
+git commit -q -m "chore: release $version"
+git tag "v$version"
+echo "$version"

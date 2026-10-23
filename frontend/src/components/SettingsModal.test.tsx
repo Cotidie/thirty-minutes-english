@@ -111,6 +111,12 @@ function rowOf(label: string): HTMLElement {
 }
 
 describe('SettingsModal', () => {
+  it('names the app version from package.json next to its title', async () => {
+    await open()
+    expect(__APP_VERSION__).toMatch(/^\d+\.\d+\.\d+$/)
+    expect(screen.getByRole('heading', { name: /Settings/ })).toHaveTextContent(`Settings v${__APP_VERSION__}`)
+  })
+
   it('shows one group at a time, secrets masked, the saved value as the placeholder', async () => {
     await open()
     expect(screen.getAllByRole('tab').map((t) => t.textContent)).toEqual(GROUPS.map((g) => g.title))

@@ -39,6 +39,15 @@
   flex: 1;
 }
 
+.settings-version {
+  margin-left: 0.4rem;
+  font-family: var(--sans);
+  font-size: 0.78rem;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+  vertical-align: middle;
+}
+
 .settings-head h2 {
   margin: 0;
   font-family: var(--serif);

@@ -50,6 +50,10 @@ Only the Claude token is required. Add the other keys in the app's ⚙ settings 
 | `OPENROUTER_API_KEY` or `COMFY_API_KEY` | Word pictures |
 | `FIRECRAWL_API_KEY` | Faster web search (works without it, rate-limited) |
 
+## Versioning
+
+Versions start at 0.3.0. Every merge into `main` bumps the patch; minor and major move only when the owner decides. `scripts/bump-version patch|minor|major` updates both packages, commits, and tags `vX.Y.Z`. The version shows in the Settings modal.
+
 ## License
 
 [MIT](LICENSE)

@@ -232,7 +232,9 @@ export function SettingsModal({ open, onClose }: Props) {
         >
           <header className="settings-head">
             <div>
-              <h2>Settings</h2>
+              <h2>
+                Settings <span className="settings-version">v{__APP_VERSION__}</span>
+              </h2>
               <p className="settings-lede">Saved values apply to the next round. No restart.</p>
             </div>
             <button
