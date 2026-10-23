@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Moves the app version one step, in frontend/package.json and backend/pyproject.toml together,
-# then commits the bump and tags it vX.Y.Z.
+# then commits the bump and tags it vX.Y.Z (annotated, so `git push --follow-tags` carries it).
 #
 #   scripts/bump-version patch   after every merge into main
 #   scripts/bump-version minor   when the owner says so
@@ -26,5 +26,5 @@ version=${version#v}
 
 git add frontend/package.json frontend/package-lock.json backend/pyproject.toml backend/uv.lock
 git commit -q -m "chore: release $version"
-git tag "v$version"
+git tag -a "v$version" -m "Release $version"
 echo "$version"
