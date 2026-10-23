@@ -1,3 +1,5 @@
+import type { Shown } from './lib/assessor/judge'
+
 export interface Expression {
   phrase: string
   meaning: string
@@ -207,12 +209,9 @@ export interface AssessorSession {
   word_score: number
 }
 
-export interface Correction {
-  word: string
-  heard: string
-  fix: string
-  repeated_ok: boolean
-}
+/** A mark as a reading keeps it, so it can go back on the paragraph. Readings kept before
+ * the marks were saved have `at` -1 and no sounds. */
+export type Correction = Shown
 
 export interface Reading {
   id: number

@@ -3,7 +3,7 @@ import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { LiveEvent } from '../lib/liveSession'
 import type { LiveConnection, LiveOptions } from '../lib/liveClient'
-import type { AzureWord } from '../lib/assessor/judge'
+import type { AzureWord, Shown } from '../lib/assessor/judge'
 import type { AssessorOptions } from '../lib/assessor/azure'
 import { api } from '../api'
 import { pairSentences } from '../lib/sentences'
@@ -59,7 +59,7 @@ const verified: AzureWord = { Word: 'verified', PronunciationAssessment: { Accur
 const paragraph = 'Researchers verified it.'
 
 /** The paragraph on the page, idle: marks land on its words in place. */
-function renderIdle(active = false) {
+function renderIdle(active = false, saved: Shown[] = []) {
   const onStart = vi.fn()
   const onEnd = vi.fn()
   render(
@@ -68,6 +68,7 @@ function renderIdle(active = false) {
       pieces={pairSentences([paragraph], [{ en: paragraph, ko: '연구자들이 확인했다.' }])[0]}
       spans={[]}
       summaries={[]}
+      saved={saved}
       onSummary={vi.fn()}
       sessionId={3}
       active={active}
@@ -117,19 +118,19 @@ describe('ReadAloud round', () => {
           session_id: 3,
           paragraph: 'Researchers verified it.',
           user_text: 'Researchers berified it.',
-          corrections: [{ word: 'verified', heard: 'b for v', fix: 'v', repeated_ok: false }],
+          corrections: [expect.objectContaining({ word: 'verified', heard: 'b for v', fix: 'v', repeated_ok: false, at: 1 })],
         }),
       ),
     )
   })
 
-  it('files nothing for a clean round, and returns to idle on Close', async () => {
+  it('files a clean round too, so the old marks do not come back, and returns to idle on Close', async () => {
     const { onEnd } = renderIdle()
     await startRound()
     act(() => segment([verified], 'Researchers verified it.'))
     await userEvent.click(screen.getByRole('button', { name: 'Done' }))
     await waitFor(() => expect(assessor.stop).toHaveBeenCalled())
-    expect(vi.mocked(api.addReading)).not.toHaveBeenCalled()
+    await waitFor(() => expect(vi.mocked(api.addReading)).toHaveBeenCalledWith(expect.objectContaining({ corrections: [] })))
 
     await userEvent.click(screen.getByRole('button', { name: 'Close' }))
     expect(onEnd).toHaveBeenCalled()
@@ -206,6 +207,32 @@ describe('ReadAloud round', () => {
   it('is disabled while another paragraph holds the microphone', () => {
     renderIdle(true)
     expect(screen.getByRole('button', { name: 'Read aloud' })).toBeDisabled()
+  })
+})
+
+describe('ReadAloud saved marks', () => {
+  const mark: Shown = {
+    word: 'verified',
+    heard: 'b for v',
+    fix: 'v',
+    at: 1,
+    score: 41,
+    sounds: [{ phoneme: 'v', score: 8, weak: true, heard: 'b' }],
+    repeated_ok: false,
+  }
+
+  it('shows the last round\'s marks on arrival, and opens a card from one without a round', async () => {
+    renderIdle(false, [mark])
+    await userEvent.click(screen.getByRole('button', { name: 'verified: b for v' }))
+    expect(screen.getByRole('note', { name: 'verified' })).toHaveTextContent("You said /b/. It's /v/.")
+    expect(screen.getByRole('button', { name: 'Read again' })).toBeEnabled()
+  })
+
+  it('clears them once a new round starts', async () => {
+    renderIdle(false, [mark])
+    await userEvent.click(screen.getByRole('button', { name: 'Read again' }))
+    await waitFor(() => expect(screen.getByRole('status')).toHaveTextContent('Listening'))
+    expect(screen.queryByRole('button', { name: 'verified: b for v' })).not.toBeInTheDocument()
   })
 })
 

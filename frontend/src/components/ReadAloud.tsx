@@ -10,6 +10,8 @@ interface Options {
   paragraph: string
   /** The session a finished round is filed under. */
   sessionId: number
+  /** The marks the paragraph's last round left, shown until a new round starts. */
+  saved: Shown[]
   onStart: () => void
   /** The microphone is free. */
   onEnd: () => void
@@ -68,12 +70,14 @@ interface Call {
  * as the reader goes; a clicked mark opens the full account in text, and the
  * coach is dialled to say its two beats and hang up.
  */
-export function useReadAloud({ paragraph, sessionId, onStart, onEnd }: Options): ReadAloudRound {
+export function useReadAloud({ paragraph, sessionId, saved, onStart, onEnd }: Options): ReadAloudRound {
   const [phase, setPhase] = useState<Phase | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [heard, setHeard] = useState('')
   const [seconds, setSeconds] = useState(0)
-  const [findings, setFindings] = useState<Shown[]>([])
+  /** The marks of a round started on this page; until then, the saved ones show. */
+  const [fresh, setFresh] = useState<Shown[] | null>(null)
+  const findings = fresh ?? saved
   const [open, setOpen] = useState<number | null>(null)
   const audioRef = useRef<HTMLAudioElement>(null)
   const roundRef = useRef<Round | null>(null)
@@ -93,7 +97,7 @@ export function useReadAloud({ paragraph, sessionId, onStart, onEnd }: Options):
     setError(null)
     setHeard('')
     setSeconds(0)
-    setFindings([])
+    setFresh([])
     setOpen(null)
     try {
       const session = await api.assessorToken()
@@ -129,7 +133,7 @@ export function useReadAloud({ paragraph, sessionId, onStart, onEnd }: Options):
       ...round.findings.map((f) => (confirmed.some((c) => c.at === f.at) ? { ...f, repeated_ok: true } : f)),
       ...fresh.map((f) => ({ ...f, repeated_ok: false })),
     ]
-    setFindings(round.findings)
+    setFresh(round.findings)
     if (text) {
       round.heard = round.heard ? `${round.heard} ${text}` : text
       setHeard(round.heard)
@@ -204,15 +208,9 @@ export function useReadAloud({ paragraph, sessionId, onStart, onEnd }: Options):
     setSeconds(elapsed)
     setPhase('done')
     await endRound()
-    if (round.findings.length === 0) return
+    // Filed even when clean: the latest round is the one whose marks come back.
     await api
-      .addReading({
-        session_id: sessionId,
-        paragraph,
-        user_text: round.heard,
-        seconds: elapsed,
-        corrections: round.findings.map(({ word, heard, fix, repeated_ok }) => ({ word, heard, fix, repeated_ok })),
-      })
+      .addReading({ session_id: sessionId, paragraph, user_text: round.heard, seconds: elapsed, corrections: round.findings })
       .catch(() => undefined)
   }
 

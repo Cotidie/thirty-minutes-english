@@ -44,6 +44,7 @@ it('keeps the paragraph in view while it is summed up, judges the summary on Don
       spans={[]}
       sessionId={3}
       summaries={[]}
+      saved={[]}
       onSummary={onSummary}
       active={false}
       onStart={onStart}

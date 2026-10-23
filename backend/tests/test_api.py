@@ -336,15 +336,16 @@ def test_jobs_endpoint_drops_finished_jobs(tmp_path):
         assert client.get("/api/jobs").json() == []
 
 
-def test_readings_keep_their_corrections_and_list_per_session(client):
+def test_readings_keep_their_marks_and_list_per_session(client):
     session_id = client.post("/api/sessions", json={"topic": "Digital twins"}).json()["session_id"]
+    sounds = [{"phoneme": "v", "score": 8, "weak": True, "heard": "b"}, {"phoneme": "ɛ", "score": 90, "weak": False}]
     body = {
         "session_id": session_id,
         "paragraph": "Researchers verified it.",
         "user_text": "researchers berified it",
         "seconds": 31,
         "corrections": [
-            {"word": "verified", "heard": "b for v", "fix": "vɛrɪfaɪd", "repeated_ok": True}
+            {"word": "verified", "heard": "b for v", "fix": "vɛrɪfaɪd", "repeated_ok": True, "at": 1, "score": 41, "sounds": sounds}
         ],
     }
     created = client.post("/api/readings", json=body)
@@ -353,8 +354,18 @@ def test_readings_keep_their_corrections_and_list_per_session(client):
 
     listed = client.get("/api/readings", params={"session_id": session_id}).json()
     assert [r["id"] for r in listed] == [created.json()["id"]]
-    assert listed[0]["corrections"][0]["repeated_ok"] is True
+    [mark] = listed[0]["corrections"]
+    assert (mark["repeated_ok"], mark["at"], mark["score"]) == (True, 1, 41)
+    assert [(s["phoneme"], s["heard"]) for s in mark["sounds"]] == [("v", "b"), ("ɛ", None)]
     assert client.get("/api/readings", params={"session_id": session_id + 1}).json() == []
+
+
+def test_a_reading_kept_before_marks_were_saved_has_no_place_on_the_paragraph(client):
+    session_id = client.post("/api/sessions", json={"topic": "Digital twins"}).json()["session_id"]
+    old = {"word": "verified", "heard": "b for v", "fix": "vɛrɪfaɪd"}
+    client.post("/api/readings", json={"session_id": session_id, "paragraph": "P.", "user_text": "p", "seconds": 3, "corrections": [old]})
+    [mark] = client.get("/api/readings", params={"session_id": session_id}).json()[0]["corrections"]
+    assert (mark["at"], mark["sounds"]) == (-1, [])
 
 
 def test_a_reading_without_corrections_is_a_clean_read(client):

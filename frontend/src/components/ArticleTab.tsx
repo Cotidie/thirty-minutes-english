@@ -1,10 +1,13 @@
 import { useEffect, useRef, useState } from "react";
 import { markedSpans } from "../lib/highlight";
 import { pairSentences } from "../lib/sentences";
+import { useReadingMarks } from "../lib/useReadingMarks";
 import { useSummaries } from "../lib/useSummaries";
 import type { Article, Question } from "../types";
 import { Paragraph } from "./Paragraph";
 import './ArticleTab.css'
+
+const NO_MARKS: never[] = [];
 
 export function ArticleTab({
   article,
@@ -18,6 +21,7 @@ export function ArticleTab({
   const [reading, setReading] = useState<number | null>(null);
   const bodyRef = useRef<HTMLElement>(null);
   const { summaries, add: addSummary } = useSummaries(sessionId);
+  const marks = useReadingMarks(sessionId);
   const paragraphs = article.body
     .split(/\n\s*\n/)
     .map((p) => p.trim())
@@ -47,6 +51,7 @@ export function ArticleTab({
             spans={markedSpans(p, evidence)}
             sessionId={sessionId}
             summaries={summaries.filter((s) => s.paragraph === p)}
+            saved={marks.get(p) ?? NO_MARKS}
             onSummary={addSummary}
             active={reading !== null && reading !== i}
             onStart={() => setReading(i)}

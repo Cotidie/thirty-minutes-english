@@ -28,15 +28,6 @@
   padding: 0 0.45rem;
 }
 
-.summary-note {
-  white-space: pre-wrap;
-  word-break: keep-all;
-  overflow-wrap: anywhere;
-  margin: 0;
-  padding-left: 0.9rem;
-  border-left: 3px solid var(--marker);
-}
-
 .starred-list {
   list-style: none;
   margin: 0;
@@ -70,9 +61,3 @@
   }
 }
 
-.summary-ok {
-  margin-left: 0.5rem;
-  font-size: 0.8rem;
-  color: var(--ink);
-  background: linear-gradient(transparent 66%, var(--marker-soft) 66%);
-}

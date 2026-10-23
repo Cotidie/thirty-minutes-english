@@ -1,6 +1,6 @@
 import { type ReactNode, useEffect, useState } from 'react'
 import { api } from '../api'
-import type { Correction, Example, Reading, SessionContent, Stars, Summary } from '../types'
+import type { Example, SessionContent, Stars, Summary } from '../types'
 import { SummaryCard } from './SummaryCard'
 import './SummaryTab.css'
 
@@ -8,27 +8,23 @@ interface Props {
   sessionId: number
   content: SessionContent
   stars: Stars
-  /** What the pair typed in the Notes box, as typed. */
-  note: string
 }
 
 /**
- * What the session left behind: the pair's notes, what they starred, the sentences
- * they made, the paragraphs they summed up, and the words the assessor stopped the reader on.
+ * What the session left behind: what the pair starred, the sentences they made, and the
+ * paragraphs they summed up. The note has its own button; read-aloud marks stay on the article.
  */
-export function SummaryTab({ sessionId, content, stars, note }: Props) {
+export function SummaryTab({ sessionId, content, stars }: Props) {
   const [examples, setExamples] = useState<Example[] | null>(null)
-  const [readings, setReadings] = useState<Reading[] | null>(null)
   const [summaries, setSummaries] = useState<Summary[] | null>(null)
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
     let live = true
-    Promise.all([api.listExamples(sessionId), api.listReadings(sessionId), api.listSummaries(sessionId)])
-      .then(([e, r, s]) => {
+    Promise.all([api.listExamples(sessionId), api.listSummaries(sessionId)])
+      .then(([e, s]) => {
         if (!live) return
         setExamples(e)
-        setReadings(r)
         setSummaries(s)
       })
       .catch((e: Error) => live && setError(e.message))
@@ -37,25 +33,16 @@ export function SummaryTab({ sessionId, content, stars, note }: Props) {
     }
   }, [sessionId])
 
-  const corrections = (readings ?? []).flatMap((r) => r.corrections ?? [])
   // Session order, so the list reads the way the tabs did.
   const starredExpressions = content.expressions.filter((e) => stars.expressions.includes(e.phrase))
   const starredWords = content.vocabulary.filter((v) => stars.words.includes(v.word))
   const starredCount = starredExpressions.length + starredWords.length
-  const loading = readings === null && error === null
+  const loading = examples === null && error === null
 
   return (
     <section className="tab-panel">
       {error && <p className="error">Could not read the session back: {error}</p>}
       {loading && <p className="empty">Reading it back…</p>}
-
-      <Section title="Notes">
-        {note.trim() ? (
-          <p className="summary-note">{note}</p>
-        ) : (
-          <p className="empty">Nothing noted. Type in the Notes box under the tabs.</p>
-        )}
-      </Section>
 
       <Section title="Starred" count={starredCount}>
         {starredCount === 0 && <p className="empty">Nothing starred. Tap ☆ on an expression or word card.</p>}
@@ -96,18 +83,6 @@ export function SummaryTab({ sessionId, content, stars, note }: Props) {
           ))}
         </ol>
       </Section>
-
-      <Section title="Reading to fix" count={readings === null ? undefined : corrections.length}>
-        {readings?.length === 0 && <p className="empty">No paragraph read aloud yet. The Article tab has the button.</p>}
-        {readings !== null && readings.length > 0 && corrections.length === 0 && (
-          <p className="empty">The coach let every word through. Clean read.</p>
-        )}
-        <ol className="summary-cards">
-          {corrections.map((c, i) => (
-            <CorrectionCard key={`${c.word}-${i}`} correction={c} />
-          ))}
-        </ol>
-      </Section>
     </section>
   )
 }
@@ -121,20 +96,5 @@ function Section({ title, count, children }: { title: string; count?: number; ch
       </h2>
       {children}
     </section>
-  )
-}
-
-function CorrectionCard({ correction }: { correction: Correction }) {
-  return (
-    <SummaryCard
-      label={correction.heard}
-      line={correction.word}
-      note={
-        <>
-          {correction.fix}
-          {correction.repeated_ok && <span className="summary-ok">got it on the retry</span>}
-        </>
-      }
-    />
   )
 }

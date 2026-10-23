@@ -1,7 +1,7 @@
 from datetime import datetime
 from enum import StrEnum
 
-from pydantic import BaseModel, ConfigDict, model_validator
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 
 class Category(StrEnum):
@@ -168,13 +168,29 @@ class SummaryFeedback(BaseModel):
     summary: str
 
 
+class Sound(BaseModel):
+    """One sound of a word as the assessor scored it."""
+
+    phoneme: str
+    score: float
+    weak: bool
+    """The sound heard instead, when weak and another fit better."""
+    heard: str | None = None
+
+
 class Correction(BaseModel):
-    """One word the assessor stopped the reader on, and the sound heard in its place."""
+    """One word the assessor stopped the reader on, and the sound heard in its place.
+    `at`, `score` and `sounds` put it back on the paragraph as a mark; readings kept
+    before the marks were saved lack them and stay off the page."""
 
     word: str
     heard: str
     fix: str
     repeated_ok: bool = False
+    """Where the word sits in the paragraph, counted in words; -1 when not known."""
+    at: int = -1
+    score: float = 0
+    sounds: list[Sound] = Field(default_factory=list)
 
 
 class Reading(BaseModel):

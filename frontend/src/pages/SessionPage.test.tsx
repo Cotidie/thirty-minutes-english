@@ -61,7 +61,7 @@ describe('SessionPage', () => {
     expect(screen.getByLabelText('hash')).toHaveTextContent('#article')
   })
 
-  it('keeps one note on every tab, saves it, and brings it to Summary', async () => {
+  it('keeps one note on every tab and saves it; Summary leaves it to the Notes box', async () => {
     renderAt('/s/3')
     await screen.findByText('a moving target')
 
@@ -74,7 +74,8 @@ describe('SessionPage', () => {
     expect(screen.getByRole('textbox', { name: 'Notes' })).toHaveValue('hedge 발음')
 
     await userEvent.click(screen.getByRole('button', { name: /Summary/ }))
+    expect(screen.getByRole('textbox', { name: 'Notes' })).toHaveValue('hedge 발음')
     const content = document.querySelector('.content') as HTMLElement
-    expect(within(content).getByText('hedge 발음')).toBeInTheDocument()
+    expect(within(content).queryByText('hedge 발음')).toBeNull()
   })
 })

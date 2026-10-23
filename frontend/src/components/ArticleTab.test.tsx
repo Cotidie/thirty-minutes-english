@@ -1,12 +1,14 @@
 import { fireEvent, render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, expect, it, vi } from 'vitest'
+import { api } from '../api'
 import { ArticleTab } from './ArticleTab'
 
 vi.mock('../api', () => ({
   api: {
     addReading: vi.fn(async () => ({})),
     listSummaries: vi.fn(async () => []),
+    listReadings: vi.fn(async () => []),
     assessorToken: vi.fn(async () => ({ token: 't', region: 'koreacentral', word_score: 60 })),
   },
 }))
@@ -64,6 +66,22 @@ describe('ArticleTab', () => {
     render(<ArticleTab article={article} sessionId={3} />)
     expect(screen.queryByRole('button', { name: 'Legacy question' })).toBeNull()
     expect(screen.getByText('Legacy question')).toBeInTheDocument()
+  })
+
+  it('puts back the marks of each paragraph\'s latest reading, leaving out ones kept without a place', async () => {
+    const mark = (word: string, at: number) => ({ word, heard: 'x for y', fix: 'f', at, score: 30, sounds: [], repeated_ok: false })
+    const reading = (paragraph: string, corrections: ReturnType<typeof mark>[]) =>
+      ({ id: 1, created_at: '', session_id: 3, paragraph, user_text: '', seconds: 9, corrections })
+    vi.mocked(api.listReadings).mockResolvedValueOnce([
+      reading('Ambition is cheap. Upkeep is what actually pays.', [mark('Upkeep', 3)]),
+      reading('Ambition is cheap. Upkeep is what actually pays.', [mark('Ambition', 0)]),
+      reading('A modest twin delivers more value.', [mark('modest', -1)]),
+    ])
+    render(<ArticleTab article={article} sessionId={3} />)
+    expect(await screen.findByRole('button', { name: 'Upkeep: x for y' })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Ambition: x for y' })).toBeNull()
+    expect(screen.queryByRole('button', { name: 'modest: x for y' })).toBeNull()
+    expect(vi.mocked(api.listReadings)).toHaveBeenCalledWith(3)
   })
 
   it('offers Read aloud under each paragraph and lets only one paragraph hold the microphone', async () => {

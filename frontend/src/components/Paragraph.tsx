@@ -1,4 +1,5 @@
 import { useMemo } from 'react'
+import type { Shown } from '../lib/assessor/judge'
 import type { Span } from '../lib/highlight'
 import type { Piece } from '../lib/sentences'
 import type { Summary } from '../types'
@@ -17,6 +18,8 @@ interface Props {
   sessionId: number
   /** Summaries of this paragraph already kept. */
   summaries: Summary[]
+  /** The marks this paragraph's last read-aloud round left. */
+  saved: Shown[]
   onSummary: (summary: Summary) => void
   /** Another paragraph holds the microphone. */
   active: boolean
@@ -30,9 +33,9 @@ interface Props {
  * Read aloud and Summarize sit in one row right under the text and stay there; what
  * their rounds show goes below the row. The text stays in view while it is summed up.
  */
-export function Paragraph({ paragraph, pieces, spans, sessionId, summaries, onSummary, active, onStart, onEnd }: Props) {
+export function Paragraph({ paragraph, pieces, spans, sessionId, summaries, saved, onSummary, active, onStart, onEnd }: Props) {
   const starts = useMemo(() => wordStarts(paragraph), [paragraph])
-  const round = useReadAloud({ paragraph, sessionId, onStart, onEnd })
+  const round = useReadAloud({ paragraph, sessionId, saved, onStart, onEnd })
   const summary = useSummary({ paragraph, sessionId, onKept: onSummary, onStart, onEnd })
   const marks: Marks = { findings: round.findings, open: round.open, onOpen: round.ask }
 

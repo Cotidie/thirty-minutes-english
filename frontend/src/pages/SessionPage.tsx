@@ -116,7 +116,7 @@ export function SessionPage() {
             onExample={addExample}
           />
         )}
-        {tab === SUMMARY_TAB && <SummaryTab sessionId={session.id} content={content} stars={stars} note={note.text} />}
+        {tab === SUMMARY_TAB && <SummaryTab sessionId={session.id} content={content} stars={stars} />}
       </div>
     </main>
   )
