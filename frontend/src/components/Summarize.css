@@ -4,35 +4,11 @@
   line-height: 1.45;
   display: grid;
   gap: 0.4rem;
-  justify-items: start;
+  margin-top: 0.35rem;
 }
 
 .summarize audio {
   display: none;
-}
-
-/* Open, the slip takes the row to itself. */
-.summarize.is-open {
-  justify-items: stretch;
-}
-
-.summarize-start {
-  border: 1px solid var(--line);
-  background: transparent;
-  border-radius: 999px;
-  padding: 0.15rem 0.7rem;
-  cursor: pointer;
-  color: var(--muted);
-}
-
-.summarize-start:hover:not(:disabled) {
-  border-color: var(--ink);
-  color: var(--ink);
-}
-
-.summarize-start:disabled {
-  opacity: 0.45;
-  cursor: default;
 }
 
 /* Summaries already kept: what was said, then the better one. */

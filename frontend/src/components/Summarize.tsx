@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState, type RefObject } from 'react'
 import { api } from '../api'
 import { connectSummary } from '../lib/liveClient'
 import type { LiveState } from '../lib/liveSession'
@@ -17,24 +17,37 @@ const STATUS_LABEL: Record<LiveState['status'], string> = {
   failed: 'Could not start',
 }
 
-interface Props {
+interface Options {
   paragraph: string
   sessionId: number
-  /** Summaries of this paragraph already kept, oldest first. */
-  kept: Summary[]
   onKept: (summary: Summary) => void
-  /** Something else holds the microphone. */
-  disabled: boolean
-  /** The round's status as it moves; null once the slip is gone. */
-  onStatus: (status: LiveState['status'] | null) => void
+  onStart: () => void
+  /** The microphone is free. */
+  onEnd: () => void
+}
+
+/** A paragraph's summary round as the page sees it. */
+export interface SummaryRound {
+  state: LiveState | null
+  audioRef: RefObject<HTMLAudioElement | null>
+  level: number
+  /** What was said, final once the round is closed. */
+  said: string
+  answer: SummaryFeedback | null
+  writing: boolean
+  failure: string | null
+  start: () => void
+  close: () => void
+  dismiss: () => void
+  keep: () => void
 }
 
 /**
- * A button under a paragraph that runs one round of the summary coach (agents/summary-coach/AGENT.md):
- * the reader says what the paragraph is about with it in view, Gemini's transcription model writes it
- * down primed with the paragraph's words, and on Done the judge answers in one fixed shape.
+ * One round of the summary coach (agents/summary-coach/AGENT.md): the reader says what the paragraph
+ * is about with it in view, Gemini's transcription model writes it down primed with the paragraph's
+ * words, and on Done the judge answers in one fixed shape.
  */
-export function Summarize({ paragraph, sessionId, kept, onKept, disabled, onStatus }: Props) {
+export function useSummary({ paragraph, sessionId, onKept, onStart, onEnd }: Options): SummaryRound {
   const audioRef = useRef<HTMLAudioElement>(null)
   const [answer, setAnswer] = useState<SummaryFeedback | null>(null)
   const [writing, setWriting] = useState(false)
@@ -44,12 +57,10 @@ export function Summarize({ paragraph, sessionId, kept, onKept, disabled, onStat
     (opts) => connectSummary(paragraph, opts),
     async (r) => onKept(await api.addSummary({ session_id: sessionId, paragraph, user_text: r.user.trim(), feedback: answer!, seconds: r.seconds })),
   )
-  const { state, close, save } = round
+  const { state } = round
   const level = useMicLevel(round.microphone)
   const status = state?.status ?? null
   const said = state?.user.trim() ?? ''
-
-  useEffect(() => onStatus(status), [status, onStatus])
 
   // The round is over and something was said: have it judged, once.
   useEffect(() => {
@@ -75,46 +86,49 @@ export function Summarize({ paragraph, sessionId, kept, onKept, disabled, onStat
   }
   const start = () => {
     clear()
-    return round.start()
+    onStart()
+    void round.start()
   }
   const dismiss = () => {
     clear()
     round.dismiss()
+    onEnd()
   }
   const keep = async () => {
-    if (await save()) dismiss()
+    if (await round.save()) dismiss()
   }
 
+  return { state, audioRef, level, said, answer, writing, failure, start, close: round.close, dismiss, keep: () => void keep() }
+}
+
+/** Starts a round. It stays in its place under the paragraph; the round itself shows below. */
+export function SummarizeButton({ summary, kept, disabled }: { summary: SummaryRound; kept: boolean; disabled: boolean }) {
   return (
-    <div className={`summarize${state ? ' is-open' : ''}`}>
+    <button type="button" className="paragraph-action" onClick={summary.start} disabled={disabled || summary.state !== null}>
+      {kept ? 'Summarize again' : 'Summarize'}
+    </button>
+  )
+}
+
+/** The round as it runs, then the summaries already kept. */
+export function SummaryPanel({ summary, kept }: { summary: SummaryRound; kept: Summary[] }) {
+  const { state, said, answer, writing, failure } = summary
+  return (
+    <div className="summarize">
       {/* The transcriber sends no sound; the transport still wants somewhere to play it. */}
-      <audio ref={audioRef} autoPlay muted />
-      {kept.length > 0 && (
-        <ol className="summaries" aria-label="Summaries of this paragraph">
-          {kept.map((s) => (
-            <li key={s.id} className="summary-kept">
-              <p className="summary-kept-said">{s.user_text}</p>
-              <p className="summary-kept-better">{s.feedback.summary}</p>
-            </li>
-          ))}
-        </ol>
-      )}
-      {state === null ? (
-        <button type="button" className="summarize-start" onClick={() => void start()} disabled={disabled}>
-          {kept.length > 0 ? 'Summarize again' : 'Summarize'}
-        </button>
-      ) : (
+      <audio ref={summary.audioRef} autoPlay muted />
+      {state && (
         <Slip
           label="Summarize this paragraph"
           state={state}
-          level={level}
+          level={summary.level}
           status={STATUS_LABEL[state.status]}
           tools={
             <>
-              <button type="button" className="slip-icon" aria-label="Retry" title="Retry" onClick={() => void start()}>
+              <button type="button" className="slip-icon" aria-label="Retry" title="Retry" onClick={summary.start}>
                 ↻
               </button>
-              <button type="button" className="slip-icon" aria-label="Discard" title="Discard" onClick={dismiss}>
+              <button type="button" className="slip-icon" aria-label="Discard" title="Discard" onClick={summary.dismiss}>
                 ✕
               </button>
             </>
@@ -123,12 +137,12 @@ export function Summarize({ paragraph, sessionId, kept, onKept, disabled, onStat
           actions={
             <>
               {state.status === 'listening' && (
-                <button type="button" onClick={close}>
+                <button type="button" onClick={summary.close}>
                   Done
                 </button>
               )}
               {state.status === 'closed' && (
-                <button type="button" className="slip-save" onClick={() => void keep()} disabled={answer === null}>
+                <button type="button" className="slip-save" onClick={summary.keep} disabled={answer === null}>
                   Keep
                 </button>
               )}
@@ -144,6 +158,16 @@ export function Summarize({ paragraph, sessionId, kept, onKept, disabled, onStat
           )}
           {answer && <Feedback answer={answer} />}
         </Slip>
+      )}
+      {kept.length > 0 && (
+        <ol className="summaries" aria-label="Summaries of this paragraph">
+          {kept.map((s) => (
+            <li key={s.id} className="summary-kept">
+              <p className="summary-kept-said">{s.user_text}</p>
+              <p className="summary-kept-better">{s.feedback.summary}</p>
+            </li>
+          ))}
+        </ol>
       )}
     </div>
   )

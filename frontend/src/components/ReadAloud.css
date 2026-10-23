@@ -9,25 +9,6 @@
   display: none;
 }
 
-.read-aloud-start {
-  border: 1px solid var(--line);
-  background: transparent;
-  border-radius: 999px;
-  padding: 0.15rem 0.7rem;
-  cursor: pointer;
-  color: var(--muted);
-}
-
-.read-aloud-start:hover:not(:disabled) {
-  border-color: var(--ink);
-  color: var(--ink);
-}
-
-.read-aloud-start:disabled {
-  opacity: 0.45;
-  cursor: default;
-}
-
 .read-aloud.is-live {
   border-left: 3px solid var(--marker);
   padding-left: 0.75rem;

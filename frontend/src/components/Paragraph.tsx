@@ -1,12 +1,11 @@
-import { useMemo, useState } from 'react'
+import { useMemo } from 'react'
 import type { Span } from '../lib/highlight'
-import type { LiveState } from '../lib/liveSession'
 import type { Piece } from '../lib/sentences'
 import type { Summary } from '../types'
 import { wordStarts, type Marks } from '../lib/words'
-import { ReadAloudBar, useReadAloud } from './ReadAloud'
+import { ReadAloudButton, ReadAloudPanel, useReadAloud } from './ReadAloud'
 import { Run, Sentence } from './Sentence'
-import { Summarize } from './Summarize'
+import { SummarizeButton, SummaryPanel, useSummary } from './Summarize'
 import './Paragraph.css'
 
 interface Props {
@@ -28,24 +27,13 @@ interface Props {
 /**
  * One paragraph of the article in its own formatting throughout: sentences
  * flip to Korean on click, and the read-aloud marks are drawn on the words in place.
- * The text stays in view while the reader sums it up out loud, so they can look back at it.
+ * Read aloud and Summarize sit in one row right under the text and stay there; what
+ * their rounds show goes below the row. The text stays in view while it is summed up.
  */
 export function Paragraph({ paragraph, pieces, spans, sessionId, summaries, onSummary, active, onStart, onEnd }: Props) {
-  /** A summary round holds the microphone. */
-  const [summing, setSumming] = useState(false)
-  const onStatus = useMemo(
-    () => (status: LiveState['status'] | null) => {
-      const now = status !== null
-      setSumming((before) => {
-        if (!before && now) onStart()
-        if (before && !now) onEnd()
-        return now
-      })
-    },
-    [onStart, onEnd],
-  )
   const starts = useMemo(() => wordStarts(paragraph), [paragraph])
   const round = useReadAloud({ paragraph, sessionId, onStart, onEnd })
+  const summary = useSummary({ paragraph, sessionId, onKept: onSummary, onStart, onEnd })
   const marks: Marks = { findings: round.findings, open: round.open, onOpen: round.ask }
 
   return (
@@ -56,17 +44,12 @@ export function Paragraph({ paragraph, pieces, spans, sessionId, summaries, onSu
           return piece.ko === null ? <Run key={j} {...run} /> : <Sentence key={j} {...run} ko={piece.ko} />
         })}
       </p>
-      <div className="paragraph-tools">
-        <ReadAloudBar round={round} active={active || summing} />
-        <Summarize
-          paragraph={paragraph}
-          sessionId={sessionId}
-          kept={summaries}
-          onKept={onSummary}
-          disabled={active || round.phase !== null}
-          onStatus={onStatus}
-        />
+      <div className="paragraph-actions">
+        <ReadAloudButton round={round} disabled={active || summary.state !== null} />
+        <SummarizeButton summary={summary} kept={summaries.length > 0} disabled={active || round.phase !== null} />
       </div>
+      <ReadAloudPanel round={round} />
+      <SummaryPanel summary={summary} kept={summaries} />
     </div>
   )
 }

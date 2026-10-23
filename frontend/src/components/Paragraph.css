@@ -7,21 +7,38 @@
   margin: 0;
 }
 
-/* Read aloud and Summarize side by side; whichever is running takes the row. */
-.paragraph-tools {
+/* Read aloud and Summarize in one row right under the text. It never moves; rounds show below it. */
+.paragraph-actions {
   display: flex;
   flex-wrap: wrap;
-  align-items: flex-start;
   gap: 0.4rem;
   margin-top: 0.35rem;
+  font-family: var(--sans);
+  font-size: 0.86rem;
 }
 
-.paragraph-tools .read-aloud {
-  margin-top: 0;
+.paragraph-action {
+  border: 1px solid var(--line);
+  background: transparent;
+  border-radius: 999px;
+  padding: 0.15rem 0.7rem;
+  cursor: pointer;
+  color: var(--muted);
+  font: inherit;
 }
 
-.paragraph-tools .read-aloud.is-shown,
-.paragraph-tools .summarize.is-open,
-.paragraph-tools .summarize:has(.summaries) {
-  flex: 1 0 100%;
+.paragraph-action:hover:not(:disabled) {
+  border-color: var(--ink);
+  color: var(--ink);
+}
+
+.paragraph-action:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+/* A panel holding only its audio element takes no room. */
+.paragraph .read-aloud:not(:has(> :not(audio))),
+.paragraph .summarize:not(:has(> :not(audio))) {
+  display: none;
 }

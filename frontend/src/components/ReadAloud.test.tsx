@@ -182,6 +182,18 @@ describe('ReadAloud round', () => {
     expect(screen.getByRole('note', { name: 'verified' })).toBeInTheDocument()
   })
 
+  it('keeps Read aloud and Summarize in one row right under the text, with the round below it', async () => {
+    renderIdle()
+    await startRound()
+    act(() => segment([berified], 'berified'))
+    await userEvent.click(screen.getByRole('button', { name: 'verified: b for v' }))
+
+    const row = screen.getByRole('button', { name: 'Summarize' }).parentElement!
+    expect(row.previousElementSibling).toHaveTextContent(paragraph)
+    expect(row).toContainElement(screen.getByRole('button', { name: 'Read again' }))
+    expect(row.compareDocumentPosition(screen.getByRole('note', { name: 'verified' }))).toBe(Node.DOCUMENT_POSITION_FOLLOWING)
+  })
+
   it('fails before touching the microphone when the assessor is off', async () => {
     vi.mocked(api.assessorToken).mockRejectedValueOnce(new Error('Read aloud is off: set AZURE_SPEECH_KEY in Settings'))
     renderIdle()

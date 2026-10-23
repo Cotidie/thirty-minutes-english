@@ -228,20 +228,24 @@ export function useReadAloud({ paragraph, sessionId, onStart, onEnd }: Options):
   return { phase, error, heard, seconds, findings, open, audioRef, start: () => void start(), done: () => void done(), reset, ask }
 }
 
-/** The round's controls: the button, the status bar, the open card, and what was heard. */
-export function ReadAloudBar({ round, active }: { round: ReadAloudRound; active: boolean }) {
+/** Starts a round. It stays in its place under the paragraph; the round itself shows below. */
+export function ReadAloudButton({ round, disabled }: { round: ReadAloudRound; disabled: boolean }) {
+  return (
+    <button type="button" className="paragraph-action" onClick={round.start} disabled={disabled || round.phase !== null}>
+      {round.phase !== null || round.findings.length > 0 ? 'Read again' : 'Read aloud'}
+    </button>
+  )
+}
+
+/** The round as it runs: the open card, the status bar, and what was heard. */
+export function ReadAloudPanel({ round }: { round: ReadAloudRound }) {
   const { phase, error, heard, seconds, findings, open } = round
   const card = open === null ? null : findings[open]
-  const shown = phase !== null || findings.length > 0
   return (
-    <div className={`read-aloud${phase === 'listening' ? ' is-live' : ''}${shown ? ' is-shown' : ''}`}>
+    <div className={`read-aloud${phase === 'listening' ? ' is-live' : ''}`}>
       <audio ref={round.audioRef} autoPlay />
       {card && <FindingCard finding={card} />}
-      {phase === null ? (
-        <button type="button" className="read-aloud-start" onClick={round.start} disabled={active}>
-          {shown ? 'Read again' : 'Read aloud'}
-        </button>
-      ) : (
+      {phase !== null && (
         <>
           <div className="read-aloud-bar">
             <span className="read-aloud-status" role="status">
