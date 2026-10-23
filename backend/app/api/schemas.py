@@ -38,14 +38,18 @@ def _not_blank(value: str) -> str:
     return value
 
 
-class ReadAloudRequest(BaseModel):
-    """A live round on one paragraph read aloud. `sdp` is the browser's WebRTC offer;
-    only the OpenAI provider needs one."""
+class ParagraphRequest(BaseModel):
+    """A live round on one paragraph of the article."""
 
     paragraph: str
-    sdp: str | None = None
 
     _check = field_validator("paragraph")(_not_blank)
+
+
+class ReadAloudRequest(ParagraphRequest):
+    """The paragraph read aloud. `sdp` is the browser's WebRTC offer; only the OpenAI provider needs one."""
+
+    sdp: str | None = None
 
 
 class ExampleSessionRequest(BaseModel):

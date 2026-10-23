@@ -30,10 +30,10 @@ interface Props {
 }
 
 /**
- * A button under a paragraph. The reader says what they understood; Gemini's transcription
- * model only writes it down, never shown the paragraph, and on Done a text model judges it
- * against the paragraph: what was missed, what was unskilled in the reader's wording, and the
- * summary with those fixes in.
+ * A button under a paragraph. The reader says what it is about, looking at it if they like;
+ * Gemini's transcription model writes it down, primed with the paragraph's words, and on Done
+ * a text model judges it against the paragraph: what was missed, what was unskilled in the
+ * reader's wording, and a model answer of one or two short sentences built from what they said.
  */
 export function Summarize({ paragraph, sessionId, kept, onKept, disabled, onStatus }: Props) {
   const audioRef = useRef<HTMLAudioElement>(null)
@@ -42,7 +42,7 @@ export function Summarize({ paragraph, sessionId, kept, onKept, disabled, onStat
   const [failure, setFailure] = useState<string | null>(null)
   const round = useLiveRound(
     audioRef,
-    connectSummary,
+    (opts) => connectSummary(paragraph, opts),
     async (r) => onKept(await api.addSummary({ session_id: sessionId, paragraph, user_text: r.user.trim(), feedback: answer!, seconds: r.seconds })),
   )
   const { state, close, save } = round
@@ -150,7 +150,7 @@ export function Summarize({ paragraph, sessionId, kept, onKept, disabled, onStat
   )
 }
 
-/** The judgment: what they missed, their wording fixed line by line, then the summary those fixes add up to. */
+/** The judgment: what they missed, their wording fixed line by line, then the model answer. */
 function Feedback({ answer }: { answer: SummaryFeedback }) {
   return (
     <div className="summary-feedback">
@@ -174,29 +174,12 @@ function Feedback({ answer }: { answer: SummaryFeedback }) {
         </ul>
       )}
       <p className="summary-better">
-        <span className="summary-heading">Put together</span>
-        {fixedParts(answer).map((part, i) => (part.fixed ? <b key={i}>{part.text}</b> : part.text))}
-        <SpeakButton text={answer.summary} what="the better summary" />
+        <span className="summary-heading">Model answer</span>
+        {answer.summary}
+        <SpeakButton text={answer.summary} what="the model answer" />
       </p>
     </div>
   )
-}
-
-/** The summary cut where a fix's wording sits in it, so the corrected pieces stand out. */
-function fixedParts({ summary, fixes }: SummaryFeedback): { text: string; fixed: boolean }[] {
-  const lower = summary.toLowerCase()
-  const spans = fixes
-    .map((fix) => ({ start: lower.indexOf(fix.better.toLowerCase()), length: fix.better.length }))
-    .filter((span) => span.start >= 0)
-    .sort((a, b) => a.start - b.start)
-  const parts: { text: string; fixed: boolean }[] = []
-  let at = 0
-  for (const span of spans) {
-    if (span.start < at) continue // overlaps the one before
-    parts.push({ text: summary.slice(at, span.start), fixed: false }, { text: summary.slice(span.start, span.start + span.length), fixed: true })
-    at = span.start + span.length
-  }
-  return [...parts, { text: summary.slice(at), fixed: false }].filter((part) => part.text)
 }
 
 function hintFor(state: LiveState, writing: boolean, answered: boolean, said: boolean): string {

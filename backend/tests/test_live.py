@@ -6,7 +6,7 @@ from fastapi.testclient import TestClient
 from app.db import Database
 from app.main import create_app
 from app.net import HttpError
-from app.voice.live import AgentDefinition, GeminiTranscriber, GeminiVoice, LiveAgent, OpenAIVoice
+from app.voice.live import AgentDefinition, GeminiTranscriber, GeminiVoice, LiveAgent, OpenAIVoice, vocabulary
 from app.wiring import Services
 from tests.test_api import FakeGenerator, InlineExecutor
 
@@ -181,31 +181,41 @@ def test_gemini_round_needs_no_offer(tmp_path, agent_dir, http):
     assert "setup" in res.json() and "url" in res.json()
 
 
-def test_transcriber_is_given_nothing_to_read_and_only_english_or_korean(http):
+def test_transcriber_hears_only_english_or_korean_primed_with_the_paragraph_words(http):
     http.json = {"name": "auth_tokens/abc"}
-    answer = GeminiTranscriber("AIza-test").start()
+    answer = GeminiTranscriber("AIza-test").start(PARAGRAPH)
     setup = http.sent()["bidiGenerateContentSetup"]
     assert setup == {
         "model": "models/gemini-3.5-transcribe-live",
         "generationConfig": {"responseModalities": ["TEXT"]},
-        "inputAudioTranscription": {"languageCodes": ["en-US", "ko-KR"]},
+        "inputAudioTranscription": {
+            "languageCodes": ["en-US", "ko-KR"],
+            "customVocabulary": ["Researchers", "verified", "that", "battery", "lasts", "twice", "long"],
+        },
     }
     assert answer["provider"] == "gemini" and answer["setup"] == setup
     assert answer["url"].endswith("?access_token=auth_tokens/abc")
 
 
-def test_summary_round_opens_the_transcriber_without_the_paragraph(tmp_path, http):
+def test_vocabulary_keeps_each_term_once_and_drops_short_common_words():
+    text = "I think AI at MIT and Segev's team found the cortical neuron. Cortical again, at five-to-eight layers."
+    assert vocabulary(text) == ["think", "AI", "MIT", "Segev's", "team", "found", "cortical", "neuron", "again", "five-to-eight", "layers"]
+    assert len(vocabulary(" ".join(f"word{chr(97 + i % 26)}{chr(97 + i // 26)}" for i in range(300)))) == 100
+
+
+def test_summary_round_opens_the_transcriber_on_the_paragraph(tmp_path, http):
     http.json = {"name": "auth_tokens/abc"}
     with make_client(tmp_path, {}, GeminiTranscriber("AIza-test")) as c:
-        res = c.post("/api/summary/sessions")
+        res = c.post("/api/summary/sessions", json={"paragraph": PARAGRAPH})
+        assert c.post("/api/summary/sessions", json={"paragraph": " "}).status_code == 422
     assert res.status_code == 201
     assert res.json()["provider"] == "gemini"
-    assert "systemInstruction" not in http.sent()["bidiGenerateContentSetup"]
+    assert "battery" in http.sent()["bidiGenerateContentSetup"]["inputAudioTranscription"]["customVocabulary"]
 
 
 def test_summary_round_is_off_without_the_gemini_key(tmp_path):
     with make_client(tmp_path, {}) as c:
-        res = c.post("/api/summary/sessions")
+        res = c.post("/api/summary/sessions", json={"paragraph": PARAGRAPH})
     assert res.status_code == 503
     assert "GEMINI_API_KEY" in res.json()["detail"]
 

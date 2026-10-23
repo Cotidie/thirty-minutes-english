@@ -8,6 +8,7 @@ from app.api.schemas import (
     ExampleFeedbackRequest,
     ExampleSessionRequest,
     LiveSession,
+    ParagraphRequest,
     ReadAloudRequest,
     SpeechRequest,
     SummaryFeedbackRequest,
@@ -36,13 +37,13 @@ def start_read_aloud(body: ReadAloudRequest, services: Svc) -> dict:
 
 
 @router.post("/summary/sessions", response_model=LiveSession, status_code=201)
-def start_summary(services: Svc) -> dict:
-    """A round that only writes down what the reader says the paragraph was about. It is not given the paragraph."""
+def start_summary(body: ParagraphRequest, services: Svc) -> dict:
+    """A round that only writes down what the reader says the paragraph is about, primed with its words."""
     transcriber = services.transcriber
     if transcriber is None:
         raise off("Summarize is off: set GEMINI_API_KEY in Settings")
     try:
-        return transcriber.start()
+        return transcriber.start(body.paragraph)
     except HttpError as e:
         raise failed("transcription session", e) from e
 

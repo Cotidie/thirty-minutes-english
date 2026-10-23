@@ -25,11 +25,3 @@
 .paragraph-tools .summarize:has(.summaries) {
   flex: 1 0 100%;
 }
-
-/* Being summed up from memory: the words are there but not readable. */
-.article .paragraph > p.is-veiled {
-  filter: blur(6px);
-  cursor: pointer;
-  user-select: none;
-  transition: filter 0.3s ease;
-}

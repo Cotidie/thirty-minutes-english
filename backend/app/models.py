@@ -164,7 +164,7 @@ class SummaryFeedback(BaseModel):
     """Key points left out or got wrong; empty when the summary holds."""
     missed: list[str]
     fixes: list[SummaryFix]
-    """The reader's summary with every fix put in, word for word."""
+    """A model answer: what the reader said, cut to one or two short sentences."""
     summary: str
 
 

@@ -17,9 +17,9 @@ export function connectReadAloud(paragraph: string, opts: RoundOptions): Promise
   return connectLive({ ...opts, start: (sdp) => api.startReadAloud(paragraph, sdp) })
 }
 
-/** Writes down what the user says a paragraph is about, in English or Korean. It is given nothing to read and never answers. */
-export function connectSummary(opts: RoundOptions): Promise<LiveConnection> {
-  return connectGeminiTranscription({ ...opts, start: () => api.startSummary() })
+/** Writes down what the user says a paragraph is about, in English or Korean, primed with the paragraph's words. It never answers. */
+export function connectSummary(paragraph: string, opts: RoundOptions): Promise<LiveConnection> {
+  return connectGeminiTranscription({ ...opts, start: () => api.startSummary(paragraph) })
 }
 
 /** One sentence made with an expression or word, said back the native way with a line of feedback. */

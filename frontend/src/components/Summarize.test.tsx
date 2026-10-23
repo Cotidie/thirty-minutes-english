@@ -10,13 +10,13 @@ import { Paragraph } from './Paragraph'
 
 const connection = { microphone: {} as MediaStream, say: vi.fn(), correct: vi.fn(), close: vi.fn(), dispose: vi.fn() }
 let emit: (e: LiveEvent) => void = () => undefined
-const connect = vi.fn(async (opts: RoundOptions): Promise<LiveConnection> => {
+const connect = vi.fn(async (_paragraph: string, opts: RoundOptions): Promise<LiveConnection> => {
   emit = opts.onEvent
   return connection
 })
 
 vi.mock('../lib/liveClient', () => ({
-  connectSummary: (opts: RoundOptions) => connect(opts),
+  connectSummary: (paragraph: string, opts: RoundOptions) => connect(paragraph, opts),
   connectReadAloud: vi.fn(),
 }))
 vi.mock('../api', () => ({ api: { summaryFeedback: vi.fn(), addSummary: vi.fn(), speak: vi.fn() } }))
@@ -29,7 +29,7 @@ const feedback: SummaryFeedback = {
   fixes: [{ said: 'was remove', better: 'got rid of', why: 'Use one simple past verb.' }],
 }
 
-it('veils the paragraph while it is summed up, judges the summary on Done, and keeps it', async () => {
+it('keeps the paragraph in view while it is summed up, judges the summary on Done, and keeps it', async () => {
   vi.useFakeTimers({ shouldAdvanceTime: true })
   const kept: Summary = { id: 5, created_at: '', session_id: 3, paragraph, user_text: said, feedback, seconds: 20 }
   vi.mocked(api.summaryFeedback).mockResolvedValue(feedback)
@@ -54,8 +54,9 @@ it('veils the paragraph while it is summed up, judges the summary on Done, and k
 
   await userEvent.click(screen.getByRole('button', { name: 'Summarize' }))
   act(() => emit({ type: 'session.started', session: { id: 'live_1' } }))
+  expect(connect.mock.calls[0][0]).toBe(paragraph) // the transcriber is primed with its words
   expect(onStart).toHaveBeenCalledOnce()
-  expect(text).toHaveClass('is-veiled')
+  expect(text).toHaveTextContent(paragraph) // still there to look back at
   expect(screen.getByRole('button', { name: 'Read aloud' })).toBeDisabled() // one microphone
 
   // The listener answering does not end the round: the reader may only have paused.
@@ -68,11 +69,10 @@ it('veils the paragraph while it is summed up, judges the summary on Done, and k
 
   await userEvent.click(screen.getByRole('button', { name: 'Done' }))
   act(() => emit({ type: 'session.closed', usage: { seconds: 20 } }))
-  expect(text).not.toHaveClass('is-veiled')
   expect(await screen.findByText(/is now bringing them back/)).toBeInTheDocument()
   expect(api.summaryFeedback).toHaveBeenCalledExactlyOnceWith(paragraph, said)
   expect(screen.getByText('Why: trams cost less than subways.')).toBeInTheDocument()
-  expect(screen.getAllByText('got rid of')).toHaveLength(2) // in its fix, and marked in the summary built from the fixes
+  expect(screen.getByText('Model answer').parentElement).toHaveTextContent(feedback.summary)
 
   await userEvent.click(screen.getByRole('button', { name: 'Keep' }))
   expect(api.addSummary).toHaveBeenCalledWith({ session_id: 3, paragraph, user_text: said, feedback, seconds: 20 })

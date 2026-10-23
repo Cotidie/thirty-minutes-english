@@ -6,6 +6,7 @@ hands out a one-use token and the setup message for its WebSocket."""
 import copy
 import json
 import logging
+import re
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Protocol
@@ -26,6 +27,8 @@ GEMINI_CONNECT_WINDOW = timedelta(minutes=2)
 TRANSCRIBE_MODEL = "gemini-3.5-transcribe-live"
 # The user speaks English, with a Korean word now and then; Gemini transcribes into these two only.
 LANGUAGES = ["en-US", "ko-KR"]
+# Google gets its best results from custom vocabulary of up to 100 terms.
+VOCABULARY_SIZE = 100
 
 
 class AgentDefinition:
@@ -143,21 +146,32 @@ class GeminiVoice:
 
 
 class GeminiTranscriber:
-    """Speech to text on Gemini's transcription model, whatever the voice provider:
-    no prompt, no voice, and nothing given to read, so it writes down only what was said."""
+    """Speech to text on Gemini's transcription model, whatever the voice provider. It takes
+    no prompt and has no voice; the paragraph reaches it as vocabulary, so its names and
+    terms come back spelled as the paragraph spells them."""
 
     def __init__(self, api_key: str):
         self.api_key = api_key
 
-    def start(self) -> dict:
+    def start(self, paragraph: str) -> dict:
         setup = {
             "model": f"models/{TRANSCRIBE_MODEL}",
             "generationConfig": {"responseModalities": ["TEXT"]},
-            "inputAudioTranscription": {"languageCodes": LANGUAGES},
+            "inputAudioTranscription": {"languageCodes": LANGUAGES, "customVocabulary": vocabulary(paragraph)},
         }
         result = gemini_round(self.api_key, setup)
         log.info("transcription opened on %s", TRANSCRIBE_MODEL)
         return result
+
+
+def vocabulary(text: str) -> list[str]:
+    """Each distinct word of the text once, in order, as written the first time. Words under
+    four letters are left out unless written in capitals (AI, MIT): they are the common ones."""
+    seen: dict[str, str] = {}
+    for word in re.findall(r"[A-Za-z][A-Za-z'-]*[A-Za-z]", text):
+        if len(word) >= 4 or word.isupper():
+            seen.setdefault(word.lower(), word)
+    return list(seen.values())[:VOCABULARY_SIZE]
 
 
 def _rfc3339(moment: datetime) -> str:
