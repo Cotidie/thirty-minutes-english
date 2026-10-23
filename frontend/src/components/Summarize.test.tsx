@@ -1,4 +1,4 @@
-import { act, render, screen } from '@testing-library/react'
+import { act, render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { expect, it, vi } from 'vitest'
 import { api } from '../api'
@@ -29,7 +29,7 @@ const feedback: SummaryFeedback = {
   fixes: [{ said: 'was remove', better: 'got rid of' }],
 }
 
-it('keeps the paragraph in view while it is summed up, judges the summary on Done, and keeps it', async () => {
+it('keeps the paragraph in view while it is summed up, then on Done judges the summary and keeps it on its own', async () => {
   vi.useFakeTimers({ shouldAdvanceTime: true })
   const kept: Summary = { id: 5, created_at: '', session_id: 3, paragraph, user_text: said, feedback, seconds: 20 }
   vi.mocked(api.summaryFeedback).mockResolvedValue(feedback)
@@ -69,16 +69,38 @@ it('keeps the paragraph in view while it is summed up, judges the summary on Don
   act(() => emit({ type: 'session.input_transcript.delta', delta: ' and now making again.' }))
 
   await userEvent.click(screen.getByRole('button', { name: 'Done' }))
+  expect(screen.queryByRole('button', { name: 'Keep' })).toBeNull()
   act(() => emit({ type: 'session.closed', usage: { seconds: 20 } }))
-  expect(await screen.findByText(/is now bringing them back/)).toBeInTheDocument()
+  await vi.waitFor(() => expect(onSummary).toHaveBeenCalledWith(kept))
   expect(api.summaryFeedback).toHaveBeenCalledExactlyOnceWith(paragraph, said)
-  expect(screen.getByText('Why: trams cost less than subways.')).toBeInTheDocument()
-  expect(screen.getByText('Say it better').nextElementSibling).toHaveTextContent('was remove → got rid of')
-  expect(screen.getByText('Model answer').nextElementSibling).toHaveTextContent(feedback.summary)
-
-  await userEvent.click(screen.getByRole('button', { name: 'Keep' }))
   expect(api.addSummary).toHaveBeenCalledWith({ session_id: 3, paragraph, user_text: said, feedback, seconds: 20 })
-  expect(onSummary).toHaveBeenCalledWith(kept)
+  // The slip closes; the kept card shows the judgment in its place.
+  expect(screen.queryByRole('dialog', { name: 'Summarize this paragraph' })).toBeNull()
   expect(onEnd).toHaveBeenCalledOnce()
   vi.useRealTimers()
+})
+
+it('shows a kept summary in the card it was judged in, set apart from the article text', () => {
+  const kept: Summary = { id: 7, created_at: '', session_id: 3, paragraph, user_text: said, feedback, seconds: 20 }
+  render(
+    <Paragraph
+      paragraph={paragraph}
+      pieces={[{ text: paragraph, start: 0, ko: null }]}
+      spans={[]}
+      sessionId={3}
+      summaries={[kept]}
+      saved={[]}
+      onSummary={vi.fn()}
+      active={false}
+      onStart={vi.fn()}
+      onEnd={vi.fn()}
+    />,
+  )
+  const [card] = within(screen.getByRole('list', { name: 'Summaries of this paragraph' })).getAllByRole('listitem')
+  expect(card).toHaveClass('slip')
+  expect(within(card).getByText('You').nextElementSibling).toHaveTextContent(said)
+  expect(within(card).getByText('Missed').nextElementSibling).toHaveTextContent(feedback.missed[0])
+  expect(within(card).getByText('Say it better').nextElementSibling).toHaveTextContent('was remove → got rid of')
+  expect(within(card).getByText('Model answer').nextElementSibling).toHaveTextContent(feedback.summary)
+  expect(screen.getByRole('button', { name: 'Summarize again' })).toBeEnabled()
 })

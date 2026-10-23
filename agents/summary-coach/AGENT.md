@@ -27,7 +27,7 @@
 2. **말하기와 받아 적기.** 사용자가 말한다. 말이 멈출 때마다 그 발화가 `serverContent.inputTranscription`으로 한 덩어리씩 오고, 호스트는 공백 하나로 잇는다. 대답할 차례가 없으니 침묵이 길어도 라운드는 닫히지 않는다.
 3. **Done.** 호스트가 마이크 전송을 멈추고 `realtimeInput.audioStreamEnd`를 보낸다. 말하던 중이면(`voiceActivity`가 `ACTIVITY_START` 뒤 아직 `ACTIVITY_END` 전) 마지막 발화가 올 때까지 최대 3초 기다렸다가 소켓을 닫는다.
 4. **판단.** transcript가 비어 있지 않으면 `prompts/feedback.md`의 `{{paragraph}}`, `{{summary}}`를 채워 판단 모델을 한 번 부른다. 출력은 `prompts/feedback.schema.json`으로 묶는다. 비어 있으면 판단하지 않는다.
-5. **보여 주기.** 아래 형식으로 그린다. Keep이면 문단, transcript, 피드백, 말한 시간(초)을 저장한다. 다시 하기는 1번부터.
+5. **저장하고 보여 주기.** 판단이 오면 묻지 않고 문단, transcript, 피드백, 말한 시간(초)을 저장한다. 진행 카드는 닫히고, 같은 자리에 저장된 카드가 아래 형식으로 남는다(최신이 위). 다시 하기는 1번부터.
 
 ## 피드백 형식
 

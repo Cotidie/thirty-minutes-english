@@ -36,7 +36,8 @@ export interface LiveRound {
 export function useLiveRound(
   audio: RefObject<HTMLAudioElement | null>,
   connect: Connect,
-  keep: Keep,
+  /** What `save` does with the round. A round that files itself does without. */
+  keep?: Keep,
   onTurn?: OnTurn,
 ): LiveRound {
   const [state, setState] = useState<LiveState | null>(null)
@@ -70,9 +71,10 @@ export function useLiveRound(
 
   const save = useCallback(async () => {
     const round = latest.current
-    if (!round) return false
+    const keep = handlers.current.keep
+    if (!round || !keep) return false
     try {
-      await handlers.current.keep(round)
+      await keep(round)
       return true
     } catch (e) {
       apply((s) => ({ ...s, error: e instanceof Error ? e.message : String(e) }))
