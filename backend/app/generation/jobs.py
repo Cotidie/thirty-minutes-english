@@ -4,22 +4,27 @@ import logging
 import random
 import time
 import uuid
-from collections import deque
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass, field
 from statistics import median
 from threading import Lock
 from typing import Literal, Protocol
 
+from app.db.expressions import ExpressionRepo
 from app.db.sessions import SessionRepo
+from app.db.stages import StageRepo
+from app.generation.exclusions import Exclusions
 from app.generation.generator import VOCABULARY_COUNT, Generator
 from app.generation.progress import Progress, Stage, with_pictures
 from app.llm import GenerationError
-from app.models import SessionContent
-from app.pictures.illustrator import Illustrator
+from app.models import Session
+from app.pictures.illustrator import Illustrator, PictureField
 
 Status = Literal["running", "done", "failed", "cancelled"]
 log = logging.getLogger(__name__)
+
+# How many corpus expressions a session teaches.
+EXPRESSION_COUNT = 5
 
 # Seconds per stage before any run has finished; a stage a run skips counts as 0.
 DEFAULT_STAGE_SECONDS: dict[Stage, float] = {
@@ -84,13 +89,14 @@ class Executor(Protocol):
 
 
 class JobRunner:
-    REPEAT_ALLOWANCE = 0.1  # each past item escapes the exclusion list with this probability
+    REPEAT_ALLOWANCE = 0.1  # each past word escapes the exclusion list with this probability
 
-    def __init__(self, sessions: SessionRepo, executor: Executor | None = None) -> None:
+    def __init__(self, sessions: SessionRepo, expressions: ExpressionRepo, stages: StageRepo, executor: Executor | None = None) -> None:
         self._sessions = sessions
+        self._expressions = expressions
+        self._stages = stages
         self.executor = executor or ThreadPoolExecutor(max_workers=2)
         self._jobs: dict[str, Job] = {}
-        self._stage_history: dict[Stage, deque[float]] = {stage: deque(maxlen=5) for stage in Stage}
         self._lock = Lock()
 
     def start(self, topic: str, generator: Generator, illustrator: Illustrator | None = None) -> Job:
@@ -126,9 +132,8 @@ class JobRunner:
         """What `job`'s own setup foresees (its picture model's time here), else the latest runs' median."""
         if job and stage in job.foreseen:
             return job.foreseen[stage]
-        with self._lock:
-            history = self._stage_history[stage]
-            return median(history) if history else DEFAULT_STAGE_SECONDS[stage]
+        history = self._stages.recent(stage)
+        return median(history) if history else DEFAULT_STAGE_SECONDS[stage]
 
     def expected_seconds(self, job: Job) -> float:
         """Earlier stages as they took; the current and later ones at least as long as they usually take."""
@@ -141,22 +146,23 @@ class JobRunner:
         return total
 
     def _run(self, job: Job, generator: Generator, illustrator: Illustrator | None) -> None:
-        """The session is saved, and `job.session_id` set, as soon as its text is written; the
-        pictures land on it one by one after that, so it can be opened while they are drawn."""
+        """The session is saved, with expressions from the corpus, and `job.session_id` set, as soon as
+        its text is written; the pictures land on it one by one after that, so it can be opened while they are drawn."""
         try:
-            used = self._sessions.used_items()
+            used = Exclusions(self._sessions.used_words())
             exclude = used.thin(1 - self.REPEAT_ALLOWANCE, random.Random())
-            log.info("job %s: banning %d/%d expressions, %d/%d words", job.id,
-                     len(exclude.expressions), len(used.expressions), len(exclude.words), len(used.words))
-            content = generator.generate(job.topic, on_progress=job.apply, exclude=exclude)
-            leaked = exclude.taught([e.phrase for e in content.expressions], [v.word for v in content.vocabulary])
+            log.info("job %s: banning %d/%d words", job.id, len(exclude.words), len(used.words))
+            draft = generator.generate(job.topic, on_progress=job.apply, exclude=exclude)
+            leaked = exclude.taught([v.word for v in draft.vocabulary])
             if leaked:
-                log.warning("job %s: %d banned items came back anyway: %s", job.id, len(leaked), leaked)
+                log.warning("job %s: %d banned words came back anyway: %s", job.id, len(leaked), leaked)
             if job.status == "cancelled":
                 return
-            job.session_id = self._sessions.create(content).id
+            picked = self._expressions.pick(EXPRESSION_COUNT, random.Random())
+            session = self._sessions.create(draft, [e.id for e in picked])
+            job.session_id = session.id
             if illustrator:
-                self._illustrate(job, illustrator, content)
+                self._illustrate(job, illustrator, session)
         except Cancelled:
             log.info("job %s: cancelled", job.id)
             return
@@ -169,9 +175,8 @@ class JobRunner:
             log.warning("job %s: failed after %.0fs in %s: %s", job.id, job.elapsed_seconds, job.stage, e)
             return
         job.finish()
-        with self._lock:
-            for stage in Stage:
-                self._stage_history[stage].append(job.stage_seconds.get(stage, 0.0))
+        for stage in Stage:
+            self._stages.add(stage, job.stage_seconds.get(stage, 0.0))
         log.info("job %s: done in %.0fs: %s", job.id, job.elapsed_seconds, {s.value: round(t) for s, t in job.stage_seconds.items()})
         job.status = "done"
 
@@ -181,19 +186,24 @@ class JobRunner:
         if seconds is not None:
             job.foreseen[Stage.ILLUSTRATING] = seconds
 
-    def _illustrate(self, job: Job, illustrator: Illustrator, content: SessionContent) -> None:
+    def _illustrate(self, job: Job, illustrator: Illustrator, session: Session) -> None:
         """Each picture onto the saved session as it is drawn; a painter failure leaves the session without the rest."""
-        session_id = job.session_id
-        assert session_id is not None
-        total = illustrator.count(content)
+        words = session.content.vocabulary
+        total = illustrator.count(words)
         self._foresee_pictures(job, illustrator, total)
         job.apply(with_pictures(job.progress, 0, total))
         try:
             illustrator.illustrate(
                 job.id,
-                content,
+                words,
                 lambda done: job.apply(with_pictures(job.progress, done, total)),
-                lambda index, field, name: self._sessions.update_vocabulary_item(session_id, index, {field: name}),
+                lambda index, field, picture_id: self._land(words[index].id, field, picture_id),
             )
         except GenerationError as e:
             log.warning("job %s: the session stays without the pictures not yet drawn: %s", job.id, e)
+
+    def _land(self, vocabulary_id: int, field: PictureField, picture_id: int) -> None:
+        try:
+            self._sessions.replace_picture(vocabulary_id, field, picture_id)
+        except KeyError:
+            log.info("picture %s arrived for word %s, whose session is gone", picture_id, vocabulary_id)

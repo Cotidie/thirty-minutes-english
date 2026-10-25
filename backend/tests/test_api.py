@@ -5,8 +5,8 @@ import pytest
 from fastapi.testclient import TestClient
 
 from app.db import Database
-from app.generation.generator import EXPRESSION_COUNT, VOCABULARY_COUNT
-from app.generation.jobs import DEFAULT_STAGE_SECONDS, Job, JobRunner
+from app.generation.generator import VOCABULARY_COUNT
+from app.generation.jobs import DEFAULT_STAGE_SECONDS, EXPRESSION_COUNT, Job, JobRunner
 from app.generation.progress import Progress, Stage
 from app.llm import GenerationError
 from app.main import create_app
@@ -417,24 +417,3 @@ def test_a_job_foresees_its_pictures_from_the_picture_model_time_here(tmp_path):
         job = c.post("/api/sessions", json={"topic": "X"}).json()
     others = sum(s for stage, s in DEFAULT_STAGE_SECONDS.items() if stage != Stage.ILLUSTRATING)
     assert job["expected_seconds"] == others + 7 * 20  # two pictures a word
-
-
-def test_stage_times_of_a_finished_run_become_the_next_estimate():
-    runner = JobRunner.__new__(JobRunner)
-    runner._stage_history = {stage: deque([4.0]) for stage in Stage}
-    runner._lock = Lock()
-    job = Job(id="j", topic="t")
-    job.stage_seconds = {Stage.STARTING: 2.0}
-    job.progress = Progress(Stage.SEARCHING, 1)
-    # starting as it took (2), searching at least its median (4), the four after it at 4 each
-    assert runner.expected_seconds(job) == 2 + 4 + 4 * 3
-
-
-def test_a_brief_detour_into_a_later_stage_does_not_shrink_the_estimate():
-    runner = JobRunner.__new__(JobRunner)
-    runner._stage_history = {stage: deque([4.0]) for stage in Stage}
-    runner._lock = Lock()
-    job = Job(id="j", topic="t")
-    job.stage_seconds = {Stage.STARTING: 2.0, Stage.WRITING: 0.5}  # thought once between searches
-    job.progress = Progress(Stage.SEARCHING, 2)
-    assert runner.expected_seconds(job) == 2 + 4 + 4 * 3

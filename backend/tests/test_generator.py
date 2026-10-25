@@ -37,9 +37,9 @@ def test_a_payload_that_fails_validation_raises():
 
 def test_past_items_go_to_a_check_tool_not_the_prompt():
     fake = FakeQuery(result(sample_draft().model_dump()))
-    generator_with(fake).generate("x", exclude=Exclusions(("push back",), ("scrutiny",)))
+    generator_with(fake).generate("x", exclude=Exclusions(("scrutiny",)))
     prompt, options = fake.calls[0]
-    assert CHECK_ITEMS_RULE in prompt and "push back" not in prompt
+    assert CHECK_ITEMS_RULE in prompt and "scrutiny" not in prompt
     assert "session" in options.mcp_servers
     assert "mcp__session__check_items" in options.allowed_tools
 
@@ -51,15 +51,21 @@ def test_no_check_tool_without_past_items():
     assert CHECK_ITEMS_RULE not in prompt and "session" not in options.mcp_servers
 
 
-def test_check_items_names_close_variants_of_taught_items():
-    exclude = Exclusions(("play devil's advocate", "push back"), ("scrutiny",))
-    reply = check_items_reply(exclude, {"expressions": ["play the devil's advocate", "on the fence"], "words": ["Scrutiny", "candor"]})
-    assert reply == "Already taught, replace: play the devil's advocate; Scrutiny"
-    assert check_items_reply(exclude, {"expressions": ["on the fence"], "words": []}) == "None of these were taught before."
+def test_check_items_names_close_variants_of_taught_words():
+    exclude = Exclusions(("scrutiny", "the status quo"))
+    reply = check_items_reply(exclude, {"words": ["Scrutiny", "candor", "status quo"]})
+    assert reply == "Already taught, replace: Scrutiny; status quo"
+    assert check_items_reply(exclude, {"words": ["candor"]}) == "None of these were taught before."
 
 
-def test_a_full_session_fits_the_schema_the_model_answers_in():
-    jsonschema.validate(sample_draft().model_dump(exclude={"vocabulary": {"__all__": {"image", "example_image"}}}), SESSION_SCHEMA)
+def test_a_full_draft_fits_the_schema_the_model_answers_in():
+    jsonschema.validate(sample_draft().model_dump(), SESSION_SCHEMA)
+
+
+def test_the_prompt_asks_for_no_expressions():
+    prompt = ClaudeGenerator(model="m").build_prompt("t", Exclusions(("scrutiny",)))
+    assert "expression" not in prompt.lower() and "1. article" in prompt and "2. vocabulary" in prompt
+    assert "expressions" not in SESSION_SCHEMA["properties"]
 
 
 def test_the_app_skill_always_runs_and_host_skills_come_after_it():

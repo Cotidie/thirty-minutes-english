@@ -8,7 +8,7 @@ from pydantic import ValidationError
 from app.generation.exclusions import Exclusions
 from app.generation.progress import Progress, StreamTracker
 from app.llm import WEB_TOOLS, Claude, GenerationError, McpServer, firecrawl
-from app.models import SessionContent
+from app.models import Draft
 from app.pictures.scenes import CAPTION_RULES, SCENE_RULES
 
 OnProgress = Callable[[Progress], None]
@@ -19,36 +19,17 @@ class Generator(Protocol):
         topic: str,
         on_progress: OnProgress | None = None,
         exclude: Exclusions | None = None,
-    ) -> SessionContent: ...
+    ) -> Draft: ...
 
 
-EXPRESSION_COUNT = 5
 VOCABULARY_COUNT = 10
 
 SESSION_SCHEMA: dict = {
     "type": "object",
     "additionalProperties": False,
-    "required": ["topic", "expressions", "article", "vocabulary"],
+    "required": ["topic", "article", "vocabulary"],
     "properties": {
         "topic": {"type": "string"},
-        "expressions": {
-            "type": "array",
-            "minItems": EXPRESSION_COUNT,
-            "maxItems": EXPRESSION_COUNT,
-            "items": {
-                "type": "object",
-                "additionalProperties": False,
-                "required": ["phrase", "meaning", "synonyms", "usage_note", "examples", "korean"],
-                "properties": {
-                    "phrase": {"type": "string"},
-                    "meaning": {"type": "string"},
-                    "synonyms": {"type": "array", "minItems": 1, "maxItems": 2, "items": {"type": "string"}},
-                    "usage_note": {"type": "string"},
-                    "examples": {"type": "array", "minItems": 2, "maxItems": 2, "items": {"type": "string"}},
-                    "korean": {"type": "string"},
-                },
-            },
-        },
         "article": {
             "type": "object",
             "additionalProperties": False,
@@ -123,19 +104,9 @@ treat each as a general-interest subject, not a specialist one.
 
 Today's article topic: {topic}
 
-Produce three parts.
+Produce two parts.
 
-1. expressions: {expression_count} general-purpose expressions that native speakers use frequently across everyday, \
-workplace, and academic conversation: phrasal verbs, collocations, idioms, and discourse phrases. \
-Target CEFR B2 to C1+: common enough that a native speaker uses them weekly, yet ones a B2 learner \
-would not produce on their own. Avoid topic-specific jargon, dated idioms, and slang that ages fast. \
-The expressions need not relate to the article topic. Mix registers (casual, workplace, discussion). \
-For each give the phrase, a plain-English meaning, synonyms (1 or 2 words or phrases a B2 learner \
-already knows that could replace it in its example sentences), a usage note of at most 20 words (register and the \
-one thing learners get wrong; no full sentences needed), 2 example sentences that sound like real speech, \
-and korean: the natural Korean equivalent of the expression, a short phrase, no explanation.
-
-2. article: a short article of 250 to 350 words on the topic, written for a smart general reader. \
+1. article: a short article of 250 to 350 words on the topic, written for a smart general reader. \
 Run at most 3 web searches, with firecrawl_search first and WebSearch only when firecrawl_search \
 fails or finds nothing usable, to ground the article in accurate, current facts (dates, names, figures) and prefer a recent development or debate as the angle; never invent \
 specifics you did not verify. In sources, list only the web pages you actually drew on (page title \
@@ -156,7 +127,7 @@ copied character for character from the body, final punctuation included, one se
 merge or split sentences. ko is that sentence in natural written Korean (해라체, "~다"로 끝맺기), translated \
 with its neighbors in mind so the Korean reads well in sequence; keep names, figures, and dates as they are.
 
-3. vocabulary: {vocabulary_count} words at B2 to C1+ level connected to the topic. Draw from the \
+2. vocabulary: {vocabulary_count} words at B2 to C1+ level connected to the topic. Draw from the \
 article body where it offers strong candidates, and fill the rest with words a well-read speaker would \
 use when discussing this subject even if they do not appear in the article. Prefer words useful across \
 academic and professional English over topic-specific jargon; no proper nouns. \
@@ -171,9 +142,9 @@ Set topic to the article topic. Use American English. Return only the structured
 
 CHECK_ITEMS_RULE = """
 
-Earlier sessions already taught some expressions and words. Before you finalize, call check_items with \
-every expression phrase and every vocabulary word you chose. Replace each one it reports as already \
-taught with a fresh item, then call it again with the replacements until it reports nothing."""
+Earlier sessions already taught some words. Before you finalize, call check_items with every \
+vocabulary word you chose. Replace each one it reports as already taught with a fresh word, then call \
+it again with the replacements until it reports nothing."""
 
 SKILLS_PREAMBLE = """Before writing, invoke each of these skills with the Skill tool and follow \
 their instructions while producing the content: {skills}.
@@ -182,14 +153,14 @@ their instructions while producing the content: {skills}.
 
 
 def check_items_reply(exclude: Exclusions, args: dict) -> str:
-    taught = exclude.taught(args.get("expressions", []), args.get("words", []))
+    taught = exclude.taught(args.get("words", []))
     return f"Already taught, replace: {'; '.join(taught)}" if taught else "None of these were taught before."
 
 
 def check_items_server(exclude: Exclusions) -> McpServer:
     """An in-process tool the model checks its picks against, so the banned list stays out of the prompt."""
 
-    @tool("check_items", "Which of these expressions and words earlier sessions already taught", {"expressions": list[str], "words": list[str]})
+    @tool("check_items", "Which of these words earlier sessions already taught", {"words": list[str]})
     async def check_items(args: dict) -> dict:
         return {"content": [{"type": "text", "text": check_items_reply(exclude, args)}]}
 
@@ -231,7 +202,6 @@ class ClaudeGenerator:
     def build_prompt(self, topic: str, exclude: Exclusions | None = None) -> str:
         prompt = PROMPT_TEMPLATE.format(
             topic=topic,
-            expression_count=EXPRESSION_COUNT,
             vocabulary_count=VOCABULARY_COUNT,
             scene_rules=SCENE_RULES,
             caption_rules=CAPTION_RULES,
@@ -246,11 +216,11 @@ class ClaudeGenerator:
         topic: str,
         on_progress: OnProgress | None = None,
         exclude: Exclusions | None = None,
-    ) -> SessionContent:
+    ) -> Draft:
         tracker = StreamTracker(on_progress or (lambda _: None))
         extra = (check_items_server(exclude),) if exclude else ()
         payload = self.claude.run(self.build_prompt(topic, exclude), SESSION_SCHEMA, tracker.feed, extra)
         try:
-            return SessionContent.model_validate(payload)
+            return Draft.model_validate(payload)
         except ValidationError as e:
             raise GenerationError(f"structured output failed validation: {e}") from e

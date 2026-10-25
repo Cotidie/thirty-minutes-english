@@ -1,6 +1,6 @@
 ---
 name: session-writing
-description: Style rules for the English practice session this app generates (article, expression examples, vocabulary examples, discussion questions, picture scenes). Use before writing any part of a session. The prompt's content rules and output schema win where they are stricter.
+description: Style rules for the English practice session this app generates (article, vocabulary examples, discussion questions, picture scenes). Use before writing any part of a session. The prompt's content rules and output schema win where they are stricter.
 ---
 
 # Session writing
@@ -30,13 +30,6 @@ These read as machine-written and teach learners bad habits:
 
 Keep a listed word only when it is the exact right word and nothing plain replaces it.
 
-## Expression examples
-
-- Sound like speech between people who know each other: contractions, a reason or a follow-up clause, an everyday setting (lab, office, dinner, a call with a friend).
-- Put the expression where a native speaker would, with its usual grammar (particle, object, tense).
-- Each of the two examples shows a different situation or register.
-- No textbook frames ("John said to Mary…"), no explaining the expression inside the example.
-
 ## Vocabulary examples
 
 - The sentence alone should let a reader guess the meaning: include the cause, contrast or result that pins it down.
@@ -64,5 +57,4 @@ Keep a listed word only when it is the exact right word and nothing plain replac
 1. Reread the first sentence of the article. Cut it if the piece works without it.
 2. Search your draft for the words above and for em dashes. Rewrite each hit.
 3. Replace every vague noun ("challenges", "concerns", "impact") with the instance behind it.
-4. Read each expression example aloud in your head. Rewrite any line nobody would say.
-5. Check that every figure, name and date in the article came from a page you searched.
+4. Check that every figure, name and date in the article came from a page you searched.

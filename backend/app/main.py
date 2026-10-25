@@ -36,7 +36,7 @@ def create_app(
     app.state.env = os.environ if env is None else env
     app.state.rebuild = rebuild
     app.state.catalog = catalog or Catalog(db.caches, fetchers={})
-    app.state.jobs = JobRunner(db.sessions, executor)
+    app.state.jobs = JobRunner(db.sessions, db.expressions, db.stages, executor)
     app.state.topics = DailyTopics(db.caches, app.state.jobs.executor)
     for router in ROUTERS:
         app.include_router(router)

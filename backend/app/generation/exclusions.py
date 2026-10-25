@@ -1,8 +1,9 @@
-"""Expressions and words already taught, so the next session can avoid them."""
+"""Words already taught, so the next session can avoid them, and the normalized key that tells close
+variants of a word or phrase apart from new ones (the expression corpus uses it too)."""
 
 import random
 import re
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 
 # Words that make "play the devil's advocate" and "play devil's advocate" the same expression.
 FILLER = {"a", "an", "the", "to", "one's", "someone's", "somebody's", "sb", "sth", "something", "someone", "your", "my"}
@@ -16,22 +17,17 @@ def key(item: str) -> str:
 
 @dataclass(frozen=True)
 class Exclusions:
-    expressions: tuple[str, ...] = field(default_factory=tuple)
-    words: tuple[str, ...] = field(default_factory=tuple)
+    words: tuple[str, ...] = ()
 
     def __bool__(self) -> bool:
-        return bool(self.expressions or self.words)
+        return bool(self.words)
 
     def thin(self, keep_probability: float, rng: random.Random | None = None) -> "Exclusions":
-        """Drop each item with probability 1 - keep_probability, so a few old items may return."""
+        """Drop each word with probability 1 - keep_probability, so a few old ones may return."""
         rng = rng or random.Random()
-        return Exclusions(
-            expressions=tuple(e for e in self.expressions if rng.random() < keep_probability),
-            words=tuple(w for w in self.words if rng.random() < keep_probability),
-        )
+        return Exclusions(tuple(w for w in self.words if rng.random() < keep_probability))
 
-    def taught(self, expressions: list[str], words: list[str]) -> list[str]:
-        """The candidates that match an item here, close variants included."""
-        old_expressions = {key(e) for e in self.expressions}
-        old_words = {key(w) for w in self.words}
-        return [e for e in expressions if key(e) in old_expressions] + [w for w in words if key(w) in old_words]
+    def taught(self, words: list[str]) -> list[str]:
+        """The candidates that match a word here, close variants included."""
+        old = {key(w) for w in self.words}
+        return [w for w in words if key(w) in old]
