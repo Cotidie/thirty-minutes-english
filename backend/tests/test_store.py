@@ -1,7 +1,7 @@
 import pytest
 
 from app.generation.generator import VOCABULARY_COUNT
-from app.models import Note, Stars
+from app.models import Correction, Note, Stars, SummaryFeedback, SummaryFix
 from app.pictures.scenes import Scene
 from tests.conftest import sample_draft, seed_expressions
 
@@ -143,3 +143,55 @@ def test_paragraphs_and_words_know_their_session(store):
     assert store.sessions.session_of_paragraph(session.content.article.paragraphs[2].id) == session.id
     assert store.sessions.session_of_vocabulary(session.content.vocabulary[0].id) == session.id
     assert store.sessions.session_of_paragraph(999) is None and store.sessions.session_of_vocabulary(999) is None
+
+
+def test_examples_point_at_an_expression_or_a_word_of_the_session(store):
+    session = store.sessions.create(sample_draft(), seed_expressions(store, 1))
+    other = store.sessions.create(sample_draft(), [])
+    e, w = session.content.expressions[0], session.content.vocabulary[0]
+    ex = store.records.add_example(session.id, e.id, None, "I said", "Coach said", 4)
+    wx = store.records.add_example(session.id, None, w.id, "word use", "echo", 2)
+    assert (ex.expression_id, ex.vocabulary_id, ex.user_text, ex.seconds) == (e.id, None, "I said", 4)
+    assert [(x.id, x.expression_id, x.vocabulary_id) for x in store.records.list_examples(session.id)] == [(ex.id, e.id, None), (wx.id, None, w.id)]
+    with pytest.raises(KeyError):
+        store.records.add_example(session.id, 999, None, "x", "y", 0)
+    with pytest.raises(KeyError):
+        store.records.add_example(other.id, e.id, None, "x", "y", 0)  # not taught in that session
+    with pytest.raises(KeyError):
+        store.records.add_example(session.id, None, other.content.vocabulary[0].id, "x", "y", 0)
+    assert store.records.list_examples(other.id) == []
+    assert store.sessions.delete(session.id) is not None
+    assert store.records.list_examples(session.id) == []
+
+
+def test_readings_and_summaries_hang_off_a_paragraph_and_go_with_the_session(store):
+    session = store.sessions.create(sample_draft(), [])
+    other = store.sessions.create(sample_draft(), [])
+    first, second = (p.id for p in session.content.article.paragraphs[:2])
+    r1 = store.records.add_reading(first, "one", 3, [])
+    r2 = store.records.add_reading(second, "two two", 4, [Correction(word="two", heard="tu", fix="tuː", at=1)])
+    readings = store.records.list_readings(session.id)
+    assert [(r.id, r.paragraph_id) for r in readings] == [(r2.id, second), (r1.id, first)]  # newest first
+    assert readings[0].corrections[0].at == 1 and readings[1].corrections == []
+
+    feedback = SummaryFeedback(missed=[], fixes=[SummaryFix(said="a", better="b")], summary="s")
+    s1 = store.records.add_summary(second, "said", feedback, 5)
+    s2 = store.records.add_summary(first, "said again", feedback, 6)
+    summaries = store.records.list_summaries(session.id)
+    assert [(s.id, s.paragraph_id) for s in summaries] == [(s1.id, second), (s2.id, first)]  # in the order made
+    assert summaries[0].feedback == feedback
+
+    assert store.records.list_readings(other.id) == [] and store.records.list_summaries(other.id) == []
+    store.sessions.delete(session.id)
+    assert store.records.list_readings(session.id) == [] and store.records.list_summaries(session.id) == []
+
+
+def test_a_reading_kept_before_corrections_were_saved_has_none(store):
+    session = store.sessions.create(sample_draft(), [])
+    with store.connect() as conn:
+        conn.execute(
+            "INSERT INTO readings (created_at, paragraph_id, user_text) VALUES ('2026-09-01T00:00:00+00:00', ?, 'old')",
+            (session.content.article.paragraphs[0].id,),
+        )
+    [reading] = store.records.list_readings(session.id)
+    assert reading.corrections is None
