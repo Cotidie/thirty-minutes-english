@@ -3,53 +3,53 @@ import json
 import httpx2
 import pytest
 
-from app.generation.generator import EXPRESSION_COUNT, VOCABULARY_COUNT
-from app.models import (
-    Article,
-    Expression,
-    Question,
-    SentencePair,
-    SessionContent,
-    Source,
-    VocabularyItem,
-)
+from app.db import Database
+from app.generation.generator import VOCABULARY_COUNT
+from app.models import ArticleDraft, Draft, Question, SentencePair, Source, VocabularyDraft
 
 
-def sample_content(topic: str = "Digital twins", title: str = "Twins at Work") -> SessionContent:
-    return SessionContent(
+def sample_draft(topic: str = "Digital twins", title: str = "Twins at Work") -> Draft:
+    """What a generator hands over: three paragraphs and the full set of words, no expressions."""
+    return Draft(
         topic=topic,
-        expressions=[
-            Expression(
-                phrase=f"phrase {i}",
-                meaning=f"meaning {i}",
-                usage_note=f"note {i}",
-                examples=[f"ex {i}a", f"ex {i}b"],
-                korean=f"표현 {i}",
-                synonyms=[f"syn {i}"],
-            )
-            for i in range(EXPRESSION_COUNT)
-        ],
-        article=Article(
+        article=ArticleDraft(
             title=title,
-            body="A body with the word ubiquitous in it.",
+            body="One.\n\nTwo two.\n\nThree.",
             questions=[
-                Question(text="q1", evidence=["the word ubiquitous"]),
-                Question(text="q2", evidence=["A body"]),
+                Question(text="q1", evidence=["One."]),
+                Question(text="q2", evidence=["Two two."]),
                 Question(text="q3"),
             ],
             sources=[Source(title="A page", url="https://example.com")],
-            translation=[SentencePair(en="A body with the word ubiquitous in it.", ko="어디에나 있다는 단어가 든 본문이다.")],
+            translation=[SentencePair(en="One.", ko="하나다.")],
         ),
         vocabulary=[
-            VocabularyItem(word=f"word{i}", pos="noun", definition=f"def {i}", example=f"ex {i}", synonyms=[f"same {i}"], korean=f"단어 {i}", scene=f"scene {i}", caption=f"caption {i}")
+            VocabularyDraft(word=f"word{i}", pos="noun", definition=f"def {i}", example=f"ex {i}", synonyms=[f"same {i}"], korean=f"단어 {i}", scene=f"scene {i}", caption=f"caption {i}")
             for i in range(VOCABULARY_COUNT)
         ],
     )
 
 
+# Distinct words, since the corpus tells phrases apart by their letters only.
+NAMES = ("alpha", "bravo", "charlie", "delta", "echo", "foxtrot", "golf", "hotel", "india", "juliet")
+
+
+def seed_expressions(db: Database, n: int = 5, setting: str | None = None) -> list[int]:
+    """`n` corpus expressions ("alpha phrase", "bravo phrase", ...), their ids in the order added."""
+    return [
+        db.expressions.add(f"{name} phrase", f"meaning {i}", [f"syn {i}"], [f"ex {i}a", f"ex {i}b"], f"note {i}", f"표현 {i}", setting, "test")
+        for i, name in enumerate(NAMES[:n])
+    ]
+
+
 @pytest.fixture
-def content() -> SessionContent:
-    return sample_content()
+def draft() -> Draft:
+    return sample_draft()
+
+
+@pytest.fixture
+def store(tmp_path) -> Database:
+    return Database(tmp_path / "s.db")
 
 
 class FakeHttp:

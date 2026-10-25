@@ -5,6 +5,7 @@ from pathlib import Path
 
 from app.db import schema
 from app.db.caches import CacheRepo
+from app.db.expressions import ExpressionRepo
 from app.db.pictures import PictureRepo
 from app.db.pins import PinRepo
 from app.db.records import RecordRepo
@@ -25,6 +26,7 @@ class Database:
                     raise NotImplementedError("this file is schema v1; migrating it is not implemented yet")
                 schema.create(conn)
         self.sessions = SessionRepo(self)
+        self.expressions = ExpressionRepo(self)
         self.records = RecordRepo(self)
         self.caches = CacheRepo(self)
         self.pictures = PictureRepo(self)

@@ -15,7 +15,7 @@ from app.wiring import Services
 from app.pictures.scenes import Scene
 
 TOPIC_TEXTS = {t.text for t in TOPICS}
-from tests.conftest import sample_content
+from tests.conftest import sample_draft
 
 
 class InlineExecutor:
@@ -35,7 +35,7 @@ class FakeGenerator:
         self.excluded.append(exclude)
         if on_progress:
             on_progress(Progress(Stage.SEARCHING, 2))
-        return sample_content(topic=topic, title=f"About {topic}")
+        return sample_draft(topic=topic, title=f"About {topic}")
 
 
 class FailingGenerator:

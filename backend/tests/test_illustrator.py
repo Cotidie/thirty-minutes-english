@@ -18,7 +18,7 @@ from app.pictures.painters import (
     painter_for,
 )
 from app.pictures.scenes import Scene, SceneWriter, Spark
-from tests.conftest import sample_content
+from tests.conftest import sample_draft
 
 
 class FakePainter:
@@ -41,7 +41,7 @@ class FakePainter:
 
 
 def test_every_word_gets_its_example_and_its_scene_drawn(tmp_path):
-    content = sample_content()
+    content = sample_draft()
     painter = FakePainter()
     done = Illustrator(painter, tmp_path / "images").illustrate("job1", content)
 
@@ -60,7 +60,7 @@ def test_the_chosen_style_leads_the_prompt_and_an_unknown_one_falls_back_to_phot
 
 
 def test_a_word_without_a_scene_gets_only_its_example_and_a_failed_picture_stays_bare(tmp_path):
-    content = sample_content()
+    content = sample_draft()
     words = list(content.vocabulary)
     words[1] = words[1].model_copy(update={"scene": None})
     content = content.model_copy(update={"vocabulary": words})
@@ -185,7 +185,7 @@ def test_fetch_retries_a_flaky_link():
 
 
 def test_redraw_draws_the_new_scene_in_the_asked_style_under_a_new_name_and_discard_drops_a_file(tmp_path):
-    content = sample_content()
+    content = sample_draft()
     old = content.vocabulary[2].model_copy(update={"image": "old.png"})
     (tmp_path / "old.png").write_bytes(b"OLD")
     painter = FakePainter()
@@ -222,7 +222,7 @@ class FakeCli:
 def test_scene_writer_names_the_word_the_scene_to_avoid_and_a_rolled_spark():
     import random
 
-    item = sample_content().vocabulary[0].model_copy(update={"scene": "the old scene"})
+    item = sample_draft().vocabulary[0].model_copy(update={"scene": "the old scene"})
     cli = FakeCli("  a new scene ", " the caption ")
     assert SceneWriter(cli, random.Random(3)).write(item) == Scene("a new scene", "the caption")
     assert "caption" in cli.prompt
@@ -237,7 +237,7 @@ def test_scene_writer_names_the_word_the_scene_to_avoid_and_a_rolled_spark():
 def test_the_illustrator_reports_each_finished_picture(tmp_path):
     counts: list[int] = []
     kept: list[tuple] = []
-    content = sample_content()
+    content = sample_draft()
     Illustrator(FakePainter(), tmp_path / "images").illustrate("job1", content, counts.append, lambda *picture: kept.append(picture))
     assert counts == list(range(1, 2 * len(content.vocabulary) + 1))
     assert kept[:3] == [(0, "example_image", "job1-0-example.png"), (0, "image", "job1-0.png"), (1, "example_image", "job1-1-example.png")]

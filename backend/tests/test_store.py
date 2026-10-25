@@ -1,88 +1,110 @@
-import sqlite3
-
 import pytest
 
-from app.db import Database
-from app.generation.generator import EXPRESSION_COUNT, VOCABULARY_COUNT
+from app.generation.generator import VOCABULARY_COUNT
 from app.models import Note, Stars
-from tests.conftest import sample_content
+from app.pictures.scenes import Scene
+from tests.conftest import sample_draft, seed_expressions
 
 
-@pytest.fixture
-def store(tmp_path) -> Database:
-    return Database(tmp_path / "s.db")
-
-
-def test_create_then_get_roundtrip(tmp_path, content):
-    store = Database(tmp_path / "s.db")
-    created = store.sessions.create(content)
+def test_create_then_get_roundtrip(store, draft):
+    created = store.sessions.create(draft, [])
     fetched = store.sessions.get(created.id)
-    assert fetched is not None
+    assert fetched == created
     assert fetched.topic == "Digital twins"
-    assert fetched.content == content
-    assert fetched.created_at == created.created_at
+    article = fetched.content.article
+    assert (article.title, article.questions, article.sources, article.translation) == (
+        draft.article.title, draft.article.questions, draft.article.sources, draft.article.translation
+    )
+    assert [v.model_dump(exclude={"id", "image", "example_image"}) for v in fetched.content.vocabulary] == [
+        v.model_dump() for v in draft.vocabulary
+    ]
 
 
-def test_list_returns_newest_first_with_title(tmp_path):
-    store = Database(tmp_path / "s.db")
-    first = store.sessions.create(sample_content(topic="A", title="First"))
-    second = store.sessions.create(sample_content(topic="B", title="Second"))
+def test_create_splits_paragraphs_links_expressions_in_order_and_get_puts_it_back(store):
+    ids = seed_expressions(store, 5)
+    session = store.sessions.create(sample_draft(), ids[::-1])
+    got = store.sessions.get(session.id)
+    assert [p.text for p in got.content.article.paragraphs] == ["One.", "Two two.", "Three."]
+    assert [e.id for e in got.content.expressions] == ids[::-1]
+    assert got.content.expressions[0].phrase == "echo phrase"
+    assert [v.word for v in got.content.vocabulary] == [f"word{i}" for i in range(VOCABULARY_COUNT)]
+    assert got.content.vocabulary[0].image is None
+
+
+def test_list_returns_newest_first_with_title(store):
+    first = store.sessions.create(sample_draft(topic="A", title="First"), [])
+    second = store.sessions.create(sample_draft(topic="B", title="Second"), [])
     summaries = store.sessions.list_all()
     assert [s.id for s in summaries] == [second.id, first.id]
-    assert summaries[0].title == "Second"
-    assert summaries[0].topic == "B"
+    assert (summaries[0].title, summaries[0].topic) == ("Second", "B")
 
 
-def test_get_missing_returns_none(tmp_path):
-    store = Database(tmp_path / "s.db")
+def test_get_missing_returns_none(store):
     assert store.sessions.get(999) is None
+    assert not store.sessions.exists(999)
 
 
-def test_delete_removes_session(tmp_path, content):
-    store = Database(tmp_path / "s.db")
-    created = store.sessions.create(content)
-    assert store.sessions.delete(created.id) is True
+def test_delete_removes_session(store, draft):
+    created = store.sessions.create(draft, [])
+    assert store.sessions.delete(created.id) == []
     assert store.sessions.get(created.id) is None
-    assert store.sessions.delete(created.id) is False
+    assert store.sessions.delete(created.id) is None
 
 
-def test_recent_topics_returns_latest_distinct(tmp_path):
-    store = Database(tmp_path / "s.db")
+def test_delete_cascades_and_hands_back_the_picture_ids(store):
+    session = store.sessions.create(sample_draft(), seed_expressions(store, 2))
+    p = store.pictures.add("m", 1, None)
+    store.sessions.replace_picture(session.content.vocabulary[0].id, "example_image", p)
+    assert store.sessions.delete(session.id) == [p]
+    with store.connect() as conn:
+        assert conn.execute("SELECT COUNT(*) FROM paragraphs").fetchone()[0] == 0
+        assert conn.execute("SELECT COUNT(*) FROM vocabulary").fetchone()[0] == 0
+        assert conn.execute("SELECT COUNT(*) FROM session_expressions").fetchone()[0] == 0
+        assert conn.execute("SELECT COUNT(*) FROM expressions").fetchone()[0] == 2  # the corpus stays
+    assert store.sessions.delete(session.id) is None
+
+
+def test_recent_topics_returns_latest_distinct(store):
     for topic in ["A", "B", "A", "C"]:
-        store.sessions.create(sample_content(topic=topic))
+        store.sessions.create(sample_draft(topic=topic), [])
     assert store.sessions.recent_topics(limit=2) == ["C", "A"]
     assert store.sessions.recent_topics(limit=10) == ["C", "A", "B"]
 
 
-def test_used_items_collects_distinct_phrases_and_words_newest_first(tmp_path):
-    store = Database(tmp_path / "s.db")
-    store.sessions.create(sample_content(topic="A"))
-    store.sessions.create(sample_content(topic="B"))
-    used = store.sessions.used_items()
-    assert used.expressions == tuple(f"phrase {i}" for i in range(EXPRESSION_COUNT))
-    assert used.words == tuple(f"word{i}" for i in range(VOCABULARY_COUNT))
+def test_used_words_lists_distinct_words_newest_first(store):
+    older = sample_draft()
+    older.vocabulary[0] = older.vocabulary[0].model_copy(update={"word": "older"})
+    store.sessions.create(older, [])
+    store.sessions.create(sample_draft(), [])
+    assert store.sessions.used_words() == tuple(f"word{i}" for i in range(VOCABULARY_COUNT)) + ("older",)
+    assert store.sessions.used_words(limit_sessions=1) == tuple(f"word{i}" for i in range(VOCABULARY_COUNT))
 
 
-def test_used_items_is_empty_on_fresh_store(tmp_path):
-    assert not Database(tmp_path / "s.db").sessions.used_items()
+def test_used_words_is_empty_on_fresh_store(store):
+    assert store.sessions.used_words() == ()
 
 
-def test_stars_replace_as_a_set_and_go_with_the_session(store):
-    session = store.sessions.create(sample_content())
-    assert store.sessions.get_stars(session.id).expressions == []
+def test_stars_are_ids_and_ignore_ids_from_other_sessions(store):
+    ids = seed_expressions(store, 3)
+    session = store.sessions.create(sample_draft(), ids[:2])
+    other = store.sessions.create(sample_draft(), ids[2:])
+    words = [v.id for v in session.content.vocabulary]
+    assert store.sessions.get_stars(session.id) == Stars()
 
-    saved = store.sessions.set_stars(session.id, Stars(expressions=["a moving target", "a moving target"], words=["mitigate"]))
-    assert saved == Stars(expressions=["a moving target"], words=["mitigate"])
+    foreign = other.content.vocabulary[0].id
+    saved = store.sessions.set_stars(session.id, Stars(expressions=[ids[1], ids[1], ids[2]], words=[words[3], foreign]))
+    assert saved == Stars(expressions=[ids[1]], words=[words[3]])
 
-    store.sessions.set_stars(session.id, Stars(words=["ubiquitous"]))
-    assert store.sessions.get_stars(session.id) == Stars(expressions=[], words=["ubiquitous"])
+    store.sessions.set_stars(session.id, Stars(words=[words[5]]))
+    assert store.sessions.get_stars(session.id) == Stars(expressions=[], words=[words[5]])
+    assert store.sessions.get_stars(other.id) == Stars()
 
     store.sessions.delete(session.id)
     assert store.sessions.get_stars(session.id) == Stars()
 
 
-def test_a_note_is_rewritten_whole_and_goes_with_the_session(store):
-    session = store.sessions.create(sample_content())
+def test_a_note_is_rewritten_whole_and_goes_with_the_session(store, draft):
+    session = store.sessions.create(draft, [])
     assert store.sessions.get_note(session.id) == Note(text="")
 
     store.sessions.set_note(session.id, Note(text="hedge: stress on first syllable"))
@@ -94,45 +116,30 @@ def test_a_note_is_rewritten_whole_and_goes_with_the_session(store):
     assert store.sessions.get_note(session.id) == Note(text="")
 
 
+def test_replace_picture_returns_the_old_one_and_can_change_the_scene(store):
+    session = store.sessions.create(sample_draft(), [])
+    word = session.content.vocabulary[1]
+    p1, p2 = store.pictures.add("m", 1, None), store.pictures.add("m", 1, None)
+    assert store.sessions.replace_picture(word.id, "image", p1) is None
+    assert store.sessions.replace_picture(word.id, "image", p2, Scene("new", "cap")) == p1
+    again = store.sessions.get(session.id).content.vocabulary[1]
+    assert (again.image, again.scene, again.caption) == (f"{p2}.png", "new", "cap")
+    with pytest.raises(KeyError):
+        store.sessions.replace_picture(999, "image", p1)
+
+
 def test_a_picture_landing_on_a_word_keeps_what_landed_on_it_meanwhile(store):
-    session = store.sessions.create(sample_content())
-    assert store.sessions.update_vocabulary_item(session.id, 1, {"image": "1.png"}).image is None
-    assert store.sessions.update_vocabulary_item(session.id, 1, {"example_image": "1-example.png"}).image == "1.png"
-    assert store.sessions.update_vocabulary_item(session.id, 4, {"image": "4.png", "scene": "new"}).word == "word4"
-    words = store.sessions.get(session.id).content.vocabulary
-    assert (words[1].image, words[1].example_image, words[4].image, words[4].scene) == ("1.png", "1-example.png", "4.png", "new")
-    assert store.sessions.update_vocabulary_item(session.id, 99, {"image": "x.png"}) is None
-    assert store.sessions.update_vocabulary_item(999, 1, {"image": "x.png"}) is None
+    session = store.sessions.create(sample_draft(), [])
+    word = session.content.vocabulary[1]
+    scene, example = store.pictures.add("m", 1, None), store.pictures.add("m", 1, None)
+    store.sessions.replace_picture(word.id, "image", scene)
+    store.sessions.replace_picture(word.id, "example_image", example)
+    got = store.sessions.get(session.id).content.vocabulary[1]
+    assert (got.image, got.example_image, got.scene) == (f"{scene}.png", f"{example}.png", "scene 1")
 
 
-def test_an_older_file_loses_what_removed_features_left_and_keeps_its_readings(tmp_path):
-    path = tmp_path / "old.db"
-    with sqlite3.connect(path) as old:
-        old.executescript(
-            """
-            CREATE TABLE asks (id INTEGER PRIMARY KEY, user_text TEXT);
-            CREATE TABLE phrasings (paragraph TEXT PRIMARY KEY, breaks_json TEXT NOT NULL);
-            CREATE TABLE settings (key TEXT PRIMARY KEY, value TEXT NOT NULL);
-            INSERT INTO settings VALUES ('SUMMARY_MODEL', 'gpt-6-sol'), ('VOICE_PROVIDER', 'gemini');
-            CREATE TABLE readings (
-                id INTEGER PRIMARY KEY AUTOINCREMENT, created_at TEXT NOT NULL, session_id INTEGER, paragraph TEXT NOT NULL,
-                user_text TEXT NOT NULL, coach_text TEXT NOT NULL, seconds REAL NOT NULL DEFAULT 0, corrections_json TEXT
-            );
-            INSERT INTO readings (created_at, session_id, paragraph, user_text, coach_text, corrections_json) VALUES (
-                '2026-09-28T11:00:00+00:00', 1, 'It held twice as long.', 'it held twice as long', 'Keep it together.',
-                '[{"kind": "phrasing", "word": "as long", "heard": "as / long", "fix": "keep it together"},
-                  {"kind": "pronunciation", "word": "held", "heard": "e for ɛ", "fix": "hɛld"}]'
-            );
-            """
-        )
-
-    store = Database(path)
-    with store.connect() as conn:
-        tables = {row["name"] for row in conn.execute("SELECT name FROM sqlite_master WHERE type = 'table'")}
-    assert not tables & {"asks", "phrasings"}
-    assert store.settings.load() == {"VOICE_PROVIDER": "gemini"}
-
-    [reading] = store.records.list_readings(1)
-    assert [c.word for c in reading.corrections] == ["held"]  # the pause finding is left out
-    store.records.add_reading(1, "Again.", "again", 3, [])
-    assert len(store.records.list_readings(1)) == 2
+def test_paragraphs_and_words_know_their_session(store):
+    session = store.sessions.create(sample_draft(), [])
+    assert store.sessions.session_of_paragraph(session.content.article.paragraphs[2].id) == session.id
+    assert store.sessions.session_of_vocabulary(session.content.vocabulary[0].id) == session.id
+    assert store.sessions.session_of_paragraph(999) is None and store.sessions.session_of_vocabulary(999) is None

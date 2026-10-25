@@ -12,7 +12,7 @@ from app.generation.generator import (
 )
 from app.generation.progress import Progress, Stage
 from app.llm import GenerationError
-from tests.conftest import sample_content
+from tests.conftest import sample_draft
 from tests.fake_claude import FakeQuery, assistant, result, tool_use
 
 
@@ -23,7 +23,7 @@ def generator_with(fake: FakeQuery, **kwargs) -> ClaudeGenerator:
 
 
 def test_generate_validates_the_payload_and_reports_progress():
-    fake = FakeQuery(assistant(tool_use("WebSearch")), assistant(tool_use("StructuredOutput")), result(sample_content().model_dump()))
+    fake = FakeQuery(assistant(tool_use("WebSearch")), assistant(tool_use("StructuredOutput")), result(sample_draft().model_dump()))
     seen = []
     content = generator_with(fake).generate("Digital twins", seen.append)
     assert content.article.title == "Twins at Work"
@@ -36,7 +36,7 @@ def test_a_payload_that_fails_validation_raises():
 
 
 def test_past_items_go_to_a_check_tool_not_the_prompt():
-    fake = FakeQuery(result(sample_content().model_dump()))
+    fake = FakeQuery(result(sample_draft().model_dump()))
     generator_with(fake).generate("x", exclude=Exclusions(("push back",), ("scrutiny",)))
     prompt, options = fake.calls[0]
     assert CHECK_ITEMS_RULE in prompt and "push back" not in prompt
@@ -45,7 +45,7 @@ def test_past_items_go_to_a_check_tool_not_the_prompt():
 
 
 def test_no_check_tool_without_past_items():
-    fake = FakeQuery(result(sample_content().model_dump()))
+    fake = FakeQuery(result(sample_draft().model_dump()))
     generator_with(fake).generate("x", exclude=Exclusions())
     prompt, options = fake.calls[0]
     assert CHECK_ITEMS_RULE not in prompt and "session" not in options.mcp_servers
@@ -59,11 +59,11 @@ def test_check_items_names_close_variants_of_taught_items():
 
 
 def test_a_full_session_fits_the_schema_the_model_answers_in():
-    jsonschema.validate(sample_content().model_dump(exclude={"vocabulary": {"__all__": {"image", "example_image"}}}), SESSION_SCHEMA)
+    jsonschema.validate(sample_draft().model_dump(exclude={"vocabulary": {"__all__": {"image", "example_image"}}}), SESSION_SCHEMA)
 
 
 def test_the_app_skill_always_runs_and_host_skills_come_after_it():
-    fake = FakeQuery(result(sample_content().model_dump()))
+    fake = FakeQuery(result(sample_draft().model_dump()))
     generator_with(fake, skills=("stop-slop",)).generate("x")
     prompt, options = fake.calls[0]
     assert options.skills == [APP_SKILL, "stop-slop"]
