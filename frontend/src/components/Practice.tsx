@@ -41,7 +41,7 @@ export function Practice({ target, label, sessionId, examples, onKept }: Props) 
       onKept(
         await api.addExample({
           session_id: sessionId,
-          expression: target.text,
+          ...(target.kind === 'expression' ? { expression_id: target.id } : { vocabulary_id: target.id }),
           user_text: r.user.trim(),
           coach_text: spoken(answer!),
           seconds: r.seconds,

@@ -211,8 +211,9 @@ interface Props {
   arriving?: boolean
   /** A word's picture was redrawn; the session holds the new item. */
   onPicture: (index: number, item: VocabularyItem) => void
-  starred: string[]
-  onToggleStar: (word: string) => void
+  /** Ids of the starred words. */
+  starred: number[]
+  onToggleStar: (id: number) => void
   /** Every sentence made in this session; each word shows its own. */
   examples: Example[]
   onExample: (example: Example) => void
@@ -279,7 +280,7 @@ export function VocabularyTab({ items, sessionId, arriving = false, onPicture, s
       <div className="vocab-grid">
         {items.map((item, index) => (
           <VocabCell
-            key={item.word}
+            key={item.id}
             item={item}
             drawing={drawing.has(index)}
             arriving={arriving}
@@ -287,12 +288,12 @@ export function VocabularyTab({ items, sessionId, arriving = false, onPicture, s
             style={style}
             onRedraw={(face) => void redraw(index, face)}
           >
-            <StarButton label={item.word} on={starred.includes(item.word)} onToggle={() => onToggleStar(item.word)} />
+            <StarButton label={item.word} on={starred.includes(item.id)} onToggle={() => onToggleStar(item.id)} />
             <Practice
               target={practiceWord(item)}
               label="Practice"
               sessionId={sessionId}
-              examples={examples.filter((e) => e.expression === item.word)}
+              examples={examples.filter((e) => e.vocabulary_id === item.id)}
               onKept={onExample}
             />
           </VocabCell>

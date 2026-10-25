@@ -36,7 +36,7 @@ export function useStars(sessionId: number) {
   }, [sessionId])
 
   const toggle = useCallback(
-    (kind: StarKind, item: string) => {
+    (kind: StarKind, item: number) => {
       const list = current.current[kind]
       const next = { ...current.current, [kind]: list.includes(item) ? list.filter((x) => x !== item) : [...list, item] }
       show(next)

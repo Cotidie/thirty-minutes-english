@@ -94,7 +94,7 @@ export function SessionPage() {
             items={content.expressions}
             sessionId={session.id}
             starred={stars.expressions}
-            onToggleStar={(phrase) => toggle('expressions', phrase)}
+            onToggleStar={(id) => toggle('expressions', id)}
             examples={examples}
             onExample={addExample}
           />
@@ -111,7 +111,7 @@ export function SessionPage() {
               )
             }
             starred={stars.words}
-            onToggleStar={(word) => toggle('words', word)}
+            onToggleStar={(id) => toggle('words', id)}
             examples={examples}
             onExample={addExample}
           />

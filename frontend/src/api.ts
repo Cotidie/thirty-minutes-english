@@ -112,7 +112,15 @@ export const api = {
         scene: target.scene ?? '',
       }),
     }),
-  addExample: (example: { session_id: number; expression: string; user_text: string; coach_text: string; seconds: number }) =>
+  /** One of `expression_id` and `vocabulary_id`, the one the sentence was made with. */
+  addExample: (example: {
+    session_id: number
+    expression_id?: number
+    vocabulary_id?: number
+    user_text: string
+    coach_text: string
+    seconds: number
+  }) =>
     request<Example>('/api/examples', { method: 'POST', body: JSON.stringify(example) }),
   listExamples: (sessionId: number) => request<Example[]>(`/api/examples?session_id=${sessionId}`),
   /** Gemini's transcription model, primed with the paragraph's words. */

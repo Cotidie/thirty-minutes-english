@@ -21,6 +21,7 @@ vi.mock('../lib/liveClient', () => ({
 vi.mock('../api', () => ({ api: { addExample: vi.fn(), exampleFeedback: vi.fn() } }))
 
 const target: PracticeTarget = {
+  id: 21,
   kind: 'expression',
   text: 'read too much into something',
   meaning: 'to find a meaning that probably is not there',
@@ -30,8 +31,8 @@ const target: PracticeTarget = {
 const kept: Example = {
   id: 7,
   created_at: '',
-  session_id: 3,
-  expression: target.text,
+  expression_id: 21,
+  vocabulary_id: null,
   user_text: "Don't read too much in his silence.",
   coach_text: "Don't read too much into his silence. It's 'into', not 'in'. Good.",
   seconds: 14,
@@ -75,7 +76,7 @@ describe('Practice', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Keep' }))
     expect(vi.mocked(api.addExample)).toHaveBeenCalledWith({
       session_id: 3,
-      expression: target.text,
+      expression_id: 21,
       user_text: "Don't read too much in his silence.",
       coach_text: "Don't read too much into his silence. It's 'into', not 'in'. Good.",
       seconds: 14,

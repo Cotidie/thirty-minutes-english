@@ -11,6 +11,7 @@ const none: Example[] = []
 
 const items = [
   {
+    id: 21,
     phrase: 'a moving target',
     meaning: 'something that keeps changing',
     usage_note: 'Neutral to workplace register. ' + 'Extra detail. '.repeat(30),
@@ -45,7 +46,7 @@ describe('ExpressionsTab', () => {
     expect(note).not.toHaveClass('is-clamped')
   })
 
-  it('stars an expression by its phrase and shows it as pressed', async () => {
+  it('stars an expression by its id and shows it as pressed', async () => {
     const onToggleStar = vi.fn()
     const { rerender } = render(
       <ExpressionsTab items={items} sessionId={3} starred={[]} onToggleStar={onToggleStar} examples={none} onExample={vi.fn()} />,
@@ -54,22 +55,30 @@ describe('ExpressionsTab', () => {
     expect(star).toHaveAttribute('aria-pressed', 'false')
 
     await userEvent.click(star)
-    expect(onToggleStar).toHaveBeenCalledWith('a moving target')
+    expect(onToggleStar).toHaveBeenCalledWith(21)
 
     rerender(
-      <ExpressionsTab items={items} sessionId={3} starred={['a moving target']} onToggleStar={onToggleStar} examples={none} onExample={vi.fn()} />,
+      <ExpressionsTab items={items} sessionId={3} starred={[21]} onToggleStar={onToggleStar} examples={none} onExample={vi.fn()} />,
     )
     expect(screen.getByRole('button', { name: 'Star a moving target' })).toHaveAttribute('aria-pressed', 'true')
   })
 
   it('shows each sentence under its own expression, behind the Your turn label', () => {
     const examples: Example[] = [
-      { id: 1, created_at: '', session_id: 3, expression: 'a moving target', user_text: 'The spec moved.', coach_text: 'The spec is a moving target. Natural.', seconds: 9 },
-      { id: 2, created_at: '', session_id: 3, expression: 'some other phrase', user_text: 'Elsewhere.', coach_text: 'Elsewhere.', seconds: 9 },
+      { id: 1, created_at: '', expression_id: 21, vocabulary_id: null, user_text: 'The spec moved.', coach_text: 'The spec is a moving target. Natural.', seconds: 9 },
+      { id: 2, created_at: '', expression_id: 22, vocabulary_id: null, user_text: 'Elsewhere.', coach_text: 'Elsewhere.', seconds: 9 },
+      { id: 3, created_at: '', expression_id: null, vocabulary_id: 21, user_text: 'A word with the same id.', coach_text: 'x', seconds: 9 },
     ]
     render(<ExpressionsTab items={items} sessionId={3} starred={[]} onToggleStar={vi.fn()} examples={examples} onExample={vi.fn()} />)
     expect(screen.getByText('The spec moved.')).toBeInTheDocument()
     expect(screen.queryByText('Elsewhere.')).not.toBeInTheDocument()
+    expect(screen.queryByText('A word with the same id.')).not.toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Your turn: one sentence each.' })).toBeInTheDocument()
+  })
+
+  it('says the corpus is empty when a session has no expressions', () => {
+    render(<ExpressionsTab items={[]} sessionId={3} starred={[]} onToggleStar={vi.fn()} examples={none} onExample={vi.fn()} />)
+    expect(screen.getByText('No expressions yet: the corpus is empty. Add expressions to it and start a new session.')).toBeInTheDocument()
+    expect(document.querySelector('.expression-list')).toBeNull()
   })
 })

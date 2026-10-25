@@ -10,14 +10,22 @@ import './ExpressionsTab.css'
 interface Props {
   items: Expression[]
   sessionId: number
-  starred: string[]
-  onToggleStar: (phrase: string) => void
+  /** Ids of the starred expressions. */
+  starred: number[]
+  onToggleStar: (id: number) => void
   /** Every sentence made in this session; each expression shows its own. */
   examples: Example[]
   onExample: (example: Example) => void
 }
 
 export function ExpressionsTab({ items, sessionId, starred, onToggleStar, examples, onExample }: Props) {
+  if (items.length === 0) {
+    return (
+      <section className="tab-panel">
+        <p className="empty">No expressions yet: the corpus is empty. Add expressions to it and start a new session.</p>
+      </section>
+    )
+  }
   return (
     <section className="tab-panel">
       <p className="tab-brief">
@@ -26,14 +34,14 @@ export function ExpressionsTab({ items, sessionId, starred, onToggleStar, exampl
       </p>
       <ol className="expression-list">
         {items.map((item) => (
-          <li key={item.phrase} className="expression">
+          <li key={item.id} className="expression">
             <div className="expression-head">
               <h3 className="expression-phrase">{item.phrase}</h3>
               {item.korean && <KoreanChip korean={item.korean} of={item.phrase} />}
               <StarButton
                 label={item.phrase}
-                on={starred.includes(item.phrase)}
-                onToggle={() => onToggleStar(item.phrase)}
+                on={starred.includes(item.id)}
+                onToggle={() => onToggleStar(item.id)}
               />
             </div>
             <p className="expression-meaning">
@@ -52,7 +60,7 @@ export function ExpressionsTab({ items, sessionId, starred, onToggleStar, exampl
               target={practiceExpression(item)}
               label="Your turn: one sentence each."
               sessionId={sessionId}
-              examples={examples.filter((e) => e.expression === item.phrase)}
+              examples={examples.filter((e) => e.expression_id === item.id)}
               onKept={onExample}
             />
           </li>

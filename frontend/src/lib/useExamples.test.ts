@@ -6,7 +6,7 @@ import { useExamples } from './useExamples'
 
 vi.mock('../api', () => ({ api: { listExamples: vi.fn() } }))
 
-const one: Example = { id: 1, created_at: '', session_id: 3, expression: 'x', user_text: 'a', coach_text: 'b', seconds: 1 }
+const one: Example = { id: 1, created_at: '', expression_id: 1, vocabulary_id: null, user_text: 'a', coach_text: 'b', seconds: 1 }
 
 describe('useExamples', () => {
   it('loads the session list and appends what is kept afterwards', async () => {

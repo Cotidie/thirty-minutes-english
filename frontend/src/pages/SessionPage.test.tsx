@@ -12,9 +12,9 @@ const session = {
   title: 'T',
   content: {
     topic: 'X',
-    expressions: [{ phrase: 'a moving target', meaning: 'keeps changing', usage_note: 'n', examples: ['e1', 'e2'] }],
+    expressions: [{ id: 1, phrase: 'a moving target', meaning: 'keeps changing', usage_note: 'n', examples: ['e1', 'e2'] }],
     article: { title: 'Title', paragraphs: [{ id: 1, text: 'Body.' }], questions: [], sources: [], translation: [] },
-    vocabulary: [{ word: 'mitigate', pos: 'verb', definition: 'make less severe', example: 'We mitigated it.' }],
+    vocabulary: [{ id: 2, word: 'mitigate', pos: 'verb', definition: 'make less severe', example: 'We mitigated it.' }],
   },
 }
 

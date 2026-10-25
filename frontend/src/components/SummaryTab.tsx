@@ -34,8 +34,11 @@ export function SummaryTab({ sessionId, content, stars }: Props) {
   }, [sessionId])
 
   // Session order, so the list reads the way the tabs did.
-  const starredExpressions = content.expressions.filter((e) => stars.expressions.includes(e.phrase))
-  const starredWords = content.vocabulary.filter((v) => stars.words.includes(v.word))
+  const starredExpressions = content.expressions.filter((e) => stars.expressions.includes(e.id))
+  const starredWords = content.vocabulary.filter((v) => stars.words.includes(v.id))
+  const phrase = new Map(content.expressions.map((e) => [e.id, e.phrase]))
+  const word = new Map(content.vocabulary.map((v) => [v.id, v.word]))
+  const madeWith = (ex: Example) => (ex.expression_id !== null ? phrase.get(ex.expression_id) : word.get(ex.vocabulary_id ?? -1)) ?? ''
   const starredCount = starredExpressions.length + starredWords.length
   const paragraphText = new Map(content.article.paragraphs.map((p) => [p.id, p.text]))
   const loading = examples === null && error === null
@@ -71,7 +74,7 @@ export function SummaryTab({ sessionId, content, stars }: Props) {
         {examples?.length === 0 && <p className="empty">No sentences yet. Each expression has a Your turn button.</p>}
         <ol className="summary-cards">
           {examples?.map((ex) => (
-            <SummaryCard key={ex.id} label={ex.expression} line={ex.user_text} note={ex.coach_text} />
+            <SummaryCard key={ex.id} label={madeWith(ex)} line={ex.user_text} note={ex.coach_text} />
           ))}
         </ol>
       </Section>

@@ -1,6 +1,8 @@
 import type { Shown } from './lib/assessor/judge'
 
+/** One expression of the corpus; stars and sentences point at it by id. */
 export interface Expression {
+  id: number
   phrase: string
   meaning: string
   /** Plainer words for the same meaning; absent on older sessions. */
@@ -41,7 +43,9 @@ export interface Article {
   translation?: SentencePair[]
 }
 
+/** One word of the session; stars and sentences point at it by id. */
 export interface VocabularyItem {
+  id: number
   word: string
   pos: string
   definition: string
@@ -77,14 +81,14 @@ export interface Topic {
   category: string
 }
 
-/** Phrases and words starred in a session. */
 export interface Note {
   text: string
 }
 
+/** What the pair starred in a session: expression ids and word ids. */
 export interface Stars {
-  expressions: string[]
-  words: string[]
+  expressions: number[]
+  words: number[]
 }
 
 export interface TopicListing {
@@ -230,6 +234,8 @@ export interface Reading {
 
 /** What a Practice round is about: an expression or a word, with what the coach needs to judge a sentence. */
 export interface PracticeTarget {
+  /** The expression's id or the word's, as `kind` says. */
+  id: number
   text: string
   meaning: string
   note: string
@@ -240,11 +246,11 @@ export interface PracticeTarget {
 }
 
 export function practiceExpression(e: Expression): PracticeTarget {
-  return { text: e.phrase, meaning: e.meaning, note: e.usage_note, kind: 'expression' }
+  return { id: e.id, text: e.phrase, meaning: e.meaning, note: e.usage_note, kind: 'expression' }
 }
 
 export function practiceWord(v: VocabularyItem): PracticeTarget {
-  return { text: v.word, meaning: v.definition, note: `part of speech: ${v.pos}`, kind: 'word', scene: v.scene ?? undefined }
+  return { id: v.id, text: v.word, meaning: v.definition, note: `part of speech: ${v.pos}`, kind: 'word', scene: v.scene ?? undefined }
 }
 
 /** One weakness in how the reader said it: their words and the better ones. */
@@ -273,12 +279,12 @@ export interface Summary {
   seconds: number
 }
 
-/** One sentence made with an expression or word, and the coach's echo of it. */
+/** One sentence made with an expression or a word (exactly one of the two ids), and the coach's echo of it. */
 export interface Example {
   id: number
   created_at: string
-  session_id: number
-  expression: string
+  expression_id: number | null
+  vocabulary_id: number | null
   user_text: string
   coach_text: string
   seconds: number
