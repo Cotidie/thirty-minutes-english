@@ -232,7 +232,7 @@ CREATE TABLE stage_times (id INTEGER PRIMARY KEY AUTOINCREMENT, stage TEXT NOT N
 
 ## 비목표
 
-- PostgreSQL. corpus 출처 조사·수집·가져오기 도구(다음 작업. `ExpressionRepo.add`만 제공). `expression_tags`. 단어 corpus. 음성 캐시 색인. 실행 중 job 저장(재시작 복구 불가). 고아 그림 파일 삭제.
+- PostgreSQL. corpus 수집·가져오기 도구(다음 작업. `ExpressionRepo.add`만 제공. 출처 조사는 `docs/plans/2026-10-26-expression-corpus-sources.md`). `expression_tags`. 단어 corpus. 음성 캐시 색인. 실행 중 job 저장(재시작 복구 불가). 고아 그림 파일 삭제.
 
 ## 빌더에게 맡기는 것
 
