@@ -1,6 +1,6 @@
 # SQLite 스키마 재설계 + Expression corpus 설계
 
-- 상태: 설계 승인 (2026-10-25). 구현 계획은 `docs/superpowers/plans/`.
+- 상태: 구현 완료 (2026-10-26, 브랜치 `feat/schema-v2`). 실 데이터 이행은 배포할 때 시작 시 자동으로 일어난다. 구현 계획은 `docs/superpowers/plans/`.
 - 범위: `backend/data/sessions.db` 스키마 v2, 그에 맞춘 repo·모델·API·프론트 수정, v1 → v2 마이그레이션. PostgreSQL 아님.
 
 ## 목적
@@ -151,8 +151,8 @@ CREATE TABLE stage_times (id INTEGER PRIMARY KEY AUTOINCREMENT, stage TEXT NOT N
 
 ## 그림 흐름
 
-- painter가 그림 하나당 `Drawn(png, seconds, cost)`를 돌려준다. painter는 더 이상 통계를 기록하지 않는다 (`PictureLog.record` 삭제, 읽기 쪽 `seconds(model)`만 남김).
-- Illustrator가 `PictureRepo.add(model, seconds, cost)` → id → `PictureFiles.write(id, png)` → `SessionRepo.set_picture(vocabulary_id, face, picture_id)`.
+- painter가 그림 하나당 `Drawn(png, model, seconds, cost)`를 돌려준다. painter는 DB를 건드리지 않고, 예상 시간용으로 `PictureStats.seconds(model)`만 읽는다.
+- Illustrator가 `PictureRepo.add(model, seconds, cost)` → id → `PictureFiles.write(id, png)` → 콜백으로 id를 넘기면 JobRunner가 `SessionRepo.replace_picture(vocabulary_id, field, picture_id)`.
 - 다시 그리기: 새 행·새 파일, vocabulary가 새 id를 가리킨 뒤 옛 파일 삭제. 옛 `pictures` 행은 남긴다(시간·비용 기록).
 - 세션 삭제: `SessionRepo.delete`가 그 세션 vocabulary가 가리키던 picture id를 돌려주고, 라우트가 `PictureFiles.remove`. 행은 남긴다.
 - 통계(`stats()`): 모델별 최근 20장 평균, `model IS NULL` 제외.
@@ -190,7 +190,7 @@ CREATE TABLE stage_times (id INTEGER PRIMARY KEY AUTOINCREMENT, stage TEXT NOT N
 |---|---|
 | `app/db/schema.py` | DDL, 인덱스, `migrate(conn)`: `user_version` 0/1 → 2 |
 | `app/db/__init__.py` | `Database`: 연결마다 `foreign_keys=ON`, 시작 시 migrate, repo 묶음 |
-| `app/db/sessions.py` | `SessionRepo`: `create(draft, expression_ids)`, `get`, `exists`, `list_all`, `delete → picture ids`, `recent_topics`, `used_words`, `set_picture`, `get_stars/set_stars`, `get_note/set_note` |
+| `app/db/sessions.py` | `SessionRepo`: `create(draft, expression_ids)`, `get`, `exists`, `list_all`, `delete → picture ids`, `recent_topics`, `used_words`, `replace_picture`, `get_stars/set_stars`, `get_note/set_note` |
 | `app/db/expressions.py` | `ExpressionRepo`: `add(...)`(key로 upsert), `get`, `pick(count, rng)`, `list_all` |
 | `app/db/records.py` | `RecordRepo`: examples/readings/summaries, FK id로 |
 | `app/db/pictures.py` | `PictureRepo`: `add → id`, `stats`, `seconds(model)` |
@@ -229,6 +229,11 @@ CREATE TABLE stage_times (id INTEGER PRIMARY KEY AUTOINCREMENT, stage TEXT NOT N
 | `Practice.tsx`, `PracticeTarget` | `expression_id` / `vocabulary_id` 들고 다님 |
 | `ExpressionsTab.tsx` | 표현 0개 안내 |
 | 테스트 | 위에 맞춤 |
+
+## 실행 방식
+
+- `app.main`은 import할 때 앱을 만들지 않는다. uvicorn은 `--factory app.main:default_app`으로 띄운다 (`backend/Dockerfile`, `compose.dev.yaml`). 테스트가 실제 `backend/data/sessions.db`를 열거나 이행하지 않게 하기 위해서다.
+- 첫 기동 때 v1 파일이면 `sessions.db.bak-v1-<날짜>`로 복사한 뒤 이행하고, 결과를 `Report(...)` 한 줄로 로그에 남긴다.
 
 ## 비목표
 
