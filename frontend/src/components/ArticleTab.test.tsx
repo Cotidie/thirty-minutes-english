@@ -24,7 +24,10 @@ vi.mock('../lib/liveClient', () => ({
 
 const article = {
   title: 'Twins',
-  body: 'Ambition is cheap. Upkeep is what actually pays.\n\nA modest twin delivers more value.',
+  paragraphs: [
+    { id: 1, text: 'Ambition is cheap. Upkeep is what actually pays.' },
+    { id: 2, text: 'A modest twin delivers more value.' },
+  ],
   questions: [
     { text: 'What pays?', evidence: ['Upkeep is what actually pays.'] },
     { text: 'Legacy question', evidence: [] },
@@ -70,12 +73,12 @@ describe('ArticleTab', () => {
 
   it('puts back the marks of each paragraph\'s latest reading, leaving out ones kept without a place', async () => {
     const mark = (word: string, at: number) => ({ word, heard: 'x for y', fix: 'f', at, score: 30, sounds: [], repeated_ok: false })
-    const reading = (paragraph: string, corrections: ReturnType<typeof mark>[]) =>
-      ({ id: 1, created_at: '', session_id: 3, paragraph, user_text: '', seconds: 9, corrections })
+    const reading = (paragraph_id: number, corrections: ReturnType<typeof mark>[]) =>
+      ({ id: 1, created_at: '', paragraph_id, user_text: '', seconds: 9, corrections })
     vi.mocked(api.listReadings).mockResolvedValueOnce([
-      reading('Ambition is cheap. Upkeep is what actually pays.', [mark('Upkeep', 3)]),
-      reading('Ambition is cheap. Upkeep is what actually pays.', [mark('Ambition', 0)]),
-      reading('A modest twin delivers more value.', [mark('modest', -1)]),
+      reading(1, [mark('Upkeep', 3)]),
+      reading(1, [mark('Ambition', 0)]),
+      reading(2, [mark('modest', -1)]),
     ])
     render(<ArticleTab article={article} sessionId={3} />)
     expect(await screen.findByRole('button', { name: 'Upkeep: x for y' })).toBeInTheDocument()

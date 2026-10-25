@@ -121,12 +121,11 @@ export const api = {
   /** A spoken summary judged against its paragraph: what was missed, the wording fixed, and the summary with the fixes in. */
   summaryFeedback: (paragraph: string, userText: string) =>
     request<SummaryFeedback>('/api/summary/feedback', { method: 'POST', body: JSON.stringify({ paragraph, user_text: userText }) }),
-  addSummary: (summary: { session_id: number; paragraph: string; user_text: string; feedback: SummaryFeedback; seconds: number }) =>
+  addSummary: (summary: { paragraph_id: number; user_text: string; feedback: SummaryFeedback; seconds: number }) =>
     request<Summary>('/api/summaries', { method: 'POST', body: JSON.stringify(summary) }),
   listSummaries: (sessionId: number) => request<Summary[]>(`/api/summaries?session_id=${sessionId}`),
   addReading: (reading: {
-    session_id: number
-    paragraph: string
+    paragraph_id: number
     user_text: string
     seconds: number
     corrections: Correction[]

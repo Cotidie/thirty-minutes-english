@@ -31,7 +31,7 @@ const feedback: SummaryFeedback = {
 
 it('keeps the paragraph in view while it is summed up, then on Done judges the summary and keeps it on its own', async () => {
   vi.useFakeTimers({ shouldAdvanceTime: true })
-  const kept: Summary = { id: 5, created_at: '', session_id: 3, paragraph, user_text: said, feedback, seconds: 20 }
+  const kept: Summary = { id: 5, created_at: '', paragraph_id: 4, user_text: said, feedback, seconds: 20 }
   vi.mocked(api.summaryFeedback).mockResolvedValue(feedback)
   vi.mocked(api.addSummary).mockResolvedValue(kept)
   const onSummary = vi.fn()
@@ -39,10 +39,9 @@ it('keeps the paragraph in view while it is summed up, then on Done judges the s
   const onEnd = vi.fn()
   const { container } = render(
     <Paragraph
-      paragraph={paragraph}
+      paragraph={{ id: 4, text: paragraph }}
       pieces={[{ text: paragraph, start: 0, ko: null }]}
       spans={[]}
-      sessionId={3}
       summaries={[]}
       saved={[]}
       onSummary={onSummary}
@@ -73,7 +72,7 @@ it('keeps the paragraph in view while it is summed up, then on Done judges the s
   act(() => emit({ type: 'session.closed', usage: { seconds: 20 } }))
   await vi.waitFor(() => expect(onSummary).toHaveBeenCalledWith(kept))
   expect(api.summaryFeedback).toHaveBeenCalledExactlyOnceWith(paragraph, said)
-  expect(api.addSummary).toHaveBeenCalledWith({ session_id: 3, paragraph, user_text: said, feedback, seconds: 20 })
+  expect(api.addSummary).toHaveBeenCalledWith({ paragraph_id: 4, user_text: said, feedback, seconds: 20 })
   // The slip closes; the kept card shows the judgment in its place.
   expect(screen.queryByRole('dialog', { name: 'Summarize this paragraph' })).toBeNull()
   expect(onEnd).toHaveBeenCalledOnce()
@@ -81,13 +80,12 @@ it('keeps the paragraph in view while it is summed up, then on Done judges the s
 })
 
 it('shows a kept summary in the card it was judged in, set apart from the article text', () => {
-  const kept: Summary = { id: 7, created_at: '', session_id: 3, paragraph, user_text: said, feedback, seconds: 20 }
+  const kept: Summary = { id: 7, created_at: '', paragraph_id: 4, user_text: said, feedback, seconds: 20 }
   render(
     <Paragraph
-      paragraph={paragraph}
+      paragraph={{ id: 4, text: paragraph }}
       pieces={[{ text: paragraph, start: 0, ko: null }]}
       spans={[]}
-      sessionId={3}
       summaries={[kept]}
       saved={[]}
       onSummary={vi.fn()}

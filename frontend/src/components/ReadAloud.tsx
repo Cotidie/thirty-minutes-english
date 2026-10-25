@@ -3,13 +3,13 @@ import { api } from '../api'
 import { startAzureAssessor, type Assessor } from '../lib/assessor/azure'
 import { Judge, type AzureWord, type Shown } from '../lib/assessor/judge'
 import { connectReadAloud, type LiveConnection } from '../lib/liveClient'
+import type { Paragraph } from '../types'
 import { FindingCard } from './FindingCard'
 import './ReadAloud.css'
 
 interface Options {
-  paragraph: string
-  /** The session a finished round is filed under. */
-  sessionId: number
+  /** The paragraph read; a finished round is filed under its id. */
+  paragraph: Paragraph
   /** The marks the paragraph's last round left, shown until a new round starts. */
   saved: Shown[]
   onStart: () => void
@@ -70,7 +70,7 @@ interface Call {
  * as the reader goes; a clicked mark opens the full account in text, and the
  * coach is dialled to say its two beats and hang up.
  */
-export function useReadAloud({ paragraph, sessionId, saved, onStart, onEnd }: Options): ReadAloudRound {
+export function useReadAloud({ paragraph: { id: paragraphId, text: paragraph }, saved, onStart, onEnd }: Options): ReadAloudRound {
   const [phase, setPhase] = useState<Phase | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [heard, setHeard] = useState('')
@@ -210,7 +210,7 @@ export function useReadAloud({ paragraph, sessionId, saved, onStart, onEnd }: Op
     await endRound()
     // Filed even when clean: the latest round is the one whose marks come back.
     await api
-      .addReading({ session_id: sessionId, paragraph, user_text: round.heard, seconds: elapsed, corrections: round.findings })
+      .addReading({ paragraph_id: paragraphId, user_text: round.heard, seconds: elapsed, corrections: round.findings })
       .catch(() => undefined)
   }
 

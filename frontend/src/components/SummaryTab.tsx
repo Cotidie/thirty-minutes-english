@@ -37,6 +37,7 @@ export function SummaryTab({ sessionId, content, stars }: Props) {
   const starredExpressions = content.expressions.filter((e) => stars.expressions.includes(e.phrase))
   const starredWords = content.vocabulary.filter((v) => stars.words.includes(v.word))
   const starredCount = starredExpressions.length + starredWords.length
+  const paragraphText = new Map(content.article.paragraphs.map((p) => [p.id, p.text]))
   const loading = examples === null && error === null
 
   return (
@@ -79,7 +80,7 @@ export function SummaryTab({ sessionId, content, stars }: Props) {
         {summaries?.length === 0 && <p className="empty">No summaries yet. Each paragraph in the Article tab has a Summarize button.</p>}
         <ol className="summary-cards">
           {summaries?.map((s) => (
-            <SummaryCard key={s.id} label={`${s.paragraph.split(/\s+/).slice(0, 4).join(' ')}…`} line={s.user_text} note={s.feedback.summary} />
+            <SummaryCard key={s.id} label={`${(paragraphText.get(s.paragraph_id) ?? '').split(/\s+/).slice(0, 4).join(' ')}…`} line={s.user_text} note={s.feedback.summary} />
           ))}
         </ol>
       </Section>

@@ -4,7 +4,7 @@ import { connectSummary } from '../lib/liveClient'
 import type { LiveState } from '../lib/liveSession'
 import { useMicLevel } from '../lib/micLevel'
 import { useLiveRound } from '../lib/useLiveRound'
-import type { Summary, SummaryFeedback } from '../types'
+import type { Paragraph, Summary, SummaryFeedback } from '../types'
 import { Slip } from './Slip'
 import { SpeakButton } from './SpeakButton'
 import './Summarize.css'
@@ -18,8 +18,8 @@ const STATUS_LABEL: Record<LiveState['status'], string> = {
 }
 
 interface Options {
-  paragraph: string
-  sessionId: number
+  /** The paragraph summed up; the kept summary is filed under its id. */
+  paragraph: Paragraph
   onKept: (summary: Summary) => void
   onStart: () => void
   /** The microphone is free. */
@@ -46,7 +46,7 @@ export interface SummaryRound {
  * is about with it in view, Gemini's transcription model writes it down primed with the paragraph's
  * words, and on Done the judge answers in one fixed shape.
  */
-export function useSummary({ paragraph, sessionId, onKept, onStart, onEnd }: Options): SummaryRound {
+export function useSummary({ paragraph: { id: paragraphId, text: paragraph }, onKept, onStart, onEnd }: Options): SummaryRound {
   const audioRef = useRef<HTMLAudioElement>(null)
   const [writing, setWriting] = useState(false)
   const [failure, setFailure] = useState<string | null>(null)
@@ -80,7 +80,7 @@ export function useSummary({ paragraph, sessionId, onKept, onStart, onEnd }: Opt
     setWriting(true)
     api
       .summaryFeedback(paragraph, said)
-      .then((feedback) => (live ? api.addSummary({ session_id: sessionId, paragraph, user_text: said, feedback, seconds }) : null))
+      .then((feedback) => (live ? api.addSummary({ paragraph_id: paragraphId, user_text: said, feedback, seconds }) : null))
       .then((summary) => {
         if (!live || !summary) return
         onKept(summary)

@@ -22,11 +22,8 @@ export function ArticleTab({
   const bodyRef = useRef<HTMLElement>(null);
   const { summaries, add: addSummary } = useSummaries(sessionId);
   const marks = useReadingMarks(sessionId);
-  const paragraphs = article.body
-    .split(/\n\s*\n/)
-    .map((p) => p.trim())
-    .filter(Boolean);
-  const sentences = pairSentences(paragraphs, article.translation ?? []);
+  const paragraphs = article.paragraphs;
+  const sentences = pairSentences(paragraphs.map((p) => p.text), article.translation ?? []);
   const evidence = active === null ? [] : article.questions[active].evidence;
 
   useEffect(() => {
@@ -45,13 +42,12 @@ export function ArticleTab({
         <h2 className="article-title">{article.title}</h2>
         {paragraphs.map((p, i) => (
           <Paragraph
-            key={i}
+            key={p.id}
             paragraph={p}
             pieces={sentences[i]}
-            spans={markedSpans(p, evidence)}
-            sessionId={sessionId}
-            summaries={summaries.filter((s) => s.paragraph === p)}
-            saved={marks.get(p) ?? NO_MARKS}
+            spans={markedSpans(p.text, evidence)}
+            summaries={summaries.filter((s) => s.paragraph_id === p.id)}
+            saved={marks.get(p.id) ?? NO_MARKS}
             onSummary={addSummary}
             active={reading !== null && reading !== i}
             onStart={() => setReading(i)}

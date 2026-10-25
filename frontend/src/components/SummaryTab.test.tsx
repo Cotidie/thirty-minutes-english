@@ -12,7 +12,14 @@ const content: SessionContent = {
     { phrase: 'a moving target', meaning: 'something that keeps changing', usage_note: '', examples: [] },
     { phrase: 'on the fence', meaning: 'undecided', usage_note: '', examples: [] },
   ],
-  article: { title: 'Twins', body: '', questions: [] },
+  article: {
+    title: 'Twins',
+    paragraphs: [
+      { id: 1, text: 'Upkeep is what actually pays for a twin.' },
+      { id: 2, text: 'A modest twin delivers more value than a grand one.' },
+    ],
+    questions: [],
+  },
   vocabulary: [
     { word: 'mitigate', pos: 'verb', definition: 'make less severe', example: 'We mitigated it.' },
     { word: 'ubiquitous', pos: 'adjective', definition: 'present everywhere', example: 'Phones are.' },
@@ -58,6 +65,14 @@ describe('SummaryTab', () => {
     await screen.findByText("I'm on the fence about the offer.")
     const counts = document.querySelectorAll('.summary-count')
     expect([...counts].map((c) => c.textContent)).toEqual(['0', '1', '0'])
+  })
+
+  it('names each summary by the opening words of the paragraph it sums up', async () => {
+    const feedback = { missed: [], fixes: [], summary: 'Small twins pay off.' }
+    vi.mocked(api.listSummaries).mockResolvedValueOnce([{ id: 4, created_at: '', paragraph_id: 2, user_text: 'small ones win', feedback, seconds: 8 }])
+    render(<SummaryTab sessionId={3} content={content} stars={none} />)
+    expect(await screen.findByText('small ones win')).toBeInTheDocument()
+    expect(screen.getByText('A modest twin delivers…')).toBeInTheDocument()
   })
 
   it('reports a failure instead of an empty summary', async () => {

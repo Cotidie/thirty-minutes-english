@@ -27,9 +27,15 @@ export interface SentencePair {
   ko: string
 }
 
+/** One paragraph of the article; readings and summaries point at it by id. */
+export interface Paragraph {
+  id: number
+  text: string
+}
+
 export interface Article {
   title: string
-  body: string
+  paragraphs: Paragraph[]
   questions: Question[]
   sources?: Source[]
   translation?: SentencePair[]
@@ -216,8 +222,7 @@ export type Correction = Shown
 export interface Reading {
   id: number
   created_at: string
-  session_id: number
-  paragraph: string
+  paragraph_id: number
   user_text: string
   seconds: number
   corrections: Correction[] | null
@@ -262,8 +267,7 @@ export interface SummaryFeedback {
 export interface Summary {
   id: number
   created_at: string
-  session_id: number
-  paragraph: string
+  paragraph_id: number
   user_text: string
   feedback: SummaryFeedback
   seconds: number

@@ -64,13 +64,12 @@ function renderIdle(active = false, saved: Shown[] = []) {
   const onEnd = vi.fn()
   render(
     <Paragraph
-      paragraph={paragraph}
+      paragraph={{ id: 7, text: paragraph }}
       pieces={pairSentences([paragraph], [{ en: paragraph, ko: '연구자들이 확인했다.' }])[0]}
       spans={[]}
       summaries={[]}
       saved={saved}
       onSummary={vi.fn()}
-      sessionId={3}
       active={active}
       onStart={onStart}
       onEnd={onEnd}
@@ -115,8 +114,7 @@ describe('ReadAloud round', () => {
     await waitFor(() =>
       expect(vi.mocked(api.addReading)).toHaveBeenCalledWith(
         expect.objectContaining({
-          session_id: 3,
-          paragraph: 'Researchers verified it.',
+          paragraph_id: 7,
           user_text: 'Researchers berified it.',
           corrections: [expect.objectContaining({ word: 'verified', heard: 'b for v', fix: 'v', repeated_ok: false, at: 1 })],
         }),

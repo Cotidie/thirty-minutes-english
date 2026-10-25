@@ -2,7 +2,7 @@ import { useMemo } from 'react'
 import type { Shown } from '../lib/assessor/judge'
 import type { Span } from '../lib/highlight'
 import type { Piece } from '../lib/sentences'
-import type { Summary } from '../types'
+import type { Paragraph as ArticleParagraph, Summary } from '../types'
 import { wordStarts, type Marks } from '../lib/words'
 import { ReadAloudButton, ReadAloudPanel, useReadAloud } from './ReadAloud'
 import { Run, Sentence } from './Sentence'
@@ -10,12 +10,11 @@ import { SummarizeButton, SummaryPanel, useSummary } from './Summarize'
 import './Paragraph.css'
 
 interface Props {
-  paragraph: string
+  paragraph: ArticleParagraph
   /** The paragraph cut into its translated sentences. */
   pieces: Piece[]
   /** Evidence passages to mark, in paragraph coordinates. */
   spans: Span[]
-  sessionId: number
   /** Summaries of this paragraph already kept. */
   summaries: Summary[]
   /** The marks this paragraph's last read-aloud round left. */
@@ -33,10 +32,10 @@ interface Props {
  * Read aloud and Summarize sit in one row right under the text and stay there; what
  * their rounds show goes below the row. The text stays in view while it is summed up.
  */
-export function Paragraph({ paragraph, pieces, spans, sessionId, summaries, saved, onSummary, active, onStart, onEnd }: Props) {
-  const starts = useMemo(() => wordStarts(paragraph), [paragraph])
-  const round = useReadAloud({ paragraph, sessionId, saved, onStart, onEnd })
-  const summary = useSummary({ paragraph, sessionId, onKept: onSummary, onStart, onEnd })
+export function Paragraph({ paragraph, pieces, spans, summaries, saved, onSummary, active, onStart, onEnd }: Props) {
+  const starts = useMemo(() => wordStarts(paragraph.text), [paragraph.text])
+  const round = useReadAloud({ paragraph, saved, onStart, onEnd })
+  const summary = useSummary({ paragraph, onKept: onSummary, onStart, onEnd })
   const marks: Marks = { findings: round.findings, open: round.open, onOpen: round.ask }
 
   return (
