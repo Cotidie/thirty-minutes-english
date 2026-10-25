@@ -462,7 +462,6 @@ interface ControlProps {
 
 function Control({ id, field, value, menu, onChange, onPin }: ControlProps) {
   const labelledBy = `${id}-label`
-  if (field.multi) return <MultiPick id={id} field={field} value={value} onChange={onChange} />
   if (field.inline && menu.catalog)
     return (
       <ModelList
@@ -506,61 +505,6 @@ function Control({ id, field, value, menu, onChange, onPin }: ControlProps) {
       placeholder={menu.placeholder}
       onChange={(e) => onChange(e.target.value)}
     />
-  )
-}
-
-/** A comma list ticked from `options`, each shown with its description; a filter narrows a long list. */
-function MultiPick({
-  id,
-  field,
-  value,
-  onChange,
-}: {
-  id: string
-  field: SettingField
-  value: string
-  onChange: (value: string) => void
-}) {
-  const [filter, setFilter] = useState('')
-  const picked = value
-    .split(',')
-    .map((s) => s.trim())
-    .filter(Boolean)
-  const choices = field.options.map((o) => o.id)
-  const describe = new Map(field.options.map((o) => [o.id, o.description]))
-  const needle = filter.trim().toLowerCase()
-  const shown = choices.filter((c) => !needle || `${c} ${describe.get(c) ?? ''}`.toLowerCase().includes(needle))
-  const toggle = (name: string) =>
-    onChange(choices.filter((c) => (c === name ? !picked.includes(c) : picked.includes(c))).join(','))
-
-  return (
-    <div className="settings-multi">
-      <div className="settings-multi-bar">
-        <input
-          id={id}
-          type="search"
-          autoComplete="off"
-          placeholder={`Filter ${choices.length} skills`}
-          value={filter}
-          onChange={(e) => setFilter(e.target.value)}
-        />
-        <span className="settings-multi-count">{picked.length === 0 ? 'None ticked' : `${picked.length} ticked`}</span>
-      </div>
-      <ul className="settings-multi-list" aria-label={`${field.key} choices`}>
-        {shown.map((name) => (
-          <li key={name}>
-            <label className="settings-multi-item">
-              <input type="checkbox" checked={picked.includes(name)} onChange={() => toggle(name)} />
-              <span>
-                <span className="settings-multi-name">{name}</span>
-                {describe.get(name) && <span className="settings-multi-desc">{describe.get(name)}</span>}
-              </span>
-            </label>
-          </li>
-        ))}
-        {shown.length === 0 && <li className="settings-multi-empty">No skill matches “{filter}”.</li>}
-      </ul>
-    </div>
   )
 }
 

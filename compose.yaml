@@ -5,7 +5,6 @@ services:
       context: ./backend
       args:
         UID: ${UID:-1000}
-        HOME_DIR: ${HOME}
     # Every runtime setting (keys, models, providers) comes from .env as is; the ⚙ modal's list
     # (backend/app/config/settings.py) owns their defaults, so none are repeated here.
     env_file:
@@ -20,9 +19,6 @@ services:
       - ./agents/read-aloud-coach:/agents/read-aloud-coach:ro
       - ./agents/example-coach:/agents/example-coach:ro
       - ./agents/summary-coach:/agents/summary-coach:ro
-      - ${HOME}/.claude/skills:${HOME}/.claude/skills:ro
-      # Skill managers link ~/.claude/skills/<name> to ../../.agents/skills/<name>; mount the target so the links resolve.
-      - ${HOME}/.agents/skills:${HOME}/.agents/skills:ro
 
   frontend:
     restart: unless-stopped

@@ -149,8 +149,8 @@ Earlier sessions already taught some words. Before you finalize, call check_item
 vocabulary word you chose. Replace each one it reports as already taught with a fresh word, then call \
 it again with the replacements until it reports nothing."""
 
-SKILLS_PREAMBLE = """Before writing, invoke each of these skills with the Skill tool and follow \
-their instructions while producing the content: {skills}.
+SKILLS_PREAMBLE = """Before writing, invoke the {skill} skill with the Skill tool and follow its \
+instructions while producing every part of the content.
 
 """
 
@@ -182,24 +182,22 @@ TIMEOUT_S = 600
 
 
 class ClaudeGenerator:
-    """`skills` are host skills to load on top of the app's own, which always runs."""
+    """Runs on the app's own skills only (backend/plugin), so a session reads the same on any machine."""
 
     def __init__(
         self,
         model: str = "opus",
         effort: str | None = "xhigh",
-        skills: tuple[str, ...] = (),
         firecrawl_key: str = "",
         timeout_s: float = TIMEOUT_S,
     ) -> None:
-        self._skills = (APP_SKILL, *skills)  # followed for every part of the session
         self.claude = Claude(
             model,
             effort,
             timeout_s,
             tools=("Read", *WEB_TOOLS),
             mcp=(firecrawl(firecrawl_key),),
-            skills=(APP_SKILL, ARTICLE_SKILL, *skills),
+            skills=(APP_SKILL, ARTICLE_SKILL),
             plugins=(str(PLUGIN_DIR),),
             partial=True,
         )
@@ -212,7 +210,7 @@ class ClaudeGenerator:
             scene_rules=SCENE_RULES,
             caption_rules=CAPTION_RULES,
         )
-        prompt = SKILLS_PREAMBLE.format(skills=", ".join(self._skills)) + prompt
+        prompt = SKILLS_PREAMBLE.format(skill=APP_SKILL) + prompt
         if exclude:
             prompt += CHECK_ITEMS_RULE
         return prompt

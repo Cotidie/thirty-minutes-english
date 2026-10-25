@@ -185,8 +185,6 @@ export interface SettingField {
   used_when: [string, string] | null
   /** What the setting does, for the info tooltip. */
   help: string
-  /** `options` are ticked, not picked; the value is a comma list. */
-  multi: boolean
 }
 
 export interface SettingGroup {

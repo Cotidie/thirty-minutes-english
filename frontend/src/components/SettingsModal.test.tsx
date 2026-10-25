@@ -25,7 +25,6 @@ function field(partial: Partial<SettingField> & Pick<SettingField, 'key' | 'grou
     shown_when: null,
     used_when: null,
     help: '',
-    multi: false,
     ...partial,
   }
 }
@@ -290,37 +289,6 @@ describe('SettingsModal pins', () => {
     expect(await screen.findByText('Pinned')).toBeInTheDocument()
     const rows = await screen.findAllByRole('option')
     expect(rows.map((o) => within(o).queryByRole('img', { name: 'Pinned' }) !== null)).toEqual([true, false, false])
-  })
-})
-
-describe('SettingsModal skills', () => {
-  it('ticks host skills from a filtered list and saves them as a comma list', async () => {
-    vi.mocked(api.getSettings).mockResolvedValue({
-      groups: GROUPS,
-      fields: [
-        ...FIELDS,
-        field({
-          key: 'CLAUDE_SKILLS',
-          group: 'claude',
-          value: 'stop-slop',
-          multi: true,
-          options: [opt('humanizer', 'Remove signs of AI writing.'), opt('stop-slop', 'Remove AI writing patterns.'), opt('tdd', 'Test first.')],
-        }),
-      ],
-    })
-    await open()
-    await showTab('Claude generation')
-    expect(screen.getByText('1 ticked')).toBeInTheDocument()
-    expect(screen.getByRole('checkbox', { name: /stop-slop/ })).toBeChecked()
-
-    await userEvent.type(screen.getByLabelText('CLAUDE_SKILLS'), 'writing')
-    expect(screen.queryByRole('checkbox', { name: /tdd/ })).not.toBeInTheDocument()
-    await userEvent.click(screen.getByRole('checkbox', { name: /humanizer/ }))
-    expect(screen.getByText('2 ticked')).toBeInTheDocument()
-
-    await userEvent.click(screen.getByRole('button', { name: 'Save' }))
-    await waitFor(() => expect(api.putSettings).toHaveBeenCalledTimes(1))
-    expect(vi.mocked(api.putSettings).mock.calls[0][0]).toEqual({ CLAUDE_SKILLS: 'humanizer,stop-slop' })
   })
 })
 

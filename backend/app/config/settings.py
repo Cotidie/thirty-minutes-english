@@ -83,7 +83,6 @@ class Spec:
     shown_when: tuple[str, str] | None = None  # (key, value): the field only matters then
     used_when: tuple[str, str] | None = None  # (key, value): a key the app only calls then; shown, marked idle otherwise
     help: str = ""  # one or two sentences for the modal's info tooltip
-    multi: bool = False  # a comma list picked from the host's skills (app.config.skills), not typed
 
 
 VOICE_VARIANTS = {
@@ -125,8 +124,6 @@ SPECS: tuple[Spec, ...] = (
          help="Writes each session: expressions, article, words and picture scenes. Sonnet is faster, Opus writes better."),
     Spec("CLAUDE_EFFORT", "claude", "xhigh", effort_of="CLAUDE_MODEL",
          help="How much the session model thinks before it writes. Higher is better and slower."),
-    Spec("CLAUDE_SKILLS", "claude", multi=True,
-         help="The app's own writing skill always runs, and its humanizer rewrites the article. Tick host skills (~/.claude/skills) to load on top."),
     Spec("TOPICS_MODEL", "claude", "sonnet", catalog="claude",
          help="Picks the three news topics once a day."),
     Spec("TOPICS_EFFORT", "claude", "medium", effort_of="TOPICS_MODEL",
@@ -217,16 +214,8 @@ class Settings:
         return self.get(self.voice_api_key_name)
 
     @property
-    def claude_skills(self) -> tuple[str, ...]:
-        return split_list(self.get("CLAUDE_SKILLS"))
-
-    @property
     def assess_word_score(self) -> int:
         return int(float(self.get("ASSESS_WORD_SCORE")))
-
-
-def split_list(value: str) -> tuple[str, ...]:
-    return tuple(s.strip() for s in value.split(",") if s.strip())
 
 
 def mask(secret: str) -> str:

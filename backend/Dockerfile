@@ -1,14 +1,13 @@
 FROM python:3.13-slim
 
-# Match the host user and home so the mounted ~/.claude/skills sits where the CLI looks.
+# Match the host user so what the app writes to the mounted data folder stays yours.
 ARG UID=1000
-ARG HOME_DIR=/home/app
 
-RUN useradd --uid ${UID} --create-home --home-dir ${HOME_DIR} app
+RUN useradd --uid ${UID} --create-home --home-dir /home/app app
 COPY --from=ghcr.io/astral-sh/uv:latest /uv /usr/local/bin/uv
 
 USER app
-ENV HOME=${HOME_DIR}
+ENV HOME=/home/app
 
 WORKDIR /app
 COPY --chown=app pyproject.toml uv.lock ./

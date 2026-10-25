@@ -69,13 +69,16 @@ def test_the_prompt_asks_for_no_expressions():
     assert "expressions" not in SESSION_SCHEMA["properties"]
 
 
-def test_the_app_skill_always_runs_and_host_skills_come_after_it():
+def test_only_the_apps_own_skills_run():
+    import inspect
+
     fake = FakeQuery(result(sample_draft().model_dump()))
-    generator_with(fake, skills=("stop-slop",)).generate("x")
+    generator_with(fake).generate("x")
     prompt, options = fake.calls[0]
-    assert options.skills == [APP_SKILL, ARTICLE_SKILL, "stop-slop"]
+    assert options.skills == [APP_SKILL, ARTICLE_SKILL]
     assert options.plugins == [{"type": "local", "path": str(PLUGIN_DIR)}]
-    assert f"{APP_SKILL}, stop-slop" in prompt
+    assert f"invoke the {APP_SKILL} skill" in prompt
+    assert "skills" not in inspect.signature(ClaudeGenerator).parameters  # nothing comes from the host
     assert (PLUGIN_DIR / "skills" / "session-writing" / "SKILL.md").is_file()
 
 

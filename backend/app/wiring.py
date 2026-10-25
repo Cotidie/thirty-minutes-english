@@ -12,7 +12,6 @@ from app.coaching.summary_feedback import SCHEMA as SUMMARY_SCHEMA
 from app.coaching.summary_feedback import TEMPLATE as SUMMARY_TEMPLATE
 from app.coaching.summary_feedback import SummaryCoach
 from app.config.settings import SPEC_BY_KEY, Settings
-from app.config.skills import host_skills
 from app.generation.generator import ClaudeGenerator, Generator
 from app.pictures.files import PictureFiles
 from app.pictures.illustrator import Illustrator
@@ -89,7 +88,6 @@ def build_services(
         generator=ClaudeGenerator(
             model=settings.get("CLAUDE_MODEL"),
             effort=effort(settings, "CLAUDE_EFFORT", efforts_of),
-            skills=tuple(s for s in settings.claude_skills if s in host_skills()),  # a vanished skill would fail the run
             firecrawl_key=settings.get("FIRECRAWL_API_KEY"),
         ),
         topic_source=ClaudeTopicSource(
