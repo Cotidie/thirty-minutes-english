@@ -123,6 +123,9 @@ CREATE INDEX stage_times_stage ON stage_times (stage, id);
 
 
 def create(conn: sqlite3.Connection) -> None:
-    """The v2 tables on an empty file."""
-    conn.executescript(SCHEMA)
+    """The v2 tables on an empty file. One statement at a time, so it can run inside a caller's transaction
+    (executescript would commit it)."""
+    for statement in SCHEMA.split(";"):
+        if statement.strip():
+            conn.execute(statement)
     conn.execute(f"PRAGMA user_version = {VERSION}")

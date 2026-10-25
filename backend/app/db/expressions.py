@@ -30,6 +30,24 @@ def expression_from(row: sqlite3.Row) -> Expression:
     )
 
 
+def upsert(
+    conn: sqlite3.Connection, phrase: str, meaning: str, synonyms: list[str], examples: list[str], usage_note: str,
+    korean: str | None, setting: str | None, source: str, added_at: str,
+) -> int:
+    """The id of the corpus row for `phrase`, written or rewritten on `conn`'s open transaction."""
+    (expression_id,) = conn.execute(
+        """INSERT INTO expressions (key, phrase, meaning, synonyms, examples, usage_note, korean, setting, source, added_at)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+           ON CONFLICT (key) DO UPDATE SET phrase = excluded.phrase, meaning = excluded.meaning,
+               synonyms = excluded.synonyms, examples = excluded.examples, usage_note = excluded.usage_note,
+               korean = excluded.korean, setting = excluded.setting, source = excluded.source
+           RETURNING id""",
+        (key(phrase), phrase, meaning, json.dumps(synonyms, ensure_ascii=False), json.dumps(examples, ensure_ascii=False),
+         usage_note, korean, setting, source, added_at),
+    ).fetchone()
+    return expression_id
+
+
 class ExpressionRepo:
     def __init__(self, db: "Database") -> None:
         self._db = db
@@ -48,19 +66,7 @@ class ExpressionRepo:
     ) -> int:
         """The expression's id. A phrase already in the corpus (close variants included) keeps its id and takes the new wording."""
         with self._db.connect() as conn:
-            (expression_id,) = conn.execute(
-                """INSERT INTO expressions (key, phrase, meaning, synonyms, examples, usage_note, korean, setting, source, added_at)
-                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                   ON CONFLICT (key) DO UPDATE SET phrase = excluded.phrase, meaning = excluded.meaning,
-                       synonyms = excluded.synonyms, examples = excluded.examples, usage_note = excluded.usage_note,
-                       korean = excluded.korean, setting = excluded.setting, source = excluded.source
-                   RETURNING id""",
-                (
-                    key(phrase), phrase, meaning, json.dumps(synonyms, ensure_ascii=False), json.dumps(examples, ensure_ascii=False),
-                    usage_note, korean, setting, source, (added_at or datetime.now(UTC)).isoformat(),
-                ),
-            ).fetchone()
-        return expression_id
+            return upsert(conn, phrase, meaning, synonyms, examples, usage_note, korean, setting, source, (added_at or datetime.now(UTC)).isoformat())
 
     def get(self, expression_id: int) -> Expression | None:
         with self._db.connect() as conn:

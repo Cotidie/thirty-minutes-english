@@ -1,9 +1,10 @@
 """The one SQLite file, and a repository per group of tables on it."""
 
+import logging
 import sqlite3
 from pathlib import Path
 
-from app.db import schema
+from app.db import migrate, schema
 from app.db.caches import CacheRepo
 from app.db.expressions import ExpressionRepo
 from app.db.pictures import PictureRepo
@@ -13,6 +14,8 @@ from app.db.sessions import SessionRepo
 from app.db.settings import SettingsRepo
 from app.db.stages import StageRepo
 
+log = logging.getLogger(__name__)
+
 
 class Database:
     def __init__(self, path: Path | str, images_dir: Path | str | None = None) -> None:
@@ -21,9 +24,10 @@ class Database:
         self.images_dir = Path(images_dir) if images_dir is not None else self.path.parent / "images"
         self.path.parent.mkdir(parents=True, exist_ok=True)
         with self.connect() as conn:
-            if conn.execute("PRAGMA user_version").fetchone()[0] < schema.VERSION:
-                if conn.execute("SELECT 1 FROM sqlite_master WHERE name = 'sessions'").fetchone():
-                    raise NotImplementedError("this file is schema v1; migrating it is not implemented yet")
+            if migrate.is_v1(conn):
+                saved = migrate.backup(self.path)
+                log.info("migrated %s to schema v2 (v1 copy: %s): %s", self.path, saved.name, migrate.migrate_v1(conn, self.images_dir))
+            elif conn.execute("PRAGMA user_version").fetchone()[0] < schema.VERSION:
                 schema.create(conn)
         self.sessions = SessionRepo(self)
         self.expressions = ExpressionRepo(self)
