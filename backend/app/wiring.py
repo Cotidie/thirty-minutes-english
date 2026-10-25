@@ -5,6 +5,7 @@ import logging
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass, field
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 from app.coaching.example_feedback import TEMPLATES, ExampleCoach
 from app.coaching.summary_feedback import SCHEMA as SUMMARY_SCHEMA
@@ -13,8 +14,9 @@ from app.coaching.summary_feedback import SummaryCoach
 from app.config.settings import SPEC_BY_KEY, Settings
 from app.config.skills import host_skills
 from app.generation.generator import ClaudeGenerator, Generator
+from app.pictures.files import PictureFiles
 from app.pictures.illustrator import Illustrator
-from app.pictures.painters import PictureLog, painter_for
+from app.pictures.painters import painter_for
 from app.pictures.scenes import SceneWriter
 from app.topics.daily import ClaudeTopicSource, TopicSource
 from app.voice.assessor import AzureAssessor
@@ -27,6 +29,9 @@ from app.voice.live import (
     OpenAIVoice,
     VoiceProvider,
 )
+
+if TYPE_CHECKING:
+    from app.db.pictures import PictureRepo
 
 log = logging.getLogger(__name__)
 
@@ -71,16 +76,15 @@ def effort(settings: Settings, key: str, efforts_of: EffortsOf) -> str | None:
 def build_services(
     settings: Settings,
     agent_dirs: dict[str, Path],
-    image_dir: Path | None = None,
+    pictures: "PictureRepo | None" = None,
+    files: PictureFiles | None = None,
     efforts_of: EffortsOf = lambda _: None,
-    pictures: PictureLog | None = None,
     speech_dir: Path | None = None,
 ) -> Services:
-    """`agent_dirs` maps read-aloud / example / summary to their folders; `image_dir` is
-    where the vocabulary pictures land (none: no pictures); `efforts_of` gives a Claude
-    model's effort levels as Claude Code reported them (None: not known); `pictures`
-    keeps how long each picture took and what it cost; `speech_dir` keeps sentences
-    read aloud (none: no reading aloud)."""
+    """`agent_dirs` maps read-aloud / example / summary to their folders; `pictures` and `files` keep
+    each picture drawn, its row and its file (none: no pictures); `efforts_of` gives a Claude model's
+    effort levels as Claude Code reported them (None: not known); `speech_dir` keeps sentences read
+    aloud (none: no reading aloud)."""
     return Services(
         generator=ClaudeGenerator(
             model=settings.get("CLAUDE_MODEL"),
@@ -95,7 +99,7 @@ def build_services(
         example_coach=_example_coach(settings, agent_dirs["example"], effort(settings, "EXAMPLE_EFFORT", efforts_of)),
         summary_coach=_summary_coach(settings, agent_dirs["summary"], effort(settings, "SUMMARY_EFFORT", efforts_of)),
         transcriber=_transcriber(settings, agent_dirs["summary"]),
-        illustrator=_illustrator(settings, image_dir, pictures),
+        illustrator=_illustrator(settings, pictures, files),
         scene_writer=SceneWriter.with_cli(settings.get("EXAMPLE_MODEL")),
         assessor=_assessor(settings),
         speaker=speaker_for(
@@ -167,12 +171,12 @@ def _summary_coach(settings: Settings, agent_dir: Path, summary_effort: str | No
     return SummaryCoach.with_cli(agent_dir, settings.get("SUMMARY_MODEL"), summary_effort)
 
 
-def _illustrator(settings: Settings, image_dir: Path | None, pictures: PictureLog | None) -> Illustrator | None:
-    """Pictures for the words, once a provider is chosen, its key is set, and there is a folder for them."""
-    if image_dir is None:
+def _illustrator(settings: Settings, pictures: "PictureRepo | None", files: PictureFiles | None) -> Illustrator | None:
+    """Pictures for the words, once a provider is chosen, its key is set, and there is a place to keep them."""
+    if pictures is None or files is None:
         return None
     keys = {"openrouter": settings.get("OPENROUTER_API_KEY"), "comfy": settings.get("COMFY_API_KEY")}
     painter = painter_for(settings.get("IMAGE_PROVIDER"), settings.get("IMAGE_MODEL"), keys, pictures)
     if painter is None and settings.get("IMAGE_PROVIDER") != "off":
         log.warning("pictures are off: no key for IMAGE_PROVIDER=%s", settings.get("IMAGE_PROVIDER"))
-    return Illustrator(painter, image_dir, settings.get("IMAGE_STYLE")) if painter else None
+    return Illustrator(painter, pictures, files, settings.get("IMAGE_STYLE")) if painter else None

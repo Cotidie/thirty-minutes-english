@@ -12,6 +12,7 @@ from app.config.catalog import Catalog
 from app.config.settings import Settings
 from app.db import Database
 from app.generation.jobs import Executor, JobRunner
+from app.pictures.files import PictureFiles
 from app.topics.daily import DailyTopics
 from app.wiring import Services, agent_dirs, build_services
 
@@ -55,7 +56,7 @@ def default_app() -> FastAPI:
     catalog = Catalog(db.caches)
 
     def rebuild(settings: Settings) -> Services:
-        return build_services(settings, dirs, image_dir, catalog.efforts_of, db.pictures, db.path.parent / "speech")
+        return build_services(settings, dirs, db.pictures, PictureFiles(image_dir), catalog.efforts_of, db.path.parent / "speech")
 
     return create_app(
         db,

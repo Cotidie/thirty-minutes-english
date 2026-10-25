@@ -7,11 +7,14 @@ import httpx2
 import pytest
 from mcp.types import CallToolResult, ImageContent, TextContent
 
+from app.db import Database
 from app.llm import GenerationError
 from app.mcp_client import McpError
+from app.pictures.files import PictureFiles
 from app.pictures.illustrator import IMAGE_RULES, STYLES, Illustrator
 from app.pictures.painters import (
     ComfyPainter,
+    Drawn,
     OpenRouterPainter,
     fetch_url,
     finished,
@@ -26,12 +29,12 @@ class FakePainter:
         self.blank = blank
         self.prompts: list[str] = []
 
-    def paint(self, prompts: list[str], on_drawn=None, on_picture=None) -> list[bytes | None]:
+    def paint(self, prompts: list[str], on_drawn=None, on_picture=None) -> list[Drawn | None]:
         self.prompts = prompts
-        pictures = [None if i in self.blank else f"PNG{i}".encode() for i in range(len(prompts))]
-        for i, png in enumerate(pictures):
-            if png and on_picture:
-                on_picture(i, png)
+        pictures = [None if i in self.blank else Drawn(f"PNG{i}".encode(), "fake", 2.0) for i in range(len(prompts))]
+        for i, drawn in enumerate(pictures):
+            if drawn and on_picture:
+                on_picture(i, drawn)
             if on_drawn:
                 on_drawn(i + 1)
         return pictures
@@ -40,37 +43,60 @@ class FakePainter:
         return None
 
 
+def illustrator_for(tmp_path, painter=None, style: str = "photo") -> tuple[Illustrator, Database, PictureFiles]:
+    db = Database(tmp_path / "s.db")
+    files = PictureFiles(tmp_path / "images")
+    return Illustrator(painter or FakePainter(), db.pictures, files, style), db, files
+
+
+def landing(into: list):
+    return lambda index, field, picture_id: into.append((index, field, picture_id))
+
+
 def test_every_word_gets_its_example_and_its_scene_drawn(tmp_path):
-    content = sample_draft()
+    words = sample_draft().vocabulary
     painter = FakePainter()
-    done = Illustrator(painter, tmp_path / "images").illustrate("job1", content)
+    illustrator, _, files = illustrator_for(tmp_path, painter)
+    landed = []
+    illustrator.illustrate("job1", words, None, landing(landed))
 
     assert 'This sentence as one moment: "ex 0" In it, "word0" (noun) means: def 0.' in painter.prompts[0]
     assert painter.prompts[1] == f"{STYLES['photo']} {IMAGE_RULES} scene 0"
-    assert [v.example_image for v in done.vocabulary] == [f"job1-{i}-example.png" for i in range(len(content.vocabulary))]
-    assert [v.image for v in done.vocabulary] == [f"job1-{i}.png" for i in range(len(content.vocabulary))]
-    assert (tmp_path / "images" / "job1-2-example.png").read_bytes() == b"PNG4"
-    assert (tmp_path / "images" / "job1-2.png").read_bytes() == b"PNG5"
-    assert content.vocabulary[0].image is None  # the input is untouched
+    assert [(i, f) for i, f, _ in landed] == [(i, f) for i in range(len(words)) for f in ("example_image", "image")]
+    picture = {(i, f): pid for i, f, pid in landed}
+    assert files.path(picture[2, "example_image"]).read_bytes() == b"PNG4"
+    assert files.path(picture[2, "image"]).read_bytes() == b"PNG5"
+
+
+def test_each_drawn_picture_is_one_row_and_one_file_named_by_the_row(tmp_path):
+    illustrator, db, files = illustrator_for(tmp_path)
+    landed = []
+    illustrator.illustrate("j", sample_draft().vocabulary, None, landing(landed))
+    ids = [pid for _, _, pid in landed]
+    assert len(set(ids)) == len(ids)
+    assert sorted((tmp_path / "images").iterdir()) == sorted(files.path(pid) for pid in ids)
+    assert files.path(ids[0]).name == f"{ids[0]}.png"
+    assert db.pictures.stats()["fake"].seconds == 2.0
 
 
 def test_the_chosen_style_leads_the_prompt_and_an_unknown_one_falls_back_to_photo(tmp_path):
-    assert Illustrator(FakePainter(), tmp_path, "comic").prompt("a dog") == f"{STYLES['comic']} {IMAGE_RULES} a dog"
-    assert Illustrator(FakePainter(), tmp_path, "nope").prompt("a dog").startswith(STYLES["photo"])
+    assert illustrator_for(tmp_path, style="comic")[0].prompt("a dog") == f"{STYLES['comic']} {IMAGE_RULES} a dog"
+    assert illustrator_for(tmp_path, style="nope")[0].prompt("a dog").startswith(STYLES["photo"])
 
 
 def test_a_word_without_a_scene_gets_only_its_example_and_a_failed_picture_stays_bare(tmp_path):
-    content = sample_draft()
-    words = list(content.vocabulary)
+    words = list(sample_draft().vocabulary)
     words[1] = words[1].model_copy(update={"scene": None})
-    content = content.model_copy(update={"vocabulary": words})
-    illustrator = Illustrator(FakePainter(blank={3}), tmp_path)  # prompts: ex0, scene0, ex1, ex2, scene2
-    done = illustrator.illustrate("j", content)
+    illustrator, db, _ = illustrator_for(tmp_path, FakePainter(blank={3}))  # prompts: ex0, scene0, ex1, ex2, scene2
+    landed = []
+    illustrator.illustrate("j", words, None, landing(landed))
 
-    assert illustrator.count(content) == 2 * len(words) - 1
-    assert (done.vocabulary[1].example_image, done.vocabulary[1].image) == ("j-1-example.png", None)
-    assert (done.vocabulary[2].example_image, done.vocabulary[2].image) == (None, "j-2.png")
-    assert not (tmp_path / "j-2-example.png").exists()
+    assert illustrator.count(words) == 2 * len(words) - 1
+    assert [f for i, f, _ in landed if i == 1] == ["example_image"]
+    assert [f for i, f, _ in landed if i == 2] == ["image"]
+    assert len(list((tmp_path / "images").iterdir())) == len(landed) == 2 * len(words) - 2
+    with db.connect() as conn:
+        assert conn.execute("SELECT COUNT(*) FROM pictures").fetchone()[0] == len(landed)  # a failed picture leaves no row
 
 
 class FakeServer:
@@ -113,7 +139,7 @@ def test_openrouter_draws_every_prompt_on_one_session_and_shrugs_off_a_failed_on
     }})
     pictures = OpenRouterPainter(server, "google/gemini-3-pro-image").paint(["a", "b", "c"])
 
-    assert pictures == [b"PNG-a", None, None]
+    assert [p and p.png for p in pictures] == [b"PNG-a", None, None]
     assert [c[1] for c in server.calls] == [{"prompt": p, "model": "google/gemini-3-pro-image"} for p in "abc"]
 
 
@@ -142,7 +168,7 @@ def test_comfy_submits_one_batch_waits_and_fetches_each_job_in_order():
 
     pictures = ComfyPainter(server, "vertexai/nano-banana-pro", fetch=fetch).paint(["a", "b", "c"], counts.append)
 
-    assert pictures == [b"PNG0", None, None]
+    assert [p and p.png for p in pictures] == [b"PNG0", None, None]
     assert counts == [1, 3]  # each wait round reports the batch's finished pictures
     submit = server.calls[0][1]
     assert submit["confirm"] is True
@@ -184,28 +210,24 @@ def test_fetch_retries_a_flaky_link():
         asyncio.run(fetch_url("https://img/2", attempts=2, wait_s=0, transport=transport))
 
 
-def test_redraw_draws_the_new_scene_in_the_asked_style_under_a_new_name_and_discard_drops_a_file(tmp_path):
-    content = sample_draft()
-    old = content.vocabulary[2].model_copy(update={"image": "old.png"})
-    (tmp_path / "old.png").write_bytes(b"OLD")
+def test_redraw_draws_the_new_scene_in_the_asked_style_as_a_new_picture_and_remove_drops_a_file(tmp_path):
     painter = FakePainter()
-    drawn = Illustrator(painter, tmp_path, "photo").redraw(7, 2, old, Scene("a fresh scene", "why it fits"), "comic")
+    illustrator, _, files = illustrator_for(tmp_path, painter)
+    picture = illustrator.redraw(Scene("a fresh scene", "why it fits"), "comic")
 
     assert painter.prompts == [f"{STYLES['comic']} {IMAGE_RULES} a fresh scene"]
-    assert (drawn.scene, drawn.caption) == ("a fresh scene", "why it fits")
-    assert drawn.image.startswith("7-2-") and drawn.image.endswith(".png")
-    assert (tmp_path / drawn.image).read_bytes() == b"PNG0"
-    assert (tmp_path / "old.png").exists()  # dropped only once the new name is stored
-    Illustrator(painter, tmp_path).discard("old.png")
-    Illustrator(painter, tmp_path).discard(None)
-    assert not (tmp_path / "old.png").exists()
+    assert files.path(picture).read_bytes() == b"PNG0"
 
-    again = Illustrator(painter, tmp_path).redraw_example(7, 2, drawn, "sketch")
+    again = illustrator.redraw_example(sample_draft().vocabulary[2], "sketch")
     assert painter.prompts[0].startswith(STYLES["sketch"]) and '"ex 2"' in painter.prompts[0]
-    assert again.example_image.startswith("7-2-") and (again.image, again.scene) == (drawn.image, "a fresh scene")
+    assert again == picture + 1 and files.path(again).is_file()
+
+    files.remove(picture)  # the caller drops the old file once the new id is stored
+    files.remove(None)
+    assert not files.path(picture).exists() and files.path(again).exists()
 
     with pytest.raises(GenerationError):
-        Illustrator(FakePainter(blank={0}), tmp_path).redraw(7, 2, drawn, Scene("another", ""), "")
+        illustrator_for(tmp_path, FakePainter(blank={0}))[0].redraw(Scene("another", ""))
 
 
 class FakeCli:
@@ -237,11 +259,12 @@ def test_scene_writer_names_the_word_the_scene_to_avoid_and_a_rolled_spark():
 def test_the_illustrator_reports_each_finished_picture(tmp_path):
     counts: list[int] = []
     kept: list[tuple] = []
-    content = sample_draft()
-    Illustrator(FakePainter(), tmp_path / "images").illustrate("job1", content, counts.append, lambda *picture: kept.append(picture))
-    assert counts == list(range(1, 2 * len(content.vocabulary) + 1))
-    assert kept[:3] == [(0, "example_image", "job1-0-example.png"), (0, "image", "job1-0.png"), (1, "example_image", "job1-1-example.png")]
-    assert (tmp_path / "images" / "job1-0.png").exists()
+    words = sample_draft().vocabulary
+    illustrator, _, files = illustrator_for(tmp_path)
+    illustrator.illustrate("job1", words, counts.append, landing(kept))
+    assert counts == list(range(1, 2 * len(words) + 1))
+    assert [(i, f) for i, f, _ in kept[:3]] == [(0, "example_image"), (0, "image"), (1, "example_image")]
+    assert files.path(kept[0][2]).exists()
 
 
 def test_a_batch_without_a_summary_is_counted_from_its_jobs():
@@ -266,13 +289,13 @@ def test_comfy_reconnects_when_the_connection_drops_and_waits_on():
     server = comfy_server(
         [McpError("dropped"), text({"timed_out": False, "summary": {"ready": 2}})], ["j0", "j1"]
     )
-    assert ComfyPainter(server, "m", fetch=fetch_ok).paint(["a", "b"]) == [b"PNG0", b"PNG1"]
+    assert [p and p.png for p in ComfyPainter(server, "m", fetch=fetch_ok).paint(["a", "b"])] == [b"PNG0", b"PNG1"]
     assert [c[0] for c in server.calls] == ["submit_batch", "wait_for_batch", "wait_for_batch", "get_batch_output"]
 
 
 def test_comfy_keeps_the_pictures_already_drawn_when_it_gives_up():
     server = comfy_server([McpError("dropped")] * 3, ["j0"])
-    assert ComfyPainter(server, "m", fetch=fetch_ok).paint(["a", "b"]) == [b"PNG0", None]
+    assert [p and p.png for p in ComfyPainter(server, "m", fetch=fetch_ok).paint(["a", "b"])] == [b"PNG0", None]
 
 
 def test_a_cancel_during_the_wait_cancels_every_comfy_job():
@@ -286,15 +309,11 @@ def test_a_cancel_during_the_wait_cancels_every_comfy_job():
     assert [c[1] for c in server.calls if c[0] == "cancel_job"] == [{"prompt_id": "j0"}, {"prompt_id": "j1"}]
 
 
-class Log:
-    """A PictureLog that keeps what it hears and knows `known` seconds per picture."""
+class Stats:
+    """Knows `known` seconds per picture for every model."""
 
     def __init__(self, known: float | None = None) -> None:
-        self.records: list[tuple[str, float | None, float | None]] = []
         self.known = known
-
-    def record(self, model, seconds, cost=None):
-        self.records.append((model, seconds, cost))
 
     def seconds(self, model):
         return self.known
@@ -306,21 +325,18 @@ def test_openrouter_times_each_picture_and_keeps_what_it_cost():
     unbilled = CallToolResult(content=[ImageContent(type="image", data=png, mime_type="image/png")])
     blank = CallToolResult(content=[TextContent(type="text", text="refused, cost: $0.002")])
     server = FakeServer({"generate-image": {"a": billed, "b": unbilled, "c": blank}})
-    log = Log()
-    OpenRouterPainter(server, "m", log).paint(["a", "b", "c"])
-    by_cost = sorted(log.records, key=lambda r: r[2] or 0)
-    assert [(m, s is not None, c) for m, s, c in by_cost] == [("m", True, None), ("m", False, 0.002), ("m", True, 0.134)]
+    drawn = OpenRouterPainter(server, "m").paint(["a", "b", "c"])
+    assert [d and (d.model, d.seconds >= 0, d.cost) for d in drawn] == [("m", True, 0.134), ("m", True, None), None]
 
 
 def test_comfy_shares_the_batch_time_over_the_pictures_that_came_back():
     server = comfy_server([text({"timed_out": False, "summary": {"ready": 1, "failed": 1}})], ["j0"])
-    log = Log()
-    ComfyPainter(server, "m", log, fetch=fetch_ok).paint(["a", "b"])
-    assert [(m, c) for m, _, c in log.records] == [("m", None)]
-    assert log.records[0][1] >= 0
+    [first, second] = ComfyPainter(server, "m", fetch=fetch_ok).paint(["a", "b"])
+    assert (first.png, first.model, first.cost, second) == (b"PNG0", "m", None, None)
+    assert first.seconds >= 0
 
 
 def test_the_wait_foreseen_for_a_batch_follows_how_each_provider_draws():
-    assert OpenRouterPainter(FakeServer({}), "m", Log(20)).expected_seconds(10) == 20  # side by side
-    assert ComfyPainter(FakeServer({}), "m", Log(20)).expected_seconds(10) == 200  # one after another
+    assert OpenRouterPainter(FakeServer({}), "m", Stats(20)).expected_seconds(10) == 20  # side by side
+    assert ComfyPainter(FakeServer({}), "m", Stats(20)).expected_seconds(10) == 200  # one after another
     assert ComfyPainter(FakeServer({}), "m").expected_seconds(10) is None  # nothing drawn yet
