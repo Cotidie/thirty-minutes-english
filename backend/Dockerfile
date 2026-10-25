@@ -18,4 +18,4 @@ COPY --chown=app plugin ./plugin
 
 ENV DB_PATH=/data/sessions.db
 EXPOSE 8765
-CMD ["uv", "run", "--no-dev", "uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8765"]
+CMD ["uv", "run", "--no-dev", "uvicorn", "--factory", "app.main:default_app", "--host", "0.0.0.0", "--port", "8765"]

@@ -1,13 +1,13 @@
-from app.models import Article
+from app.models import ArticleDraft
 
 
 def test_article_accepts_question_objects():
-    article = Article(title="T", body="Body text.", questions=[{"text": "Why?", "evidence": ["Body text."]}])
+    article = ArticleDraft(title="T", body="Body text.", questions=[{"text": "Why?", "evidence": ["Body text."]}])
     assert article.questions[0].evidence == ["Body text."]
 
 
 def test_translation_keeps_only_pairs_whose_sentence_is_in_the_body():
-    a = Article.model_validate(
+    a = ArticleDraft.model_validate(
         {
             "title": "t",
             "body": "First one. Second one.",
@@ -20,4 +20,4 @@ def test_translation_keeps_only_pairs_whose_sentence_is_in_the_body():
         }
     )
     assert [p.ko for p in a.translation] == ["첫 번째다.", "두 번째다."]
-    assert Article.model_validate({"title": "t", "body": "b", "questions": []}).translation == []
+    assert ArticleDraft.model_validate({"title": "t", "body": "b", "questions": []}).translation == []

@@ -1,4 +1,3 @@
-import sqlite3
 import json
 from contextlib import asynccontextmanager
 
@@ -161,9 +160,9 @@ def test_comfy_lists_text_to_image_partner_models(monkeypatch):
 def test_image_models_carry_what_a_picture_cost_and_took_here(tmp_path):
     db = Database(tmp_path / "s.db")
     for seconds, cost in ((10, 0.10), (None, 0.20), (20, None)):
-        db.pictures.record("z/img", seconds, cost)
+        db.pictures.add("z/img", seconds, cost)
     for cost in [9.0] + [0.01] * PictureRepo.RECENT:  # only the latest pictures count
-        db.pictures.record("a/img", 5, cost)
+        db.pictures.add("a/img", 5, cost)
     assert db.pictures.stats() == {
         "z/img": PictureStat(pytest.approx(15), pytest.approx(0.15)),
         "a/img": PictureStat(5, pytest.approx(0.01)),
@@ -176,16 +175,6 @@ def test_image_models_carry_what_a_picture_cost_and_took_here(tmp_path):
         image = {f["key"]: f for f in c.get("/api/settings").json()["fields"]}["IMAGE_MODEL"]
     z = next(o for o in image["variants"]["openrouter"]["options"] if o["id"] == "z/img")
     assert (z["image_per_m"], z["per_image"], z["seconds_per_image"]) == (120.0, pytest.approx(0.15), pytest.approx(15))
-
-
-def test_costs_kept_before_seconds_were_move_into_the_picture_stats(tmp_path):
-    path = tmp_path / "s.db"
-    with sqlite3.connect(path) as conn:
-        conn.execute("CREATE TABLE image_costs (id INTEGER PRIMARY KEY AUTOINCREMENT, created_at TEXT NOT NULL, model TEXT NOT NULL, cost REAL NOT NULL)")
-        conn.execute("INSERT INTO image_costs (created_at, model, cost) VALUES ('t', 'z/img', 0.06)")
-    db = Database(path)
-    assert db.pictures.stats() == {"z/img": PictureStat(None, pytest.approx(0.06))}
-    assert Database(path).pictures.stats() == db.pictures.stats()  # once only
 
 
 def test_the_modal_gets_the_cached_models_with_the_default_kept_and_can_refresh(tmp_path):
@@ -259,5 +248,5 @@ def test_a_pinned_model_leads_its_menu(tmp_path):
 
 def test_a_list_cached_by_an_older_version_still_reads(tmp_path):
     db = Database(tmp_path / "s.db")
-    db.caches.set_model_list("x", {"at": 1000.0, "options": [{"id": "m", "description": "dropped field", "efforts": ["low"]}]})
+    db.caches.set_model_list("x", 1000.0, [{"id": "m", "description": "dropped field", "efforts": ["low"]}])
     assert Catalog(db.caches, {}, Clock()).options("x", {}) == [ModelOption("m", efforts=("low",))]

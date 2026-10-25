@@ -1,6 +1,5 @@
-"""How long each drawn picture took and what it cost (where the provider says), per model, so the
-settings modal can show what a model takes here instead of a list price, and a job can foresee
-how long its pictures will take."""
+"""Every picture drawn, one row each: its file is images/{id}.png. How long a model took and what it
+cost (where the provider says) feed the settings modal and a job's estimate of its pictures."""
 
 from dataclasses import dataclass
 from datetime import UTC, datetime
@@ -24,18 +23,22 @@ class PictureRepo:
     def __init__(self, db: "Database") -> None:
         self._db = db
 
-    def record(self, model: str, seconds: float | None, cost: float | None = None) -> None:
+    def add(self, model: str | None, seconds: float | None, cost: float | None) -> int:
+        """The new picture's id, which names its file. `model` is None for pictures carried over from v1."""
         with self._db.connect() as conn:
-            conn.execute(
-                "INSERT INTO image_stats (created_at, model, seconds, cost) VALUES (?, ?, ?, ?)",
+            cur = conn.execute(
+                "INSERT INTO pictures (created_at, model, seconds, cost) VALUES (?, ?, ?, ?)",
                 (datetime.now(UTC).isoformat(), model, seconds, cost),
             )
+        assert cur.lastrowid is not None
+        return cur.lastrowid
 
     def stats(self) -> dict[str, PictureStat]:
         with self._db.connect() as conn:
             rows = conn.execute(
                 """SELECT model, AVG(seconds), AVG(cost) FROM (
-                       SELECT model, seconds, cost, ROW_NUMBER() OVER (PARTITION BY model ORDER BY id DESC) AS n FROM image_stats
+                       SELECT model, seconds, cost, ROW_NUMBER() OVER (PARTITION BY model ORDER BY id DESC) AS n
+                       FROM pictures WHERE model IS NOT NULL
                    ) WHERE n <= ? GROUP BY model""",
                 (self.RECENT,),
             ).fetchall()

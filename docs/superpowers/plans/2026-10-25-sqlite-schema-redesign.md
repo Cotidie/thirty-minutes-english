@@ -17,7 +17,7 @@
 - `EXPRESSION_COUNT = 5`, `VOCABULARY_COUNT = 10` (`app/generation/generator.py`).
 - 단락 나누기: `re.split(r"\n\s*\n", body)`, `strip()`, 빈 것 제외. 프론트와 같은 규칙이었음 (`ArticleTab.tsx:26`).
 - 그림 파일 = `images/{pictures.id}.png`. API의 `image`/`example_image`는 그 파일명.
-- `expressions.key = app.generation.exclusions.key(phrase)`. `register ∈ {casual, workplace, discussion, NULL}`.
+- `expressions.key = app.generation.exclusions.key(phrase)`. `setting ∈ {casual, workplace, discussion, NULL}`.
 - v1 백업 파일명 `sessions.db.bak-v1-YYYY-MM-DD`.
 - 커밋 메시지: 소문자 `feat:`/`refactor:`/`test:` 접두, Co-Authored-By 없음.
 - GitNexus (`CLAUDE.md`): 심볼 편집 전 `node .gitnexus/run.cjs impact "<Symbol>" --direction upstream --repo .`, 커밋 전 `node .gitnexus/run.cjs detect-changes --scope all --repo .`. 계획 시점 결과: `Article`·`SessionContent`·`VocabularyItem`(백엔드·프론트 둘 다) **HIGH**(직접 참조 15~25, 전부 모델 소비자·테스트), `Database`·`PictureLog` MEDIUM, 나머지 LOW. HIGH 심볼은 Task 1·8·9에서 바꾸며, 그 작업의 테스트가 소비자 전부를 덮는다.
@@ -44,7 +44,7 @@
 - Produces `app/models.py`:
   - `Paragraph(id: int, text: str)`; `Article(title, paragraphs: list[Paragraph], questions: list[Question], sources: list[Source] = [], translation: list[SentencePair] = [])` (`body` 삭제, `keep_only_sentences_found_in_the_body` 검증은 `ArticleDraft`로 이동)
   - `ArticleDraft(title, body, questions, sources, translation)` 기존 Article 그대로. `VocabularyDraft` = 기존 VocabularyItem에서 `image`/`example_image` 뺀 것. `Draft(topic, article: ArticleDraft, vocabulary: list[VocabularyDraft])`
-  - `Expression(id: int, phrase, meaning, synonyms: list[str] = [], usage_note, examples: list[str], korean: str | None = None, register: str | None = None)`
+  - `Expression(id: int, phrase, meaning, synonyms: list[str] = [], usage_note, examples: list[str], korean: str | None = None, setting: str | None = None)`
   - `VocabularyItem(id: int, ...기존 필드, image: str | None, example_image: str | None)`
   - `SessionContent(topic, expressions: list[Expression], article: Article, vocabulary: list[VocabularyItem])`, `Session`, `SessionSummary` 그대로
   - `Stars(expressions: list[int] = [], words: list[int] = [])`
@@ -104,9 +104,9 @@ def test_pictures_are_rows_with_an_id_and_stats_skip_unknown_models(tmp_path):
 **Interfaces:**
 - Consumes Task 1 모델·`Database`.
 - Produces `app/db/expressions.py`:
-  - `ExpressionRepo.add(phrase: str, meaning: str, synonyms: list[str], examples: list[str], usage_note: str, korean: str | None, register: str | None, source: str, added_at: datetime | None = None) -> int` (`key(phrase)`로 upsert: 같은 key면 내용 갱신, id 유지)
+  - `ExpressionRepo.add(phrase: str, meaning: str, synonyms: list[str], examples: list[str], usage_note: str, korean: str | None, setting: str | None, source: str, added_at: datetime | None = None) -> int` (`key(phrase)`로 upsert: 같은 key면 내용 갱신, id 유지)
   - `get(expression_id: int) -> Expression | None`; `list_all() -> list[Expression]` (id 순); `count() -> int`
-  - `pick(count: int, rng: random.Random) -> list[Expression]`: 설계 문서 "표현 선택 규칙". register별로(NULL 포함) 섞은 뒤 돌아가며 뽑고, 안 배운 것이 모자라면 마지막으로 배운 시점 오름차순으로 채움. 중복 없음.
+  - `pick(count: int, rng: random.Random) -> list[Expression]`: 설계 문서 "표현 선택 규칙". setting별로(NULL 포함) 섞은 뒤 돌아가며 뽑고, 안 배운 것이 모자라면 마지막으로 배운 시점 오름차순으로 채움. 중복 없음.
 - Produces `app/db/sessions.py`:
   - `create(draft: Draft, expression_ids: Sequence[int]) -> Session`; `get(session_id) -> Session | None`; `exists`; `list_all`; `recent_topics(limit)` 그대로
   - `delete(session_id) -> list[int] | None`: 지운 세션의 vocabulary가 가리키던 picture id들(둘 다), 세션이 없으면 None
@@ -115,7 +115,7 @@ def test_pictures_are_rows_with_an_id_and_stats_skip_unknown_models(tmp_path):
   - `session_of_paragraph(paragraph_id: int) -> int | None`; `session_of_vocabulary(vocabulary_id: int) -> int | None`
   - `get_stars(session_id) -> Stars` / `set_stars(session_id, stars: Stars) -> Stars` (id 목록; 세션 밖 id는 무시), `get_note` / `set_note` (`sessions.note`)
   - `get`이 만드는 `VocabularyItem.image = f"{picture_id}.png"` (NULL → None). `Expression`은 `session_expressions.position` 순.
-- Produces `tests/conftest.py`: `sample_draft(topic="Digital twins", title="Twins at Work") -> Draft` (기존 `sample_content`에서 expressions 제거, body는 단락 3개 `"One.\n\nTwo two.\n\nThree."` 형태), `seed_expressions(db: Database, n: int = 5, register: str | None = None) -> list[int]`, fixture `draft`.
+- Produces `tests/conftest.py`: `sample_draft(topic="Digital twins", title="Twins at Work") -> Draft` (기존 `sample_content`에서 expressions 제거, body는 단락 3개 `"One.\n\nTwo two.\n\nThree."` 형태), `seed_expressions(db: Database, n: int = 5, setting: str | None = None) -> list[int]`, fixture `draft`.
 
 - [ ] **Step 1: impact.** `SessionRepo`, `Exclusions`(사용처 확인용).
 - [ ] **Step 2: `tests/test_expressions.py` 작성 (실패)**
@@ -127,10 +127,10 @@ def test_add_upserts_by_normalized_key_and_keeps_the_id(store):
     assert a == b and store.expressions.count() == 1
     assert store.expressions.get(a).meaning == "m2"
 
-def test_pick_prefers_untaught_and_mixes_registers(store):
+def test_pick_prefers_untaught_and_mixes_settings(store):
     ids = {r: [store.expressions.add(f"{r} {i}", "m", [], [], "n", None, r, "s") for i in range(3)] for r in ("casual", "workplace", None)}
     picked = store.expressions.pick(3, random.Random(1))
-    assert {e.register for e in picked} == {"casual", "workplace", None}
+    assert {e.setting for e in picked} == {"casual", "workplace", None}
 
 def test_pick_fills_from_the_longest_ago_taught_when_untaught_run_out(store):
     first = store.expressions.add("one", "m", [], [], "n", None, None, "s")

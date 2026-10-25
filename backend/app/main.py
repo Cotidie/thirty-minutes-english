@@ -47,6 +47,7 @@ def create_app(
 
 
 def default_app() -> FastAPI:
+    """The app over the real data folder; uvicorn calls it (--factory), so importing this module opens nothing."""
     logging.basicConfig(level=logging.INFO, format="%(levelname)s %(name)s: %(message)s")
     db = Database(os.environ.get("DB_PATH", ROOT / "data" / "sessions.db"))
     dirs = agent_dirs(os.environ, ROOT.parent / "agents")
@@ -64,5 +65,3 @@ def default_app() -> FastAPI:
         catalog=catalog,
     )
 
-
-app = default_app()

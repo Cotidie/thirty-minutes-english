@@ -76,7 +76,7 @@ CREATE TABLE expressions (
     examples   TEXT    NOT NULL,                 -- JSON [str]
     usage_note TEXT    NOT NULL,
     korean     TEXT,
-    register   TEXT,                             -- casual | workplace | discussion | NULL(모름)
+    setting    TEXT,                             -- casual | workplace | discussion | NULL(모름). 말하는 자리
     source     TEXT    NOT NULL,                 -- 출처 이름. 세션에서 옮긴 것은 'session'
     added_at   TEXT    NOT NULL
 ) STRICT;
@@ -143,7 +143,7 @@ CREATE TABLE stage_times (id INTEGER PRIMARY KEY AUTOINCREMENT, stage TEXT NOT N
 ## 표현 선택 규칙
 
 - 세션 저장 시 corpus에서 5개(`EXPRESSION_COUNT`). 생성기는 더 이상 표현을 쓰지 않는다 (프롬프트·스키마·`Exclusions.expressions` 제거. `check_items`는 단어만).
-- 후보 = `session_expressions`에 한 번도 없는 표현. register별로 돌아가며(NULL도 한 묶음) 무작위로 뽑아 섞는다.
+- 후보 = `session_expressions`에 한 번도 없는 표현. setting별로 돌아가며(NULL도 한 묶음) 무작위로 뽑아 섞는다.
 - 안 배운 것이 5개 미만이면 가장 오래전에 배운 것(마지막 `sessions.created_at` 오름차순)으로 채운다. 표현에는 `REPEAT_ALLOWANCE` 안 씀(단어에만).
 - corpus가 비어 있으면 표현 0개인 세션. 프론트는 Expressions 탭에 "corpus가 비어 있다" 안내.
 - 주제 매칭 없음. 현재 프롬프트도 표현은 주제와 무관. 필요해지면 `expression_tags(expression_id, tag)` 추가.
@@ -208,7 +208,7 @@ CREATE TABLE stage_times (id INTEGER PRIMARY KEY AUTOINCREMENT, stage TEXT NOT N
 1. `sessions.db` → `sessions.db.bak-v1-<날짜>` 복사. 한 트랜잭션.
 2. 새 테이블 생성. 옛 `sessions`는 `sessions_v1`로 rename.
 3. 세션마다 `content_json` 파싱 → `sessions`(note는 `notes`에서), `paragraphs`(`\n\s*\n`으로 나누고 trim, 빈 것 제외), `vocabulary`(`starred` = `stars`에 word 있음).
-4. 표현: `key(phrase)`로 `expressions` upsert(`source='session'`, `register NULL`, `added_at` = 세션 `created_at`), `session_expressions`(`starred` = `stars`에 phrase 있음).
+4. 표현: `key(phrase)`로 `expressions` upsert(`source='session'`, `setting NULL`, `added_at` = 세션 `created_at`), `session_expressions`(`starred` = `stars`에 phrase 있음).
 5. 그림: vocabulary의 `image`/`example_image` 파일명마다 `pictures` 행(`created_at` = 세션, model NULL). 파일이 없으면 FK NULL. `image_stats` 행 → `pictures` 행(파일 없음). 파일 rename(`{id}.png`)은 DB 트랜잭션 커밋 뒤에 한다. rename 실패는 경고 로그.
 6. `readings`/`summaries`: 단락 텍스트 → 같은 세션 단락과 trim 비교, 안 맞으면 공백 정규화 비교, 그래도 없으면 버리고 경고 로그.
 7. `examples`: `key(expression)` → 그 세션의 `session_expressions`, 아니면 그 세션의 vocabulary word. 없으면 버리고 경고.

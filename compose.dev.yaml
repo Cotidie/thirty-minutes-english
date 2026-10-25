@@ -2,7 +2,7 @@
 #   docker compose -f compose.yaml -f compose.dev.yaml up --build
 services:
   backend:
-    command: ["uv", "run", "uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8765", "--reload"]
+    command: ["uv", "run", "uvicorn", "--factory", "app.main:default_app", "--host", "0.0.0.0", "--port", "8765", "--reload"]
     volumes:
       - ./backend/app:/app/app
       - ./backend/plugin:/app/plugin

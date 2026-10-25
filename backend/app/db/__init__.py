@@ -3,119 +3,38 @@
 import sqlite3
 from pathlib import Path
 
+from app.db import schema
 from app.db.caches import CacheRepo
 from app.db.pictures import PictureRepo
 from app.db.pins import PinRepo
 from app.db.records import RecordRepo
 from app.db.sessions import SessionRepo
 from app.db.settings import SettingsRepo
-
-SCHEMA = """
-CREATE TABLE IF NOT EXISTS sessions (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    created_at TEXT NOT NULL,
-    topic TEXT NOT NULL,
-    title TEXT NOT NULL,
-    content_json TEXT NOT NULL
-);
-CREATE TABLE IF NOT EXISTS stars (
-    session_id INTEGER NOT NULL,
-    kind TEXT NOT NULL,
-    item TEXT NOT NULL,
-    PRIMARY KEY (session_id, kind, item)
-);
-CREATE TABLE IF NOT EXISTS notes (
-    session_id INTEGER PRIMARY KEY,
-    text TEXT NOT NULL
-);
-CREATE TABLE IF NOT EXISTS readings (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    created_at TEXT NOT NULL,
-    session_id INTEGER,
-    paragraph TEXT NOT NULL,
-    user_text TEXT NOT NULL,
-    seconds REAL NOT NULL DEFAULT 0,
-    corrections_json TEXT
-);
-CREATE TABLE IF NOT EXISTS examples (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    created_at TEXT NOT NULL,
-    session_id INTEGER NOT NULL,
-    expression TEXT NOT NULL,
-    user_text TEXT NOT NULL,
-    coach_text TEXT NOT NULL,
-    seconds REAL NOT NULL DEFAULT 0
-);
-CREATE TABLE IF NOT EXISTS summaries (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    created_at TEXT NOT NULL,
-    session_id INTEGER NOT NULL,
-    paragraph TEXT NOT NULL,
-    user_text TEXT NOT NULL,
-    feedback_json TEXT NOT NULL,
-    seconds REAL NOT NULL DEFAULT 0
-);
-CREATE TABLE IF NOT EXISTS topic_days (
-    day TEXT PRIMARY KEY,
-    topics_json TEXT NOT NULL
-);
-CREATE TABLE IF NOT EXISTS image_stats (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    created_at TEXT NOT NULL,
-    model TEXT NOT NULL,
-    seconds REAL,
-    cost REAL
-);
-CREATE TABLE IF NOT EXISTS model_pins (
-    source TEXT NOT NULL,
-    model TEXT NOT NULL,
-    pinned_at TEXT NOT NULL,
-    PRIMARY KEY (source, model)
-);
-CREATE TABLE IF NOT EXISTS model_lists (
-    source TEXT PRIMARY KEY,
-    list_json TEXT NOT NULL
-);
-CREATE TABLE IF NOT EXISTS settings (
-    key TEXT PRIMARY KEY,
-    value TEXT NOT NULL
-);
-"""
+from app.db.stages import StageRepo
 
 
 class Database:
-    def __init__(self, path: Path | str) -> None:
+    def __init__(self, path: Path | str, images_dir: Path | str | None = None) -> None:
+        """`images_dir` holds the picture files; next to the file by default."""
         self.path = Path(path)
+        self.images_dir = Path(images_dir) if images_dir is not None else self.path.parent / "images"
         self.path.parent.mkdir(parents=True, exist_ok=True)
         with self.connect() as conn:
-            conn.executescript(SCHEMA)
-            _carry_over_costs(conn)
-            _drop_removed(conn)
+            if conn.execute("PRAGMA user_version").fetchone()[0] < schema.VERSION:
+                if conn.execute("SELECT 1 FROM sqlite_master WHERE name = 'sessions'").fetchone():
+                    raise NotImplementedError("this file is schema v1; migrating it is not implemented yet")
+                schema.create(conn)
         self.sessions = SessionRepo(self)
         self.records = RecordRepo(self)
         self.caches = CacheRepo(self)
         self.pictures = PictureRepo(self)
+        self.stages = StageRepo(self)
         self.pins = PinRepo(self)
         self.settings = SettingsRepo(self)
 
     def connect(self) -> sqlite3.Connection:
-        """A connection whose `with` block is one transaction."""
+        """A connection whose `with` block is one transaction, with foreign keys enforced."""
         conn = sqlite3.connect(self.path)
         conn.row_factory = sqlite3.Row
+        conn.execute("PRAGMA foreign_keys = ON")
         return conn
-
-
-def _carry_over_costs(conn: sqlite3.Connection) -> None:
-    """Moves the costs of the table before seconds were kept into image_stats, once."""
-    if conn.execute("SELECT 1 FROM sqlite_master WHERE name = 'image_costs'").fetchone():
-        conn.execute("INSERT INTO image_stats (created_at, model, cost) SELECT created_at, model, cost FROM image_costs ORDER BY id")
-        conn.execute("DROP TABLE image_costs")
-
-
-def _drop_removed(conn: sqlite3.Connection) -> None:
-    """What the Ask coach, phrasing and the talking read-aloud coach left in an older file."""
-    conn.execute("DROP TABLE IF EXISTS asks")
-    conn.execute("DROP TABLE IF EXISTS phrasings")
-    conn.execute("DELETE FROM settings WHERE key IN ('SUMMARY_MODEL', 'ASSESS_BREAK_CONFIDENCE', 'ASSESS_FEEDBACK')")
-    if any(column["name"] == "coach_text" for column in conn.execute("PRAGMA table_info(readings)")):
-        conn.execute("ALTER TABLE readings DROP COLUMN coach_text")

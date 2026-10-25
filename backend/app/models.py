@@ -40,14 +40,19 @@ class Topic(BaseModel):
 
 
 class Expression(BaseModel):
+    """One expression of the corpus; a session teaches a few of them."""
+
+    id: int
     phrase: str
     meaning: str
-    """Plainer words for the same meaning; empty on sessions made before they were asked for."""
+    """Plainer words for the same meaning."""
     synonyms: list[str] = []
     usage_note: str
     examples: list[str]
     """The Korean equivalent, hidden behind a chip until tapped."""
     korean: str | None = None
+    """Where it is said: casual, workplace or discussion; None when the source does not say."""
+    setting: str | None = None
 
 
 class Question(BaseModel):
@@ -67,7 +72,9 @@ class SentencePair(BaseModel):
     ko: str
 
 
-class Article(BaseModel):
+class ArticleDraft(BaseModel):
+    """The article as the generator writes it: one body, its paragraphs split by blank lines."""
+
     title: str
     body: str
     questions: list[Question]
@@ -75,13 +82,32 @@ class Article(BaseModel):
     translation: list[SentencePair] = []
 
     @model_validator(mode="after")
-    def keep_only_sentences_found_in_the_body(self) -> "Article":
+    def keep_only_sentences_found_in_the_body(self) -> "ArticleDraft":
         """A pair the reader cannot click on is no use; the sentence stays English."""
         self.translation = [pair for pair in self.translation if pair.en.strip() and pair.en.strip() in self.body]
         return self
 
 
-class VocabularyItem(BaseModel):
+class Paragraph(BaseModel):
+    """One paragraph of a stored article; readings and summaries point at it by id."""
+
+    id: int
+    text: str
+
+
+class Article(BaseModel):
+    """The article as stored: its paragraphs in order, each with its id."""
+
+    title: str
+    paragraphs: list[Paragraph]
+    questions: list[Question]
+    sources: list[Source] = []
+    translation: list[SentencePair] = []
+
+
+class VocabularyDraft(BaseModel):
+    """A word as the generator writes it, before it is stored or drawn."""
+
     word: str
     pos: str
     definition: str
@@ -94,10 +120,24 @@ class VocabularyItem(BaseModel):
     scene: str | None = None
     """One or two sentences on what the picture shows and why it is the word; hidden until asked for."""
     caption: str | None = None
-    """The scene drawn, for the learner to describe in Practice: a file name under the images folder, served at /api/images/{image}."""
+
+
+class VocabularyItem(VocabularyDraft):
+    """A stored word; stars and practice sentences point at it by id."""
+
+    id: int
+    """The scene drawn, for the learner to describe in Practice: {picture id}.png, served at /api/images/{image}."""
     image: str | None = None
     """The example sentence drawn; the picture the card opens on."""
     example_image: str | None = None
+
+
+class Draft(BaseModel):
+    """What the generator writes for a topic. The expressions come from the corpus, not from here."""
+
+    topic: str
+    article: ArticleDraft
+    vocabulary: list[VocabularyDraft]
 
 
 class SessionContent(BaseModel):
@@ -122,10 +162,10 @@ class Session(BaseModel):
 
 
 class Stars(BaseModel):
-    """What the pair starred in a session, by phrase and by word."""
+    """What the pair starred in a session: expression ids and word (vocabulary) ids."""
 
-    expressions: list[str] = []
-    words: list[str] = []
+    expressions: list[int] = []
+    words: list[int] = []
 
 
 class Note(BaseModel):
@@ -196,8 +236,7 @@ class Correction(BaseModel):
 class Reading(BaseModel):
     id: int
     created_at: datetime
-    session_id: int
-    paragraph: str
+    paragraph_id: int
     user_text: str
     seconds: float
     corrections: list[Correction] | None = None
@@ -208,20 +247,19 @@ class Summary(BaseModel):
 
     id: int
     created_at: datetime
-    session_id: int
-    paragraph: str
+    paragraph_id: int
     user_text: str
     feedback: SummaryFeedback
     seconds: float
 
 
 class Example(BaseModel):
-    """One sentence a reader made with an expression, and the coach's echo of it."""
+    """One sentence a reader made with an expression or a word (exactly one of the two ids), and the coach's echo of it."""
 
     id: int
     created_at: datetime
-    session_id: int
-    expression: str
+    expression_id: int | None = None
+    vocabulary_id: int | None = None
     user_text: str
     coach_text: str
     seconds: float

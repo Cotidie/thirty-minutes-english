@@ -182,16 +182,16 @@ class Catalog:
         """The newest `limit` models (None: all), plus any in `keep` (the default, the saved one)
         that are older, so they keep their name and price; the cache holds the whole list."""
         cached = self._caches.get_model_list(source)
-        if cached is None or self._clock() - cached["at"] > self.TTL_S:
+        if cached is None or self._clock() - cached.fetched_at > self.TTL_S:
             self.refresh_later(keys, [source])
-        every = [from_cache(o) for o in (cached or {}).get("options", [])]
+        every = [from_cache(o) for o in (cached.options if cached else [])]
         cut = len(every) if limit is None else limit
         return every[:cut] + [o for o in every[cut:] if o.id in keep]
 
     def efforts_of(self, model: str) -> tuple[str, ...] | None:
         """A Claude model's effort levels from the cached list; None when the model is not listed."""
-        cached = self._caches.get_model_list("claude") or {}
-        found = next((o for o in cached.get("options", []) if o["id"] == model), None)
+        cached = self._caches.get_model_list("claude")
+        found = next((o for o in (cached.options if cached else []) if o["id"] == model), None)
         return None if found is None or found.get("efforts") is None else tuple(found["efforts"])
 
     def refresh(self, keys: Keys, sources: list[str] | None = None) -> dict[str, str]:
@@ -205,7 +205,7 @@ class Catalog:
                 errors[source] = str(e) or type(e).__name__
                 continue
             if found:
-                self._caches.set_model_list(source, {"at": self._clock(), "options": [asdict(o) for o in found]})
+                self._caches.set_model_list(source, self._clock(), [asdict(o) for o in found])
         return errors
 
     def refresh_later(self, keys: Keys, sources: list[str] | None = None) -> None:
