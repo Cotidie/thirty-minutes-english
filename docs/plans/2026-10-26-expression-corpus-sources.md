@@ -33,7 +33,6 @@
 |---|---|---|---|
 | **British Council "What to Say!"** [LearnEnglish Speaking](https://learnenglish.britishcouncil.org/free-resources/speaking) | 기능별 레슨(이해 확인, 대화 이어가기, 반박하기). 레슨마다 useful phrases 목록, 대본, 연습 문제 | A1~B2 | 쉬움. 대본은 접힌 영역이지만 HTML에 있음 |
 | **BBC The English We Speak** [목록](https://www.bbc.co.uk/learningenglish/features/the-english-we-speak) | 표현 하나마다 소개, 대화 대본, 예문 3개 | 주 1회. 2026-09 회차까지 확인 | 보통. firecrawl은 본문을 못 가져옴, 브라우저 필요 |
-| **Wiktionary** [English phrasebook](https://en.wiktionary.org/wiki/Category:English_phrasebook) + 관용구 범주 | 표현, 뜻, 예문 | phrasebook 465개 | 가장 쉬움. [kaikki.org](https://kaikki.org/dictionary/rawdata.html) JSON 덤프를 받으면 됨. CC BY-SA |
 | **PhraseMix** [examples](https://www.phrasemix.com/examples?page=1) | 상황별 문장과 해설 | 여러 쪽 | 쉬움. `?page=N` 순회 |
 
 후순위:
@@ -47,6 +46,7 @@
 |---|---|
 | 하루 영어 한개 (maily.so/1wordaday) | 뉴스 어휘 위주 |
 | TalkEnglish Speaking Basics | 초급 패턴(`I'm + (verb)` 등)이라 수준이 너무 낮음 |
+| Wiktionary English phrasebook | 여행 회화 기초 문장 위주라 수준이 너무 낮음 |
 | 명랑소녀다이어리 「오늘의 영어표현」 (blog.naver.com/sry1988) | 단어가 섞이고, 저자가 예문 대부분을 AI로 만들었다고 밝힘 |
 | 일일영어회화 유튜브 커뮤니티 | 그림 묘사 글만 있고 1년 전 중단 |
 | 매일영어습관 유튜브 커뮤니티 | 이미지만, 글 없음 |
@@ -57,4 +57,4 @@
 
 - 형태별 도구: 텍스트 HTML은 HTTP 요청, JS 렌더링(네이버 회화, BBC)은 브라우저, 이미지 카드(티멘트, Leo Kim, Else)는 OCR.
 - 인스타그램은 firecrawl이 지원하지 않는다. BrowserOS neo에서는 로그인 상태로 프로필과 캡션을 읽을 수 있었다. 단, 인스타그램 약관은 자동 수집을 금지한다.
-- 라이선스가 명확한 곳은 Wiktionary(CC BY-SA)뿐. 나머지 약관은 확인하지 않았다.
+- 남은 출처의 약관은 확인하지 않았다.
