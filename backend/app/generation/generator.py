@@ -112,6 +112,9 @@ fails or finds nothing usable, to ground the article in accurate, current facts 
 specifics you did not verify. In sources, list only the web pages you actually drew on (page title \
 and exact URL from the search results); leave it empty if you used none. \
 Use 3 to 5 paragraphs separated by blank lines. Take a clear angle so there is something to discuss. \
+Then run the {article_skill} skill on the title and body in its embedded mode: strip the AI patterns it lists, \
+keep every fact, name, number, and date, keep 3 to 5 paragraphs separated by blank lines, and keep only the \
+final text. The evidence and the translation below are copied from this final body. \
 Then write 3 discussion questions. Each is one short sentence of at most 14 words, in plain \
 conversational wording a friend would ask across a table. No compound questions, no "explain the \
 writer's reasoning", no quoting. Questions invite explanation, not yes/no. \
@@ -170,6 +173,8 @@ def check_items_server(exclude: Exclusions) -> McpServer:
 # The app's own writing rules, a local plugin beside the app package (backend/plugin, /app/plugin in the image).
 PLUGIN_DIR = Path(__file__).resolve().parents[2] / "plugin"
 APP_SKILL = "english-session:session-writing"
+# Vendored from github.com/blader/humanizer (MIT, v3.1.0); the article alone goes through it.
+ARTICLE_SKILL = "english-session:humanizer"
 
 
 # The cutoff for a hung run, not a budget: Opus at xhigh takes about 300s on its own.
@@ -187,14 +192,14 @@ class ClaudeGenerator:
         firecrawl_key: str = "",
         timeout_s: float = TIMEOUT_S,
     ) -> None:
-        self._skills = (APP_SKILL, *skills)
+        self._skills = (APP_SKILL, *skills)  # followed for every part of the session
         self.claude = Claude(
             model,
             effort,
             timeout_s,
             tools=("Read", *WEB_TOOLS),
             mcp=(firecrawl(firecrawl_key),),
-            skills=self._skills,
+            skills=(APP_SKILL, ARTICLE_SKILL, *skills),
             plugins=(str(PLUGIN_DIR),),
             partial=True,
         )
@@ -203,6 +208,7 @@ class ClaudeGenerator:
         prompt = PROMPT_TEMPLATE.format(
             topic=topic,
             vocabulary_count=VOCABULARY_COUNT,
+            article_skill=ARTICLE_SKILL,
             scene_rules=SCENE_RULES,
             caption_rules=CAPTION_RULES,
         )

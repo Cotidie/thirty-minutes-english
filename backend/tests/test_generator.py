@@ -4,6 +4,7 @@ import pytest
 from app.generation.exclusions import Exclusions
 from app.generation.generator import (
     APP_SKILL,
+    ARTICLE_SKILL,
     CHECK_ITEMS_RULE,
     PLUGIN_DIR,
     SESSION_SCHEMA,
@@ -72,7 +73,7 @@ def test_the_app_skill_always_runs_and_host_skills_come_after_it():
     fake = FakeQuery(result(sample_draft().model_dump()))
     generator_with(fake, skills=("stop-slop",)).generate("x")
     prompt, options = fake.calls[0]
-    assert options.skills == [APP_SKILL, "stop-slop"]
+    assert options.skills == [APP_SKILL, ARTICLE_SKILL, "stop-slop"]
     assert options.plugins == [{"type": "local", "path": str(PLUGIN_DIR)}]
     assert f"{APP_SKILL}, stop-slop" in prompt
     assert (PLUGIN_DIR / "skills" / "session-writing" / "SKILL.md").is_file()
@@ -81,3 +82,16 @@ def test_the_app_skill_always_runs_and_host_skills_come_after_it():
 def test_the_time_limit_leaves_room_for_a_five_minute_run():
     """An Opus xhigh run took 303.6s and died at a 300s limit, one tool call from done."""
     assert ClaudeGenerator(model="opus").claude.timeout_s == 600
+
+
+def test_the_humanizer_rewrites_the_article_before_its_evidence_and_translation_are_copied():
+    fake = FakeQuery(result(sample_draft().model_dump()))
+    generator_with(fake).generate("x")
+    prompt, options = fake.calls[0]
+    assert ARTICLE_SKILL in options.skills
+    humanize = prompt.index(f"run the {ARTICLE_SKILL} skill on the title and body")
+    assert prompt.index("1. article") < humanize < prompt.index("Then write 3 discussion questions") < prompt.index("Then give translation")
+    assert ARTICLE_SKILL not in prompt[: prompt.index("\n\n")]  # only the article, not every part of the session
+    skill = PLUGIN_DIR / "skills" / "humanizer"
+    assert (skill / "SKILL.md").read_text().startswith("---\nname: humanizer\n") and (skill / "LICENSE").is_file()
+
