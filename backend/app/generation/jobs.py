@@ -17,7 +17,8 @@ from app.generation.exclusions import Exclusions
 from app.generation.generator import VOCABULARY_COUNT, Generator
 from app.generation.progress import Progress, Stage, with_pictures
 from app.llm import GenerationError
-from app.models import Session
+from app.models import FigureDraft, PictureDraft, Session
+from app.pictures.figures import SourceImages
 from app.pictures.illustrator import Illustrator
 
 Status = Literal["running", "done", "failed", "cancelled"]
@@ -91,10 +92,19 @@ class Executor(Protocol):
 class JobRunner:
     REPEAT_ALLOWANCE = 0.1  # each past word escapes the exclusion list with this probability
 
-    def __init__(self, sessions: SessionRepo, expressions: ExpressionRepo, stages: StageRepo, executor: Executor | None = None) -> None:
+    def __init__(
+        self,
+        sessions: SessionRepo,
+        expressions: ExpressionRepo,
+        stages: StageRepo,
+        executor: Executor | None = None,
+        sources: SourceImages | None = None,
+    ) -> None:
+        """`sources` downloads the images the generator found; without it the article gets only a drawn picture."""
         self._sessions = sessions
         self._expressions = expressions
         self._stages = stages
+        self._sources = sources
         self.executor = executor or ThreadPoolExecutor(max_workers=2)
         self._jobs: dict[str, Job] = {}
         self._lock = Lock()
@@ -161,8 +171,10 @@ class JobRunner:
             picked = self._expressions.pick(EXPRESSION_COUNT, random.Random())
             session = self._sessions.create(draft, [e.id for e in picked])
             job.session_id = session.id
+            kept = self._keep_figures(session, draft.article.figures)
+            scene = None if kept else draft.article.picture
             if illustrator:
-                self._illustrate(job, illustrator, session)
+                self._illustrate(job, illustrator, session, scene)
         except Cancelled:
             log.info("job %s: cancelled", job.id)
             return
@@ -186,10 +198,36 @@ class JobRunner:
         if seconds is not None:
             job.foreseen[Stage.ILLUSTRATING] = seconds
 
-    def _illustrate(self, job: Job, illustrator: Illustrator, session: Session) -> None:
-        """Each picture onto the saved session as it is drawn; a painter failure leaves the session without the rest."""
+    @staticmethod
+    def _under(session: Session, after: int) -> int:
+        """The id of paragraph `after` (counted from 1), the last one when the number runs past them."""
+        paragraphs = session.content.article.paragraphs
+        return paragraphs[min(max(after, 1), len(paragraphs)) - 1].id
+
+    def _keep_figures(self, session: Session, figures: list[FigureDraft]) -> int:
+        """Downloads the images the generator found and shows them under their paragraphs; how many came through."""
+        if self._sources is None or not session.content.article.paragraphs:
+            return 0
+        kept = 0
+        for figure in figures:
+            picture_id = self._sources.keep(figure.image_url)
+            if picture_id is None:
+                continue
+            try:
+                self._sessions.add_figure(self._under(session, figure.after), picture_id, figure.caption, figure.page_url or None, figure.credit or None)
+            except KeyError:
+                self._sources.drop(picture_id)
+                return kept
+            kept += 1
+        return kept
+
+    def _illustrate(self, job: Job, illustrator: Illustrator, session: Session, scene: PictureDraft | None) -> None:
+        """Each picture onto the saved session as it is drawn, the article's `scene` among them when given;
+        a painter failure leaves the session without the rest."""
         words = session.content.vocabulary
-        total = illustrator.count(words)
+        if not session.content.article.paragraphs:
+            scene = None
+        total = illustrator.count(words, scene.scene if scene else None)
         self._foresee_pictures(job, illustrator, total)
         job.apply(with_pictures(job.progress, 0, total))
         try:
@@ -198,6 +236,8 @@ class JobRunner:
                 words,
                 lambda done: job.apply(with_pictures(job.progress, done, total)),
                 lambda index, field, picture_id: self._sessions.replace_picture(words[index].id, field, picture_id),
+                scene.scene if scene else None,
+                lambda picture_id: self._sessions.add_figure(self._under(session, scene.after), picture_id, scene.caption, None, None),
             )
         except GenerationError as e:
             log.warning("job %s: the session stays without the pictures not yet drawn: %s", job.id, e)

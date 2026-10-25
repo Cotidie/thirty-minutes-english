@@ -1,11 +1,11 @@
-import { useEffect, useRef, useState } from "react";
+import { Fragment, useEffect, useRef, useState } from "react";
 import { markedSpans } from "../lib/highlight";
 import { pairSentences } from "../lib/sentences";
 import { useReadingMarks } from "../lib/useReadingMarks";
 import { useSummaries } from "../lib/useSummaries";
-import type { Article, Question } from "../types";
+import type { Article, Figure, Question } from "../types";
 import { Paragraph } from "./Paragraph";
-import './ArticleTab.css'
+import "./ArticleTab.css";
 
 const NO_MARKS: never[] = [];
 
@@ -23,7 +23,10 @@ export function ArticleTab({
   const { summaries, add: addSummary } = useSummaries(sessionId);
   const marks = useReadingMarks(sessionId);
   const paragraphs = article.paragraphs;
-  const sentences = pairSentences(paragraphs.map((p) => p.text), article.translation ?? []);
+  const sentences = pairSentences(
+    paragraphs.map((p) => p.text),
+    article.translation ?? [],
+  );
   const evidence = active === null ? [] : article.questions[active].evidence;
 
   useEffect(() => {
@@ -41,18 +44,24 @@ export function ArticleTab({
       <article className="article" ref={bodyRef}>
         <h2 className="article-title">{article.title}</h2>
         {paragraphs.map((p, i) => (
-          <Paragraph
-            key={p.id}
-            paragraph={p}
-            pieces={sentences[i]}
-            spans={markedSpans(p.text, evidence)}
-            summaries={summaries.filter((s) => s.paragraph_id === p.id)}
-            saved={marks.get(p.id) ?? NO_MARKS}
-            onSummary={addSummary}
-            active={reading !== null && reading !== i}
-            onStart={() => setReading(i)}
-            onEnd={() => setReading(null)}
-          />
+          <Fragment key={p.id}>
+            <Paragraph
+              paragraph={p}
+              pieces={sentences[i]}
+              spans={markedSpans(p.text, evidence)}
+              summaries={summaries.filter((s) => s.paragraph_id === p.id)}
+              saved={marks.get(p.id) ?? NO_MARKS}
+              onSummary={addSummary}
+              active={reading !== null && reading !== i}
+              onStart={() => setReading(i)}
+              onEnd={() => setReading(null)}
+            />
+            {(article.figures ?? [])
+              .filter((f) => f.paragraph_id === p.id)
+              .map((f) => (
+                <ArticleFigure key={f.id} figure={f} />
+              ))}
+          </Fragment>
         ))}
       </article>
       <section className="questions">
@@ -115,6 +124,37 @@ function QuestionItem({
     >
       {question.text}
     </button>
+  );
+}
+
+/** An image under its paragraph, with where it came from: the page and who it credits, or that it was drawn for the article. */
+function ArticleFigure({ figure }: { figure: Figure }) {
+  const from = figure.source_url
+    ? [figure.credit, hostOf(figure.source_url)].filter(Boolean).join(" · ")
+    : null;
+  return (
+    <figure className="article-figure">
+      <img
+        src={`/api/images/${figure.image}`}
+        alt={figure.caption}
+        loading="lazy"
+      />
+      <figcaption>
+        {figure.caption}{" "}
+        {figure.source_url ? (
+          <a
+            className="figure-source"
+            href={figure.source_url}
+            target="_blank"
+            rel="noreferrer"
+          >
+            {from}
+          </a>
+        ) : (
+          <span className="figure-source">Drawn for this article</span>
+        )}
+      </figcaption>
+    </figure>
   );
 }
 

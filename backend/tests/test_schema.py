@@ -7,10 +7,10 @@ from app.db.pictures import PictureStat
 from app.generation.progress import Stage
 
 
-def test_a_fresh_file_is_at_version_2_with_strict_tables_and_live_foreign_keys(tmp_path):
+def test_a_fresh_file_is_at_the_current_version_with_strict_tables_and_live_foreign_keys(tmp_path):
     db = Database(tmp_path / "s.db")
     with db.connect() as conn:
-        assert conn.execute("PRAGMA user_version").fetchone()[0] == 2
+        assert conn.execute("PRAGMA user_version").fetchone()[0] == 3
         sqls = [r[0] for r in conn.execute("SELECT sql FROM sqlite_master WHERE type = 'table' AND name NOT LIKE 'sqlite_%'")]
         assert sqls and all(s.rstrip().endswith("STRICT") for s in sqls)
         assert {r[1] for r in conn.execute("PRAGMA table_info(sessions)")} == {"id", "created_at", "topic", "title", "note", "questions", "sources", "translation"}
@@ -33,3 +33,18 @@ def test_pictures_are_rows_with_an_id_and_stats_skip_unknown_models(tmp_path):
     pictures.add(None, 9.0, None)
     assert pictures.stats() == {"m": PictureStat(5.0, 0.01)}
     assert pictures.seconds("m") == 5.0 and pictures.seconds("none") is None
+
+
+def test_a_v2_file_gains_the_figures_table_and_keeps_its_sessions(tmp_path):
+    from tests.conftest import sample_draft
+
+    path = tmp_path / "s.db"
+    session = Database(path).sessions.create(sample_draft(), [])
+    with sqlite3.connect(path) as conn:  # back to how a v2 file looked
+        conn.execute("DROP TABLE figures")
+        conn.execute("PRAGMA user_version = 2")
+    db = Database(path)
+    with db.connect() as conn:
+        assert conn.execute("PRAGMA user_version").fetchone()[0] == 3
+        assert conn.execute("SELECT sql FROM sqlite_master WHERE name = 'figures'").fetchone()[0].rstrip().endswith("STRICT")
+    assert db.sessions.get(session.id).content.article.figures == []

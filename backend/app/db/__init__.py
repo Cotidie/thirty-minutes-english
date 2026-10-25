@@ -29,8 +29,10 @@ class Database:
                 renames = saved.with_name(f"{saved.name}.renames.json")
                 report = migrate.migrate_v1(conn, self.images_dir, renames)
                 log.info("migrated %s to schema v2 (v1 copy: %s, file renames: %s): %s", self.path, saved.name, renames.name, report)
-            elif conn.execute("PRAGMA user_version").fetchone()[0] < schema.VERSION:
+            elif (version := conn.execute("PRAGMA user_version").fetchone()[0]) == 0:
                 schema.create(conn)
+            elif version < schema.VERSION:
+                schema.upgrade(conn)
         self.sessions = SessionRepo(self)
         self.expressions = ExpressionRepo(self)
         self.records = RecordRepo(self)

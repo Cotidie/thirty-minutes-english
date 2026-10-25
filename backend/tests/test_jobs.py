@@ -1,4 +1,11 @@
+from io import BytesIO
+
+import httpx2
+from PIL import Image as PILImage
+
 from app.db import Database
+from app.models import FigureDraft
+from app.pictures.figures import SourceImages
 from app.pictures.files import PictureFiles
 from app.pictures.illustrator import Illustrator
 from app.pictures.painters import Drawn
@@ -13,20 +20,37 @@ class InlineExecutor:
 
 
 class Recording:
-    """A generator that hands back the sample draft and keeps what it was told to avoid."""
+    """A generator that hands back the sample draft (with `figures`, when given) and keeps what it was told to avoid."""
 
-    def __init__(self) -> None:
+    def __init__(self, figures: list[FigureDraft] = ()) -> None:
         self.excluded = []
+        self.figures = list(figures)
 
     def generate(self, topic, on_progress=None, exclude=None):
         self.excluded.append(exclude)
         if on_progress:
             on_progress(Progress(Stage.SEARCHING, 1))
-        return sample_draft(topic=topic)
+        draft = sample_draft(topic=topic)
+        draft.article.figures = self.figures
+        return draft
+
+
+def photo(width: int = 800) -> bytes:
+    out = BytesIO()
+    PILImage.new("RGB", (width, 600), (40, 90, 160)).save(out, "JPEG")
+    return out.getvalue()
+
+
+async def web(url: str) -> bytes:
+    """Every page's images download, except those at gone.example."""
+    if "gone.example" in url:
+        raise httpx2.ConnectError("gone")
+    return photo()
 
 
 def runner_over(db: Database) -> JobRunner:
-    return JobRunner(db.sessions, db.expressions, db.stages, InlineExecutor())
+    files = PictureFiles(db.images_dir)
+    return JobRunner(db.sessions, db.expressions, db.stages, InlineExecutor(), SourceImages(db.pictures, files, web))
 
 
 def test_a_finished_job_saves_the_draft_with_expressions_from_the_corpus(tmp_path):
@@ -107,3 +131,41 @@ def test_deleting_the_session_while_its_pictures_are_drawn_leaves_no_files(tmp_p
     job = runner_over(db).start("A", Recording(), Illustrator(Deleting(), db.pictures, files))
     assert job.status == "done" and db.sessions.get(job.session_id) is None
     assert list(files.dir.iterdir()) == []
+
+
+def figure(after: int, url: str = "https://news.example/tram.jpg") -> FigureDraft:
+    return FigureDraft(after=after, image_url=url, page_url="https://news.example/trams", credit="Yonhap", caption=f"Under {after}.")
+
+
+def test_source_images_are_kept_under_their_paragraph_and_the_scene_is_not_drawn(tmp_path):
+    from tests.test_illustrator import FakePainter
+
+    db = Database(tmp_path / "s.db")
+    painter = FakePainter()
+    illustrator = Illustrator(painter, db.pictures, PictureFiles(db.images_dir))
+    job = runner_over(db).start("A", Recording([figure(3), figure(1, "https://gone.example/a.jpg")]), illustrator)
+    article = db.sessions.get(job.session_id).content.article
+    assert [(f.paragraph_id, f.source_url, f.credit, f.caption) for f in article.figures] == [
+        (article.paragraphs[2].id, "https://news.example/trams", "Yonhap", "Under 3.")
+    ]
+    assert len(painter.prompts) == 2 * len(sample_draft().vocabulary)  # the words' pictures only
+
+
+def test_with_no_source_image_the_articles_scene_is_drawn_under_its_paragraph(tmp_path):
+    from tests.test_illustrator import FakePainter
+
+    db = Database(tmp_path / "s.db")
+    illustrator = Illustrator(FakePainter(), db.pictures, PictureFiles(db.images_dir))
+    job = runner_over(db).start("A", Recording([figure(1, "https://gone.example/a.jpg")]), illustrator)
+    article = db.sessions.get(job.session_id).content.article
+    [drawn] = article.figures
+    assert (drawn.paragraph_id, drawn.caption, drawn.source_url, drawn.credit) == (article.paragraphs[1].id, "Waiting for the tram.", None, None)
+    assert job.progress.pictures_total == 2 * len(sample_draft().vocabulary) + 1
+
+
+def test_a_source_image_comes_through_with_pictures_off_and_a_late_paragraph_number_lands_on_the_last(tmp_path):
+    db = Database(tmp_path / "s.db")
+    job = runner_over(db).start("A", Recording([figure(9)]))
+    article = db.sessions.get(job.session_id).content.article
+    assert [f.paragraph_id for f in article.figures] == [article.paragraphs[-1].id]
+    assert PictureFiles(db.images_dir).path(int(article.figures[0].image.removesuffix(".png"))).is_file()

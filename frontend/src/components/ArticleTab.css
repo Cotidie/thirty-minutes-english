@@ -93,3 +93,34 @@
   border-radius: 999px;
   padding: 0 0.45rem;
 }
+
+.article-figure {
+  margin: 0.25rem 0 1.75rem;
+}
+
+.article-figure img {
+  display: block;
+  width: 100%;
+  height: auto;
+  border-radius: 6px;
+  border: 1px solid var(--line);
+}
+
+.article-figure figcaption {
+  margin-top: 0.5rem;
+  font-family: var(--sans);
+  font-size: 0.85rem;
+  line-height: 1.45;
+  color: var(--muted);
+}
+
+.figure-source {
+  white-space: nowrap;
+  color: var(--muted);
+}
+
+a.figure-source {
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+

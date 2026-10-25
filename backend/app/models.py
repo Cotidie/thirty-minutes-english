@@ -72,6 +72,24 @@ class SentencePair(BaseModel):
     ko: str
 
 
+class FigureDraft(BaseModel):
+    """An image the generator saw on a page it drew on, to show under paragraph `after` (counted from 1)."""
+
+    after: int
+    image_url: str
+    page_url: str
+    credit: str = ""
+    caption: str
+
+
+class PictureDraft(BaseModel):
+    """A drawable moment from the article, drawn only when no source image could be kept."""
+
+    after: int = 1
+    scene: str
+    caption: str = ""
+
+
 class ArticleDraft(BaseModel):
     """The article as the generator writes it: one body, its paragraphs split by blank lines."""
 
@@ -80,6 +98,8 @@ class ArticleDraft(BaseModel):
     questions: list[Question]
     sources: list[Source] = []
     translation: list[SentencePair] = []
+    figures: list[FigureDraft] = []
+    picture: PictureDraft | None = None
 
     @model_validator(mode="after")
     def keep_only_sentences_found_in_the_body(self) -> "ArticleDraft":
@@ -95,14 +115,28 @@ class Paragraph(BaseModel):
     text: str
 
 
+class Figure(BaseModel):
+    """An image shown under a paragraph: one from a page the article drew on (with its page and credit),
+    or one drawn for the article (neither)."""
+
+    id: int
+    paragraph_id: int
+    """{picture id}.png, served at /api/images/{image}."""
+    image: str
+    caption: str
+    source_url: str | None = None
+    credit: str | None = None
+
+
 class Article(BaseModel):
-    """The article as stored: its paragraphs in order, each with its id."""
+    """The article as stored: its paragraphs in order, each with its id, and the figures under them."""
 
     title: str
     paragraphs: list[Paragraph]
     questions: list[Question]
     sources: list[Source] = []
     translation: list[SentencePair] = []
+    figures: list[Figure] = []
 
 
 class VocabularyDraft(BaseModel):

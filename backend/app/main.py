@@ -12,6 +12,7 @@ from app.config.catalog import Catalog
 from app.config.settings import Settings
 from app.db import Database
 from app.generation.jobs import Executor, JobRunner
+from app.pictures.figures import SourceImages
 from app.pictures.files import PictureFiles
 from app.topics.daily import DailyTopics
 from app.wiring import Services, agent_dirs, build_services
@@ -38,7 +39,7 @@ def create_app(
     app.state.env = os.environ if env is None else env
     app.state.rebuild = rebuild
     app.state.catalog = catalog or Catalog(db.caches, fetchers={})
-    app.state.jobs = JobRunner(db.sessions, db.expressions, db.stages, executor)
+    app.state.jobs = JobRunner(db.sessions, db.expressions, db.stages, executor, SourceImages(db.pictures, app.state.files))
     app.state.topics = DailyTopics(db.caches, app.state.jobs.executor)
     for router in ROUTERS:
         app.include_router(router)

@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from '@testing-library/react'
+import { fireEvent, render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, expect, it, vi } from 'vitest'
 import { api } from '../api'
@@ -85,6 +85,20 @@ describe('ArticleTab', () => {
     expect(screen.queryByRole('button', { name: 'Ambition: x for y' })).toBeNull()
     expect(screen.queryByRole('button', { name: 'modest: x for y' })).toBeNull()
     expect(vi.mocked(api.listReadings)).toHaveBeenCalledWith(3)
+  })
+
+  it('shows each figure right under its paragraph, with its caption and where it came from', () => {
+    const figures = [
+      { id: 1, paragraph_id: 2, image: '6.png', caption: 'A tram stop in the rain.', source_url: null, credit: null },
+      { id: 2, paragraph_id: 1, image: '5.png', caption: 'Trams on the Wirye line.', source_url: 'https://www.yna.co.kr/view/1', credit: 'Yonhap' },
+    ]
+    render(<ArticleTab article={{ ...article, figures }} sessionId={3} />)
+    const [first, second] = screen.getAllByRole('figure')
+    expect(within(first).getByRole('img', { name: 'Trams on the Wirye line.' })).toHaveAttribute('src', '/api/images/5.png')
+    expect(within(first).getByRole('link', { name: 'Yonhap · yna.co.kr' })).toHaveAttribute('href', 'https://www.yna.co.kr/view/1')
+    expect(first.previousElementSibling).toHaveTextContent('Upkeep is what actually pays.')
+    expect(within(second).getByText('Drawn for this article')).toBeInTheDocument()
+    expect(second.previousElementSibling).toHaveTextContent('A modest twin delivers more value.')
   })
 
   it('offers Read aloud under each paragraph and lets only one paragraph hold the microphone', async () => {

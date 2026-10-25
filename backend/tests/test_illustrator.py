@@ -93,6 +93,17 @@ def test_a_picture_whose_word_went_away_loses_its_file(tmp_path):
     assert sorted(f.name for f in (tmp_path / "images").iterdir()) == sorted(files.name(pid) for pid in landed)
 
 
+def test_the_article_scene_is_drawn_with_the_words_and_handed_over_on_its_own(tmp_path):
+    painter = FakePainter()
+    illustrator, _, files = illustrator_for(tmp_path, painter)
+    words = sample_draft().vocabulary[:1]
+    landed, article = [], []
+    assert illustrator.count(words, "a tram stop") == 3 and illustrator.count(words) == 2
+    illustrator.illustrate("j", words, None, landing(landed), "a tram stop", article.append)
+    assert painter.prompts[-1] == f"{STYLES['photo']} {IMAGE_RULES} a tram stop"
+    assert len(landed) == 2 and len(article) == 1 and files.path(article[0]).is_file()
+
+
 def test_the_chosen_style_leads_the_prompt_and_an_unknown_one_falls_back_to_photo(tmp_path):
     assert illustrator_for(tmp_path, style="comic")[0].prompt("a dog") == f"{STYLES['comic']} {IMAGE_RULES} a dog"
     assert illustrator_for(tmp_path, style="nope")[0].prompt("a dog").startswith(STYLES["photo"])

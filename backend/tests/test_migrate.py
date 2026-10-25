@@ -152,12 +152,12 @@ def migrated(tmp_path) -> Database:
     return Database(path, images)
 
 
-def test_a_v1_file_is_backed_up_and_comes_up_as_v2_with_everything_in_rows(tmp_path):
+def test_a_v1_file_is_backed_up_and_comes_up_current_with_everything_in_rows(tmp_path):
     db = migrated(tmp_path)
     [backup] = tmp_path.glob("s.db.bak-v1-????-??-??")
     assert sqlite3.connect(backup).execute("SELECT COUNT(*) FROM sessions").fetchone()[0] == 2  # the copy is the v1 file
     with db.connect() as conn:
-        assert conn.execute("PRAGMA user_version").fetchone()[0] == 2
+        assert conn.execute("PRAGMA user_version").fetchone()[0] == 3
         names = {r[0] for r in conn.execute("SELECT name FROM sqlite_master WHERE type = 'table'")}
     assert names >= {"paragraphs", "vocabulary", "expressions", "session_expressions", "pictures"}
     assert not {n for n in names if n.endswith("_v1")} and not names & {"stars", "notes", "image_stats"}

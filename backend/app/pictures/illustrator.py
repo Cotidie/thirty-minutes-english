@@ -76,32 +76,44 @@ class Illustrator:
                 wanted.append((i, "image", self.prompt(item.scene)))
         return wanted
 
-    def count(self, vocabulary: Sequence[VocabularyDraft]) -> int:
-        return len(self._wanted(vocabulary))
+    def count(self, vocabulary: Sequence[VocabularyDraft], article_scene: str | None = None) -> int:
+        return len(self._wanted(vocabulary)) + (1 if article_scene else 0)
 
     def illustrate(
-        self, job_id: str, vocabulary: Sequence[VocabularyDraft], on_drawn: OnDrawn | None = None, on_picture: OnPicture | None = None
+        self,
+        job_id: str,
+        vocabulary: Sequence[VocabularyDraft],
+        on_drawn: OnDrawn | None = None,
+        on_picture: OnPicture | None = None,
+        article_scene: str | None = None,
+        on_article: Callable[[int], None] | None = None,
     ) -> None:
-        """Draws the example of every word and the scene of every word that has one. `on_picture` hears of
-        each picture as soon as its row and file are there; a picture that failed is not heard of. When
-        `on_picture` raises KeyError (the word went away while drawing), the picture's file goes too."""
+        """Draws the example of every word, the scene of every word that has one, and `article_scene` when
+        given, all in one batch. `on_picture` hears of a word's picture and `on_article` of the article's, as
+        soon as its row and file are there; a picture that failed is not heard of. When either raises KeyError
+        (its session went away while drawing), the picture's file goes too."""
         wanted = self._wanted(vocabulary)
+        prompts = [prompt for _, _, prompt in wanted] + ([self.prompt(article_scene)] if article_scene else [])
+
+        def what(n: int) -> str:
+            return repr(vocabulary[wanted[n][0]].word) if n < len(wanted) else "the article"
 
         def keep(n: int, drawn: Drawn) -> None:
-            i, field, _ = wanted[n]
             picture_id = self._keep(drawn)
-            if on_picture is None:
-                return
             try:
-                on_picture(i, field, picture_id)
+                if n < len(wanted):
+                    i, field, _ = wanted[n]
+                    if on_picture:
+                        on_picture(i, field, picture_id)
+                elif on_article:
+                    on_article(picture_id)
             except KeyError:
                 self._files.remove(picture_id)
-                log.info("job %s: %r went away while drawing; dropped picture %s", job_id, vocabulary[i].word, picture_id)
+                log.info("job %s: %s went away while drawing; dropped picture %s", job_id, what(n), picture_id)
 
-        pictures = self._painter.paint([prompt for _, _, prompt in wanted], on_drawn, keep)
-        for (i, field, _), drawn in zip(wanted, pictures):
+        for n, drawn in enumerate(self._painter.paint(prompts, on_drawn, keep)):
             if drawn is None:
-                log.warning("job %s: no %s for %r", job_id, field, vocabulary[i].word)
+                log.warning("job %s: no picture for %s", job_id, what(n))
 
     def redraw(self, scene: Scene, style: str = "") -> int:
         """`scene` drawn in `style`, as a new picture. The old one stays until the caller has stored the new id

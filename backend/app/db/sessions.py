@@ -10,7 +10,7 @@ from typing import TYPE_CHECKING
 
 from app.db.expressions import COLUMNS as EXPRESSION_COLUMNS
 from app.db.expressions import expression_from
-from app.models import Article, Draft, Note, Paragraph, Question, SentencePair, Session, SessionContent, SessionSummary, Source, Stars, VocabularyItem
+from app.models import Article, Draft, Figure, Note, Paragraph, Question, SentencePair, Session, SessionContent, SessionSummary, Source, Stars, VocabularyItem
 
 if TYPE_CHECKING:
     from app.db import Database
@@ -87,12 +87,20 @@ class SessionRepo:
                 (session_id,),
             ).fetchall()
             words = conn.execute("SELECT * FROM vocabulary WHERE session_id = ? ORDER BY position", (session_id,)).fetchall()
+            figures = conn.execute(
+                "SELECT f.* FROM figures f JOIN paragraphs p ON p.id = f.paragraph_id WHERE p.session_id = ? ORDER BY f.id", (session_id,)
+            ).fetchall()
         article = Article(
             title=row["title"],
             paragraphs=[Paragraph(id=p["id"], text=p["text"]) for p in paragraphs],
             questions=[Question(**q) for q in json.loads(row["questions"])],
             sources=[Source(**s) for s in json.loads(row["sources"])],
             translation=[SentencePair(**t) for t in json.loads(row["translation"])],
+            figures=[
+                Figure(id=f["id"], paragraph_id=f["paragraph_id"], image=f"{f['picture_id']}.png", caption=f["caption"],
+                       source_url=f["source_url"], credit=f["credit"])
+                for f in figures
+            ],
         )
         content = SessionContent(
             topic=row["topic"], expressions=[expression_from(e) for e in expressions], article=article, vocabulary=[_word(w) for w in words]
@@ -109,15 +117,32 @@ class SessionRepo:
         return [SessionSummary(**dict(row)) for row in rows]
 
     def delete(self, session_id: int) -> list[int] | None:
-        """The ids of the pictures the session's words showed, whose files the caller removes; None when there was no such session.
-        Everything the session owns goes with it; the corpus and the picture rows stay."""
+        """The ids of the pictures the session showed (its words', then its figures'), whose files the caller removes;
+        None when there was no such session. Everything the session owns goes with it; the corpus and the picture rows stay."""
         with self._db.connect() as conn:
             rows = conn.execute(
                 "SELECT picture_id, example_picture_id FROM vocabulary WHERE session_id = ? ORDER BY position", (session_id,)
             ).fetchall()
+            figures = conn.execute(
+                "SELECT f.picture_id FROM figures f JOIN paragraphs p ON p.id = f.paragraph_id WHERE p.session_id = ? ORDER BY f.id",
+                (session_id,),
+            ).fetchall()
             if conn.execute("DELETE FROM sessions WHERE id = ?", (session_id,)).rowcount == 0:
                 return None
-        return [picture for row in rows for picture in row if picture is not None]
+        return [picture for row in rows for picture in row if picture is not None] + [f[0] for f in figures]
+
+    def add_figure(self, paragraph_id: int, picture_id: int, caption: str, source_url: str | None, credit: str | None) -> int:
+        """Shows the picture under the paragraph. Raises KeyError when the paragraph is gone (its session was deleted)."""
+        try:
+            with self._db.connect() as conn:
+                cur = conn.execute(
+                    "INSERT INTO figures (paragraph_id, picture_id, caption, source_url, credit) VALUES (?, ?, ?, ?, ?)",
+                    (paragraph_id, picture_id, caption, source_url, credit),
+                )
+        except sqlite3.IntegrityError:
+            raise KeyError(paragraph_id) from None
+        assert cur.lastrowid is not None
+        return cur.lastrowid
 
     def recent_topics(self, limit: int) -> list[str]:
         with self._db.connect() as conn:

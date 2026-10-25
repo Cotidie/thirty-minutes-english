@@ -35,9 +35,22 @@ export interface Paragraph {
   text: string
 }
 
+/** An image under a paragraph: from a page the article drew on (with its page and credit), or drawn for it (neither). */
+export interface Figure {
+  id: number
+  paragraph_id: number
+  /** A file name under /api/images/. */
+  image: string
+  caption: string
+  source_url: string | null
+  credit: string | null
+}
+
 export interface Article {
   title: string
   paragraphs: Paragraph[]
+  /** Absent on sessions made before figures were kept. */
+  figures?: Figure[]
   questions: Question[]
   sources?: Source[]
   translation?: SentencePair[]

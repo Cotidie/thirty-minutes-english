@@ -33,10 +33,32 @@ SESSION_SCHEMA: dict = {
         "article": {
             "type": "object",
             "additionalProperties": False,
-            "required": ["title", "body", "questions", "sources", "translation"],
+            "required": ["title", "body", "questions", "sources", "translation", "figures", "picture"],
             "properties": {
                 "title": {"type": "string"},
                 "body": {"type": "string"},
+                "figures": {
+                    "type": "array",
+                    "maxItems": 2,
+                    "items": {
+                        "type": "object",
+                        "additionalProperties": False,
+                        "required": ["after", "image_url", "page_url", "credit", "caption"],
+                        "properties": {
+                            "after": {"type": "integer", "minimum": 1},
+                            "image_url": {"type": "string"},
+                            "page_url": {"type": "string"},
+                            "credit": {"type": "string"},
+                            "caption": {"type": "string"},
+                        },
+                    },
+                },
+                "picture": {
+                    "type": "object",
+                    "additionalProperties": False,
+                    "required": ["after", "scene", "caption"],
+                    "properties": {"after": {"type": "integer", "minimum": 1}, "scene": {"type": "string"}, "caption": {"type": "string"}},
+                },
                 "translation": {
                     "type": "array",
                     "minItems": 1,
@@ -128,7 +150,16 @@ rather than asking about life in general. Its evidence is an empty list. \
 Then give translation: every sentence of the article body, in reading order, as pairs. en is the sentence \
 copied character for character from the body, final punctuation included, one sentence per pair; never \
 merge or split sentences. ko is that sentence in natural written Korean (해라체, "~다"로 끝맺기), translated \
-with its neighbors in mind so the Korean reads well in sequence; keep names, figures, and dates as they are.
+with its neighbors in mind so the Korean reads well in sequence; keep names, figures, and dates as they are. \
+Then give figures: up to 2 images you saw on the pages you drew on (firecrawl_scrape with the images format \
+lists a page's images) that show what a paragraph says: a photo of the place, people, or thing, a diagram, or \
+a map. Never a logo, ad, icon, author photo, or tracking pixel. For each give after (the paragraph it belongs \
+under, counted from 1), image_url (the exact image address from the page), page_url (the page it was on), \
+credit (the outlet or photographer the page names), and caption (one plain sentence on what it shows and why \
+it matters to that paragraph). Leave figures empty when no such image turned up. Always give picture too: one \
+moment from the article that a photo could capture, in two or three concrete sentences (the place, who is \
+there, what they are doing, details a viewer could point at; no text or signs), with after (the paragraph it \
+belongs under) and a one-sentence caption. It is drawn only when none of the figures can be used.
 
 2. vocabulary: {vocabulary_count} words at B2 to C1+ level connected to the topic. Draw from the \
 article body where it offers strong candidates, and fill the rest with words a well-read speaker would \

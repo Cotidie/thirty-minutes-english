@@ -3,7 +3,21 @@ for values read and written whole with their row; anything pointed at is a row o
 
 import sqlite3
 
-VERSION = 2
+VERSION = 3
+
+# Added in v3: images under the article's paragraphs.
+FIGURES = """
+CREATE TABLE figures (
+    id           INTEGER PRIMARY KEY AUTOINCREMENT,
+    paragraph_id INTEGER NOT NULL REFERENCES paragraphs(id) ON DELETE CASCADE,
+    picture_id   INTEGER NOT NULL REFERENCES pictures(id),
+    caption      TEXT    NOT NULL,
+    source_url   TEXT,
+    credit       TEXT
+) STRICT;
+
+CREATE INDEX figures_paragraph ON figures (paragraph_id);
+"""
 
 SCHEMA = """
 CREATE TABLE sessions (
@@ -119,13 +133,23 @@ CREATE INDEX examples_vocabulary ON examples (vocabulary_id);
 CREATE INDEX readings_paragraph ON readings (paragraph_id);
 CREATE INDEX summaries_paragraph ON summaries (paragraph_id);
 CREATE INDEX stage_times_stage ON stage_times (stage, id);
-"""
+""" + FIGURES
+
+
+def _run(conn: sqlite3.Connection, script: str) -> None:
+    """One statement at a time, so it can run inside a caller's transaction (executescript would commit it)."""
+    for statement in script.split(";"):
+        if statement.strip():
+            conn.execute(statement)
 
 
 def create(conn: sqlite3.Connection) -> None:
-    """The v2 tables on an empty file. One statement at a time, so it can run inside a caller's transaction
-    (executescript would commit it)."""
-    for statement in SCHEMA.split(";"):
-        if statement.strip():
-            conn.execute(statement)
+    """Every current table on an empty file."""
+    _run(conn, SCHEMA)
+    conn.execute(f"PRAGMA user_version = {VERSION}")
+
+
+def upgrade(conn: sqlite3.Connection) -> None:
+    """A v2 file brought to the current version."""
+    _run(conn, FIGURES)
     conn.execute(f"PRAGMA user_version = {VERSION}")
