@@ -1,21 +1,19 @@
-from collections import deque
-from threading import Lock
-
 import pytest
 from fastapi.testclient import TestClient
 
 from app.db import Database
 from app.generation.generator import VOCABULARY_COUNT
-from app.generation.jobs import DEFAULT_STAGE_SECONDS, EXPRESSION_COUNT, Job, JobRunner
+from app.generation.jobs import DEFAULT_STAGE_SECONDS, EXPRESSION_COUNT
 from app.generation.progress import Progress, Stage
 from app.llm import GenerationError
 from app.main import create_app
 from app.topics.pool import TOPICS
 from app.wiring import Services
+from app.pictures.files import PictureFiles
 from app.pictures.scenes import Scene
 
 TOPIC_TEXTS = {t.text for t in TOPICS}
-from tests.conftest import sample_draft
+from tests.conftest import sample_draft, seed_expressions
 
 
 class InlineExecutor:
@@ -46,10 +44,16 @@ class FailingGenerator:
 @pytest.fixture
 def client(tmp_path):
     gen = FakeGenerator()
-    app = create_app(Database(tmp_path / "s.db"), Services(gen), InlineExecutor())
+    db = Database(tmp_path / "s.db")
+    seed_expressions(db, EXPRESSION_COUNT)
+    app = create_app(db, Services(gen), InlineExecutor())
     with TestClient(app) as c:
         c.generator = gen
         yield c
+
+
+def content_of(client, session_id: int) -> dict:
+    return client.get(f"/api/sessions/{session_id}").json()["content"]
 
 
 def create(client, topic=None) -> dict:
@@ -90,7 +94,19 @@ def test_list_and_get(client):
     listed = client.get("/api/sessions").json()
     assert [s["id"] for s in listed] == [sid]
     assert listed[0]["title"] == "About X"
-    assert client.get(f"/api/sessions/{sid}").json()["content"]["topic"] == "X"
+    content = content_of(client, sid)
+    assert content["topic"] == "X"
+    assert [p["text"] for p in content["article"]["paragraphs"]] == ["One.", "Two two.", "Three."]
+    assert "body" not in content["article"] and all(isinstance(p["id"], int) for p in content["article"]["paragraphs"])
+    assert len(content["expressions"]) == EXPRESSION_COUNT and all(isinstance(e["id"], int) for e in content["expressions"])
+    assert all(isinstance(v["id"], int) for v in content["vocabulary"])
+
+
+def test_a_session_with_an_empty_corpus_has_no_expressions(tmp_path):
+    app = create_app(Database(tmp_path / "s.db"), Services(FakeGenerator()), InlineExecutor())
+    with TestClient(app) as c:
+        sid = c.post("/api/sessions", json={"topic": "X"}).json()["session_id"]
+        assert content_of(c, sid)["expressions"] == []
 
 
 def test_get_missing_404(client):
@@ -144,66 +160,100 @@ def test_a_failed_job_stays_listed_until_it_is_dismissed(tmp_path):
 
 
 class FakeIllustrator:
-    def __init__(self, error: Exception | None = None, seconds: float | None = None):
+    """Draws nothing real: each picture is a row in the picture table and a file, as the real one leaves them."""
+
+    def __init__(self, db: Database, error: Exception | None = None, seconds: float | None = None):
+        self.files = PictureFiles(db.images_dir)
+        self.pictures = db.pictures
         self.error = error
         self.seconds = seconds
         self.job_ids: list[str] = []
+        self.styles: list[str] = []
 
     def expected_seconds(self, count: int) -> float | None:
         return None if self.seconds is None else self.seconds * count
 
-    def count(self, content) -> int:
-        return 2 * len(content.vocabulary)
+    def count(self, words) -> int:
+        return 2 * len(words)
 
-    def illustrate(self, job_id: str, content, on_drawn=None, on_picture=None):
+    def draw(self) -> int:
+        picture_id = self.pictures.add("fake", 1.0, None)
+        self.files.write(picture_id, b"PNG")
+        return picture_id
+
+    def illustrate(self, job_id: str, words, on_drawn=None, on_picture=None):
         self.job_ids.append(job_id)
         if on_drawn:
-            on_drawn(self.count(content))
+            on_drawn(self.count(words))
         if self.error:
             raise self.error
-        for i in range(len(content.vocabulary)):
-            on_picture(i, "image", f"{job_id}-{i}.png")
-            on_picture(i, "example_image", f"{job_id}-{i}-example.png")
+        for i in range(len(words)):
+            on_picture(i, "image", self.draw())
+            on_picture(i, "example_image", self.draw())
+
+    def redraw(self, scene, style=""):
+        self.styles.append(style)
+        return self.draw()
+
+    def redraw_example(self, item, style=""):
+        self.styles.append(style)
+        return self.draw()
+
+
+def with_pictures(tmp_path, illustrator_of=FakeIllustrator, **services):
+    db = Database(tmp_path / "s.db")
+    illustrator = illustrator_of(db)
+    app = create_app(db, Services(FakeGenerator(), illustrator=illustrator, **services), InlineExecutor())
+    return app, illustrator, db
 
 
 def test_pictures_are_drawn_after_the_text_and_saved_with_the_session(tmp_path):
-    illustrator = FakeIllustrator()
-    app = create_app(Database(tmp_path / "s.db"), Services(FakeGenerator(), illustrator=illustrator), InlineExecutor())
+    app, illustrator, db = with_pictures(tmp_path)
     with TestClient(app) as c:
         job = c.post("/api/sessions", json={"topic": "X"}).json()
-        session = c.get(f"/api/sessions/{job['session_id']}").json()
+        words = content_of(c, job["session_id"])["vocabulary"]
     assert illustrator.job_ids == [job["id"]]
     assert job["stage"] == "illustrating"
     assert job["pictures_done"] == 20  # the fake reports both pictures of every word drawn
-    assert session["content"]["vocabulary"][0]["image"] == f"{job['id']}-0.png"
-    assert session["content"]["vocabulary"][9]["example_image"] == f"{job['id']}-9-example.png"
+    assert (words[0]["image"], words[0]["example_image"], words[9]["example_image"]) == ("1.png", "2.png", "20.png")
+    assert db.pictures.stats()["fake"].seconds == 1.0
 
 
 def test_the_session_can_be_opened_while_its_pictures_are_drawn(tmp_path):
     seen: dict = {}
 
     class Watched(FakeIllustrator):
-        def illustrate(self, job_id, content, on_drawn=None, on_picture=None):
-            on_picture(0, "example_image", "first.png")
+        def illustrate(self, job_id, words, on_drawn=None, on_picture=None):
+            on_picture(0, "example_image", self.draw())
             job = c.get(f"/api/jobs/{job_id}").json()
             seen.update(job=job, session=c.get(f"/api/sessions/{job['session_id']}").json())
 
-    app = create_app(Database(tmp_path / "s.db"), Services(FakeGenerator(), illustrator=Watched()), InlineExecutor())
+    app, _, _ = with_pictures(tmp_path, Watched)
     with TestClient(app) as c:
         c.post("/api/sessions", json={"topic": "X"})
     assert (seen["job"]["status"], seen["job"]["stage"]) == ("running", "illustrating")
     words = seen["session"]["content"]["vocabulary"]
-    assert (words[0]["example_image"], words[0]["image"], words[1]["example_image"]) == ("first.png", None, None)
+    assert (words[0]["example_image"], words[0]["image"], words[1]["example_image"]) == ("1.png", None, None)
 
 
 def test_a_session_still_goes_out_when_the_pictures_fail(tmp_path):
-    services = Services(FakeGenerator(), illustrator=FakeIllustrator(GenerationError("openrouter down")))
-    app = create_app(Database(tmp_path / "s.db"), services, InlineExecutor())
+    app, _, _ = with_pictures(tmp_path, lambda db: FakeIllustrator(db, GenerationError("openrouter down")))
     with TestClient(app) as c:
         job = c.post("/api/sessions", json={"topic": "X"}).json()
-        session = c.get(f"/api/sessions/{job['session_id']}").json()
+        words = content_of(c, job["session_id"])["vocabulary"]
     assert job["status"] == "done"
-    assert session["content"]["vocabulary"][0]["image"] is None
+    assert words[0]["image"] is None
+
+
+def test_deleting_a_session_removes_its_picture_files(tmp_path):
+    app, _, db = with_pictures(tmp_path)
+    with TestClient(app) as c:
+        kept = c.post("/api/sessions", json={"topic": "Kept"}).json()["session_id"]
+        gone = c.post("/api/sessions", json={"topic": "Gone"}).json()["session_id"]
+        assert len(list(db.images_dir.iterdir())) == 40
+        assert c.delete(f"/api/sessions/{gone}").status_code == 204
+    assert sorted(f.name for f in db.images_dir.iterdir()) == sorted(f"{i}.png" for i in range(1, 21))
+    assert kept != gone
 
 
 class FakeSceneWriter:
@@ -211,41 +261,35 @@ class FakeSceneWriter:
         return Scene(f"another scene for {item.word}", f"why it is {item.word}")
 
 
-class RedrawingIllustrator(FakeIllustrator):
-    def __init__(self):
-        super().__init__()
-        self.styles: list[str] = []
-        self.discarded: list[str | None] = []
-
-    def redraw(self, session_id, index, item, scene, style=""):
-        self.styles.append(style)
-        return item.model_copy(update={"scene": scene.text, "caption": scene.caption, "image": f"{session_id}-{index}-new.png"})
-
-    def redraw_example(self, session_id, index, item, style=""):
-        self.styles.append(style)
-        return item.model_copy(update={"example_image": f"{session_id}-{index}-example-new.png"})
-
-    def discard(self, image):
-        self.discarded.append(image)
-
-
 def test_a_word_can_be_redrawn_in_a_chosen_style_and_the_session_keeps_it(tmp_path):
-    illustrator = RedrawingIllustrator()
-    services = Services(FakeGenerator(), illustrator=illustrator, scene_writer=FakeSceneWriter())
-    app = create_app(Database(tmp_path / "s.db"), services, InlineExecutor())
+    app, illustrator, db = with_pictures(tmp_path, scene_writer=FakeSceneWriter())
+    files = PictureFiles(db.images_dir)
     with TestClient(app) as c:
-        sid = c.post("/api/sessions", json={"topic": "X"}).json()["session_id"]
+        sid = c.post("/api/sessions", json={"topic": "X"}).json()["session_id"]  # word 1 shows pictures 3 and 4
         res = c.post(f"/api/sessions/{sid}/pictures/1", json={"style": "comic"})
         assert res.status_code == 200
-        assert (res.json()["scene"], res.json()["caption"]) == ("another scene for word1", "why it is word1")
-        assert res.json()["image"] == f"{sid}-1-new.png"
-        assert c.get(f"/api/sessions/{sid}").json()["content"]["vocabulary"][1]["image"] == f"{sid}-1-new.png"
+        assert (res.json()["scene"], res.json()["caption"], res.json()["image"]) == ("another scene for word1", "why it is word1", "21.png")
+        assert content_of(c, sid)["vocabulary"][1]["image"] == "21.png"
         example = c.post(f"/api/sessions/{sid}/pictures/1", json={"face": "example"}).json()
-        assert (example["example_image"], example["image"]) == (f"{sid}-1-example-new.png", f"{sid}-1-new.png")
+        assert (example["example_image"], example["image"]) == ("22.png", "21.png")
         assert c.post(f"/api/sessions/{sid}/pictures/99", json={}).status_code == 404
-    job = illustrator.job_ids[0]
     assert illustrator.styles == ["comic", ""]
-    assert illustrator.discarded == [f"{job}-1.png", f"{job}-1-example.png"]  # only the picture each redraw replaced
+    assert not files.path(3).exists() and not files.path(4).exists()  # only the picture each redraw replaced
+    assert files.path(5).exists() and files.path(21).exists() and files.path(22).exists()
+
+
+def test_redraw_after_the_session_went_away_leaves_no_file(tmp_path):
+    class Vanishing(FakeIllustrator):
+        def redraw(self, scene, style=""):
+            picture = super().redraw(scene, style)
+            assert c.delete(f"/api/sessions/{sid}").status_code == 204
+            return picture
+
+    app, _, db = with_pictures(tmp_path, Vanishing, scene_writer=FakeSceneWriter())
+    with TestClient(app) as c:
+        sid = c.post("/api/sessions", json={"topic": "X"}).json()["session_id"]
+        assert c.post(f"/api/sessions/{sid}/pictures/1", json={}).status_code == 404
+    assert list(db.images_dir.iterdir()) == []
 
 
 def test_redraw_is_503_while_pictures_are_off(client):
@@ -253,12 +297,11 @@ def test_redraw_is_503_while_pictures_are_off(client):
     assert client.post(f"/api/sessions/{sid}/pictures/0", json={}).status_code == 503
 
 
-def test_second_generation_receives_items_from_the_first(client):
+def test_second_generation_receives_the_words_of_the_first(client):
     create(client, "A")
     create(client, "B")
     first, second = client.generator.excluded
     assert not first
-    assert set(second.expressions) <= {f"phrase {i}" for i in range(EXPRESSION_COUNT)}
     assert set(second.words) <= {f"word{i}" for i in range(VOCABULARY_COUNT)}
 
 
@@ -266,7 +309,8 @@ def test_stars_endpoint_round_trips_and_404s_on_unknown_session(client):
     sid = create(client, "X")["session_id"]
     assert client.get(f"/api/sessions/{sid}/stars").json() == {"expressions": [], "words": []}
 
-    body = {"expressions": ["a moving target"], "words": ["mitigate"]}
+    content = content_of(client, sid)
+    body = {"expressions": [content["expressions"][1]["id"]], "words": [content["vocabulary"][3]["id"]]}
     assert client.put(f"/api/sessions/{sid}/stars", json=body).json() == body
     assert client.get(f"/api/sessions/{sid}/stars").json() == body
 
@@ -289,19 +333,23 @@ def test_note_endpoint_round_trips_and_404s_on_unknown_session(client):
 def test_examples_stack_under_a_session_in_the_order_made(client):
     sid = create(client, "X")["session_id"]
     assert client.get("/api/examples", params={"session_id": sid}).json() == []
+    content = content_of(client, sid)
+    expression, word = content["expressions"][0]["id"], content["vocabulary"][2]["id"]
 
-    body = {"session_id": sid, "expression": "phrase 0", "user_text": "I said it.", "coach_text": "I said it. Natural.", "seconds": 9}
+    body = {"session_id": sid, "expression_id": expression, "user_text": "I said it.", "coach_text": "I said it. Natural.", "seconds": 9}
     first = client.post("/api/examples", json=body)
     assert first.status_code == 201
-    assert first.json()["expression"] == "phrase 0"
-    client.post("/api/examples", json={**body, "user_text": "Again."})
+    assert (first.json()["expression_id"], first.json()["vocabulary_id"]) == (expression, None)
+    client.post("/api/examples", json={"session_id": sid, "vocabulary_id": word, "user_text": "Again.", "coach_text": "Good."})
 
     listed = client.get("/api/examples", params={"session_id": sid}).json()
-    assert [e["user_text"] for e in listed] == ["I said it.", "Again."]
+    assert [(e["user_text"], e["expression_id"], e["vocabulary_id"]) for e in listed] == [("I said it.", expression, None), ("Again.", None, word)]
     assert client.get("/api/examples", params={"session_id": sid + 1}).json() == []
 
     assert client.post("/api/examples", json={**body, "session_id": 999}).status_code == 404
     assert client.post("/api/examples", json={**body, "coach_text": " "}).status_code == 422
+    assert client.post("/api/examples", json={**body, "vocabulary_id": word}).status_code == 422  # one or the other
+    assert client.post("/api/examples", json={k: v for k, v in body.items() if k != "expression_id"}).status_code == 422
 
     client.delete(f"/api/sessions/{sid}")
     assert client.get("/api/examples", params={"session_id": sid}).json() == []
@@ -336,12 +384,27 @@ def test_jobs_endpoint_drops_finished_jobs(tmp_path):
         assert client.get("/api/jobs").json() == []
 
 
+def test_an_example_for_an_expression_not_in_the_session_is_404(client):
+    first = create(client, "A")["session_id"]
+    second = create(client, "B")["session_id"]
+    taught_elsewhere = {e["id"] for e in content_of(client, first)["expressions"]} - {e["id"] for e in content_of(client, second)["expressions"]}
+    other_word = content_of(client, first)["vocabulary"][0]["id"]
+    body = {"session_id": second, "user_text": "x", "coach_text": "y"}
+    for target in [{"expression_id": 999}, {"vocabulary_id": other_word}, *({"expression_id": e} for e in taught_elsewhere)]:
+        res = client.post("/api/examples", json={**body, **target})
+        assert (res.status_code, res.json()["detail"]) == (404, "not taught in this session")
+    assert client.get("/api/examples", params={"session_id": second}).json() == []
+
+
+def first_paragraph(client, session_id: int) -> int:
+    return content_of(client, session_id)["article"]["paragraphs"][0]["id"]
+
+
 def test_readings_keep_their_marks_and_list_per_session(client):
     session_id = client.post("/api/sessions", json={"topic": "Digital twins"}).json()["session_id"]
     sounds = [{"phoneme": "v", "score": 8, "weak": True, "heard": "b"}, {"phoneme": "ɛ", "score": 90, "weak": False}]
     body = {
-        "session_id": session_id,
-        "paragraph": "Researchers verified it.",
+        "paragraph_id": first_paragraph(client, session_id),
         "user_text": "researchers berified it",
         "seconds": 31,
         "corrections": [
@@ -351,6 +414,8 @@ def test_readings_keep_their_marks_and_list_per_session(client):
     created = client.post("/api/readings", json=body)
     assert created.status_code == 201
     assert created.json()["corrections"][0]["word"] == "verified"
+    assert created.json()["paragraph_id"] == body["paragraph_id"]
+    assert client.post("/api/readings", json={**body, "paragraph_id": 999}).status_code == 404
 
     listed = client.get("/api/readings", params={"session_id": session_id}).json()
     assert [r["id"] for r in listed] == [created.json()["id"]]
@@ -363,14 +428,14 @@ def test_readings_keep_their_marks_and_list_per_session(client):
 def test_a_reading_kept_before_marks_were_saved_has_no_place_on_the_paragraph(client):
     session_id = client.post("/api/sessions", json={"topic": "Digital twins"}).json()["session_id"]
     old = {"word": "verified", "heard": "b for v", "fix": "vɛrɪfaɪd"}
-    client.post("/api/readings", json={"session_id": session_id, "paragraph": "P.", "user_text": "p", "seconds": 3, "corrections": [old]})
+    client.post("/api/readings", json={"paragraph_id": first_paragraph(client, session_id), "user_text": "p", "seconds": 3, "corrections": [old]})
     [mark] = client.get("/api/readings", params={"session_id": session_id}).json()[0]["corrections"]
     assert (mark["at"], mark["sounds"]) == (-1, [])
 
 
 def test_a_reading_without_corrections_is_a_clean_read(client):
     session_id = client.post("/api/sessions", json={"topic": "Digital twins"}).json()["session_id"]
-    body = {"session_id": session_id, "paragraph": "Researchers verified it.", "user_text": "researchers verified it"}
+    body = {"paragraph_id": first_paragraph(client, session_id), "user_text": "researchers verified it"}
     assert client.post("/api/readings", json=body).json()["corrections"] == []
 
 
@@ -412,8 +477,18 @@ def test_a_fresh_job_expects_the_default_time_of_every_stage(tmp_path):
 
 
 def test_a_job_foresees_its_pictures_from_the_picture_model_time_here(tmp_path):
-    app = create_app(Database(tmp_path / "s.db"), Services(FakeGenerator(), illustrator=FakeIllustrator(seconds=7)), DeferredExecutor())
+    db = Database(tmp_path / "s.db")
+    app = create_app(db, Services(FakeGenerator(), illustrator=FakeIllustrator(db, seconds=7)), DeferredExecutor())
     with TestClient(app) as c:
         job = c.post("/api/sessions", json={"topic": "X"}).json()
     others = sum(s for stage, s in DEFAULT_STAGE_SECONDS.items() if stage != Stage.ILLUSTRATING)
     assert job["expected_seconds"] == others + 7 * 20  # two pictures a word
+
+
+def test_stage_estimates_survive_a_restart(tmp_path):
+    path = tmp_path / "s.db"
+    with TestClient(create_app(Database(path), Services(FakeGenerator()), InlineExecutor())) as c:
+        c.post("/api/sessions", json={"topic": "X"})
+    with TestClient(create_app(Database(path), Services(FakeGenerator()), DeferredExecutor())) as c:
+        job = c.post("/api/sessions", json={"topic": "Y"}).json()
+    assert job["stage_expected_seconds"] < DEFAULT_STAGE_SECONDS[Stage.STARTING]  # the first run's time, not the default

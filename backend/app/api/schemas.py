@@ -2,7 +2,7 @@
 
 from typing import Literal
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 from app.generation.jobs import Status
 from app.generation.progress import Stage
@@ -77,13 +77,22 @@ class ExampleFeedbackRequest(BaseModel):
 
 
 class ExampleRequest(BaseModel):
+    """A sentence made in a session with one of its expressions or one of its words: exactly one of the two ids."""
+
     session_id: int
-    expression: str
+    expression_id: int | None = None
+    vocabulary_id: int | None = None
     user_text: str
     coach_text: str
     seconds: float = 0
 
-    _check = field_validator("expression", "user_text", "coach_text")(_not_blank)
+    _check = field_validator("user_text", "coach_text")(_not_blank)
+
+    @model_validator(mode="after")
+    def names_one_target(self) -> "ExampleRequest":
+        if (self.expression_id is None) == (self.vocabulary_id is None):
+            raise ValueError("give expression_id or vocabulary_id, not both")
+        return self
 
 
 class SummaryFeedbackRequest(BaseModel):
@@ -95,20 +104,24 @@ class SummaryFeedbackRequest(BaseModel):
     _check = field_validator("paragraph", "user_text")(_not_blank)
 
 
-class SummaryRequest(SummaryFeedbackRequest):
-    session_id: int
+class SummaryRequest(BaseModel):
+    """A judged summary of one paragraph, kept with it."""
+
+    paragraph_id: int
+    user_text: str
     feedback: SummaryFeedback
     seconds: float = 0
 
+    _check = field_validator("user_text")(_not_blank)
+
 
 class ReadingRequest(BaseModel):
-    session_id: int
-    paragraph: str
+    """One paragraph read aloud, kept with it, clean or not."""
+
+    paragraph_id: int
     user_text: str
     seconds: float = 0
     corrections: list[Correction] = []
-
-    _check = field_validator("paragraph")(_not_blank)
 
 
 class SpeechRequest(BaseModel):

@@ -9,6 +9,7 @@ from app.config.catalog import Catalog
 from app.config.settings import Settings
 from app.db import Database
 from app.generation.jobs import JobRunner
+from app.pictures.files import PictureFiles
 from app.topics.daily import DailyTopics
 from app.wiring import Services
 
@@ -35,6 +36,10 @@ def _catalog(request: Request) -> Catalog:
     return request.app.state.catalog
 
 
+def _files(request: Request) -> PictureFiles:
+    return request.app.state.files
+
+
 def _settings(request: Request) -> Settings:
     return Settings(request.app.state.env, request.app.state.db.settings.load())
 
@@ -45,12 +50,19 @@ Jobs = Annotated[JobRunner, Depends(_jobs)]
 Topics = Annotated[DailyTopics, Depends(_topics)]
 CurrentSettings = Annotated[Settings, Depends(_settings)]
 Models = Annotated[Catalog, Depends(_catalog)]
+Files = Annotated[PictureFiles, Depends(_files)]
 
 
 def require_session(db: Database, session_id: int) -> None:
     """404 unless `session_id` names a stored session."""
     if not db.sessions.exists(session_id):
         raise HTTPException(status_code=404, detail="session not found")
+
+
+def require_paragraph(db: Database, paragraph_id: int) -> None:
+    """404 unless `paragraph_id` names a paragraph of a stored session."""
+    if db.sessions.session_of_paragraph(paragraph_id) is None:
+        raise HTTPException(status_code=404, detail="paragraph not found")
 
 
 def off(detail: str) -> HTTPException:

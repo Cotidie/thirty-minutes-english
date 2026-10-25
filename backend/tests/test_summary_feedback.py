@@ -37,10 +37,12 @@ def test_a_spoken_summary_is_judged_against_its_paragraph_and_kept_with_the_sess
         assert feedback.json() == ANSWER
         assert PARAGRAPH in cli.prompts[0] and said in cli.prompts[0] and "{{" not in cli.prompts[0]
 
-        kept = c.post("/api/summaries", json={"session_id": sid, "paragraph": PARAGRAPH, "user_text": said, "feedback": ANSWER, "seconds": 12})
+        paragraph_id = c.get(f"/api/sessions/{sid}").json()["content"]["article"]["paragraphs"][1]["id"]
+        kept = c.post("/api/summaries", json={"paragraph_id": paragraph_id, "user_text": said, "feedback": ANSWER, "seconds": 12})
         assert kept.status_code == 201
         [summary] = c.get(f"/api/summaries?session_id={sid}").json()
-        assert (summary["paragraph"], summary["user_text"], summary["feedback"]) == (PARAGRAPH, said, ANSWER)
+        assert (summary["paragraph_id"], summary["user_text"], summary["feedback"]) == (paragraph_id, said, ANSWER)
+        assert c.post("/api/summaries", json={"paragraph_id": 999, "user_text": said, "feedback": ANSWER}).status_code == 404
 
         assert c.post("/api/summary/feedback", json={"paragraph": PARAGRAPH, "user_text": " "}).status_code == 422
         c.delete(f"/api/sessions/{sid}")

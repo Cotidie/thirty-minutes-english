@@ -33,6 +33,7 @@ def create_app(
     `catalog` the model lists are whatever the database holds, never fetched."""
     app = FastAPI(title="english-speaking-claude")
     app.state.db = db
+    app.state.files = PictureFiles(image_dir or db.images_dir)
     app.state.services = services
     app.state.env = os.environ if env is None else env
     app.state.rebuild = rebuild
@@ -52,7 +53,7 @@ def default_app() -> FastAPI:
     logging.basicConfig(level=logging.INFO, format="%(levelname)s %(name)s: %(message)s")
     db = Database(os.environ.get("DB_PATH", ROOT / "data" / "sessions.db"))
     dirs = agent_dirs(os.environ, ROOT.parent / "agents")
-    image_dir = db.path.parent / "images"
+    image_dir = db.images_dir
     catalog = Catalog(db.caches)
 
     def rebuild(settings: Settings) -> Services:

@@ -2,7 +2,7 @@ from dataclasses import asdict
 
 from fastapi import APIRouter, HTTPException, Response
 
-from app.api.deps import Db, Jobs, Svc, failed, off, require_session
+from app.api.deps import Db, Files, Jobs, Svc, failed, off, require_session
 from app.api.schemas import CreateSessionRequest, JobStatus, RedrawRequest
 from app.generation.jobs import Job, JobRunner
 from app.llm import GenerationError
@@ -73,16 +73,20 @@ def get_session(session_id: int, db: Db) -> Session:
 
 
 @router.delete("/sessions/{session_id}", status_code=204)
-def delete_session(session_id: int, db: Db) -> Response:
-    if not db.sessions.delete(session_id):
+def delete_session(session_id: int, db: Db, files: Files) -> Response:
+    """The session, everything kept with it, and the picture files its words showed."""
+    pictures = db.sessions.delete(session_id)
+    if pictures is None:
         raise HTTPException(status_code=404, detail="session not found")
+    for picture_id in pictures:
+        files.remove(picture_id)
     return Response(status_code=204)
 
 
 @router.post("/sessions/{session_id}/pictures/{index}", response_model=VocabularyItem)
-def redraw_picture(session_id: int, index: int, body: RedrawRequest, db: Db, services: Svc) -> VocabularyItem:
-    """One of a word's pictures drawn again and saved in place of the old one: the example
-    sentence as it is, or a fresh scene for Practice."""
+def redraw_picture(session_id: int, index: int, body: RedrawRequest, db: Db, services: Svc, files: Files) -> VocabularyItem:
+    """One of a word's pictures drawn again and shown in place of the old one, whose file goes:
+    the example sentence as it is, or a fresh scene for Practice."""
     session = db.sessions.get(session_id)
     if session is None or not 0 <= index < len(session.content.vocabulary):
         raise HTTPException(status_code=404, detail="no such word")
@@ -92,17 +96,21 @@ def redraw_picture(session_id: int, index: int, body: RedrawRequest, db: Db, ser
     item = session.content.vocabulary[index]
     try:
         if body.face == "example":
-            changes = {"example_image": illustrator.redraw_example(session_id, index, item, body.style).example_image}
+            field, scene = "example_image", None
+            picture_id = illustrator.redraw_example(item, body.style)
         else:
-            drawn = illustrator.redraw(session_id, index, item, writer.write(item), body.style)
-            changes = {"scene": drawn.scene, "caption": drawn.caption, "image": drawn.image}
+            field, scene = "image", writer.write(item)
+            picture_id = illustrator.redraw(scene, body.style)
     except GenerationError as e:
         raise failed("redraw", e) from e
-    previous = db.sessions.update_vocabulary_item(session_id, index, changes)
-    if previous is None:
-        raise HTTPException(status_code=404, detail="the session went away while drawing")
-    illustrator.discard(previous.example_image if body.face == "example" else previous.image)
-    return previous.model_copy(update=changes)
+    try:
+        previous = db.sessions.replace_picture(item.id, field, picture_id, scene)
+    except KeyError:
+        files.remove(picture_id)
+        raise HTTPException(status_code=404, detail="the session went away while drawing") from None
+    files.remove(previous)
+    changes = {field: files.name(picture_id)} | ({"scene": scene.text, "caption": scene.caption or None} if scene else {})
+    return item.model_copy(update=changes)
 
 
 @router.get("/sessions/{session_id}/stars", response_model=Stars)
