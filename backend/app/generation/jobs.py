@@ -18,7 +18,7 @@ from app.generation.generator import VOCABULARY_COUNT, Generator
 from app.generation.progress import Progress, Stage, with_pictures
 from app.llm import GenerationError
 from app.models import Session
-from app.pictures.illustrator import Illustrator, PictureField
+from app.pictures.illustrator import Illustrator
 
 Status = Literal["running", "done", "failed", "cancelled"]
 log = logging.getLogger(__name__)
@@ -197,13 +197,7 @@ class JobRunner:
                 job.id,
                 words,
                 lambda done: job.apply(with_pictures(job.progress, done, total)),
-                lambda index, field, picture_id: self._land(words[index].id, field, picture_id),
+                lambda index, field, picture_id: self._sessions.replace_picture(words[index].id, field, picture_id),
             )
         except GenerationError as e:
             log.warning("job %s: the session stays without the pictures not yet drawn: %s", job.id, e)
-
-    def _land(self, vocabulary_id: int, field: PictureField, picture_id: int) -> None:
-        try:
-            self._sessions.replace_picture(vocabulary_id, field, picture_id)
-        except KeyError:
-            log.info("picture %s arrived for word %s, whose session is gone", picture_id, vocabulary_id)

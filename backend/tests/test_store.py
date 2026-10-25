@@ -138,11 +138,11 @@ def test_a_picture_landing_on_a_word_keeps_what_landed_on_it_meanwhile(store):
     assert (got.image, got.example_image, got.scene) == (f"{scene}.png", f"{example}.png", "scene 1")
 
 
-def test_paragraphs_and_words_know_their_session(store):
+def test_paragraphs_know_their_session(store):
     session = store.sessions.create(sample_draft(), [])
     assert store.sessions.session_of_paragraph(session.content.article.paragraphs[2].id) == session.id
-    assert store.sessions.session_of_vocabulary(session.content.vocabulary[0].id) == session.id
-    assert store.sessions.session_of_paragraph(999) is None and store.sessions.session_of_vocabulary(999) is None
+    assert store.sessions.session_of_paragraph(999) is None
+    assert not hasattr(store.sessions, "session_of_vocabulary")  # nothing asks it
 
 
 def test_examples_point_at_an_expression_or_a_word_of_the_session(store):

@@ -160,11 +160,6 @@ class SessionRepo:
             row = conn.execute("SELECT session_id FROM paragraphs WHERE id = ?", (paragraph_id,)).fetchone()
         return row[0] if row else None
 
-    def session_of_vocabulary(self, vocabulary_id: int) -> int | None:
-        with self._db.connect() as conn:
-            row = conn.execute("SELECT session_id FROM vocabulary WHERE id = ?", (vocabulary_id,)).fetchone()
-        return row[0] if row else None
-
     def get_stars(self, session_id: int) -> Stars:
         with self._db.connect() as conn:
             expressions = conn.execute(

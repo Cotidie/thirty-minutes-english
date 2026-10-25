@@ -1,4 +1,7 @@
 from app.db import Database
+from app.pictures.files import PictureFiles
+from app.pictures.illustrator import Illustrator
+from app.pictures.painters import Drawn
 from app.generation.jobs import DEFAULT_STAGE_SECONDS, EXPRESSION_COUNT, Job, JobRunner
 from app.generation.progress import Progress, Stage
 from tests.conftest import sample_draft, seed_expressions
@@ -82,3 +85,25 @@ def test_a_brief_detour_into_a_later_stage_does_not_shrink_the_estimate(tmp_path
 
 def test_a_fresh_runner_expects_the_default_time_of_every_stage(tmp_path):
     assert runner_over(Database(tmp_path / "s.db")).expected_seconds(Job(id="j", topic="t")) == sum(DEFAULT_STAGE_SECONDS.values())
+
+
+def test_deleting_the_session_while_its_pictures_are_drawn_leaves_no_files(tmp_path):
+    db = Database(tmp_path / "s.db")
+
+    class Deleting:
+        """Deletes the session as soon as it starts drawing, as a user could from the home page."""
+
+        def expected_seconds(self, count):
+            return None
+
+        def paint(self, prompts, on_drawn=None, on_picture=None):
+            db.sessions.delete(db.sessions.list_all()[0].id)
+            pictures = [Drawn(b"PNG", "m", 1.0) for _ in prompts]
+            for i, drawn in enumerate(pictures):
+                on_picture(i, drawn)
+            return pictures
+
+    files = PictureFiles(tmp_path / "images")
+    job = runner_over(db).start("A", Recording(), Illustrator(Deleting(), db.pictures, files))
+    assert job.status == "done" and db.sessions.get(job.session_id) is None
+    assert list(files.dir.iterdir()) == []

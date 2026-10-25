@@ -83,14 +83,20 @@ class Illustrator:
         self, job_id: str, vocabulary: Sequence[VocabularyDraft], on_drawn: OnDrawn | None = None, on_picture: OnPicture | None = None
     ) -> None:
         """Draws the example of every word and the scene of every word that has one. `on_picture` hears of
-        each picture as soon as its row and file are there; a picture that failed is not heard of."""
+        each picture as soon as its row and file are there; a picture that failed is not heard of. When
+        `on_picture` raises KeyError (the word went away while drawing), the picture's file goes too."""
         wanted = self._wanted(vocabulary)
 
         def keep(n: int, drawn: Drawn) -> None:
             i, field, _ = wanted[n]
             picture_id = self._keep(drawn)
-            if on_picture:
+            if on_picture is None:
+                return
+            try:
                 on_picture(i, field, picture_id)
+            except KeyError:
+                self._files.remove(picture_id)
+                log.info("job %s: %r went away while drawing; dropped picture %s", job_id, vocabulary[i].word, picture_id)
 
         pictures = self._painter.paint([prompt for _, _, prompt in wanted], on_drawn, keep)
         for (i, field, _), drawn in zip(wanted, pictures):

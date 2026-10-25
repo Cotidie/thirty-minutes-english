@@ -79,6 +79,20 @@ def test_each_drawn_picture_is_one_row_and_one_file_named_by_the_row(tmp_path):
     assert db.pictures.stats()["fake"].seconds == 2.0
 
 
+def test_a_picture_whose_word_went_away_loses_its_file(tmp_path):
+    illustrator, _, files = illustrator_for(tmp_path)
+    landed = []
+
+    def land(index, field, picture_id):
+        if index == 1:
+            raise KeyError(index)  # the word's session was deleted while drawing
+        landed.append(picture_id)
+
+    illustrator.illustrate("j", sample_draft().vocabulary[:2], None, land)
+    assert len(landed) == 2
+    assert sorted(f.name for f in (tmp_path / "images").iterdir()) == sorted(files.name(pid) for pid in landed)
+
+
 def test_the_chosen_style_leads_the_prompt_and_an_unknown_one_falls_back_to_photo(tmp_path):
     assert illustrator_for(tmp_path, style="comic")[0].prompt("a dog") == f"{STYLES['comic']} {IMAGE_RULES} a dog"
     assert illustrator_for(tmp_path, style="nope")[0].prompt("a dog").startswith(STYLES["photo"])

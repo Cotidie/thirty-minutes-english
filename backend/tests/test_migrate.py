@@ -154,7 +154,7 @@ def migrated(tmp_path) -> Database:
 
 def test_a_v1_file_is_backed_up_and_comes_up_as_v2_with_everything_in_rows(tmp_path):
     db = migrated(tmp_path)
-    [backup] = tmp_path.glob("s.db.bak-v1-*")
+    [backup] = tmp_path.glob("s.db.bak-v1-????-??-??")
     assert sqlite3.connect(backup).execute("SELECT COUNT(*) FROM sessions").fetchone()[0] == 2  # the copy is the v1 file
     with db.connect() as conn:
         assert conn.execute("PRAGMA user_version").fetchone()[0] == 2
@@ -181,7 +181,7 @@ def test_reopening_a_migrated_file_changes_nothing(tmp_path):
     db = migrated(tmp_path)
     again = Database(db.path, db.images_dir)
     assert again.sessions.get(11) == db.sessions.get(11)
-    assert len(list(tmp_path.glob("s.db.bak-v1-*"))) == 1
+    assert len(list(tmp_path.glob("s.db.bak-v1-????-??-??"))) == 1
 
 
 def test_pictures_become_rows_and_files_are_renamed_by_id(tmp_path):
@@ -247,3 +247,25 @@ def test_a_new_session_after_migration_gets_the_next_id(tmp_path):
 
     db = migrated(tmp_path)
     assert db.sessions.create(sample_draft(), []).id == 13
+
+
+def test_the_renames_are_written_beside_the_backup(tmp_path):
+    db = migrated(tmp_path)
+    [renames] = tmp_path.glob("s.db.bak-v1-*.renames.json")
+    word = db.sessions.get(11).content.vocabulary[0]
+    assert json.loads(renames.read_text()) == {"11-0-aaaa.png": word.image, "11-0-example.png": word.example_image}
+
+
+def test_a_failed_migration_leaves_the_v1_file_as_it_was(tmp_path):
+    import pytest
+
+    path, images = tmp_path / "s.db", tmp_path / "images"
+    make_v1(path, images)
+    (images / "3.png").write_bytes(b"in the way")  # the first word picture would take id 3, after the two image_stats rows
+    with pytest.raises(RuntimeError, match="3.png already exists"):
+        Database(path, images)
+    conn = sqlite3.connect(path)
+    assert conn.execute("PRAGMA user_version").fetchone()[0] == 0
+    assert "content_json" in {r[1] for r in conn.execute("PRAGMA table_info(sessions)")}
+    assert not [r for r in conn.execute("SELECT name FROM sqlite_master WHERE name LIKE '%_v1' OR name = 'paragraphs'")]
+    assert (images / "11-0-aaaa.png").is_file() and list(tmp_path.glob("s.db.bak-v1-*"))

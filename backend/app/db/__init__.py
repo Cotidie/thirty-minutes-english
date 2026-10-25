@@ -26,7 +26,9 @@ class Database:
         with self.connect() as conn:
             if migrate.is_v1(conn):
                 saved = migrate.backup(self.path)
-                log.info("migrated %s to schema v2 (v1 copy: %s): %s", self.path, saved.name, migrate.migrate_v1(conn, self.images_dir))
+                renames = saved.with_name(f"{saved.name}.renames.json")
+                report = migrate.migrate_v1(conn, self.images_dir, renames)
+                log.info("migrated %s to schema v2 (v1 copy: %s, file renames: %s): %s", self.path, saved.name, renames.name, report)
             elif conn.execute("PRAGMA user_version").fetchone()[0] < schema.VERSION:
                 schema.create(conn)
         self.sessions = SessionRepo(self)

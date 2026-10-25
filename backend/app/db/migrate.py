@@ -47,14 +47,17 @@ def backup(path: Path) -> Path:
     return target
 
 
-def migrate_v1(conn: sqlite3.Connection, images_dir: Path | None) -> Report:
-    return Migration(conn, images_dir).run()
+def migrate_v1(conn: sqlite3.Connection, images_dir: Path | None, renames: Path | None = None) -> Report:
+    """`renames` gets the old-to-new file name of every picture, written before the commit, so a crash
+    before the renames, or a return to the v1 copy, can be undone by hand."""
+    return Migration(conn, images_dir, renames).run()
 
 
 class Migration:
-    def __init__(self, conn: sqlite3.Connection, images_dir: Path | None) -> None:
+    def __init__(self, conn: sqlite3.Connection, images_dir: Path | None, renames: Path | None = None) -> None:
         self.conn = conn
         self.images_dir = images_dir
+        self.renames = renames
         self.files = {p.name for p in images_dir.iterdir() if p.is_file()} if images_dir and images_dir.is_dir() else set()
         self.pictures: dict[str, int] = {}  # v1 file name -> its pictures row
         self.referenced: set[str] = set()
@@ -79,6 +82,8 @@ class Migration:
             for name in old:
                 conn.execute(f'DROP TABLE "{name}_v1"')
             self.report.expressions = conn.execute("SELECT COUNT(*) FROM expressions").fetchone()[0]
+            if self.renames:
+                self.renames.write_text(json.dumps({name: f"{pid}.png" for name, pid in self.pictures.items()}, indent=1))
             conn.commit()
         except BaseException:
             conn.rollback()
