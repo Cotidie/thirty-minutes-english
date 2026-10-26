@@ -9,7 +9,7 @@
 | **브릿센트 「하루 1분 영어」** [유튜브 커뮤니티](https://www.youtube.com/@BRITCENT/posts), [네이버 블로그](https://m.blog.naver.com/PostList.naver?blogId=britcent) | 텍스트. 한국어 문장 → 영어 표현, 발음기호, 뉘앙스 설명, 예문 4개와 해석. 영국 영어 | 매일 (2026-10-25 게시물 확인) | 쉬움. 틀이 고정 |
 | **네이버 「오늘의 영어 회화」** [learn.dict.naver.com/conversation](https://learn.dict.naver.com/conversation#/endic/20261026) | 대화문 하나, 핵심 문장, 표현별 예문과 해석 | 매일. 주소가 `#/endic/YYYYMMDD` | 보통. JS 렌더링이라 브라우저 필요 |
 | **소리튠영어(주아쌤)** [@soritune_english](https://www.instagram.com/soritune_english/) | "소리블록" 게시물은 캡션에 패턴이 텍스트로 있음. 예: `It depends on + 명사 → ~에 따라 달라` | 거의 매일. 광고 섞임 | 보통. 유튜브 커뮤니티는 광고와 빈칸 퀴즈 위주라 제외 |
-| **티멘트** [유튜브 커뮤니티](https://www.youtube.com/@temmentenglishofficial/posts) | 이미지 카드 6~8장. 글은 제목 한 줄 | 자주 | 어려움. OCR 필요 |
+| **티멘트** [유튜브 커뮤니티](https://www.youtube.com/@temmentenglishofficial/posts), [@temmentenglish](https://www.instagram.com/temmentenglish/) | 이미지 카드 6~8장. 글은 제목 한 줄 (유튜브 기준. 인스타그램 게시물은 아직 열어 보지 않음) | 자주 | 어려움. OCR 필요 |
 | **Leo Kim** [@leokim_english](https://www.instagram.com/leokim_english/), **Else** [@else.korea](https://www.instagram.com/else.korea/) | 캡션은 제목뿐, 본문은 이미지. 예: "온라인 회의 필수 표현 40개" | Leo Kim 주 1~2회, Else 매일 | 어려움. OCR 필요 |
 
 브릿센트 게시물 틀 (파서 기준):
