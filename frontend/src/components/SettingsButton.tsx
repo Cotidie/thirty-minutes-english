@@ -1,8 +1,7 @@
 import { useEffect, useState } from 'react'
 import { SettingsModal } from './SettingsModal'
-import './SettingsButton.css'
 
-/** The gear in the corner of every page. `,` opens it, like most editors. */
+/** The gear among the corner tools. `,` opens it, like most editors. */
 export function SettingsButton() {
   const [open, setOpen] = useState(false)
 
@@ -20,7 +19,7 @@ export function SettingsButton() {
     <>
       <button
         type="button"
-        className="settings-open"
+        className="corner-button"
         onClick={() => setOpen(true)}
         aria-label="Settings"
         aria-keyshortcuts=","

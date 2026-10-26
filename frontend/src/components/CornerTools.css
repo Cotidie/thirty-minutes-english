@@ -1,8 +1,13 @@
-.settings-open {
+.corner-tools {
   position: fixed;
   top: 1rem;
   right: 1rem;
   z-index: 20;
+  display: flex;
+  gap: 0.5rem;
+}
+
+.corner-button {
   width: 2.5rem;
   height: 2.5rem;
   display: grid;
@@ -18,8 +23,8 @@
     border-color 120ms ease;
 }
 
-.settings-open:hover,
-.settings-open:focus-visible {
+.corner-button:hover,
+.corner-button:focus-visible {
   color: var(--ink);
   border-color: var(--ink);
 }
