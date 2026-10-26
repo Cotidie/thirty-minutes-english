@@ -58,7 +58,7 @@ class Expression(BaseModel):
 class CorpusEntry(Expression):
     """An expression as the corpus keeps it: where it came from and the sessions that taught it."""
 
-    """"session" for one a session taught before the corpus existed, else the post it was read from."""
+    """The post it was read from."""
     source: str
     added_at: str
     """Ids of the sessions that taught it, oldest first."""

@@ -76,9 +76,9 @@ describe('ExpressionsTab', () => {
     expect(screen.getByRole('button', { name: 'Your turn: one sentence each.' })).toBeInTheDocument()
   })
 
-  it('says the corpus is empty when a session has no expressions', () => {
+  it('says so when a session has no expressions', () => {
     render(<ExpressionsTab items={[]} sessionId={3} starred={[]} onToggleStar={vi.fn()} examples={none} onExample={vi.fn()} />)
-    expect(screen.getByText('No expressions yet: the corpus is empty. Add expressions to it and start a new session.')).toBeInTheDocument()
+    expect(screen.getByText('This session has no expressions.')).toBeInTheDocument()
     expect(document.querySelector('.expression-list')).toBeNull()
   })
 })

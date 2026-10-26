@@ -17,7 +17,7 @@ export interface Expression {
 export interface CorpusEntry extends Expression {
   /** casual, workplace or discussion; null when the source did not say. */
   setting: string | null
-  /** "session" for one a session taught before the corpus existed, else the post it was read from. */
+  /** The post it was read from. */
   source: string
   added_at: string
   /** Ids of the sessions that taught it, oldest first. */

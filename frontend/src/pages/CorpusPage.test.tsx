@@ -16,7 +16,7 @@ const entry = (over: Partial<CorpusEntry>): CorpusEntry => ({
   examples: [],
   korean: null,
   setting: 'casual',
-  source: 'session',
+  source: 'https://www.youtube.com/post/Ugkx2',
   added_at: '2026-10-26T00:00:00+00:00',
   sessions: [],
   ...over,
@@ -78,7 +78,10 @@ it('filters by setting, source and whether a session taught it', async () => {
 it('links each entry to its post and to the sessions that taught it', async () => {
   renderPage()
   await screen.findByText('Be my guest')
-  expect(screen.getByRole('link', { name: 'YouTube post' })).toHaveAttribute('href', 'https://www.youtube.com/post/Ugkx1')
+  expect(screen.getAllByRole('link', { name: 'YouTube post' }).map((a) => a.getAttribute('href'))).toEqual([
+    'https://www.youtube.com/post/Ugkx1',
+    'https://www.youtube.com/post/Ugkx2',
+  ])
   expect(screen.getByRole('link', { name: 'Instagram post' })).toHaveAttribute('href', 'https://www.instagram.com/p/DQ1/')
   expect(screen.getByRole('link', { name: 'Session 7' })).toHaveAttribute('href', '/s/7')
 })

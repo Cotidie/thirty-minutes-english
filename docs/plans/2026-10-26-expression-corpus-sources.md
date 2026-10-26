@@ -61,7 +61,7 @@
 
 ## 티멘트 수집 기록 (2026-10-26)
 
-corpus 38개 → 1,028개 (티멘트 990개 추가).
+corpus는 티멘트 표현 997개뿐이다. 처음엔 세션이 생성했던 38개 옆에 990개를 더했고(1,028개), 같은 날 생성분을 뺐다: 티멘트에도 있는 7개는 id를 지킨 채 티멘트 내용과 출처로 바꾸고, 나머지 31개는 세션 연결(별 3개, 연습 문장 1개 포함)과 함께 지웠다.
 
 | 단계 | 방법 | 결과 |
 |---|---|---|
@@ -77,4 +77,4 @@ corpus 38개 → 1,028개 (티멘트 990개 추가).
 - 990개 중 403개는 카드에 예문이 없어(표현과 한국어 뜻만 있는 목록형 게시물) Claude가 쓴 예문이다. 나머지 예문은 카드 그대로다.
 - "Happen to + 명사"와 "Happen to + 동사"는 같은 key라 한 행(`Happen to~`)으로 합쳐졌다.
 - `source`는 게시물 주소 (`https://www.youtube.com/post/<id>`, `https://www.instagram.com/p/<code>/`).
-- 추출 JSON과 스크립트, 백업은 `backend/data/` 아래 (`corpus-temment-2026-10-26/`, 적재 전 `sessions.db.bak-corpus-2026-10-26`, 예문 보충 전 `sessions.db.bak-examples-2026-10-26`). git에는 없다.
+- 추출 JSON과 스크립트, 백업은 `backend/data/` 아래 (`corpus-temment-2026-10-26/`, 적재 전 `sessions.db.bak-corpus-2026-10-26`, 예문 보충 전 `sessions.db.bak-examples-2026-10-26`, 생성분 삭제 전 `sessions.db.bak-drop-generated-2026-10-26`). git에는 없다.

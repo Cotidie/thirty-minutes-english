@@ -22,7 +22,7 @@ export function ExpressionsTab({ items, sessionId, starred, onToggleStar, exampl
   if (items.length === 0) {
     return (
       <section className="tab-panel">
-        <p className="empty">No expressions yet: the corpus is empty. Add expressions to it and start a new session.</p>
+        <p className="empty">This session has no expressions.</p>
       </section>
     )
   }

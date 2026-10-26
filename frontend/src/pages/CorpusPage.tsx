@@ -4,15 +4,13 @@ import { api } from '../api'
 import type { CorpusEntry } from '../types'
 import './CorpusPage.css'
 
-type Source = 'youtube' | 'instagram' | 'session'
+type Source = 'youtube' | 'instagram'
 type Taught = 'all' | 'new' | 'taught'
 
-const SOURCE_LABEL: Record<Source, string> = { youtube: 'YouTube post', instagram: 'Instagram post', session: 'From a session' }
+const SOURCE_LABEL: Record<Source, string> = { youtube: 'YouTube post', instagram: 'Instagram post' }
 
 function sourceOf(entry: CorpusEntry): Source {
-  if (entry.source.includes('youtube.com')) return 'youtube'
-  if (entry.source.includes('instagram.com')) return 'instagram'
-  return 'session'
+  return entry.source.includes('instagram.com') ? 'instagram' : 'youtube'
 }
 
 /** The expression corpus new sessions pick from, to read through: search and filters, nothing to edit. */
@@ -69,7 +67,6 @@ export function CorpusPage() {
           <option value="all">All</option>
           <option value="youtube">YouTube</option>
           <option value="instagram">Instagram</option>
-          <option value="session">Sessions</option>
         </select>
         <label htmlFor="corpus-taught">Taught</label>
         <select id="corpus-taught" value={taught} onChange={(e) => setTaught(e.target.value as Taught)}>
@@ -91,7 +88,6 @@ export function CorpusPage() {
 }
 
 function CorpusItem({ entry }: { entry: CorpusEntry }) {
-  const kind = sourceOf(entry)
   return (
     <li className="corpus-item">
       <div className="corpus-head">
@@ -112,13 +108,9 @@ function CorpusItem({ entry }: { entry: CorpusEntry }) {
         </ul>
       )}
       <p className="corpus-meta">
-        {kind === 'session' ? (
-          SOURCE_LABEL.session
-        ) : (
-          <a href={entry.source} target="_blank" rel="noreferrer">
-            {SOURCE_LABEL[kind]}
-          </a>
-        )}
+        <a href={entry.source} target="_blank" rel="noreferrer">
+          {SOURCE_LABEL[sourceOf(entry)]}
+        </a>
         {entry.sessions.length > 0 && (
           <>
             {' · Taught in '}
