@@ -1,7 +1,8 @@
 FROM node:22-alpine AS deps
 WORKDIR /app
 COPY package.json package-lock.json ./
-RUN npm ci
+# Every release bumps the version in these two files, so this step reruns; the cache keeps it off the network.
+RUN --mount=type=cache,target=/root/.npm npm ci
 
 # Development: Vite dev server with the source bind-mounted (see compose.dev.yaml).
 FROM deps AS dev

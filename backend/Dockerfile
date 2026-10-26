@@ -4,14 +4,15 @@ FROM python:3.13-slim
 ARG UID=1000
 
 RUN useradd --uid ${UID} --create-home --home-dir /home/app app
-COPY --from=ghcr.io/astral-sh/uv:latest /uv /usr/local/bin/uv
+COPY --from=ghcr.io/astral-sh/uv:0.11.14 /uv /usr/local/bin/uv
 
 USER app
-ENV HOME=/home/app
+ENV HOME=/home/app UV_LINK_MODE=copy
 
 WORKDIR /app
 COPY --chown=app pyproject.toml uv.lock ./
-RUN uv sync --frozen --no-dev
+# Every release bumps the version in these two files, so this step reruns; the cache keeps it off the network.
+RUN --mount=type=cache,target=/home/app/.cache/uv,uid=${UID} uv sync --frozen --no-dev
 COPY --chown=app app ./app
 COPY --chown=app plugin ./plugin
 
