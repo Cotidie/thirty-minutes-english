@@ -1,6 +1,8 @@
+import pytest
 from fastapi.testclient import TestClient
 
 from app.db import Database
+from app.db.topics import TopicInUse
 from app.main import create_app
 from app.models import Category
 from app.wiring import Services
@@ -44,3 +46,35 @@ def test_every_topic_is_served_with_the_names_of_all_categories(tmp_path):
     last = body["topics"][-1]
     assert (last["text"], last["category"], last["news_days"], last["sessions"]) == ("Typed one", "typed", [], [session.id])
     assert body["labels"]["typed"] == "Typed in" and body["labels"]["news"] == "In the news"
+
+
+def ids_by_text(store) -> dict[str, int]:
+    return {t.text: t.id for t in store.topics.list_all()}
+
+
+def test_a_topic_no_session_uses_is_deleted_with_its_news_days(store):
+    store.topics.set_news("2026-10-26", ["A", "B", "C"])
+    ids = ids_by_text(store)
+    assert store.topics.delete(ids["B"]) is True
+    assert store.topics.news("2026-10-26") == ["A", "C"]
+    assert "B" not in ids_by_text(store)
+    assert store.topics.delete(ids[CURATED_TOPICS[0].text]) is True
+    assert CURATED_TOPICS[0] not in store.topics.curated()
+    assert store.topics.delete(ids["B"]) is False
+
+
+def test_a_topic_a_session_uses_stays(store):
+    store.sessions.create(sample_draft(topic="Mine"), [])
+    with pytest.raises(TopicInUse):
+        store.topics.delete(ids_by_text(store)["Mine"])
+    assert "Mine" in ids_by_text(store)
+
+
+def test_a_topic_is_deleted_over_http_unless_a_session_uses_it(tmp_path):
+    db = Database(tmp_path / "s.db")
+    db.sessions.create(sample_draft(topic="Mine"), [])
+    ids = ids_by_text(db)
+    with TestClient(create_app(db, Services(FakeGenerator()), InlineExecutor())) as c:
+        assert c.delete(f"/api/topics/{ids['Mine']}").status_code == 409
+        assert c.delete(f"/api/topics/{ids[CURATED_TOPICS[0].text]}").status_code == 204
+        assert c.delete(f"/api/topics/{ids[CURATED_TOPICS[0].text]}").status_code == 404

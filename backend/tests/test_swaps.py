@@ -1,0 +1,73 @@
+import random
+
+from fastapi.testclient import TestClient
+
+from app.db import Database
+from app.main import create_app
+from app.wiring import Services
+from tests.conftest import sample_draft, seed_expressions
+from tests.test_api import FakeGenerator, InlineExecutor
+
+
+def taught(store, session_id: int) -> list[int]:
+    return [e.id for e in store.sessions.get(session_id).content.expressions]
+
+
+def test_a_swap_puts_a_fresh_expression_in_the_same_place(store):
+    a, b, c = seed_expressions(store, 3)
+    session = store.sessions.create(sample_draft(), [a, b]).id
+    store.sessions.set_stars(session, store.sessions.get_stars(session).model_copy(update={"expressions": [a, b]}))
+    store.records.add_example(session, a, None, "mine", "echo", 1.0)
+    swapped_in = store.sessions.swap_expression(session, a)
+    assert swapped_in is not None and swapped_in.id == c
+    assert taught(store, session) == [c, b]
+    assert store.sessions.get_stars(session).expressions == [b]
+    assert store.records.list_examples(session) == []
+
+
+def test_a_swapped_out_expression_counts_as_used_and_is_picked_after_the_never_used(store):
+    a, b, c = seed_expressions(store, 3)
+    session = store.sessions.create(sample_draft(), [a]).id
+    store.sessions.swap_expression(session, a, random.Random(0))
+    [swapped_in] = taught(store, session)
+    [never_used] = {b, c} - {swapped_in}
+    entries = {e.id: e for e in store.expressions.list_all()}
+    assert (entries[a].sessions, entries[a].swapped) == ([], [session])
+    assert entries[swapped_in].sessions == [session]
+    assert [e.id for e in store.expressions.pick(3, random.Random(0))] == [never_used, a, swapped_in]
+
+
+def test_a_swap_never_brings_back_what_the_session_had(store):
+    a, b, c, d = seed_expressions(store, 4)
+    session = store.sessions.create(sample_draft(), [a, b]).id
+    first = store.sessions.swap_expression(session, b)
+    second = store.sessions.swap_expression(session, first.id)
+    assert {first.id, second.id} == {c, d}
+    assert store.sessions.swap_expression(session, second.id) is None
+    assert taught(store, session) == [a, second.id]
+
+
+def test_a_swap_misses_an_expression_the_session_does_not_teach(store):
+    a, b = seed_expressions(store, 2)
+    session = store.sessions.create(sample_draft(), [a]).id
+    assert store.sessions.swap_expression(session, b) is None
+    assert store.sessions.swap_expression(session + 1, a) is None
+
+
+def test_deleting_a_session_forgets_what_it_swapped_out(store):
+    a, _ = seed_expressions(store, 2)
+    session = store.sessions.create(sample_draft(), [a]).id
+    store.sessions.swap_expression(session, a)
+    store.sessions.delete(session)
+    assert all(e.swapped == [] and e.sessions == [] for e in store.expressions.list_all())
+
+
+def test_an_expression_is_swapped_over_http(tmp_path):
+    db = Database(tmp_path / "s.db")
+    a, b = seed_expressions(db, 2)
+    session = db.sessions.create(sample_draft(), [a]).id
+    with TestClient(create_app(db, Services(FakeGenerator()), InlineExecutor())) as c:
+        res = c.post(f"/api/sessions/{session}/expressions/{a}/swap")
+        assert res.status_code == 200 and res.json()["id"] == b
+        assert c.post(f"/api/sessions/{session}/expressions/{a}/swap").status_code == 404
+        assert c.get(f"/api/sessions/{session}").json()["content"]["expressions"][0]["id"] == b

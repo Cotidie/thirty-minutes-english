@@ -1,11 +1,11 @@
-import { fireEvent, render, screen } from '@testing-library/react'
+import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { MemoryRouter } from 'react-router-dom'
 import { beforeEach, expect, it, vi } from 'vitest'
 import { api } from '../api'
 import type { TopicEntry, TopicLibrary } from '../types'
 import { TopicsPanel } from './TopicsPanel'
 
-vi.mock('../api', () => ({ api: { topicLibrary: vi.fn() } }))
+vi.mock('../api', () => ({ api: { topicLibrary: vi.fn(), deleteTopic: vi.fn() } }))
 
 const topic = (over: Partial<TopicEntry>): TopicEntry => ({
   id: 1,
@@ -76,4 +76,23 @@ it('says so when the topics do not load', async () => {
   vi.mocked(api.topicLibrary).mockRejectedValue(new Error('500 Internal Server Error'))
   renderPanel()
   expect(await screen.findByText(/Could not load the topics: 500/)).toBeInTheDocument()
+})
+
+it('offers delete only on the topics no session was written on', async () => {
+  renderPanel()
+  await screen.findByText('Why databases still run the world')
+  expect(screen.getByRole('button', { name: 'Delete Why databases still run the world' })).toBeInTheDocument()
+  expect(screen.queryByRole('button', { name: 'Delete Mass protests sweeping Europe' })).not.toBeInTheDocument()
+  expect(screen.queryByRole('button', { name: 'Delete why cities are bringing back trams' })).not.toBeInTheDocument()
+})
+
+it('deletes a topic after a confirm', async () => {
+  vi.mocked(api.deleteTopic).mockResolvedValue(undefined)
+  renderPanel()
+  await screen.findByText('Why databases still run the world')
+  fireEvent.click(screen.getByRole('button', { name: 'Delete Why databases still run the world' }))
+  fireEvent.click(screen.getByRole('button', { name: 'Delete for good' }))
+  await waitFor(() => expect(shown()).toEqual(['why cities are bringing back trams', 'Mass protests sweeping Europe']))
+  expect(api.deleteTopic).toHaveBeenCalledWith(1)
+  expect(screen.getByText('2 of 2')).toBeInTheDocument()
 })

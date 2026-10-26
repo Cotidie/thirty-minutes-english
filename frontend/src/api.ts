@@ -5,6 +5,7 @@ import type {
   CorpusEntry,
   Example,
   ExampleFeedback,
+  Expression,
   KeyTestResult,
   LiveSession,
   Note,
@@ -44,6 +45,10 @@ export const api = {
   listSessions: () => request<SessionSummary[]>('/api/sessions'),
   /** The whole expression corpus; the corpus page searches it in the browser. */
   corpus: () => request<CorpusEntry[]>('/api/expressions'),
+  /** Out of the corpus and out of every session that taught it. */
+  deleteExpression: (id: number) => request<void>(`/api/expressions/${id}`, { method: 'DELETE' }),
+  /** Fails with a 409 when a session was written on it. */
+  deleteTopic: (id: number) => request<void>(`/api/topics/${id}`, { method: 'DELETE' }),
   getSession: (id: number) => request<Session>(`/api/sessions/${id}`),
   startGeneration: (topic: string | null) =>
     request<JobStatus>('/api/sessions', { method: 'POST', body: JSON.stringify({ topic }) }),
@@ -53,6 +58,9 @@ export const api = {
   /** Stops a running generation; nothing from it is saved. */
   cancelJob: (id: string) => request<JobStatus>(`/api/jobs/${id}`, { method: 'DELETE' }),
   deleteSession: (id: number) => request<void>(`/api/sessions/${id}`, { method: 'DELETE' }),
+  /** Another corpus expression in this one's place; the one swapped out counts as used. */
+  swapExpression: (sessionId: number, expressionId: number) =>
+    request<Expression>(`/api/sessions/${sessionId}/expressions/${expressionId}/swap`, { method: 'POST' }),
   /** One of a word's pictures drawn again in `style` (blank: the configured one) and saved: the example
    * sentence as it is, or a fresh scene for Practice. The item as it now is. */
   redrawPicture: (sessionId: number, index: number, face: PictureFace, style = '') =>

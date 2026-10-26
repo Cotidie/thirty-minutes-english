@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { api } from '../api'
 import type { TopicEntry, TopicLibrary } from '../types'
+import { ConfirmDelete } from './ConfirmDelete'
 import { SessionLinks } from './SessionLinks'
 
 type Used = 'all' | 'used' | 'unused'
@@ -29,6 +30,11 @@ export function TopicsPanel() {
       )
   }, [library, query, category, used])
 
+  async function remove(id: number) {
+    await api.deleteTopic(id)
+    setLibrary((l) => l && { ...l, topics: l.topics.filter((t) => t.id !== id) })
+  }
+
   return (
     <>
       <p className="database-lede">Every topic: the curated pool, each day's news, and the ones you typed in.</p>
@@ -55,14 +61,15 @@ export function TopicsPanel() {
       {library && <p className="db-count">{`${shown.length} of ${library.topics.length}`}</p>}
       <ol className="db-list">
         {shown.map((t) => (
-          <TopicItem key={t.id} topic={t} label={library?.labels[t.category] ?? t.category} />
+          <TopicItem key={t.id} topic={t} label={library?.labels[t.category] ?? t.category} onDelete={() => remove(t.id)} />
         ))}
       </ol>
     </>
   )
 }
 
-function TopicItem({ topic, label }: { topic: TopicEntry; label: string }) {
+/** A topic a session was written on has no delete: the session needs it. */
+function TopicItem({ topic, label, onDelete }: { topic: TopicEntry; label: string; onDelete: () => Promise<void> }) {
   const news = topic.news_days.length > 0 && `In the news on ${topic.news_days.map(formatDay).join(', ')}`
   return (
     <li className="db-item">
@@ -71,6 +78,7 @@ function TopicItem({ topic, label }: { topic: TopicEntry; label: string }) {
         <span className="topic-category" data-category={topic.category}>
           {label}
         </span>
+        {topic.sessions.length === 0 && <ConfirmDelete label={topic.text} onDelete={onDelete} />}
       </div>
       <p className="db-meta">
         {news}

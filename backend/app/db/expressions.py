@@ -1,10 +1,12 @@
 """The expression corpus: each expression once, by its normalized phrase. Which sessions taught
-which expression lives in session_expressions, so the corpus itself holds only the expressions."""
+which expression lives in session_expressions, and which ones a session swapped out in
+swapped_expressions, so the corpus itself holds only the expressions."""
 
 import json
 import random
 import sqlite3
 from collections import defaultdict
+from collections.abc import Collection
 from datetime import UTC, datetime
 from typing import TYPE_CHECKING
 
@@ -15,6 +17,8 @@ if TYPE_CHECKING:
     from app.db import Database
 
 COLUMNS = "e.id, e.phrase, e.meaning, e.synonyms, e.examples, e.usage_note, e.korean, e.setting"
+# Every session that used an expression: taught it, or swapped it out.
+USES = "SELECT session_id, expression_id FROM session_expressions UNION ALL SELECT session_id, expression_id FROM swapped_expressions"
 
 
 def expression_from(row: sqlite3.Row) -> Expression:
@@ -78,31 +82,41 @@ class ExpressionRepo:
             rows = conn.execute(
                 f"""SELECT {COLUMNS}, e.source, e.added_at,
                         (SELECT json_group_array(session_id) FROM (SELECT session_id FROM session_expressions
-                            WHERE expression_id = e.id ORDER BY session_id)) AS sessions
+                            WHERE expression_id = e.id ORDER BY session_id)) AS sessions,
+                        (SELECT json_group_array(session_id) FROM (SELECT session_id FROM swapped_expressions
+                            WHERE expression_id = e.id ORDER BY session_id)) AS swapped
                     FROM expressions e ORDER BY e.id"""
             ).fetchall()
         return [
             CorpusEntry(**expression_from(row).model_dump(), source=row["source"], added_at=row["added_at"],
-                        sessions=json.loads(row["sessions"]))
+                        sessions=json.loads(row["sessions"]), swapped=json.loads(row["swapped"]))
             for row in rows
         ]
+
+    def delete(self, expression_id: int) -> bool:
+        """Takes the expression out of the corpus and out of every session that taught it, with its stars
+        and practice sentences there; False when there was no such expression."""
+        with self._db.connect() as conn:
+            conn.execute("DELETE FROM session_expressions WHERE expression_id = ?", (expression_id,))
+            return conn.execute("DELETE FROM expressions WHERE id = ?", (expression_id,)).rowcount > 0
 
     def count(self) -> int:
         with self._db.connect() as conn:
             return conn.execute("SELECT COUNT(*) FROM expressions").fetchone()[0]
 
-    def pick(self, count: int, rng: random.Random) -> list[Expression]:
-        """Up to `count` expressions for a new session: never-taught ones first, taken in turn from each
-        setting so a session mixes them; when those run out, the ones taught longest ago."""
+    def pick(self, count: int, rng: random.Random, exclude: Collection[int] = ()) -> list[Expression]:
+        """Up to `count` expressions for a session, none of `exclude`: never-used ones first, taken in turn
+        from each setting so a session mixes them; when those run out, the ones used longest ago."""
         with self._db.connect() as conn:
             rows = conn.execute(
-                f"""SELECT {COLUMNS}, MAX(se.session_id) AS last_taught FROM expressions e
-                    LEFT JOIN session_expressions se ON se.expression_id = e.id
+                f"""SELECT {COLUMNS}, MAX(u.session_id) AS last_used FROM expressions e
+                    LEFT JOIN ({USES}) u ON u.expression_id = e.id
                     GROUP BY e.id ORDER BY e.id"""
             ).fetchall()
+        rows = [row for row in rows if row["id"] not in exclude]
         by_setting: dict[str | None, list[sqlite3.Row]] = defaultdict(list)
         for row in rows:
-            if row["last_taught"] is None:
+            if row["last_used"] is None:
                 by_setting[row["setting"]].append(row)
         groups = sorted(by_setting.values(), key=lambda g: str(g[0]["setting"]))
         rng.shuffle(groups)
@@ -113,6 +127,6 @@ class ExpressionRepo:
             for group in groups:
                 if group and len(picked) < count:
                     picked.append(group.pop())
-        taught = sorted((r for r in rows if r["last_taught"] is not None), key=lambda r: (r["last_taught"], r["id"]))
-        picked += taught[: count - len(picked)]
+        used = sorted((r for r in rows if r["last_used"] is not None), key=lambda r: (r["last_used"], r["id"]))
+        picked += used[: count - len(picked)]
         return [expression_from(row) for row in picked]

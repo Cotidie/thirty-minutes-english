@@ -32,6 +32,25 @@
   margin-left: 0;
 }
 
+.expression-swap {
+  flex: none;
+  display: inline-flex;
+  border: 0;
+  background: transparent;
+  padding: 0.3rem;
+  color: var(--muted);
+  cursor: pointer;
+}
+
+.expression-swap:hover {
+  color: var(--ink);
+}
+
+.expression-swap:disabled {
+  opacity: 0.45;
+  cursor: progress;
+}
+
 .expression-phrase {
   font-family: var(--serif);
   font-weight: 500;

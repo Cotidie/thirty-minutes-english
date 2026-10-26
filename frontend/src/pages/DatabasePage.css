@@ -102,6 +102,34 @@
   gap: 0.25rem 0.75rem;
 }
 
+.db-delete {
+  margin-left: auto;
+  font-size: 0.85rem;
+}
+
+.db-confirm {
+  flex-basis: 100%;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.4rem 0.75rem;
+  margin: 0.4rem 0 0.2rem;
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+
+.db-confirm-delete {
+  border-color: var(--error);
+  color: var(--error);
+  padding: 0.3rem 0.85rem;
+  font-size: 0.9rem;
+}
+
+.db-confirm-delete:hover:not(:disabled) {
+  background: var(--error);
+  color: var(--paper);
+}
+
 .corpus-phrase {
   font-family: var(--serif);
   font-weight: 500;

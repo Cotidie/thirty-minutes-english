@@ -22,6 +22,8 @@ export interface CorpusEntry extends Expression {
   added_at: string
   /** Ids of the sessions that taught it, oldest first. */
   sessions: number[]
+  /** Ids of the sessions it was swapped out of, oldest first; those count as using it too. */
+  swapped: number[]
 }
 
 export interface Question {

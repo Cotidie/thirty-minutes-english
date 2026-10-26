@@ -83,7 +83,9 @@ a {
 
 .btn-link {
   border: 0;
+  background: transparent;
   padding: 0.3rem 0.4rem;
+  cursor: pointer;
   color: var(--muted);
   text-decoration: underline;
   text-underline-offset: 0.2em;

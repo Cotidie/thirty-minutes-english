@@ -1,10 +1,11 @@
 import { useEffect, useMemo, useState } from 'react'
 import { api } from '../api'
 import type { CorpusEntry } from '../types'
+import { ConfirmDelete } from './ConfirmDelete'
 import { SessionLinks } from './SessionLinks'
 
 type Source = 'youtube' | 'instagram'
-type Taught = 'all' | 'new' | 'taught'
+type Used = 'all' | 'new' | 'used'
 
 const SOURCE_LABEL: Record<Source, string> = { youtube: 'YouTube post', instagram: 'Instagram post' }
 
@@ -12,14 +13,19 @@ function sourceOf(entry: CorpusEntry): Source {
   return entry.source.includes('instagram.com') ? 'instagram' : 'youtube'
 }
 
-/** The expression corpus new sessions pick from, to read through: search and filters, nothing to edit. */
+/** Taught in a session, or swapped out of one. */
+function isUsed(entry: CorpusEntry): boolean {
+  return entry.sessions.length + entry.swapped.length > 0
+}
+
+/** The expression corpus new sessions pick from, to read through with search and filters, and to prune. */
 export function CorpusPanel() {
   const [corpus, setCorpus] = useState<CorpusEntry[] | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [query, setQuery] = useState('')
   const [setting, setSetting] = useState('all')
   const [source, setSource] = useState<Source | 'all'>('all')
-  const [taught, setTaught] = useState<Taught>('all')
+  const [used, setUsed] = useState<Used>('all')
 
   useEffect(() => {
     api.corpus().then(setCorpus).catch((e: Error) => setError(e.message))
@@ -32,9 +38,14 @@ export function CorpusPanel() {
         (!q || [e.phrase, e.meaning, e.korean ?? ''].some((text) => text.toLowerCase().includes(q))) &&
         (setting === 'all' || e.setting === setting) &&
         (source === 'all' || sourceOf(e) === source) &&
-        (taught === 'all' || (taught === 'taught') === e.sessions.length > 0),
+        (used === 'all' || (used === 'used') === isUsed(e)),
     )
-  }, [corpus, query, setting, source, taught])
+  }, [corpus, query, setting, source, used])
+
+  async function remove(id: number) {
+    await api.deleteExpression(id)
+    setCorpus((c) => c && c.filter((e) => e.id !== id))
+  }
 
   return (
     <>
@@ -60,11 +71,11 @@ export function CorpusPanel() {
           <option value="youtube">YouTube</option>
           <option value="instagram">Instagram</option>
         </select>
-        <label htmlFor="corpus-taught">Taught</label>
-        <select id="corpus-taught" value={taught} onChange={(e) => setTaught(e.target.value as Taught)}>
+        <label htmlFor="corpus-used">Used</label>
+        <select id="corpus-used" value={used} onChange={(e) => setUsed(e.target.value as Used)}>
           <option value="all">All</option>
           <option value="new">Not yet</option>
-          <option value="taught">Taught</option>
+          <option value="used">In a session</option>
         </select>
       </div>
 
@@ -72,19 +83,21 @@ export function CorpusPanel() {
       {corpus && <p className="db-count">{`${shown.length} of ${corpus.length}`}</p>}
       <ol className="db-list">
         {shown.map((entry) => (
-          <CorpusItem key={entry.id} entry={entry} />
+          <CorpusItem key={entry.id} entry={entry} onDelete={() => remove(entry.id)} />
         ))}
       </ol>
     </>
   )
 }
 
-function CorpusItem({ entry }: { entry: CorpusEntry }) {
+function CorpusItem({ entry, onDelete }: { entry: CorpusEntry; onDelete: () => Promise<void> }) {
+  const taughtIn = entry.sessions.map((id) => `Session ${id}`).join(', ')
   return (
     <li className="db-item">
       <div className="db-head">
         <h2 className="corpus-phrase">{entry.phrase}</h2>
         {entry.setting && <span className="corpus-setting">{entry.setting}</span>}
+        <ConfirmDelete label={entry.phrase} warning={taughtIn && `Also takes it out of ${taughtIn}.`} onDelete={onDelete} />
       </div>
       {entry.korean && <p className="corpus-korean">{entry.korean}</p>}
       <p className="corpus-meaning">
@@ -107,6 +120,12 @@ function CorpusItem({ entry }: { entry: CorpusEntry }) {
           <>
             {' · Taught in '}
             <SessionLinks ids={entry.sessions} />
+          </>
+        )}
+        {entry.swapped.length > 0 && (
+          <>
+            {' · Swapped out of '}
+            <SessionLinks ids={entry.swapped} />
           </>
         )}
       </p>

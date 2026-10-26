@@ -8,7 +8,7 @@ from datetime import UTC, datetime
 from app.db import topics
 from app.models import Category
 
-VERSION = 4
+VERSION = 5
 
 # Added in v3: images under the article's paragraphs.
 FIGURES = """
@@ -41,6 +41,18 @@ CREATE TABLE topic_days (
 ) STRICT;
 
 CREATE INDEX topic_days_topic ON topic_days (topic_id);
+"""
+
+# Added in v5: the expressions swapped out of a session, which count as used there.
+SWAPS = """
+CREATE TABLE swapped_expressions (
+    session_id    INTEGER NOT NULL REFERENCES sessions(id) ON DELETE CASCADE,
+    expression_id INTEGER NOT NULL REFERENCES expressions(id) ON DELETE CASCADE,
+    swapped_at    TEXT    NOT NULL,
+    PRIMARY KEY (session_id, expression_id)
+) STRICT;
+
+CREATE INDEX swapped_expressions_expression ON swapped_expressions (expression_id);
 """
 
 SESSIONS = """
@@ -161,7 +173,7 @@ CREATE INDEX examples_vocabulary ON examples (vocabulary_id);
 CREATE INDEX readings_paragraph ON readings (paragraph_id);
 CREATE INDEX summaries_paragraph ON summaries (paragraph_id);
 CREATE INDEX stage_times_stage ON stage_times (stage, id);
-""" + FIGURES
+""" + FIGURES + SWAPS
 
 
 def _run(conn: sqlite3.Connection, script: str) -> None:
@@ -179,12 +191,15 @@ def create(conn: sqlite3.Connection) -> None:
 
 
 def upgrade(conn: sqlite3.Connection, version: int) -> None:
-    """A v2 or v3 file brought to the current version, a step at a time, each in its own transaction."""
+    """An older file brought to the current version, a step at a time, each in its own transaction."""
     if version < 3:
         _run(conn, FIGURES)
         conn.execute("PRAGMA user_version = 3")
     if version < 4:
         _topics(conn)
+    if version < 5:
+        _run(conn, SWAPS)
+        conn.execute("PRAGMA user_version = 5")
 
 
 def _topics(conn: sqlite3.Connection) -> None:

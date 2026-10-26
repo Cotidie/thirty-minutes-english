@@ -13,6 +13,10 @@ if TYPE_CHECKING:
     from app.db import Database
 
 
+class TopicInUse(Exception):
+    """A session points at the topic, so it stays."""
+
+
 def ensure(conn: sqlite3.Connection, text: str, category: Category, added_at: str) -> int:
     """The id of the topic `text`, added under `category` when it is new; a known topic keeps its category."""
     conn.execute(
@@ -58,6 +62,15 @@ class TopicRepo:
     def set_news(self, day: str, texts: list[str]) -> None:
         with self._db.connect() as conn:
             set_day(conn, day, texts, datetime.now(UTC).isoformat())
+
+    def delete(self, topic_id: int) -> bool:
+        """Takes the topic out of the pool and off the days that listed it; False when there was no such topic.
+        Raises TopicInUse when a session points at it."""
+        with self._db.connect() as conn:
+            if conn.execute("SELECT 1 FROM sessions WHERE topic_id = ?", (topic_id,)).fetchone():
+                raise TopicInUse(topic_id)
+            conn.execute("DELETE FROM topic_days WHERE topic_id = ?", (topic_id,))
+            return conn.execute("DELETE FROM topics WHERE id = ?", (topic_id,)).rowcount > 0
 
     def list_all(self) -> list[TopicEntry]:
         with self._db.connect() as conn:

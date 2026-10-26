@@ -62,13 +62,15 @@ class Expression(BaseModel):
 
 
 class CorpusEntry(Expression):
-    """An expression as the corpus keeps it: where it came from and the sessions that taught it."""
+    """An expression as the corpus keeps it: where it came from and the sessions that used it."""
 
     """The post it was read from."""
     source: str
     added_at: str
     """Ids of the sessions that taught it, oldest first."""
     sessions: list[int] = []
+    """Ids of the sessions it was swapped out of, oldest first; those count as using it too."""
+    swapped: list[int] = []
 
 
 class Question(BaseModel):

@@ -91,6 +91,14 @@ CREATE TABLE session_expressions (               -- 배운 기록. 행이 있으
     UNIQUE (session_id, position)
 ) STRICT;
 
+-- v5: 세션에서 바꿔 뺀 표현. 그 세션이 쓴 것으로 친다
+CREATE TABLE swapped_expressions (
+    session_id    INTEGER NOT NULL REFERENCES sessions(id) ON DELETE CASCADE,
+    expression_id INTEGER NOT NULL REFERENCES expressions(id) ON DELETE CASCADE,
+    swapped_at    TEXT    NOT NULL,
+    PRIMARY KEY (session_id, expression_id)
+) STRICT;
+
 -- 그린 그림 하나가 행 하나. 파일은 images/{id}.png. image_stats 대체.
 CREATE TABLE pictures (
     id         INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -141,18 +149,20 @@ CREATE TABLE topic_days (day TEXT NOT NULL, position INTEGER NOT NULL, topic_id 
 CREATE TABLE stage_times (id INTEGER PRIMARY KEY AUTOINCREMENT, stage TEXT NOT NULL, seconds REAL NOT NULL, finished_at TEXT NOT NULL) STRICT;
 ```
 
-인덱스: `paragraphs(session_id)`, `vocabulary(session_id)`, `session_expressions(session_id)`, `session_expressions(expression_id)`, `examples(session_expression_id)`, `examples(vocabulary_id)`, `readings(paragraph_id)`, `summaries(paragraph_id)`, `stage_times(stage, id)`, `sessions(topic_id)`, `topic_days(topic_id)`.
+인덱스: `paragraphs(session_id)`, `vocabulary(session_id)`, `session_expressions(session_id)`, `session_expressions(expression_id)`, `examples(session_expression_id)`, `examples(vocabulary_id)`, `readings(paragraph_id)`, `summaries(paragraph_id)`, `stage_times(stage, id)`, `sessions(topic_id)`, `topic_days(topic_id)`, `swapped_expressions(expression_id)`.
 
-버전: v3에 `figures`, v4(2026-10-26)에 `topics`와 참조형 `topic_days`·`sessions.topic_id`. v3→v4 업그레이드는 날짜 붙은 백업(`.bak-v3-…`)을 남기고, 큐레이션 주제를 넣고(이후엔 코드가 아니라 DB가 원본, `app/topics/curated.py`는 시드), 뉴스 JSON과 세션 주제 텍스트를 참조로 바꾸고, foreign key를 끈 채 `sessions`를 다시 만든 뒤 키를 검사한다.
+버전: v3에 `figures`, v4(2026-10-26)에 `topics`와 참조형 `topic_days`·`sessions.topic_id`. v3→v4 업그레이드는 날짜 붙은 백업(`.bak-v3-…`)을 남기고, 큐레이션 주제를 넣고(이후엔 코드가 아니라 DB가 원본, `app/topics/curated.py`는 시드), 뉴스 JSON과 세션 주제 텍스트를 참조로 바꾸고, foreign key를 끈 채 `sessions`를 다시 만든 뒤 키를 검사한다. v5(2026-10-27)에 `swapped_expressions`. 테이블 하나 추가라 백업(`.bak-v4-…`) 뒤 만들기만 한다.
 
 ## 표현 선택 규칙
 
 - 세션 저장 시 corpus에서 5개(`EXPRESSION_COUNT`). 생성기는 더 이상 표현을 쓰지 않는다 (프롬프트·스키마·`Exclusions.expressions` 제거. `check_items`는 단어만).
-- 후보 = `session_expressions`에 한 번도 없는 표현. setting별로 돌아가며(NULL도 한 묶음) 무작위로 뽑아 섞는다.
-- 안 배운 것이 5개 미만이면 가장 오래전에 배운 것(마지막 `sessions.created_at` 오름차순)으로 채운다. 표현에는 `REPEAT_ALLOWANCE` 안 씀(단어에만).
-- corpus가 비어 있으면 표현 0개인 세션. 프론트는 Expressions 탭에 "corpus가 비어 있다" 안내.
+- 쓴 표현 = `session_expressions`(가르침)나 `swapped_expressions`(바꿔 뺌)에 행이 있는 표현.
+- 후보 = 한 번도 안 쓴 표현. setting별로 돌아가며(NULL도 한 묶음) 무작위로 뽑아 섞는다.
+- 안 쓴 것이 5개 미만이면 가장 오래전에 쓴 것(마지막 세션 id 오름차순)으로 채운다. 표현에는 `REPEAT_ALLOWANCE` 안 씀(단어에만).
+- corpus가 비어 있으면 표현 0개인 세션. Expressions 탭은 "This session has no expressions."
+- 바꾸기(Expressions 탭의 ↻): 같은 규칙으로 하나를 뽑되 그 세션이 가르쳤거나 바꿔 뺀 표현은 빼고, 같은 position에 넣는다. 뺀 표현은 `swapped_expressions`에 남고, 그 자리의 별표와 연습 문장은 지운다. 남은 후보가 없으면 404.
+- 삭제(Database 페이지): 표현은 corpus와 그 표현을 가르친 모든 세션에서 지운다(별표, 연습 문장 포함). 주제는 그 주제로 쓴 세션이 없을 때만 지운다(있으면 409). 그날 뉴스 목록에서도 빠진다.
 - 주제 매칭 없음. 현재 프롬프트도 표현은 주제와 무관. 필요해지면 `expression_tags(expression_id, tag)` 추가.
-- 마이그레이션 직후에는 corpus 38개가 전부 이미 배운 것이라, corpus를 채우기 전까지 새 세션은 가장 오래전 세션(12→13→14)의 표현을 다시 가르친다. owner 결정(2026-10-26): 감수한다. 생성기의 표현 코드는 지금 제거하고, 가져오기 도구는 다음 작업.
 
 ## 그림 흐름
 

@@ -1,7 +1,8 @@
 """Sessions and what belongs to them: the article's paragraphs, the words, the expressions taught
-from the corpus, the stars on those, and the note."""
+from the corpus (and the ones swapped out), the stars on those, and the note."""
 
 import json
+import random
 import re
 import sqlite3
 from collections.abc import Sequence
@@ -11,7 +12,7 @@ from typing import TYPE_CHECKING
 from app.db.expressions import COLUMNS as EXPRESSION_COLUMNS
 from app.db import topics
 from app.db.expressions import expression_from
-from app.models import Article, Category, Draft, Figure, Note, Paragraph, Question, SentencePair, Session, SessionContent, SessionSummary, Source, Stars, VocabularyItem
+from app.models import Article, Category, Draft, Expression, Figure, Note, Paragraph, Question, SentencePair, Session, SessionContent, SessionSummary, Source, Stars, VocabularyItem
 
 if TYPE_CHECKING:
     from app.db import Database
@@ -111,6 +112,38 @@ class SessionRepo:
             topic=row["topic"], expressions=[expression_from(e) for e in expressions], article=article, vocabulary=[_word(w) for w in words]
         )
         return Session(id=row["id"], created_at=row["created_at"], topic=row["topic"], content=content)
+
+    def swap_expression(self, session_id: int, expression_id: int, rng: random.Random | None = None) -> Expression | None:
+        """The expression put in place of `expression_id`, picked as a new session picks one but never one this
+        session has had; the one swapped out counts as used here, and its star and practice sentences go.
+        None when the session does not teach `expression_id`, or the corpus has nothing else to offer."""
+        with self._db.connect() as conn:
+            had = {
+                row[0] for row in conn.execute(
+                    "SELECT expression_id FROM session_expressions WHERE session_id = ?"
+                    " UNION SELECT expression_id FROM swapped_expressions WHERE session_id = ?",
+                    (session_id, session_id),
+                )
+            }
+        if expression_id not in had:
+            return None
+        picked = self._db.expressions.pick(1, rng or random.Random(), exclude=had)
+        if not picked:
+            return None
+        with self._db.connect() as conn:
+            row = conn.execute(
+                "DELETE FROM session_expressions WHERE session_id = ? AND expression_id = ? RETURNING position", (session_id, expression_id)
+            ).fetchone()
+            if row is None:
+                return None
+            conn.execute(
+                "INSERT INTO session_expressions (session_id, expression_id, position) VALUES (?, ?, ?)", (session_id, picked[0].id, row[0])
+            )
+            conn.execute(
+                "INSERT INTO swapped_expressions (session_id, expression_id, swapped_at) VALUES (?, ?, ?)",
+                (session_id, expression_id, datetime.now(UTC).isoformat()),
+            )
+        return picked[0]
 
     def exists(self, session_id: int) -> bool:
         with self._db.connect() as conn:

@@ -6,7 +6,7 @@ from app.api.deps import Db, Files, Jobs, Svc, failed, off, require_session
 from app.api.schemas import CreateSessionRequest, JobStatus, RedrawRequest
 from app.generation.jobs import Job, JobRunner
 from app.llm import GenerationError
-from app.models import Note, Session, SessionSummary, Stars, VocabularyItem
+from app.models import Expression, Note, Session, SessionSummary, Stars, VocabularyItem
 from app.topics.pool import pick_topic
 
 router = APIRouter(prefix="/api")
@@ -83,6 +83,15 @@ def delete_session(session_id: int, db: Db, files: Files) -> Response:
     for picture_id in pictures:
         files.remove(picture_id)
     return Response(status_code=204)
+
+
+@router.post("/sessions/{session_id}/expressions/{expression_id}/swap", response_model=Expression)
+def swap_expression(session_id: int, expression_id: int, db: Db) -> Expression:
+    """Another corpus expression in this one's place; the one swapped out counts as used, so new sessions pick it last."""
+    expression = db.sessions.swap_expression(session_id, expression_id)
+    if expression is None:
+        raise HTTPException(status_code=404, detail="the session does not teach this expression, or nothing is left to swap in")
+    return expression
 
 
 @router.post("/sessions/{session_id}/pictures/{index}", response_model=VocabularyItem)

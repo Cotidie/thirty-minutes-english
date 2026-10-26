@@ -29,6 +29,7 @@ vi.mock('../api', () => ({
     listReadings: vi.fn(async () => []),
     listSummaries: vi.fn(async () => []),
     pictureStyles: vi.fn(async () => ({ current: '', options: [] })),
+    swapExpression: vi.fn(async () => ({ id: 5, phrase: 'touch base', meaning: 'contact briefly', usage_note: 'n', examples: ['e3', 'e4'] })),
   },
 }))
 vi.mock('../lib/liveClient', () => ({ connectExample: vi.fn(), connectSummary: vi.fn() }))
@@ -77,5 +78,13 @@ describe('SessionPage', () => {
     expect(screen.getByRole('textbox', { name: 'Notes' })).toHaveValue('hedge 발음')
     const content = document.querySelector('.content') as HTMLElement
     expect(within(content).queryByText('hedge 발음')).toBeNull()
+  })
+
+  it('swaps an expression in place for the one the server picked', async () => {
+    renderAt('/s/3')
+    await userEvent.click(await screen.findByRole('button', { name: 'Swap a moving target for another expression' }))
+    expect(await screen.findByText('touch base')).toBeInTheDocument()
+    expect(screen.queryByText('a moving target')).not.toBeInTheDocument()
+    expect(api.swapExpression).toHaveBeenCalledWith(3, 1)
   })
 })
