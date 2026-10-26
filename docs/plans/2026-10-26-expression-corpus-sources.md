@@ -70,11 +70,11 @@ corpus는 티멘트 표현 997개뿐이다. 처음엔 세션이 생성했던 38�
 | 중복 제거 | 카드 이미지 dHash(256비트) 비교. 거리 8 미만이면 같은 카드 | 캐러셀 171개는 유튜브와 같음, 2개는 일부만, 20개만 인스타 전용 |
 | 카드 읽기 | Claude Sonnet 5.5에 게시물별 카드 이미지를 보내 JSON 스키마로 받음. 영어 뜻과 usage note는 Claude가 씀 | 게시물 179개와 퀴즈 21개 → 항목 1,175개 |
 | 적재 | `key()`로 같은 표현을 합침(예문은 합쳐 최대 3개). 카드의 두 줄 대화는 `"<말>" "<대답>"` 한 예문으로 합침. 이미 있던 표현은 그대로 둠 | 997개 중 7개는 기존, 990개 추가 |
-| 예문 보충 | 카드에 예문이 없는 표현마다 Claude가 예문 하나를 씀 | 403개 |
+| 예문 보충 | 표현마다 예문 최소 2개. 카드 예문을 먼저 두고, 모자라면 Claude가 씀 | Claude 예문 1,253개 |
 
 넣지 않은 것: 릴스(영상), 단어 목록 게시물과 표현 게시물 속 단어 42개, 추천·공부법·인사 게시물. 넣은 경계 사례: 노래 가사와 영화 대사 6개 게시물, 텍스트 퀴즈 21개.
 
-- 990개 중 403개는 카드에 예문이 없어(표현과 한국어 뜻만 있는 목록형 게시물) Claude가 쓴 예문이다. 나머지 예문은 카드 그대로다.
+- 예문은 표현마다 2~3개다. 카드 예문이 앞이고, 2개가 안 되는 표현은 Claude가 채웠다(`written/examples.json`, 다시 적재할 때도 같은 규칙). 카드에 예문이 하나도 없던 403개는 두 예문 모두 Claude가 썼다. 바꿔치기한 7개는 세션에서 쓰던 예문을 되살려 채웠다.
 - "Happen to + 명사"와 "Happen to + 동사"는 같은 key라 한 행(`Happen to~`)으로 합쳐졌다.
 - `source`는 게시물 주소 (`https://www.youtube.com/post/<id>`, `https://www.instagram.com/p/<code>/`).
-- 추출 JSON과 스크립트, 백업은 `backend/data/` 아래 (`corpus-temment-2026-10-26/`, 적재 전 `sessions.db.bak-corpus-2026-10-26`, 예문 보충 전 `sessions.db.bak-examples-2026-10-26`, 생성분 삭제 전 `sessions.db.bak-drop-generated-2026-10-26`). git에는 없다.
+- 추출 JSON과 스크립트, 백업은 `backend/data/` 아래 (`corpus-temment-2026-10-26/`, 적재 전 `sessions.db.bak-corpus-2026-10-26`, 예문 보충 전 `sessions.db.bak-examples-2026-10-26`, 생성분 삭제 전 `sessions.db.bak-drop-generated-2026-10-26`, 예문 2개 보충 전 `sessions.db.bak-min-examples-2026-10-26`). git에는 없다.
