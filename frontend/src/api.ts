@@ -2,6 +2,7 @@ import type { JobStatus } from './lib/progress'
 import type {
   AssessorSession,
   Correction,
+  CorpusEntry,
   Example,
   ExampleFeedback,
   KeyTestResult,
@@ -38,6 +39,8 @@ export const api = {
   topics: () => request<TopicListing>('/api/topics'),
   refreshTopics: () => request<TopicListing>('/api/topics/refresh', { method: 'POST' }),
   listSessions: () => request<SessionSummary[]>('/api/sessions'),
+  /** The whole expression corpus; the corpus page searches it in the browser. */
+  corpus: () => request<CorpusEntry[]>('/api/expressions'),
   getSession: (id: number) => request<Session>(`/api/sessions/${id}`),
   startGeneration: (topic: string | null) =>
     request<JobStatus>('/api/sessions', { method: 'POST', body: JSON.stringify({ topic }) }),

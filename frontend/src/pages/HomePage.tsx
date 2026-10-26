@@ -32,6 +32,9 @@ export function HomePage() {
         <p className="lede">
           A few expressions, one short article, and the words around it. Everything you two need to talk for half an hour.
         </p>
+        <Link to="/corpus" className="home-corpus">
+          Browse the expression corpus
+        </Link>
       </header>
 
       <TopicPicker

@@ -43,6 +43,13 @@ function renderHome() {
 }
 
 describe('HomePage', () => {
+  it('links to the expression corpus', async () => {
+    vi.mocked(api.listJobs).mockResolvedValue([])
+    renderHome()
+
+    expect(await screen.findByRole('link', { name: 'Browse the expression corpus' })).toHaveAttribute('href', '/corpus')
+  })
+
   it('picks up a generation still running on the server', async () => {
     vi.mocked(api.listJobs).mockResolvedValue([running])
     renderHome()

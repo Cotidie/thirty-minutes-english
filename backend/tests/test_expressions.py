@@ -1,6 +1,12 @@
 import random
 
+from fastapi.testclient import TestClient
+
+from app.db import Database
+from app.main import create_app
+from app.wiring import Services
 from tests.conftest import NAMES, sample_draft
+from tests.test_api import FakeGenerator, InlineExecutor
 
 
 def test_add_upserts_by_normalized_key_and_keeps_the_id(store):
@@ -44,3 +50,21 @@ def test_pick_fills_from_the_longest_ago_taught_when_untaught_run_out(store):
 
 def test_pick_returns_what_there_is(store):
     assert store.expressions.pick(5, random.Random(0)) == []
+
+
+def test_list_all_carries_each_source_and_the_sessions_that_taught_it(store):
+    taught = store.expressions.add("old", "m", [], ["e"], "n", "한", "casual", "https://www.youtube.com/post/x")
+    fresh = store.expressions.add("new", "m", [], [], "n", None, None, "session")
+    first = store.sessions.create(sample_draft(), [taught]).id
+    second = store.sessions.create(sample_draft(), [taught]).id
+    entries = {e.id: e for e in store.expressions.list_all()}
+    assert entries[taught].source == "https://www.youtube.com/post/x" and entries[taught].sessions == [first, second]
+    assert entries[fresh].sessions == [] and entries[fresh].added_at
+
+
+def test_the_corpus_is_served_whole(tmp_path):
+    db = Database(tmp_path / "s.db")
+    db.expressions.add("touch base", "m", [], ["Let's touch base."], "n", "연락하다", "workplace", "session")
+    with TestClient(create_app(db, Services(FakeGenerator()), InlineExecutor())) as c:
+        [entry] = c.get("/api/expressions").json()
+    assert (entry["phrase"], entry["setting"], entry["source"], entry["sessions"]) == ("touch base", "workplace", "session", [])

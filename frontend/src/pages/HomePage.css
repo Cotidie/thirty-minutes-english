@@ -34,6 +34,12 @@
   max-width: 34rem;
 }
 
+.home-corpus {
+  display: inline-block;
+  margin-top: 0.9rem;
+  font-size: 0.95rem;
+}
+
 .history-title {
   font-family: var(--serif);
   font-weight: 500;

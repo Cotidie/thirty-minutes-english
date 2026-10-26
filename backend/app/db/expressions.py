@@ -9,7 +9,7 @@ from datetime import UTC, datetime
 from typing import TYPE_CHECKING
 
 from app.generation.exclusions import key
-from app.models import Expression
+from app.models import CorpusEntry, Expression
 
 if TYPE_CHECKING:
     from app.db import Database
@@ -73,9 +73,19 @@ class ExpressionRepo:
             row = conn.execute(f"SELECT {COLUMNS} FROM expressions e WHERE e.id = ?", (expression_id,)).fetchone()
         return expression_from(row) if row else None
 
-    def list_all(self) -> list[Expression]:
+    def list_all(self) -> list[CorpusEntry]:
         with self._db.connect() as conn:
-            return [expression_from(row) for row in conn.execute(f"SELECT {COLUMNS} FROM expressions e ORDER BY e.id")]
+            rows = conn.execute(
+                f"""SELECT {COLUMNS}, e.source, e.added_at,
+                        (SELECT json_group_array(session_id) FROM (SELECT session_id FROM session_expressions
+                            WHERE expression_id = e.id ORDER BY session_id)) AS sessions
+                    FROM expressions e ORDER BY e.id"""
+            ).fetchall()
+        return [
+            CorpusEntry(**expression_from(row).model_dump(), source=row["source"], added_at=row["added_at"],
+                        sessions=json.loads(row["sessions"]))
+            for row in rows
+        ]
 
     def count(self) -> int:
         with self._db.connect() as conn:

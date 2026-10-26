@@ -1,0 +1,132 @@
+.corpus {
+  max-width: 44rem;
+  margin: 0 auto;
+  padding: 3rem 1.25rem 6rem;
+}
+
+.corpus-back {
+  color: var(--muted);
+  font-size: 0.95rem;
+  text-decoration: none;
+}
+
+.corpus-title {
+  font-family: var(--serif);
+  font-weight: 500;
+  font-size: clamp(2rem, 5vw, 2.8rem);
+  line-height: 1.1;
+  margin: 0.75rem 0 0.5rem;
+}
+
+.corpus-lede {
+  font-family: var(--serif);
+  font-size: 1.15rem;
+  color: var(--muted);
+  margin: 0 0 2rem;
+}
+
+.corpus-filters {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem 0.6rem;
+  margin-bottom: 1rem;
+}
+
+.corpus-search {
+  flex: 1 1 100%;
+  font: inherit;
+  padding: 0.6rem 0.75rem;
+  border: 1px solid var(--line);
+  border-radius: 0.4rem;
+  background: var(--paper);
+}
+
+.corpus-filters label {
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+
+.corpus-filters select {
+  font: inherit;
+  font-size: 0.95rem;
+  padding: 0.3rem 0.4rem;
+  margin-right: 0.75rem;
+  border: 1px solid var(--line);
+  border-radius: 0.4rem;
+  background: var(--paper);
+}
+
+.corpus-count {
+  color: var(--muted);
+  font-size: 0.9rem;
+  font-variant-numeric: tabular-nums;
+  margin: 0 0 0.5rem;
+}
+
+.corpus-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.corpus-item {
+  padding: 1.25rem 0;
+  border-top: 1px solid var(--line);
+}
+
+.corpus-head {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 0.25rem 0.75rem;
+}
+
+.corpus-phrase {
+  font-family: var(--serif);
+  font-weight: 500;
+  font-size: 1.45rem;
+  line-height: 1.2;
+  margin: 0;
+}
+
+.corpus-setting {
+  color: var(--muted);
+  font-size: 0.8rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.corpus-korean {
+  color: var(--phrase);
+  margin: 0.2rem 0 0.4rem;
+}
+
+.corpus-meaning {
+  font-family: var(--serif);
+  font-size: 1.1rem;
+  margin: 0 0 0.3rem;
+}
+
+.corpus-synonyms {
+  color: var(--muted);
+}
+
+.corpus-note {
+  color: var(--muted);
+  font-size: 0.95rem;
+  margin: 0 0 0.5rem;
+}
+
+.corpus-examples {
+  margin: 0 0 0.5rem;
+  padding-left: 1.2rem;
+  font-family: var(--serif);
+  font-size: 1.05rem;
+}
+
+.corpus-meta {
+  color: var(--muted);
+  font-size: 0.85rem;
+  margin: 0;
+}
