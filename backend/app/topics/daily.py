@@ -6,7 +6,7 @@ import logging
 from datetime import UTC, date, datetime
 from typing import Protocol
 
-from app.db.caches import CacheRepo
+from app.db.topics import TopicRepo
 from app.llm import WEB_TOOLS, Claude, GenerationError, firecrawl
 from app.models import Category, Topic, TopicListing
 from app.topics.pool import pool_for_day
@@ -78,8 +78,8 @@ class ClaudeTopicSource:
 class DailyTopics:
     """Today's list, and the background refresh that fills its news slots."""
 
-    def __init__(self, caches: CacheRepo, executor=None):
-        self._caches = caches
+    def __init__(self, topics: TopicRepo, executor=None):
+        self._topics = topics
         self._executor = executor
         # The day whose news fetch is running right now, and how many times
         # the pool half has been redealt today.
@@ -94,15 +94,15 @@ class DailyTopics:
     def listing(self) -> TopicListing:
         """The day's topics, whether a fetch is still on its way, and the last failure."""
         day = self.today()
-        fresh = self._caches.get_daily_topics(day.isoformat()) or []
-        pool = pool_for_day(day, POOL_COUNT + FRESH_COUNT - len(fresh), exclude=fresh, salt=self._salt)
+        fresh = self._topics.news(day.isoformat()) or []
+        pool = pool_for_day(day, POOL_COUNT + FRESH_COUNT - len(fresh), self._topics.curated(), exclude=fresh, salt=self._salt)
         news = [Topic(text=t, category=Category.NEWS) for t in fresh]
         return TopicListing(topics=news + pool, pending=self._inflight == day.isoformat(), error=self._error)
 
     def ensure_fetched(self, source: TopicSource | None) -> None:
         """Starts the day's fetch if it has not run yet. Safe to call on every request."""
         day = self.today().isoformat()
-        if source is None or self._inflight == day or self._caches.get_daily_topics(day) is not None:
+        if source is None or self._inflight == day or self._topics.news(day) is not None:
             return
         self._start(day, source)
 
@@ -138,5 +138,5 @@ class DailyTopics:
             log.warning("no news topics came back for %s, staying on the pool", day)
             return
         self._error = None
-        self._caches.set_daily_topics(day, topics)
+        self._topics.set_news(day, topics)
         log.info("topics for %s: %d from the news", day, len(topics))

@@ -1,8 +1,7 @@
-import { Fragment, useEffect, useMemo, useState } from 'react'
-import { Link } from 'react-router-dom'
+import { useEffect, useMemo, useState } from 'react'
 import { api } from '../api'
 import type { CorpusEntry } from '../types'
-import './CorpusPage.css'
+import { SessionLinks } from './SessionLinks'
 
 type Source = 'youtube' | 'instagram'
 type Taught = 'all' | 'new' | 'taught'
@@ -14,7 +13,7 @@ function sourceOf(entry: CorpusEntry): Source {
 }
 
 /** The expression corpus new sessions pick from, to read through: search and filters, nothing to edit. */
-export function CorpusPage() {
+export function CorpusPanel() {
   const [corpus, setCorpus] = useState<CorpusEntry[] | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [query, setQuery] = useState('')
@@ -38,19 +37,12 @@ export function CorpusPage() {
   }, [corpus, query, setting, source, taught])
 
   return (
-    <main className="corpus">
-      <header className="corpus-header">
-        <Link to="/" className="corpus-back">
-          ← Sessions
-        </Link>
-        <h1 className="corpus-title">Expression corpus</h1>
-        <p className="corpus-lede">Every expression a new session can pick its five from.</p>
-      </header>
-
-      <div className="corpus-filters">
+    <>
+      <p className="database-lede">Every expression a new session can pick its five from.</p>
+      <div className="db-filters">
         <input
           type="search"
-          className="corpus-search"
+          className="db-search"
           placeholder="Search the phrase, meaning or Korean"
           value={query}
           onChange={(e) => setQuery(e.target.value)}
@@ -77,20 +69,20 @@ export function CorpusPage() {
       </div>
 
       {error && <p className="error">Could not load the corpus: {error}</p>}
-      {corpus && <p className="corpus-count">{`${shown.length} of ${corpus.length}`}</p>}
-      <ol className="corpus-list">
+      {corpus && <p className="db-count">{`${shown.length} of ${corpus.length}`}</p>}
+      <ol className="db-list">
         {shown.map((entry) => (
           <CorpusItem key={entry.id} entry={entry} />
         ))}
       </ol>
-    </main>
+    </>
   )
 }
 
 function CorpusItem({ entry }: { entry: CorpusEntry }) {
   return (
-    <li className="corpus-item">
-      <div className="corpus-head">
+    <li className="db-item">
+      <div className="db-head">
         <h2 className="corpus-phrase">{entry.phrase}</h2>
         {entry.setting && <span className="corpus-setting">{entry.setting}</span>}
       </div>
@@ -107,19 +99,14 @@ function CorpusItem({ entry }: { entry: CorpusEntry }) {
           ))}
         </ul>
       )}
-      <p className="corpus-meta">
+      <p className="db-meta">
         <a href={entry.source} target="_blank" rel="noreferrer">
           {SOURCE_LABEL[sourceOf(entry)]}
         </a>
         {entry.sessions.length > 0 && (
           <>
             {' · Taught in '}
-            {entry.sessions.map((id, i) => (
-              <Fragment key={id}>
-                {i > 0 && ', '}
-                <Link to={`/s/${id}`}>Session {id}</Link>
-              </Fragment>
-            ))}
+            <SessionLinks ids={entry.sessions} />
           </>
         )}
       </p>

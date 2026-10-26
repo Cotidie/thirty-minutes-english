@@ -1,9 +1,14 @@
-"""Schema v2: every table STRICT, every reference a foreign key. JSON lives in TEXT columns only
-for values read and written whole with their row; anything pointed at is a row of its own."""
+"""Every table STRICT, every reference a foreign key. JSON lives in TEXT columns only for values read
+and written whole with their row; anything pointed at is a row of its own."""
 
+import json
 import sqlite3
+from datetime import UTC, datetime
 
-VERSION = 3
+from app.db import topics
+from app.models import Category
+
+VERSION = 4
 
 # Added in v3: images under the article's paragraphs.
 FIGURES = """
@@ -19,17 +24,41 @@ CREATE TABLE figures (
 CREATE INDEX figures_paragraph ON figures (paragraph_id);
 """
 
-SCHEMA = """
+# Added in v4: topics are rows; a day's news lists them, and a session points at its own.
+TOPICS = """
+CREATE TABLE topics (
+    id       INTEGER PRIMARY KEY AUTOINCREMENT,
+    text     TEXT    NOT NULL UNIQUE,
+    category TEXT    NOT NULL,
+    added_at TEXT    NOT NULL
+) STRICT;
+
+CREATE TABLE topic_days (
+    day      TEXT    NOT NULL,
+    position INTEGER NOT NULL,
+    topic_id INTEGER NOT NULL REFERENCES topics(id),
+    PRIMARY KEY (day, position)
+) STRICT;
+
+CREATE INDEX topic_days_topic ON topic_days (topic_id);
+"""
+
+SESSIONS = """
 CREATE TABLE sessions (
     id          INTEGER PRIMARY KEY AUTOINCREMENT,
     created_at  TEXT    NOT NULL,
-    topic       TEXT    NOT NULL,
+    topic_id    INTEGER NOT NULL REFERENCES topics(id),
     title       TEXT    NOT NULL,
     note        TEXT    NOT NULL DEFAULT '',
     questions   TEXT    NOT NULL,
     sources     TEXT    NOT NULL,
     translation TEXT    NOT NULL
 ) STRICT;
+
+CREATE INDEX sessions_topic ON sessions (topic_id);
+"""
+
+SCHEMA = TOPICS + SESSIONS + """
 
 CREATE TABLE paragraphs (
     id          INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -121,7 +150,6 @@ CREATE TABLE summaries (
 CREATE TABLE settings    (key TEXT PRIMARY KEY, value TEXT NOT NULL) STRICT;
 CREATE TABLE model_pins  (source TEXT NOT NULL, model TEXT NOT NULL, pinned_at TEXT NOT NULL, PRIMARY KEY (source, model)) STRICT;
 CREATE TABLE model_lists (source TEXT PRIMARY KEY, fetched_at REAL NOT NULL, options TEXT NOT NULL) STRICT;
-CREATE TABLE topic_days  (day TEXT PRIMARY KEY, topics TEXT NOT NULL) STRICT;
 CREATE TABLE stage_times (id INTEGER PRIMARY KEY AUTOINCREMENT, stage TEXT NOT NULL, seconds REAL NOT NULL, finished_at TEXT NOT NULL) STRICT;
 
 CREATE INDEX paragraphs_session ON paragraphs (session_id);
@@ -144,12 +172,56 @@ def _run(conn: sqlite3.Connection, script: str) -> None:
 
 
 def create(conn: sqlite3.Connection) -> None:
-    """Every current table on an empty file."""
+    """Every current table on an empty file, with the curated topics."""
     _run(conn, SCHEMA)
+    topics.seed(conn, _now())
     conn.execute(f"PRAGMA user_version = {VERSION}")
 
 
-def upgrade(conn: sqlite3.Connection) -> None:
-    """A v2 file brought to the current version."""
-    _run(conn, FIGURES)
-    conn.execute(f"PRAGMA user_version = {VERSION}")
+def upgrade(conn: sqlite3.Connection, version: int) -> None:
+    """A v2 or v3 file brought to the current version, a step at a time, each in its own transaction."""
+    if version < 3:
+        _run(conn, FIGURES)
+        conn.execute("PRAGMA user_version = 3")
+    if version < 4:
+        _topics(conn)
+
+
+def _topics(conn: sqlite3.Connection) -> None:
+    """v3 to v4: the topics table, seeded; the day lists and the session topics turned into references.
+    Rebuilding sessions drops the old table, which with foreign keys on would delete every session's
+    children, so this runs with them off and checks them before it commits."""
+    conn.commit()
+    conn.execute("PRAGMA foreign_keys = OFF")
+    try:
+        conn.execute("BEGIN")
+        conn.execute("ALTER TABLE topic_days RENAME TO topic_days_v3")
+        _run(conn, TOPICS)
+        topics.seed(conn, _now())
+        for day, texts in conn.execute("SELECT day, topics FROM topic_days_v3 ORDER BY day").fetchall():
+            topics.set_day(conn, day, json.loads(texts), f"{day}T00:00:00+00:00")
+        conn.execute("DROP TABLE topic_days_v3")
+        counter = conn.execute("SELECT seq FROM sqlite_sequence WHERE name = 'sessions'").fetchone()
+        conn.execute(SESSIONS.split(";")[0].replace("CREATE TABLE sessions", "CREATE TABLE sessions_v4"))
+        for row in conn.execute("SELECT * FROM sessions ORDER BY id").fetchall():
+            session_id, created_at, topic, *rest = tuple(row)
+            topic_id = topics.ensure(conn, topic, Category.TYPED, created_at)
+            conn.execute("INSERT INTO sessions_v4 VALUES (?, ?, ?, ?, ?, ?, ?, ?)", (session_id, created_at, topic_id, *rest))
+        conn.execute("DROP TABLE sessions")
+        conn.execute("ALTER TABLE sessions_v4 RENAME TO sessions")
+        conn.execute(SESSIONS.split(";")[1])
+        if counter:  # deleted sessions keep their ids retired
+            conn.execute("UPDATE sqlite_sequence SET seq = MAX(seq, ?) WHERE name = 'sessions'", (counter[0],))
+        if broken := conn.execute("PRAGMA foreign_key_check").fetchall():
+            raise sqlite3.IntegrityError(f"foreign keys broken by the v4 upgrade: {broken[:5]}")
+        conn.execute("PRAGMA user_version = 4")
+        conn.commit()
+    except BaseException:
+        conn.rollback()
+        raise
+    finally:
+        conn.execute("PRAGMA foreign_keys = ON")
+
+
+def _now() -> str:
+    return datetime.now(UTC).isoformat()

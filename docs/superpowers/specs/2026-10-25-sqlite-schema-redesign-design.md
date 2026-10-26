@@ -32,7 +32,7 @@ PRAGMA user_version = 2;
 CREATE TABLE sessions (
     id          INTEGER PRIMARY KEY AUTOINCREMENT,
     created_at  TEXT    NOT NULL,                -- ISO 8601 UTC
-    topic       TEXT    NOT NULL,                -- 사용자 자유 입력 또는 pool. FK 대상 없음
+    topic_id    INTEGER NOT NULL REFERENCES topics(id),  -- v4. 직접 입력한 주제도 topics 행(category 'typed')
     title       TEXT    NOT NULL,
     note        TEXT    NOT NULL DEFAULT '',     -- 자유 메모 (v1 notes)
     questions   TEXT    NOT NULL,                -- JSON [{text, evidence: [..]}]
@@ -134,11 +134,16 @@ CREATE TABLE summaries (
 CREATE TABLE settings    (key TEXT PRIMARY KEY, value TEXT NOT NULL) STRICT;
 CREATE TABLE model_pins  (source TEXT NOT NULL, model TEXT NOT NULL, pinned_at TEXT NOT NULL, PRIMARY KEY (source, model)) STRICT;
 CREATE TABLE model_lists (source TEXT PRIMARY KEY, fetched_at REAL NOT NULL, options TEXT NOT NULL) STRICT;  -- options: JSON [Option]
-CREATE TABLE topic_days  (day TEXT PRIMARY KEY, topics TEXT NOT NULL) STRICT;                                 -- topics: JSON [str]
+-- v4: 주제는 행. 큐레이션(카테고리별), 그날 뉴스('news'), 세션용 직접 입력('typed'). 텍스트는 한 번만
+CREATE TABLE topics     (id INTEGER PRIMARY KEY AUTOINCREMENT, text TEXT NOT NULL UNIQUE, category TEXT NOT NULL, added_at TEXT NOT NULL) STRICT;
+-- v4: 그날의 뉴스 주제 목록을 참조로. 새로고침은 그날 목록을 통째로 바꾼다
+CREATE TABLE topic_days (day TEXT NOT NULL, position INTEGER NOT NULL, topic_id INTEGER NOT NULL REFERENCES topics(id), PRIMARY KEY (day, position)) STRICT;
 CREATE TABLE stage_times (id INTEGER PRIMARY KEY AUTOINCREMENT, stage TEXT NOT NULL, seconds REAL NOT NULL, finished_at TEXT NOT NULL) STRICT;
 ```
 
-인덱스: `paragraphs(session_id)`, `vocabulary(session_id)`, `session_expressions(session_id)`, `session_expressions(expression_id)`, `examples(session_expression_id)`, `examples(vocabulary_id)`, `readings(paragraph_id)`, `summaries(paragraph_id)`, `stage_times(stage, id)`.
+인덱스: `paragraphs(session_id)`, `vocabulary(session_id)`, `session_expressions(session_id)`, `session_expressions(expression_id)`, `examples(session_expression_id)`, `examples(vocabulary_id)`, `readings(paragraph_id)`, `summaries(paragraph_id)`, `stage_times(stage, id)`, `sessions(topic_id)`, `topic_days(topic_id)`.
+
+버전: v3에 `figures`, v4(2026-10-26)에 `topics`와 참조형 `topic_days`·`sessions.topic_id`. v3→v4 업그레이드는 날짜 붙은 백업(`.bak-v3-…`)을 남기고, 큐레이션 주제를 넣고(이후엔 코드가 아니라 DB가 원본, `app/topics/curated.py`는 시드), 뉴스 JSON과 세션 주제 텍스트를 참조로 바꾸고, foreign key를 끈 채 `sessions`를 다시 만든 뒤 키를 검사한다.
 
 ## 표현 선택 규칙
 

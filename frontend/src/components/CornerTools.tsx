@@ -2,11 +2,11 @@ import { Link } from 'react-router-dom'
 import { SettingsButton } from './SettingsButton'
 import './CornerTools.css'
 
-/** The round buttons in the corner of every page: the expression corpus, then the settings. */
+/** The round buttons in the corner of every page: the database, then the settings. */
 export function CornerTools() {
   return (
     <nav className="corner-tools">
-      <Link to="/corpus" className="corner-button" aria-label="Expression corpus" title="Expression corpus">
+      <Link to="/database" className="corner-button" aria-label="Database" title="Database">
         <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true">
           <g fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
             <ellipse cx="12" cy="5.5" rx="7" ry="2.5" />

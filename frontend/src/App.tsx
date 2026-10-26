@@ -1,6 +1,6 @@
 import { BrowserRouter, Route, Routes } from 'react-router-dom'
 import { CornerTools } from './components/CornerTools'
-import { CorpusPage } from './pages/CorpusPage'
+import { DatabasePage } from './pages/DatabasePage'
 import { HomePage } from './pages/HomePage'
 import { SessionPage } from './pages/SessionPage'
 
@@ -10,7 +10,8 @@ export default function App() {
       <Routes>
         <Route path="/" element={<HomePage />} />
         <Route path="/s/:id" element={<SessionPage />} />
-        <Route path="/corpus" element={<CorpusPage />} />
+        <Route path="/database" element={<DatabasePage tab="expressions" />} />
+        <Route path="/database/topics" element={<DatabasePage tab="topics" />} />
       </Routes>
       <CornerTools />
     </BrowserRouter>

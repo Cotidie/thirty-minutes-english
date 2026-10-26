@@ -10,11 +10,11 @@ from dataclasses import dataclass
 from datetime import date
 from pathlib import Path
 
-from app.db import schema
+from app.db import schema, topics
 from app.db.expressions import upsert as upsert_expression
 from app.db.sessions import paragraphs_of
 from app.generation.exclusions import key
-from app.models import ArticleDraft, VocabularyDraft
+from app.models import ArticleDraft, Category, VocabularyDraft
 
 log = logging.getLogger(__name__)
 
@@ -40,9 +40,9 @@ def is_v1(conn: sqlite3.Connection) -> bool:
     )
 
 
-def backup(path: Path) -> Path:
-    """A copy of the v1 file beside it, dated."""
-    target = path.with_name(f"{path.name}.bak-v1-{date.today():%Y-%m-%d}")
+def backup(path: Path, version: int) -> Path:
+    """A copy of the file, still at `version`, beside it and dated."""
+    target = path.with_name(f"{path.name}.bak-v{version}-{date.today():%Y-%m-%d}")
     shutil.copy2(path, target)
     return target
 
@@ -96,7 +96,8 @@ class Migration:
         conn = self.conn
         conn.execute("INSERT INTO settings SELECT key, value FROM settings_v1")
         conn.execute("INSERT INTO model_pins SELECT source, model, pinned_at FROM model_pins_v1")
-        conn.execute("INSERT INTO topic_days SELECT day, topics_json FROM topic_days_v1")
+        for day, stored in conn.execute("SELECT day, topics_json FROM topic_days_v1").fetchall():
+            topics.set_day(conn, day, json.loads(stored), f"{day}T00:00:00+00:00")
         for source, stored in conn.execute("SELECT source, list_json FROM model_lists_v1").fetchall():
             cached = json.loads(stored)
             conn.execute("INSERT INTO model_lists VALUES (?, ?, ?)", (source, cached["at"], json.dumps(cached["options"], ensure_ascii=False)))
@@ -107,8 +108,8 @@ class Migration:
         article = ArticleDraft.model_validate(content["article"])
         note = conn.execute("SELECT text FROM notes_v1 WHERE session_id = ?", (session_id,)).fetchone()
         conn.execute(
-            "INSERT INTO sessions (id, created_at, topic, title, note, questions, sources, translation) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
-            (session_id, created_at, row["topic"], row["title"], note[0] if note else "", *(
+            "INSERT INTO sessions (id, created_at, topic_id, title, note, questions, sources, translation) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+            (session_id, created_at, topics.ensure(conn, row["topic"], Category.TYPED, created_at), row["title"], note[0] if note else "", *(
                 json.dumps([m.model_dump() for m in models], ensure_ascii=False) for models in (article.questions, article.sources, article.translation)
             )),
         )

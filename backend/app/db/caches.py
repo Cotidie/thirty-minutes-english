@@ -1,4 +1,4 @@
-"""Answers worth keeping so the model runs once: a day's news topics and the providers' model lists."""
+"""Answers worth keeping so the model runs once: the providers' model lists."""
 
 import json
 from dataclasses import dataclass
@@ -19,18 +19,6 @@ class ModelList:
 class CacheRepo:
     def __init__(self, db: "Database") -> None:
         self._db = db
-
-    def get_daily_topics(self, day: str) -> list[str] | None:
-        with self._db.connect() as conn:
-            row = conn.execute("SELECT topics FROM topic_days WHERE day = ?", (day,)).fetchone()
-        return json.loads(row["topics"]) if row else None
-
-    def set_daily_topics(self, day: str, topics: list[str]) -> None:
-        with self._db.connect() as conn:
-            conn.execute(
-                "INSERT INTO topic_days (day, topics) VALUES (?, ?) ON CONFLICT (day) DO UPDATE SET topics = excluded.topics",
-                (day, json.dumps(topics, ensure_ascii=False)),
-            )
 
     def get_model_list(self, source: str) -> ModelList | None:
         with self._db.connect() as conn:

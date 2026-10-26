@@ -5,7 +5,8 @@ from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 
 class Category(StrEnum):
-    """Where a suggested topic comes from. Drives the chip colour on the home page."""
+    """Where a topic comes from: a curated field, the day's news, or typed in for one session (never
+    suggested). Drives the chip colour on the home page."""
 
     CS = "cs"
     IE = "ie"
@@ -16,6 +17,11 @@ class Category(StrEnum):
     KOREA = "korea"
     RESEARCH = "research"
     NEWS = "news"
+    TYPED = "typed"
+
+
+# Not curated: the pool deals from every other category.
+UNCURATED = (Category.NEWS, Category.TYPED)
 
 
 # What each category is called in the key under the chips, in the order the key lists them.
@@ -216,6 +222,24 @@ class Note(BaseModel):
     """The pair's free-form notes on a session, saved whole on every edit."""
 
     text: str = ""
+
+
+class TopicEntry(Topic):
+    """A topic as the database keeps it: the days it led the news and the sessions written on it."""
+
+    id: int
+    added_at: str
+    """Days it was among the day's news, oldest first."""
+    news_days: list[str] = []
+    """Ids of the sessions written on it, oldest first."""
+    sessions: list[int] = []
+
+
+class TopicLibrary(BaseModel):
+    """Every topic, for the database page, with every category's name (typed-in ones too)."""
+
+    topics: list[TopicEntry]
+    labels: dict[Category, str] = CATEGORY_LABELS | {Category.TYPED: "Typed in"}
 
 
 class TopicListing(BaseModel):

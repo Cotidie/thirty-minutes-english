@@ -5,7 +5,8 @@ import pytest
 
 from app.db import Database
 from app.generation.generator import VOCABULARY_COUNT
-from app.models import ArticleDraft, Draft, PictureDraft, Question, SentencePair, Source, VocabularyDraft
+from app.models import ArticleDraft, Draft, PictureDraft, Question, SentencePair, Source, Topic, VocabularyDraft
+from app.topics.curated import CURATED
 
 
 def sample_draft(topic: str = "Digital twins", title: str = "Twins at Work") -> Draft:
@@ -32,6 +33,9 @@ def sample_draft(topic: str = "Digital twins", title: str = "Twins at Work") -> 
 
 
 # Distinct words, since the corpus tells phrases apart by their letters only.
+# The curated topics every new file is seeded with, in seed order.
+CURATED_TOPICS = [Topic(text=text, category=category) for category, texts in CURATED.items() for text in texts]
+
 NAMES = ("alpha", "bravo", "charlie", "delta", "echo", "foxtrot", "golf", "hotel", "india", "juliet")
 
 

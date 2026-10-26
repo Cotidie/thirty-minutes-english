@@ -3,7 +3,7 @@ import { MemoryRouter } from 'react-router-dom'
 import { beforeEach, expect, it, vi } from 'vitest'
 import { api } from '../api'
 import type { CorpusEntry } from '../types'
-import { CorpusPage } from './CorpusPage'
+import { CorpusPanel } from './CorpusPanel'
 
 vi.mock('../api', () => ({ api: { corpus: vi.fn() } }))
 
@@ -35,7 +35,7 @@ beforeEach(() => {
 function renderPage() {
   render(
     <MemoryRouter>
-      <CorpusPage />
+      <CorpusPanel />
     </MemoryRouter>,
   )
 }

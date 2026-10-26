@@ -8,8 +8,9 @@ from app.llm import GenerationError
 from app.main import create_app
 from app.models import Category
 from app.topics.daily import FRESH_COUNT, POOL_COUNT, DailyTopics
-from app.topics.pool import TOPICS, pool_for_day
+from app.topics.pool import pool_for_day
 from app.wiring import Services
+from tests.conftest import CURATED_TOPICS as TOPICS
 from tests.test_api import FakeGenerator, InlineExecutor
 
 NEWS = [f"news topic {i}" for i in range(FRESH_COUNT)]
@@ -41,21 +42,21 @@ def parts(listing) -> tuple[list, bool]:
 
 
 def test_pool_slice_holds_all_day_and_turns_over_at_midnight():
-    today = pool_for_day(date(2026, 9, 14), 6)
-    assert today == pool_for_day(date(2026, 9, 14), 6)
-    assert today != pool_for_day(date(2026, 9, 15), 6)
+    today = pool_for_day(date(2026, 9, 14), 6, TOPICS)
+    assert today == pool_for_day(date(2026, 9, 14), 6, TOPICS)
+    assert today != pool_for_day(date(2026, 9, 15), 6, TOPICS)
     assert set(today) <= set(TOPICS)
     assert len(set(today)) == 6
 
 
 def test_pool_slice_leaves_out_what_the_news_already_covers():
     taken = texts(TOPICS[:3])
-    assert not set(texts(pool_for_day(date(2026, 9, 14), 6, exclude=taken))) & set(taken)
+    assert not set(texts(pool_for_day(date(2026, 9, 14), 6, TOPICS, exclude=taken))) & set(taken)
 
 
 def test_the_day_starts_on_the_pool_then_keeps_what_the_news_gave(store):
     source = FakeSource()
-    daily = DailyTopics(store.caches)
+    daily = DailyTopics(store.topics)
 
     topics, pending = parts(daily.listing())
     assert pending is False  # nothing asked for yet
@@ -73,17 +74,17 @@ def test_the_day_starts_on_the_pool_then_keeps_what_the_news_gave(store):
 
 def test_a_day_is_fetched_once(store):
     source = FakeSource()
-    daily = DailyTopics(store.caches)
+    daily = DailyTopics(store.topics)
     daily.ensure_fetched(source)
     daily.ensure_fetched(source)
-    DailyTopics(store.caches).ensure_fetched(source)  # a restart on the same day
+    DailyTopics(store.topics).ensure_fetched(source)  # a restart on the same day
     assert source.calls == 1
 
 
 def test_an_empty_fetch_is_not_cached_and_is_tried_again(store):
     source = FakeSource()
     source.fetch = lambda count: []  # type: ignore[method-assign]
-    daily = DailyTopics(store.caches)
+    daily = DailyTopics(store.topics)
     daily.ensure_fetched(source)
 
     topics, pending = parts(daily.listing())
@@ -98,7 +99,7 @@ def test_an_empty_fetch_is_not_cached_and_is_tried_again(store):
 
 def test_a_failed_fetch_leaves_a_full_list_of_pool_topics(store):
     source = FakeSource(GenerationError("claude timed out after 180s"))
-    daily = DailyTopics(store.caches)
+    daily = DailyTopics(store.topics)
     daily.ensure_fetched(source)
 
     topics, pending = parts(daily.listing())
@@ -109,7 +110,7 @@ def test_a_failed_fetch_leaves_a_full_list_of_pool_topics(store):
 
 
 def test_without_a_source_nothing_is_pending(store):
-    daily = DailyTopics(store.caches)
+    daily = DailyTopics(store.topics)
     daily.ensure_fetched(None)
     topics, pending = parts(daily.listing())
     assert pending is False
@@ -133,7 +134,7 @@ def test_endpoint_serves_the_news_half_once_it_lands(tmp_path):
 
 def test_refresh_redeals_the_pool_and_fetches_the_news_again(store):
     source = FakeSource()
-    daily = DailyTopics(store.caches)
+    daily = DailyTopics(store.topics)
     daily.ensure_fetched(source)
     before, _ = parts(daily.listing())
 
@@ -147,7 +148,7 @@ def test_refresh_redeals_the_pool_and_fetches_the_news_again(store):
 
 
 def test_refresh_without_a_source_still_redeals_the_pool(store):
-    daily = DailyTopics(store.caches)
+    daily = DailyTopics(store.topics)
     before, _ = parts(daily.listing())
     daily.refresh(None)
     after, pending = parts(daily.listing())
@@ -194,7 +195,7 @@ def test_pending_is_true_only_while_a_fetch_is_in_flight(store):
     source = FakeSource()
     source.fetch = lambda count: []  # type: ignore[method-assign]
     executor = HeldExecutor()
-    daily = DailyTopics(store.caches, executor)
+    daily = DailyTopics(store.topics, executor)
 
     daily.ensure_fetched(source)
     assert daily.listing().pending is True

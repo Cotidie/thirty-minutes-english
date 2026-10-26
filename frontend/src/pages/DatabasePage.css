@@ -1,16 +1,16 @@
-.corpus {
+.database {
   max-width: 44rem;
   margin: 0 auto;
   padding: 3rem 1.25rem 6rem;
 }
 
-.corpus-back {
+.database-back {
   color: var(--muted);
   font-size: 0.95rem;
   text-decoration: none;
 }
 
-.corpus-title {
+.database-title {
   font-family: var(--serif);
   font-weight: 500;
   font-size: clamp(2rem, 5vw, 2.8rem);
@@ -18,14 +18,34 @@
   margin: 0.75rem 0 0.5rem;
 }
 
-.corpus-lede {
+.database-lede {
   font-family: var(--serif);
   font-size: 1.15rem;
   color: var(--muted);
-  margin: 0 0 2rem;
+  margin: 0 0 1.25rem;
 }
 
-.corpus-filters {
+.database-tabs {
+  display: flex;
+  gap: 1.25rem;
+  margin: 0 0 1.5rem;
+  border-bottom: 1px solid var(--line);
+}
+
+.database-tab {
+  padding: 0.5rem 0;
+  margin-bottom: -1px;
+  border-bottom: 2px solid transparent;
+  color: var(--muted);
+  text-decoration: none;
+}
+
+.database-tab.is-active {
+  color: var(--ink);
+  border-bottom-color: var(--ink);
+}
+
+.db-filters {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
@@ -33,7 +53,7 @@
   margin-bottom: 1rem;
 }
 
-.corpus-search {
+.db-search {
   flex: 1 1 100%;
   font: inherit;
   padding: 0.6rem 0.75rem;
@@ -42,12 +62,12 @@
   background: var(--paper);
 }
 
-.corpus-filters label {
+.db-filters label {
   color: var(--muted);
   font-size: 0.9rem;
 }
 
-.corpus-filters select {
+.db-filters select {
   font: inherit;
   font-size: 0.95rem;
   padding: 0.3rem 0.4rem;
@@ -57,25 +77,25 @@
   background: var(--paper);
 }
 
-.corpus-count {
+.db-count {
   color: var(--muted);
   font-size: 0.9rem;
   font-variant-numeric: tabular-nums;
   margin: 0 0 0.5rem;
 }
 
-.corpus-list {
+.db-list {
   list-style: none;
   padding: 0;
   margin: 0;
 }
 
-.corpus-item {
+.db-item {
   padding: 1.25rem 0;
   border-top: 1px solid var(--line);
 }
 
-.corpus-head {
+.db-head {
   display: flex;
   align-items: baseline;
   flex-wrap: wrap;
@@ -125,8 +145,25 @@
   font-size: 1.05rem;
 }
 
-.corpus-meta {
+.db-meta {
   color: var(--muted);
   font-size: 0.85rem;
   margin: 0;
+}
+
+.topic-text {
+  font-family: var(--serif);
+  font-weight: 500;
+  font-size: 1.25rem;
+  line-height: 1.25;
+  margin: 0;
+}
+
+.topic-category {
+  border: 1px solid var(--cat-line, var(--line));
+  border-radius: 999px;
+  background: var(--cat-fill, var(--paper));
+  color: var(--cat-ink, var(--muted));
+  padding: 0.05rem 0.55rem;
+  font-size: 0.8rem;
 }

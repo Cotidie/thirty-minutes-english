@@ -37,7 +37,9 @@ def list_sessions(db: Db) -> list[SessionSummary]:
 @router.post("/sessions", response_model=JobStatus, status_code=202)
 def create_session(body: CreateSessionRequest, db: Db, jobs: Jobs, services: Svc) -> JobStatus:
     """A blank topic takes one from the pool that the last few sessions did not use."""
-    topic = (body.topic or "").strip() or pick_topic(db.sessions.recent_topics(RECENT_TOPIC_WINDOW))
+    topic = (body.topic or "").strip() or pick_topic(
+        db.sessions.recent_topics(RECENT_TOPIC_WINDOW), [t.text for t in db.topics.curated()]
+    )
     return status_of(jobs.start(topic, services.generator, services.illustrator), jobs)
 
 

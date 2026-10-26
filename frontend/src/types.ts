@@ -115,6 +115,22 @@ export interface Stars {
   words: number[]
 }
 
+/** A topic as the database keeps it, for the database page. */
+export interface TopicEntry extends Topic {
+  id: number
+  added_at: string
+  /** Days it was among the day's news, oldest first. */
+  news_days: string[]
+  /** Ids of the sessions written on it, oldest first. */
+  sessions: number[]
+}
+
+/** Every topic, with every category's name (typed-in ones too). */
+export interface TopicLibrary {
+  topics: TopicEntry[]
+  labels: Record<string, string>
+}
+
 export interface TopicListing {
   topics: Topic[]
   /** Today's news half has not landed yet; the list is pool topics for now. */

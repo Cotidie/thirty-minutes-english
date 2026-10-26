@@ -9,8 +9,9 @@ from datetime import UTC, datetime
 from typing import TYPE_CHECKING
 
 from app.db.expressions import COLUMNS as EXPRESSION_COLUMNS
+from app.db import topics
 from app.db.expressions import expression_from
-from app.models import Article, Draft, Figure, Note, Paragraph, Question, SentencePair, Session, SessionContent, SessionSummary, Source, Stars, VocabularyItem
+from app.models import Article, Category, Draft, Figure, Note, Paragraph, Question, SentencePair, Session, SessionContent, SessionSummary, Source, Stars, VocabularyItem
 
 if TYPE_CHECKING:
     from app.db import Database
@@ -19,6 +20,8 @@ if TYPE_CHECKING:
 
 # The vocabulary column each picture of a word lives in.
 PICTURE_COLUMNS = {"image": "picture_id", "example_image": "example_picture_id"}
+# A session read with its topic's text.
+WITH_TOPIC = "sessions s JOIN topics t ON t.id = s.topic_id"
 
 
 def paragraphs_of(body: str) -> list[str]:
@@ -50,9 +53,11 @@ class SessionRepo:
         """Stores the draft with the corpus expressions it teaches, in that order."""
         article = draft.article
         with self._db.connect() as conn:
+            now = datetime.now(UTC).isoformat()
             cur = conn.execute(
-                "INSERT INTO sessions (created_at, topic, title, questions, sources, translation) VALUES (?, ?, ?, ?, ?, ?)",
-                (datetime.now(UTC).isoformat(), draft.topic, article.title, _json(article.questions), _json(article.sources), _json(article.translation)),
+                "INSERT INTO sessions (created_at, topic_id, title, questions, sources, translation) VALUES (?, ?, ?, ?, ?, ?)",
+                (now, topics.ensure(conn, draft.topic, Category.TYPED, now), article.title, _json(article.questions), _json(article.sources),
+                 _json(article.translation)),
             )
             session_id = cur.lastrowid
             conn.executemany(
@@ -77,7 +82,7 @@ class SessionRepo:
 
     def get(self, session_id: int) -> Session | None:
         with self._db.connect() as conn:
-            row = conn.execute("SELECT * FROM sessions WHERE id = ?", (session_id,)).fetchone()
+            row = conn.execute(f"SELECT s.*, t.text AS topic FROM {WITH_TOPIC} WHERE s.id = ?", (session_id,)).fetchone()
             if row is None:
                 return None
             paragraphs = conn.execute("SELECT id, text FROM paragraphs WHERE session_id = ? ORDER BY position", (session_id,)).fetchall()
@@ -113,7 +118,7 @@ class SessionRepo:
 
     def list_all(self) -> list[SessionSummary]:
         with self._db.connect() as conn:
-            rows = conn.execute("SELECT id, created_at, topic, title FROM sessions ORDER BY id DESC").fetchall()
+            rows = conn.execute(f"SELECT s.id, s.created_at, t.text AS topic, s.title FROM {WITH_TOPIC} ORDER BY s.id DESC").fetchall()
         return [SessionSummary(**dict(row)) for row in rows]
 
     def delete(self, session_id: int) -> list[int] | None:
@@ -147,7 +152,7 @@ class SessionRepo:
     def recent_topics(self, limit: int) -> list[str]:
         with self._db.connect() as conn:
             rows = conn.execute(
-                "SELECT topic, MAX(id) AS last_id FROM sessions GROUP BY topic ORDER BY last_id DESC LIMIT ?", (limit,)
+                f"SELECT t.text AS topic, MAX(s.id) AS last_id FROM {WITH_TOPIC} GROUP BY s.topic_id ORDER BY last_id DESC LIMIT ?", (limit,)
             ).fetchall()
         return [row["topic"] for row in rows]
 

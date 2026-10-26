@@ -40,7 +40,7 @@ def create_app(
     app.state.rebuild = rebuild
     app.state.catalog = catalog or Catalog(db.caches, fetchers={})
     app.state.jobs = JobRunner(db.sessions, db.expressions, db.stages, executor, SourceImages(db.pictures, app.state.files))
-    app.state.topics = DailyTopics(db.caches, app.state.jobs.executor)
+    app.state.topics = DailyTopics(db.topics, app.state.jobs.executor)
     for router in ROUTERS:
         app.include_router(router)
     if image_dir is not None:

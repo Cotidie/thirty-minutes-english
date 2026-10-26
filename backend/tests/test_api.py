@@ -7,13 +7,13 @@ from app.generation.jobs import DEFAULT_STAGE_SECONDS, EXPRESSION_COUNT
 from app.generation.progress import Progress, Stage
 from app.llm import GenerationError
 from app.main import create_app
-from app.topics.pool import TOPICS
 from app.wiring import Services
 from app.pictures.files import PictureFiles
 from app.pictures.scenes import Scene
 
-TOPIC_TEXTS = {t.text for t in TOPICS}
-from tests.conftest import sample_draft, seed_expressions
+from tests.conftest import CURATED_TOPICS, sample_draft, seed_expressions
+
+TOPIC_TEXTS = {t.text for t in CURATED_TOPICS}
 
 
 class InlineExecutor:

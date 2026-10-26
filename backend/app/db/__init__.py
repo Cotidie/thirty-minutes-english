@@ -13,6 +13,7 @@ from app.db.records import RecordRepo
 from app.db.sessions import SessionRepo
 from app.db.settings import SettingsRepo
 from app.db.stages import StageRepo
+from app.db.topics import TopicRepo
 
 log = logging.getLogger(__name__)
 
@@ -25,14 +26,16 @@ class Database:
         self.path.parent.mkdir(parents=True, exist_ok=True)
         with self.connect() as conn:
             if migrate.is_v1(conn):
-                saved = migrate.backup(self.path)
+                saved = migrate.backup(self.path, 1)
                 renames = saved.with_name(f"{saved.name}.renames.json")
                 report = migrate.migrate_v1(conn, self.images_dir, renames)
                 log.info("migrated %s to schema v2 (v1 copy: %s, file renames: %s): %s", self.path, saved.name, renames.name, report)
             elif (version := conn.execute("PRAGMA user_version").fetchone()[0]) == 0:
                 schema.create(conn)
             elif version < schema.VERSION:
-                schema.upgrade(conn)
+                saved = migrate.backup(self.path, version)
+                schema.upgrade(conn, version)
+                log.info("upgraded %s from schema v%d to v%d (copy: %s)", self.path, version, schema.VERSION, saved.name)
         self.sessions = SessionRepo(self)
         self.expressions = ExpressionRepo(self)
         self.records = RecordRepo(self)
@@ -41,6 +44,7 @@ class Database:
         self.stages = StageRepo(self)
         self.pins = PinRepo(self)
         self.settings = SettingsRepo(self)
+        self.topics = TopicRepo(self)
 
     def connect(self) -> sqlite3.Connection:
         """A connection whose `with` block is one transaction, with foreign keys enforced."""

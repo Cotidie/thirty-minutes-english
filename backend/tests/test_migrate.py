@@ -3,7 +3,7 @@ import logging
 import sqlite3
 from pathlib import Path
 
-from app.db import Database
+from app.db import Database, schema
 from app.db.pictures import PictureStat
 from app.models import Stars
 
@@ -157,7 +157,7 @@ def test_a_v1_file_is_backed_up_and_comes_up_current_with_everything_in_rows(tmp
     [backup] = tmp_path.glob("s.db.bak-v1-????-??-??")
     assert sqlite3.connect(backup).execute("SELECT COUNT(*) FROM sessions").fetchone()[0] == 2  # the copy is the v1 file
     with db.connect() as conn:
-        assert conn.execute("PRAGMA user_version").fetchone()[0] == 3
+        assert conn.execute("PRAGMA user_version").fetchone()[0] == schema.VERSION
         names = {r[0] for r in conn.execute("SELECT name FROM sqlite_master WHERE type = 'table'")}
     assert names >= {"paragraphs", "vocabulary", "expressions", "session_expressions", "pictures"}
     assert not {n for n in names if n.endswith("_v1")} and not names & {"stars", "notes", "image_stats"}
@@ -230,7 +230,7 @@ def test_model_lists_topic_days_and_settings_keep_their_values(tmp_path):
     db = migrated(tmp_path)
     cached = db.caches.get_model_list("claude")
     assert (cached.fetched_at, cached.options) == (1000.0, [{"id": "opus", "efforts": ["low"]}])
-    assert db.caches.get_daily_topics("2026-10-23") == ["T1", "T2"]
+    assert db.topics.news("2026-10-23") == ["T1", "T2"]
     assert db.settings.load() == {"SUMMARY_MODEL": "sonnet", "VOICE_PROVIDER": "gemini"}  # nothing is dropped any more
     assert db.pins.pinned("openrouter_images") == ["m"]
 

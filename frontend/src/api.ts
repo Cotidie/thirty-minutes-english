@@ -19,6 +19,7 @@ import type {
   SettingsUpdate,
   SettingsView,
   Stars,
+  TopicLibrary,
   TopicListing,
   VocabularyItem,
   VoiceProvider,
@@ -38,6 +39,8 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
 export const api = {
   topics: () => request<TopicListing>('/api/topics'),
   refreshTopics: () => request<TopicListing>('/api/topics/refresh', { method: 'POST' }),
+  /** Every topic with the days it led the news and the sessions written on it. */
+  topicLibrary: () => request<TopicLibrary>('/api/topics/all'),
   listSessions: () => request<SessionSummary[]>('/api/sessions'),
   /** The whole expression corpus; the corpus page searches it in the browser. */
   corpus: () => request<CorpusEntry[]>('/api/expressions'),
