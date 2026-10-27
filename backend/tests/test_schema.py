@@ -6,7 +6,7 @@ from app.db import Database, schema
 from app.db.pictures import PictureStat
 from app.generation.progress import Stage
 from app.models import Category
-from tests.conftest import CURATED_TOPICS, sample_draft
+from tests.conftest import CURATED_TOPICS, sample_draft, seed_expressions
 
 
 def as_v3(path) -> None:
@@ -36,6 +36,7 @@ def as_v3(path) -> None:
         conn.execute("CREATE TABLE topic_days (day TEXT PRIMARY KEY, topics TEXT NOT NULL) STRICT")
         conn.executemany("INSERT INTO topic_days VALUES (?, ?)", days)
         conn.execute("DROP TABLE swapped_expressions")
+        conn.execute("ALTER TABLE expressions DROP COLUMN korean_example")
         conn.execute("PRAGMA user_version = 3")
     conn.close()
 
@@ -113,10 +114,24 @@ def test_a_v4_file_gains_the_swapped_expressions_table_and_keeps_its_sessions(tm
     session = Database(path).sessions.create(sample_draft(), [])
     with sqlite3.connect(path) as conn:
         conn.execute("DROP TABLE swapped_expressions")
+        conn.execute("ALTER TABLE expressions DROP COLUMN korean_example")
         conn.execute("PRAGMA user_version = 4")
     db = Database(path)
     with db.connect() as conn:
-        assert conn.execute("PRAGMA user_version").fetchone()[0] == 5
+        assert conn.execute("PRAGMA user_version").fetchone()[0] == schema.VERSION
         assert conn.execute("SELECT sql FROM sqlite_master WHERE name = 'swapped_expressions'").fetchone()[0].rstrip().endswith("STRICT")
     assert list(tmp_path.glob("s.db.bak-v4-????-??-??"))
     assert db.sessions.get(session.id).content.article.title == session.content.article.title
+
+
+def test_a_v5_file_gains_an_empty_korean_example_on_each_expression(tmp_path):
+    path = tmp_path / "s.db"
+    [expression] = seed_expressions(Database(path), 1)
+    with sqlite3.connect(path) as conn:
+        conn.execute("ALTER TABLE expressions DROP COLUMN korean_example")
+        conn.execute("PRAGMA user_version = 5")
+    db = Database(path)
+    with db.connect() as conn:
+        assert conn.execute("PRAGMA user_version").fetchone()[0] == schema.VERSION
+    assert list(tmp_path.glob("s.db.bak-v5-????-??-??"))
+    assert db.expressions.get(expression).korean_example is None

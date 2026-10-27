@@ -8,7 +8,7 @@ from datetime import UTC, datetime
 from app.db import topics
 from app.models import Category
 
-VERSION = 5
+VERSION = 6
 
 # Added in v3: images under the article's paragraphs.
 FIGURES = """
@@ -53,6 +53,12 @@ CREATE TABLE swapped_expressions (
 ) STRICT;
 
 CREATE INDEX swapped_expressions_expression ON swapped_expressions (expression_id);
+"""
+
+# Added in v6: a Korean sentence the pair say in English with the expression, and the English model
+# answer, as one JSON object {"korean", "english"}; NULL until the corpus has one.
+KOREAN_EXAMPLES = """
+ALTER TABLE expressions ADD COLUMN korean_example TEXT;
 """
 
 SESSIONS = """
@@ -173,7 +179,7 @@ CREATE INDEX examples_vocabulary ON examples (vocabulary_id);
 CREATE INDEX readings_paragraph ON readings (paragraph_id);
 CREATE INDEX summaries_paragraph ON summaries (paragraph_id);
 CREATE INDEX stage_times_stage ON stage_times (stage, id);
-""" + FIGURES + SWAPS
+""" + FIGURES + SWAPS + KOREAN_EXAMPLES
 
 
 def _run(conn: sqlite3.Connection, script: str) -> None:
@@ -200,6 +206,9 @@ def upgrade(conn: sqlite3.Connection, version: int) -> None:
     if version < 5:
         _run(conn, SWAPS)
         conn.execute("PRAGMA user_version = 5")
+    if version < 6:
+        _run(conn, KOREAN_EXAMPLES)
+        conn.execute("PRAGMA user_version = 6")
 
 
 def _topics(conn: sqlite3.Connection) -> None:

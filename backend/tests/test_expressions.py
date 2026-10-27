@@ -4,6 +4,7 @@ from fastapi.testclient import TestClient
 
 from app.db import Database
 from app.main import create_app
+from app.models import KoreanExample
 from app.wiring import Services
 from tests.conftest import NAMES, sample_draft, seed_expressions
 from tests.test_api import FakeGenerator, InlineExecutor
@@ -90,3 +91,15 @@ def test_an_expression_is_deleted_over_http_once(tmp_path):
         assert c.delete(f"/api/expressions/{expression}").status_code == 204
         assert c.delete(f"/api/expressions/{expression}").status_code == 404
         assert c.get("/api/expressions").json() == []
+
+
+def test_a_korean_example_comes_with_its_expression_wherever_it_is_read(store):
+    a, b = seed_expressions(store, 2)
+    with store.connect() as conn:
+        conn.execute("UPDATE expressions SET korean_example = ? WHERE id = ?",
+                     ('{"korean": "못 오면 미리 알려 줘.", "english": "Let me know in advance if you can\'t come."}', a))
+    session = store.sessions.create(sample_draft(), [a, b]).id
+    example = KoreanExample(korean="못 오면 미리 알려 줘.", english="Let me know in advance if you can't come.")
+    assert [e.korean_example for e in store.sessions.get(session).content.expressions] == [example, None]
+    assert store.expressions.get(a).korean_example == example
+    assert [e.korean_example for e in store.expressions.list_all()] == [example, None]

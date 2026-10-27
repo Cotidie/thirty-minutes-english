@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from '@testing-library/react'
+import { render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, expect, it, vi } from 'vitest'
 import type { Example } from '../types'
@@ -129,5 +129,28 @@ describe('ExpressionsTab', () => {
     render(<ExpressionsTab items={items} sessionId={3} starred={[]} onToggleStar={vi.fn()} examples={none} onExample={vi.fn()} onSwap={vi.fn()} onAdd={onAdd} />)
     await userEvent.click(screen.getByRole('button', { name: 'Add another expression' }))
     expect(await screen.findByText('Could not add one: nothing is left to add')).toBeInTheDocument()
+  })
+
+  it('flips the Korean example under the examples to its English model answer and back', async () => {
+    const withExample = [{ ...items[0], korean_example: { korean: '마감이 계속 바뀌어.', english: 'The deadline is a moving target.' } }]
+    render(<ExpressionsTab items={withExample} sessionId={3} starred={[]} onToggleStar={vi.fn()} examples={none} onExample={vi.fn()} onSwap={vi.fn()} onAdd={vi.fn()} />)
+    const example = screen.getByRole('button', { name: /마감이 계속 바뀌어\./ })
+    expect(document.querySelector('.expression-examples')!.compareDocumentPosition(example)).toBe(Node.DOCUMENT_POSITION_FOLLOWING)
+    expect(example.compareDocumentPosition(screen.getByRole('button', { name: 'Your turn: one sentence each.' }))).toBe(Node.DOCUMENT_POSITION_FOLLOWING)
+    expect(example).toHaveAttribute('aria-pressed', 'false')
+    expect(screen.queryByText(/The deadline is/)).toBeNull()
+
+    await userEvent.click(example)
+    expect(example).toHaveAttribute('aria-pressed', 'true')
+    expect(within(example).getByText('a moving target', { selector: 'mark' })).toBeInTheDocument()
+    expect(screen.queryByText('마감이 계속 바뀌어.')).toBeNull()
+
+    await userEvent.click(example)
+    expect(within(example).getByText('마감이 계속 바뀌어.')).toBeInTheDocument()
+  })
+
+  it('leaves the Korean example out when the expression has none', () => {
+    render(<ExpressionsTab items={items} sessionId={3} starred={[]} onToggleStar={vi.fn()} examples={none} onExample={vi.fn()} onSwap={vi.fn()} onAdd={vi.fn()} />)
+    expect(document.querySelector('.korean-example')).toBeNull()
   })
 })

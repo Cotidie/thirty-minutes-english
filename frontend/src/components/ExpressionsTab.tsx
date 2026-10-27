@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { practiceExpression, type Example, type Expression } from '../types'
+import { practiceExpression, type Example, type Expression, type KoreanExample as KoreanExampleData } from '../types'
 import { Practice } from './Practice'
 import { StarButton } from './StarButton'
 import { KoreanChip } from './KoreanChip'
@@ -71,8 +71,8 @@ export function ExpressionsTab({ items, sessionId, starred, onToggleStar, exampl
   return (
     <section className="tab-panel">
       <p className="tab-brief">
-        Read the examples aloud, then each of you makes one sentence of your own. Press Your turn to have it echoed back
-        the native way.
+        Read the examples aloud, then each of you says the Korean sentence in English before you tap it for the model
+        answer. Press Your turn to make one sentence of your own and have it echoed back the native way.
       </p>
       <ol className="expression-list">
         {items.map((item) => (
@@ -112,6 +112,7 @@ export function ExpressionsTab({ items, sessionId, starred, onToggleStar, exampl
                 </li>
               ))}
             </ul>
+            {item.korean_example && <KoreanExample example={item.korean_example} phrase={item.phrase} />}
             <Practice
               target={practiceExpression(item)}
               label="Your turn: one sentence each."
@@ -138,5 +139,29 @@ function UsageNote({ text }: { text: string }) {
     >
       {text}
     </button>
+  )
+}
+
+/** The Korean sentence until tapped, then the English model answer with the expression marked. */
+function KoreanExample({ example, phrase }: { example: KoreanExampleData; phrase: string }) {
+  const [english, setEnglish] = useState(false)
+  return (
+    <div className="korean-example">
+      <p className="korean-example-label">한국어로 해 보기</p>
+      <button type="button" className="korean-example-card" aria-pressed={english} onClick={() => setEnglish((e) => !e)}>
+        {english ? (
+          <span className="korean-example-english">
+            <Marked text={example.english} word={phrase} />
+          </span>
+        ) : (
+          <span className="korean-example-korean" lang="ko">
+            {example.korean}
+          </span>
+        )}
+        <span className="korean-example-hint">
+          {english ? '모범 답안 · 다르게 말해도 표현을 넣었으면 충분해요' : '둘 다 영어로 말해 본 뒤 눌러서 모범 답안 보기'}
+        </span>
+      </button>
+    </div>
   )
 }

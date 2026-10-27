@@ -1,14 +1,20 @@
 .expression-list {
   list-style: none;
   padding: 0;
-  margin: 0;
+  margin: 0 0 1.5rem;
   counter-reset: expr;
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
 }
 
+/* Each expression is a card of its own. */
 .expression {
   counter-increment: expr;
-  padding: 1.75rem 0;
-  border-top: 1px solid var(--line);
+  padding: 1.75rem 2rem;
+  background: var(--paper);
+  border: 1px solid var(--line);
+  border-radius: 16px;
 }
 
 /* Phrase, chip and star share one centre line; the row carries the gap below. */
@@ -125,4 +131,52 @@
 .expression-add:disabled {
   opacity: 0.45;
   cursor: progress;
+}
+
+.korean-example {
+  margin: 0 0 1rem;
+  padding-top: 1rem;
+  border-top: 1px dashed var(--line);
+}
+
+.korean-example-label {
+  margin: 0 0 0.5rem;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--phrase);
+}
+
+/* The Korean sentence until tapped, then the English model answer. */
+.korean-example-card {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  width: 100%;
+  padding: 0.85rem 1.1rem;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--ground);
+  text-align: left;
+  cursor: pointer;
+}
+
+.korean-example-card[aria-pressed='true'] {
+  border-color: var(--phrase);
+  background: var(--paper);
+}
+
+.korean-example-korean,
+.korean-example-english {
+  font-family: var(--serif);
+  font-size: 1.3rem;
+  line-height: 1.45;
+}
+
+.korean-example-hint {
+  font-size: 0.8rem;
+  color: var(--muted);
+}
+
+.korean-example-card[aria-pressed='true'] .korean-example-hint {
+  color: var(--phrase);
 }

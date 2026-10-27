@@ -16,7 +16,7 @@ from app.models import CorpusEntry, Expression
 if TYPE_CHECKING:
     from app.db import Database
 
-COLUMNS = "e.id, e.phrase, e.meaning, e.synonyms, e.examples, e.usage_note, e.korean, e.setting"
+COLUMNS = "e.id, e.phrase, e.meaning, e.synonyms, e.examples, e.usage_note, e.korean, e.setting, e.korean_example"
 # Every session that used an expression: taught it, or swapped it out.
 USES = "SELECT session_id, expression_id FROM session_expressions UNION ALL SELECT session_id, expression_id FROM swapped_expressions"
 
@@ -31,6 +31,7 @@ def expression_from(row: sqlite3.Row) -> Expression:
         examples=json.loads(row["examples"]),
         korean=row["korean"],
         setting=row["setting"],
+        korean_example=row["korean_example"] and json.loads(row["korean_example"]),
     )
 
 

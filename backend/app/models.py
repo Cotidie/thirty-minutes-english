@@ -45,6 +45,14 @@ class Topic(BaseModel):
     category: Category
 
 
+class KoreanExample(BaseModel):
+    """A Korean sentence the pair each say in English with the expression, then tap to see `english`."""
+
+    korean: str
+    """The model answer: one way to say `korean` with the expression."""
+    english: str
+
+
 class Expression(BaseModel):
     """One expression of the corpus; a session teaches a few of them."""
 
@@ -59,6 +67,8 @@ class Expression(BaseModel):
     korean: str | None = None
     """Where it is said: casual, workplace or discussion; None when the source does not say."""
     setting: str | None = None
+    """None until the corpus has one."""
+    korean_example: KoreanExample | None = None
 
 
 class CorpusEntry(Expression):

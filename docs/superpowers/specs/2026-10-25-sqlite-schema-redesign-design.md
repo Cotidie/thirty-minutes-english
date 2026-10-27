@@ -78,7 +78,8 @@ CREATE TABLE expressions (
     korean     TEXT,
     setting    TEXT,                             -- casual | workplace | discussion | NULL(모름). 말하는 자리
     source     TEXT    NOT NULL,                 -- 출처 이름. 세션에서 옮긴 것은 'session'
-    added_at   TEXT    NOT NULL
+    added_at   TEXT    NOT NULL,
+    korean_example TEXT                          -- JSON {korean, english}: 한국어 예문과 영어 모범 답안. NULL이면 아직 없음 (v6)
 ) STRICT;
 
 CREATE TABLE session_expressions (               -- 배운 기록. 행이 있으면 가르친 것
@@ -151,7 +152,7 @@ CREATE TABLE stage_times (id INTEGER PRIMARY KEY AUTOINCREMENT, stage TEXT NOT N
 
 인덱스: `paragraphs(session_id)`, `vocabulary(session_id)`, `session_expressions(session_id)`, `session_expressions(expression_id)`, `examples(session_expression_id)`, `examples(vocabulary_id)`, `readings(paragraph_id)`, `summaries(paragraph_id)`, `stage_times(stage, id)`, `sessions(topic_id)`, `topic_days(topic_id)`, `swapped_expressions(expression_id)`.
 
-버전: v3에 `figures`, v4(2026-10-26)에 `topics`와 참조형 `topic_days`·`sessions.topic_id`. v3→v4 업그레이드는 날짜 붙은 백업(`.bak-v3-…`)을 남기고, 큐레이션 주제를 넣고(이후엔 코드가 아니라 DB가 원본, `app/topics/curated.py`는 시드), 뉴스 JSON과 세션 주제 텍스트를 참조로 바꾸고, foreign key를 끈 채 `sessions`를 다시 만든 뒤 키를 검사한다. v5(2026-10-27)에 `swapped_expressions`. 테이블 하나 추가라 백업(`.bak-v4-…`) 뒤 만들기만 한다.
+버전: v3에 `figures`, v4(2026-10-26)에 `topics`와 참조형 `topic_days`·`sessions.topic_id`. v3→v4 업그레이드는 날짜 붙은 백업(`.bak-v3-…`)을 남기고, 큐레이션 주제를 넣고(이후엔 코드가 아니라 DB가 원본, `app/topics/curated.py`는 시드), 뉴스 JSON과 세션 주제 텍스트를 참조로 바꾸고, foreign key를 끈 채 `sessions`를 다시 만든 뒤 키를 검사한다. v5(2026-10-27)에 `swapped_expressions`. 테이블 하나 추가라 백업(`.bak-v4-…`) 뒤 만들기만 한다. v6(2026-10-27)에 `expressions.korean_example`. 열 하나 추가라 백업(`.bak-v5-…`) 뒤 `ALTER TABLE`만 한다.
 
 ## 표현 선택 규칙
 
@@ -162,6 +163,7 @@ CREATE TABLE stage_times (id INTEGER PRIMARY KEY AUTOINCREMENT, stage TEXT NOT N
 - corpus가 비어 있으면 표현 0개인 세션. Expressions 탭은 "This session has no expressions."
 - 바꾸기(Expressions 탭의 ↻): 같은 규칙으로 하나를 뽑되 그 세션이 가르쳤거나 바꿔 뺀 표현은 빼고, 같은 position에 넣는다. 뺀 표현은 `swapped_expressions`에 남고, 그 자리의 별표와 연습 문장은 지운다. 남은 후보가 없으면 404.
 - 더하기(Expressions 탭 맨 아래 가로로 긴 +): 바꾸기와 같은 규칙으로 하나를 뽑아 맨 뒤 position에 넣는다. 세션이 없거나 남은 후보가 없으면 404.
+- 한국어 예문: 표현마다 하나. 카드의 영어 예문 아래에 한국어로 보이고, 둘이 각자 영어로 말해 본 뒤 누르면 영어 모범 답안(표현에 형광펜)으로 바뀐다. 다시 누르면 한국어. 앱에는 쓰는 경로가 없고, `backend/data/corpus-temment-2026-10-26/scripts/write_korean_examples.py`가 Claude로 만들어 `--apply`로 채운다(영어 예문과 다른 상황, 모범 답안엔 표현이 꼭 들어감).
 - 삭제(Database 페이지): 표현은 corpus와 그 표현을 가르친 모든 세션에서 지운다(별표, 연습 문장 포함). 주제는 그 주제로 쓴 세션이 없을 때만 지운다(있으면 409). 그날 뉴스 목록에서도 빠진다.
 - 주제 매칭 없음. 현재 프롬프트도 표현은 주제와 무관. 필요해지면 `expression_tags(expression_id, tag)` 추가.
 

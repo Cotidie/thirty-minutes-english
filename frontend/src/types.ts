@@ -11,6 +11,14 @@ export interface Expression {
   examples: string[]
   /** The Korean equivalent, hidden behind a chip until tapped. */
   korean?: string | null
+  /** Said in English by each of the pair, then tapped for the model answer; null until the corpus has one. */
+  korean_example?: KoreanExample | null
+}
+
+export interface KoreanExample {
+  korean: string
+  /** The model answer: one way to say `korean` with the expression. */
+  english: string
 }
 
 /** An expression as the corpus keeps it, for the corpus page. */
