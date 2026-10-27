@@ -117,7 +117,7 @@ describe('ExpressionsTab', () => {
     render(<ExpressionsTab items={withExample} starred={[]} onToggleStar={vi.fn()} onSwap={vi.fn()} onAdd={vi.fn()} />)
     const example = screen.getByRole('button', { name: /마감이 계속 바뀌어\./ })
     expect(document.querySelector('.expression-examples')!.compareDocumentPosition(example)).toBe(Node.DOCUMENT_POSITION_FOLLOWING)
-    expect(within(example).queryByText(/둘 다 영어로/)).toBeNull()
+    expect(within(example).getByText('영어로 어떻게 말할까요?')).toBeInTheDocument()
     expect(example).toHaveAttribute('aria-pressed', 'false')
     expect(screen.queryByText(/The deadline is/)).toBeNull()
 
@@ -125,6 +125,7 @@ describe('ExpressionsTab', () => {
     expect(example).toHaveAttribute('aria-pressed', 'true')
     expect(within(example).getByText('a moving target', { selector: 'mark' })).toBeInTheDocument()
     expect(screen.queryByText('마감이 계속 바뀌어.')).toBeNull()
+    expect(within(example).queryByText('영어로 어떻게 말할까요?')).toBeNull()
 
     await userEvent.click(example)
     expect(within(example).getByText('마감이 계속 바뀌어.')).toBeInTheDocument()

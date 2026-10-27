@@ -146,7 +146,9 @@ function KoreanExample({ example, phrase }: { example: KoreanExampleData; phrase
             {example.korean}
           </span>
         )}
-        {english && <span className="korean-example-hint">모범 답안 · 다르게 말해도 표현을 넣었으면 충분해요</span>}
+        <span className="korean-example-hint">
+          {english ? '모범 답안 · 다르게 말해도 표현을 넣었으면 충분해요' : '영어로 어떻게 말할까요?'}
+        </span>
       </button>
     </div>
   )
