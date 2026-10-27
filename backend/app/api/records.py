@@ -13,9 +13,9 @@ router = APIRouter(prefix="/api")
 def add_example(body: ExampleRequest, db: Db) -> Example:
     require_session(db, body.session_id)
     try:
-        return db.records.add_example(body.session_id, body.expression_id, body.vocabulary_id, body.user_text, body.coach_text, body.seconds)
+        return db.records.add_example(body.session_id, body.vocabulary_id, body.user_text, body.coach_text, body.seconds)
     except KeyError:
-        raise HTTPException(status_code=404, detail="not taught in this session") from None
+        raise HTTPException(status_code=404, detail="not a word of this session") from None
 
 
 @router.get("/examples", response_model=list[Example])

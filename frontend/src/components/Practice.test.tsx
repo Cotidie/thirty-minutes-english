@@ -22,28 +22,27 @@ vi.mock('../api', () => ({ api: { addExample: vi.fn(), exampleFeedback: vi.fn() 
 
 const target: PracticeTarget = {
   id: 21,
-  kind: 'expression',
-  text: 'read too much into something',
-  meaning: 'to find a meaning that probably is not there',
-  note: "takes 'into', not 'in'",
+  word: 'mitigate',
+  meaning: 'make less severe',
+  pos: 'verb',
+  scene: 'a dam holding back a flood',
 }
 
 const kept: Example = {
   id: 7,
   created_at: '',
-  expression_id: 21,
-  vocabulary_id: null,
-  user_text: "Don't read too much in his silence.",
-  coach_text: "Don't read too much into his silence. It's 'into', not 'in'. Good.",
+  vocabulary_id: 21,
+  user_text: "The dam mitigate the flood.",
+  coach_text: "The dam mitigates the flood. Mitigates takes an s here. Good.",
   seconds: 14,
 }
 
 function renderPractice(examples: Example[] = [], onKept = vi.fn()) {
-  render(<Practice target={target} label="Your turn: one sentence each." sessionId={3} examples={examples} onKept={onKept} />)
+  render(<Practice target={target} label="Practice" sessionId={3} examples={examples} onKept={onKept} />)
   return onKept
 }
 
-const feedback = { paraphrase: "Don't read too much into his silence.", feedback: ["It's 'into', not 'in'.", 'Good.'] }
+const feedback = { paraphrase: "The dam mitigates the flood.", feedback: ["Mitigates takes an s here.", 'Good.'] }
 
 beforeEach(() => {
   connect.mockClear()
@@ -56,12 +55,12 @@ beforeEach(() => {
 
 /** The reader says the sentence; the coach signals it heard it; the native version comes back and is read aloud. */
 async function sayAndHear() {
-  await userEvent.click(screen.getByRole('button', { name: /Your turn/ }))
+  await userEvent.click(screen.getByRole('button', { name: /^Practice/ }))
   act(() => emit({ type: 'session.started', session: { id: 'live_1' } }))
-  act(() => emit({ type: 'session.input_transcript.delta', delta: "Don't read too much in his silence." }))
+  act(() => emit({ type: 'session.input_transcript.delta', delta: "The dam mitigate the flood." }))
   act(() => emit({ type: 'session.output_transcript.delta', delta: 'Got it.' }))
-  await screen.findByText("It's 'into', not 'in'.")
-  act(() => emit({ type: 'session.output_transcript.delta', delta: " Don't read too much into his silence. It's 'into', not 'in'." }))
+  await screen.findByText("Mitigates takes an s here.")
+  act(() => emit({ type: 'session.output_transcript.delta', delta: " The dam mitigates the flood. Mitigates takes an s here." }))
   act(() => emit({ type: 'session.usage.updated', usage: { seconds: 14 } }))
   await userEvent.click(screen.getByRole('button', { name: 'Done' }))
   act(() => emit({ type: 'session.closed', usage: { seconds: 14 } }))
@@ -76,27 +75,27 @@ describe('Practice', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Keep' }))
     expect(vi.mocked(api.addExample)).toHaveBeenCalledWith({
       session_id: 3,
-      expression_id: 21,
-      user_text: "Don't read too much in his silence.",
-      coach_text: "Don't read too much into his silence. It's 'into', not 'in'. Good.",
+      vocabulary_id: 21,
+      user_text: "The dam mitigate the flood.",
+      coach_text: "The dam mitigates the flood. Mitigates takes an s here. Good.",
       seconds: 14,
     })
     expect(onKept).toHaveBeenCalledWith(kept)
     // The slip closes so the next sentence can start from the label.
-    expect(screen.getByRole('button', { name: /Your turn/ })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /^Practice/ })).toBeInTheDocument()
   })
 
   it('asks the text coach once the sentence is in, and has the answer read aloud', async () => {
     renderPractice()
     await sayAndHear()
-    expect(vi.mocked(api.exampleFeedback)).toHaveBeenCalledWith(target, "Don't read too much in his silence.")
-    expect(connection.say).toHaveBeenCalledWith("Don't read too much into his silence. It's 'into', not 'in'. Good.")
+    expect(vi.mocked(api.exampleFeedback)).toHaveBeenCalledWith(target, "The dam mitigate the flood.")
+    expect(connection.say).toHaveBeenCalledWith("The dam mitigates the flood. Mitigates takes an s here. Good.")
     // The Coach line is the written answer, never the live transcript's "Got it."
     expect(screen.queryByText(/Got it/)).not.toBeInTheDocument()
-    expect(screen.getByText("Don't read too much into his silence.")).toBeInTheDocument()
+    expect(screen.getByText("The dam mitigates the flood.")).toBeInTheDocument()
     // Each change is its own bullet.
     const notes = screen.getByRole('list', { name: 'Feedback' })
-    expect(notes).toHaveTextContent("It's 'into', not 'in'.")
+    expect(notes).toHaveTextContent("Mitigates takes an s here.")
     expect(notes.querySelectorAll('li')).toHaveLength(2)
   })
 
@@ -105,7 +104,7 @@ describe('Practice', () => {
     let answer: (f: typeof feedback) => void = () => undefined
     vi.mocked(api.exampleFeedback).mockReturnValue(new Promise((resolve) => (answer = resolve)))
     renderPractice()
-    await userEvent.click(screen.getByRole('button', { name: /Your turn/ }))
+    await userEvent.click(screen.getByRole('button', { name: /^Practice/ }))
     act(() => emit({ type: 'session.started', session: { id: 'live_1' } }))
     act(() => emit({ type: 'session.input_transcript.delta', delta: 'A sentence.' }))
     act(() => emit({ type: 'session.output_transcript.delta', delta: 'Got it.' }))
@@ -127,7 +126,7 @@ describe('Practice', () => {
   it('shows why when the answer does not come, and keeps nothing', async () => {
     vi.mocked(api.exampleFeedback).mockRejectedValue(new Error('feedback failed: claude timed out after 90s'))
     renderPractice()
-    await userEvent.click(screen.getByRole('button', { name: /Your turn/ }))
+    await userEvent.click(screen.getByRole('button', { name: /^Practice/ }))
     act(() => emit({ type: 'session.started', session: { id: 'live_1' } }))
     act(() => emit({ type: 'session.input_transcript.delta', delta: 'A sentence.' }))
     act(() => emit({ type: 'session.output_transcript.delta', delta: 'Got it.' }))
@@ -142,24 +141,24 @@ describe('Practice', () => {
     const items = screen.getAllByRole('listitem')
     expect(items[0]).toHaveTextContent('First try.')
     expect(items[0]).toHaveTextContent('First try. Natural.')
-    expect(items[1]).toHaveTextContent("It's 'into', not 'in'.")
+    expect(items[1]).toHaveTextContent("Mitigates takes an s here.")
   })
 
   it('discards with ✕ while still listening, dropping the connection', async () => {
     const onKept = renderPractice()
-    await userEvent.click(screen.getByRole('button', { name: /Your turn/ }))
+    await userEvent.click(screen.getByRole('button', { name: /^Practice/ }))
     act(() => emit({ type: 'session.started', session: { id: 'live_1' } }))
     act(() => emit({ type: 'session.input_transcript.delta', delta: 'hello?' }))
 
     await userEvent.click(screen.getByRole('button', { name: 'Discard' }))
     expect(connection.dispose).toHaveBeenCalled()
     expect(onKept).not.toHaveBeenCalled()
-    expect(screen.getByRole('button', { name: /Your turn/ })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /^Practice/ })).toBeInTheDocument()
   })
 
   it('retries with ↻, both mid-round and after, starting a fresh round each time', async () => {
     renderPractice()
-    await userEvent.click(screen.getByRole('button', { name: /Your turn/ }))
+    await userEvent.click(screen.getByRole('button', { name: /^Practice/ }))
     act(() => emit({ type: 'session.started', session: { id: 'live_1' } }))
     act(() => emit({ type: 'session.input_transcript.delta', delta: 'wrong start' }))
     await userEvent.click(screen.getByRole('button', { name: 'Retry' }))
@@ -175,7 +174,7 @@ describe('Practice', () => {
 
   it('will not keep a round the coach never answered', async () => {
     renderPractice()
-    await userEvent.click(screen.getByRole('button', { name: /Your turn/ }))
+    await userEvent.click(screen.getByRole('button', { name: /^Practice/ }))
     act(() => emit({ type: 'session.started', session: { id: 'live_1' } }))
     act(() => emit({ type: 'session.input_transcript.delta', delta: 'hello?' }))
     await userEvent.click(screen.getByRole('button', { name: 'Done' }))

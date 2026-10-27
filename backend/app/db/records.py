@@ -1,4 +1,4 @@
-"""What the coaches leave behind: sentences made with an expression or a word, paragraphs read aloud
+"""What the coaches leave behind: sentences made with a word, paragraphs read aloud
 or summed up. Each points at what it practised by id, so it goes when its session goes."""
 
 import json
@@ -15,44 +15,30 @@ class RecordRepo:
     def __init__(self, db: "Database") -> None:
         self._db = db
 
-    # A sentence made with an expression or a word, and the coach's echo.
+    # A sentence made with a word, and the coach's echo.
 
-    def add_example(
-        self, session_id: int, expression_id: int | None, vocabulary_id: int | None, user_text: str, coach_text: str, seconds: float
-    ) -> Example:
-        """Raises KeyError unless the expression was taught in the session, or the word is one of its words."""
+    def add_example(self, session_id: int, vocabulary_id: int, user_text: str, coach_text: str, seconds: float) -> Example:
+        """Raises KeyError unless the word is one of the session's."""
         created_at = datetime.now(UTC)
         with self._db.connect() as conn:
-            if expression_id is not None:
-                taught = conn.execute(
-                    "SELECT id FROM session_expressions WHERE session_id = ? AND expression_id = ?", (session_id, expression_id)
-                ).fetchone()
-                if taught is None:
-                    raise KeyError(expression_id)
-                target = ("session_expression_id", taught[0])
-            else:
-                if conn.execute("SELECT 1 FROM vocabulary WHERE id = ? AND session_id = ?", (vocabulary_id, session_id)).fetchone() is None:
-                    raise KeyError(vocabulary_id)
-                target = ("vocabulary_id", vocabulary_id)
+            if conn.execute("SELECT 1 FROM vocabulary WHERE id = ? AND session_id = ?", (vocabulary_id, session_id)).fetchone() is None:
+                raise KeyError(vocabulary_id)
             cur = conn.execute(
-                f"INSERT INTO examples (created_at, {target[0]}, user_text, coach_text, seconds) VALUES (?, ?, ?, ?, ?)",
-                (created_at.isoformat(), target[1], user_text, coach_text, seconds),
+                "INSERT INTO examples (created_at, vocabulary_id, user_text, coach_text, seconds) VALUES (?, ?, ?, ?, ?)",
+                (created_at.isoformat(), vocabulary_id, user_text, coach_text, seconds),
             )
         return Example(
-            id=cur.lastrowid, created_at=created_at, expression_id=expression_id, vocabulary_id=vocabulary_id,
-            user_text=user_text, coach_text=coach_text, seconds=seconds,
+            id=cur.lastrowid, created_at=created_at, vocabulary_id=vocabulary_id, user_text=user_text, coach_text=coach_text, seconds=seconds
         )
 
     def list_examples(self, session_id: int) -> list[Example]:
-        """In the order they were made, so they stack under each expression and word."""
+        """In the order they were made, so they stack under each word."""
         with self._db.connect() as conn:
             rows = conn.execute(
-                """SELECT x.id, x.created_at, se.expression_id, x.vocabulary_id, x.user_text, x.coach_text, x.seconds
-                   FROM examples x
-                   LEFT JOIN session_expressions se ON se.id = x.session_expression_id
-                   LEFT JOIN vocabulary v ON v.id = x.vocabulary_id
-                   WHERE se.session_id = ? OR v.session_id = ? ORDER BY x.id""",
-                (session_id, session_id),
+                """SELECT x.id, x.created_at, x.vocabulary_id, x.user_text, x.coach_text, x.seconds
+                   FROM examples x JOIN vocabulary v ON v.id = x.vocabulary_id
+                   WHERE v.session_id = ? ORDER BY x.id""",
+                (session_id,),
             ).fetchall()
         return [Example(**dict(row)) for row in rows]
 

@@ -2,7 +2,7 @@
 
 from typing import Literal
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from app.generation.jobs import Status
 from app.generation.progress import Stage
@@ -53,46 +53,43 @@ class ReadAloudRequest(ParagraphRequest):
 
 
 class ExampleSessionRequest(BaseModel):
-    sdp: str | None = None
-    expression: str
-    meaning: str
-    usage_note: str = ""
+    """A live round for one sentence made with one of the session's words."""
 
-    _check = field_validator("expression", "meaning")(_not_blank)
+    sdp: str | None = None
+    word: str
+    meaning: str
+    """Its part of speech."""
+    pos: str
+
+    _check = field_validator("word", "meaning", "pos")(_not_blank)
 
 
 class ExampleFeedbackRequest(BaseModel):
-    """One sentence a reader made with a target, for the coach to say back and judge."""
+    """One sentence a reader made with a word, for the coach to reword freely so it uses the word well."""
 
-    expression: str
+    word: str
+    """Its part of speech."""
+    pos: str
     meaning: str
-    usage_note: str = ""
     user_text: str
-    """An expression gets the light native fix; a word gets a free rewording that uses it well."""
-    kind: Literal["expression", "word"] = "expression"
-    """For a word: the picture's scene, so the rewording can describe it."""
+    """What the word's picture shows, so the rewording can describe it."""
     scene: str = ""
 
-    _check = field_validator("expression", "meaning", "user_text")(_not_blank)
+    _check = field_validator("word", "pos", "meaning", "user_text")(_not_blank)
 
 
 class ExampleRequest(BaseModel):
-    """A sentence made in a session with one of its expressions or one of its words: exactly one of the two ids."""
+    """A sentence made in a session with one of its words."""
+
+    model_config = ConfigDict(extra="forbid")
 
     session_id: int
-    expression_id: int | None = None
-    vocabulary_id: int | None = None
+    vocabulary_id: int
     user_text: str
     coach_text: str
     seconds: float = 0
 
     _check = field_validator("user_text", "coach_text")(_not_blank)
-
-    @model_validator(mode="after")
-    def names_one_target(self) -> "ExampleRequest":
-        if (self.expression_id is None) == (self.vocabulary_id is None):
-            raise ValueError("give expression_id or vocabulary_id, not both")
-        return self
 
 
 class SummaryFeedbackRequest(BaseModel):

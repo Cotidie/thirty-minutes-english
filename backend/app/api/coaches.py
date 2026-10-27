@@ -1,4 +1,4 @@
-"""The voice coaches, the pronunciation assessor, reading aloud, and the text runs behind Your turn and Summarize."""
+"""The voice coaches, the pronunciation assessor, reading aloud, and the text runs behind Practice and Summarize."""
 
 from fastapi import APIRouter, Response
 
@@ -61,9 +61,7 @@ def summary_feedback(body: SummaryFeedbackRequest, services: Svc) -> SummaryFeed
 
 @router.post("/example/sessions", response_model=LiveSession, status_code=201)
 def start_example(body: ExampleSessionRequest, services: Svc) -> dict:
-    return start_live(
-        services, "example", body.sdp, expression=body.expression, meaning=body.meaning, usage_note=body.usage_note or "none"
-    )
+    return start_live(services, "example", body.sdp, word=body.word, meaning=body.meaning, pos=body.pos)
 
 
 @router.get("/assessor/token", response_model=AssessorSession)
@@ -82,7 +80,7 @@ def example_feedback(body: ExampleFeedbackRequest, services: Svc) -> ExampleFeed
     if coach is None:
         raise off("example coach is off: the example-coach folder is missing")
     try:
-        return coach.feedback(body.expression, body.meaning, body.usage_note, body.user_text, body.kind, body.scene)
+        return coach.feedback(body.word, body.pos, body.meaning, body.user_text, body.scene)
     except GenerationError as e:
         raise failed("feedback", e) from e
 

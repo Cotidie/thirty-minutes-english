@@ -1,6 +1,5 @@
 import { useState } from 'react'
-import { practiceExpression, type Example, type Expression, type KoreanExample as KoreanExampleData } from '../types'
-import { Practice } from './Practice'
+import type { Expression, KoreanExample as KoreanExampleData } from '../types'
 import { StarButton } from './StarButton'
 import { KoreanChip } from './KoreanChip'
 import { Synonyms } from './Synonyms'
@@ -9,13 +8,9 @@ import './ExpressionsTab.css'
 
 interface Props {
   items: Expression[]
-  sessionId: number
   /** Ids of the starred expressions. */
   starred: number[]
   onToggleStar: (id: number) => void
-  /** Every sentence made in this session; each expression shows its own. */
-  examples: Example[]
-  onExample: (example: Example) => void
   /** Puts another corpus expression in this one's place; rejects with what went wrong. */
   onSwap: (id: number) => Promise<void>
   /** Teaches one more corpus expression after the others; rejects with what went wrong. */
@@ -25,7 +20,7 @@ interface Props {
 /** What a failed change was about: an expression's swap, or the add. */
 type Failure = { at: number | 'add'; message: string }
 
-export function ExpressionsTab({ items, sessionId, starred, onToggleStar, examples, onExample, onSwap, onAdd }: Props) {
+export function ExpressionsTab({ items, starred, onToggleStar, onSwap, onAdd }: Props) {
   // One change at a time, so two at once cannot pick the same expression.
   const [busy, setBusy] = useState(false)
   const [failure, setFailure] = useState<Failure | null>(null)
@@ -72,7 +67,7 @@ export function ExpressionsTab({ items, sessionId, starred, onToggleStar, exampl
     <section className="tab-panel">
       <p className="tab-brief">
         Read the examples aloud, then each of you says the Korean sentence in English before you tap it for the model
-        answer. Press Your turn to make one sentence of your own and have it echoed back the native way.
+        answer.
       </p>
       <ol className="expression-list">
         {items.map((item) => (
@@ -113,13 +108,6 @@ export function ExpressionsTab({ items, sessionId, starred, onToggleStar, exampl
               ))}
             </ul>
             {item.korean_example && <KoreanExample example={item.korean_example} phrase={item.phrase} />}
-            <Practice
-              target={practiceExpression(item)}
-              label="Your turn: one sentence each."
-              sessionId={sessionId}
-              examples={examples.filter((e) => e.expression_id === item.id)}
-              onKept={onExample}
-            />
           </li>
         ))}
       </ol>
@@ -158,9 +146,7 @@ function KoreanExample({ example, phrase }: { example: KoreanExampleData; phrase
             {example.korean}
           </span>
         )}
-        <span className="korean-example-hint">
-          {english ? '모범 답안 · 다르게 말해도 표현을 넣었으면 충분해요' : '둘 다 영어로 말해 본 뒤 눌러서 모범 답안 보기'}
-        </span>
+        {english && <span className="korean-example-hint">모범 답안 · 다르게 말해도 표현을 넣었으면 충분해요</span>}
       </button>
     </div>
   )

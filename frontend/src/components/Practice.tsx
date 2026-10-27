@@ -41,7 +41,7 @@ export function Practice({ target, label, sessionId, examples, onKept }: Props) 
       onKept(
         await api.addExample({
           session_id: sessionId,
-          ...(target.kind === 'expression' ? { expression_id: target.id } : { vocabulary_id: target.id }),
+          vocabulary_id: target.id,
           user_text: r.user.trim(),
           coach_text: spoken(answer!),
           seconds: r.seconds,
@@ -77,7 +77,7 @@ export function Practice({ target, label, sessionId, examples, onKept }: Props) 
     <div className="practice">
       <audio ref={audioRef} autoPlay />
       {examples.length > 0 && (
-        <ol className="sentences" aria-label={`Sentences with ${target.text}`}>
+        <ol className="sentences" aria-label={`Sentences with ${target.word}`}>
           {examples.map((ex) => (
             <li key={ex.id} className="sentence">
               <p className="sentence-said">{ex.user_text}</p>
@@ -92,7 +92,7 @@ export function Practice({ target, label, sessionId, examples, onKept }: Props) 
         </button>
       ) : (
         <Slip
-          label={`Practice ${target.text}`}
+          label={`Practice ${target.word}`}
           state={state}
           level={level}
           status={STATUS_LABEL[state.status]}

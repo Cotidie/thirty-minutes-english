@@ -213,14 +213,14 @@ describe('VocabularyTab', () => {
 
   it('gives each word a Practice button with its own sentences under it', () => {
     const examples: Example[] = [
-      { id: 1, created_at: '', expression_id: null, vocabulary_id: 32, user_text: 'We mitigated the delay.', coach_text: 'We mitigated the delay. Natural.', seconds: 9 },
-      { id: 2, created_at: '', expression_id: 31, vocabulary_id: null, user_text: 'An expression with the same id.', coach_text: 'x', seconds: 9 },
+      { id: 1, created_at: '', vocabulary_id: 32, user_text: 'We mitigated the delay.', coach_text: 'We mitigated the delay. Natural.', seconds: 9 },
+      { id: 2, created_at: '', vocabulary_id: 99, user_text: 'A word of another session.', coach_text: 'x', seconds: 9 },
     ]
     render(<VocabularyTab items={items} sessionId={3} onPicture={vi.fn()} starred={[]} onToggleStar={vi.fn()} examples={examples} onExample={vi.fn()} />)
     expect(screen.getAllByRole('button', { name: 'Practice' })).toHaveLength(2)
     expect(screen.getByText('We mitigated the delay.')).toBeInTheDocument()
     expect(screen.getByRole('list', { name: 'Sentences with mitigate' })).toBeInTheDocument()
     expect(screen.queryByRole('list', { name: 'Sentences with ubiquitous' })).not.toBeInTheDocument()
-    expect(screen.queryByText('An expression with the same id.')).not.toBeInTheDocument()
+    expect(screen.queryByText('A word of another session.')).not.toBeInTheDocument()
   })
 })

@@ -145,20 +145,18 @@ def test_paragraphs_know_their_session(store):
     assert not hasattr(store.sessions, "session_of_vocabulary")  # nothing asks it
 
 
-def test_examples_point_at_an_expression_or_a_word_of_the_session(store):
-    session = store.sessions.create(sample_draft(), seed_expressions(store, 1))
+def test_examples_point_at_a_word_of_the_session(store):
+    session = store.sessions.create(sample_draft(), [])
     other = store.sessions.create(sample_draft(), [])
-    e, w = session.content.expressions[0], session.content.vocabulary[0]
-    ex = store.records.add_example(session.id, e.id, None, "I said", "Coach said", 4)
-    wx = store.records.add_example(session.id, None, w.id, "word use", "echo", 2)
-    assert (ex.expression_id, ex.vocabulary_id, ex.user_text, ex.seconds) == (e.id, None, "I said", 4)
-    assert [(x.id, x.expression_id, x.vocabulary_id) for x in store.records.list_examples(session.id)] == [(ex.id, e.id, None), (wx.id, None, w.id)]
+    w, w2 = session.content.vocabulary[0], session.content.vocabulary[1]
+    first = store.records.add_example(session.id, w.id, "word use", "echo", 2)
+    second = store.records.add_example(session.id, w2.id, "again", "echo", 3)
+    assert (first.vocabulary_id, first.user_text, first.seconds) == (w.id, "word use", 2)
+    assert [(x.id, x.vocabulary_id) for x in store.records.list_examples(session.id)] == [(first.id, w.id), (second.id, w2.id)]
     with pytest.raises(KeyError):
-        store.records.add_example(session.id, 999, None, "x", "y", 0)
+        store.records.add_example(session.id, 999, "x", "y", 0)
     with pytest.raises(KeyError):
-        store.records.add_example(other.id, e.id, None, "x", "y", 0)  # not taught in that session
-    with pytest.raises(KeyError):
-        store.records.add_example(session.id, None, other.content.vocabulary[0].id, "x", "y", 0)
+        store.records.add_example(session.id, other.content.vocabulary[0].id, "x", "y", 0)  # a word of another session
     assert store.records.list_examples(other.id) == []
     assert store.sessions.delete(session.id) is not None
     assert store.records.list_examples(session.id) == []

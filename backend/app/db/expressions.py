@@ -96,7 +96,7 @@ class ExpressionRepo:
 
     def delete(self, expression_id: int) -> bool:
         """Takes the expression out of the corpus and out of every session that taught it, with its stars
-        and practice sentences there; False when there was no such expression."""
+        there; False when there was no such expression."""
         with self._db.connect() as conn:
             conn.execute("DELETE FROM session_expressions WHERE expression_id = ?", (expression_id,))
             return conn.execute("DELETE FROM expressions WHERE id = ?", (expression_id,)).rowcount > 0

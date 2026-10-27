@@ -8,7 +8,7 @@ from datetime import UTC, datetime
 from app.db import topics
 from app.models import Category
 
-VERSION = 6
+VERSION = 7
 
 # Added in v3: images under the article's paragraphs.
 FIGURES = """
@@ -59,6 +59,20 @@ CREATE INDEX swapped_expressions_expression ON swapped_expressions (expression_i
 # answer, as one JSON object {"korean", "english"}; NULL until the corpus has one.
 KOREAN_EXAMPLES = """
 ALTER TABLE expressions ADD COLUMN korean_example TEXT;
+"""
+
+# Rebuilt in v7: sentences are made with words only, since expressions lost their Your turn.
+EXAMPLES = """
+CREATE TABLE examples (
+    id            INTEGER PRIMARY KEY AUTOINCREMENT,
+    created_at    TEXT    NOT NULL,
+    vocabulary_id INTEGER NOT NULL REFERENCES vocabulary(id) ON DELETE CASCADE,
+    user_text     TEXT    NOT NULL,
+    coach_text    TEXT    NOT NULL,
+    seconds       REAL    NOT NULL DEFAULT 0
+) STRICT;
+
+CREATE INDEX examples_vocabulary ON examples (vocabulary_id);
 """
 
 SESSIONS = """
@@ -136,17 +150,6 @@ CREATE TABLE pictures (
     cost       REAL
 ) STRICT;
 
-CREATE TABLE examples (
-    id                    INTEGER PRIMARY KEY AUTOINCREMENT,
-    created_at            TEXT    NOT NULL,
-    session_expression_id INTEGER REFERENCES session_expressions(id) ON DELETE CASCADE,
-    vocabulary_id         INTEGER REFERENCES vocabulary(id) ON DELETE CASCADE,
-    user_text             TEXT    NOT NULL,
-    coach_text            TEXT    NOT NULL,
-    seconds               REAL    NOT NULL DEFAULT 0,
-    CHECK ((session_expression_id IS NULL) <> (vocabulary_id IS NULL))
-) STRICT;
-
 CREATE TABLE readings (
     id           INTEGER PRIMARY KEY AUTOINCREMENT,
     created_at   TEXT    NOT NULL,
@@ -174,12 +177,10 @@ CREATE INDEX paragraphs_session ON paragraphs (session_id);
 CREATE INDEX vocabulary_session ON vocabulary (session_id);
 CREATE INDEX session_expressions_session ON session_expressions (session_id);
 CREATE INDEX session_expressions_expression ON session_expressions (expression_id);
-CREATE INDEX examples_session_expression ON examples (session_expression_id);
-CREATE INDEX examples_vocabulary ON examples (vocabulary_id);
 CREATE INDEX readings_paragraph ON readings (paragraph_id);
 CREATE INDEX summaries_paragraph ON summaries (paragraph_id);
 CREATE INDEX stage_times_stage ON stage_times (stage, id);
-""" + FIGURES + SWAPS + KOREAN_EXAMPLES
+""" + FIGURES + SWAPS + KOREAN_EXAMPLES + EXAMPLES
 
 
 def _run(conn: sqlite3.Connection, script: str) -> None:
@@ -209,6 +210,26 @@ def upgrade(conn: sqlite3.Connection, version: int) -> None:
     if version < 6:
         _run(conn, KOREAN_EXAMPLES)
         conn.execute("PRAGMA user_version = 6")
+    if version < 7:
+        _examples_of_words(conn)
+
+
+def _examples_of_words(conn: sqlite3.Connection) -> None:
+    """v6 to v7: the examples table without its expression column; sentences made with an expression go,
+    and the id counter carries on so a new sentence never takes a gone one's id."""
+    (counter,) = conn.execute("SELECT COALESCE(MAX(seq), 0) FROM sqlite_sequence WHERE name = 'examples'").fetchone()
+    conn.execute("ALTER TABLE examples RENAME TO examples_v6")
+    conn.execute("DROP INDEX IF EXISTS examples_session_expression")
+    conn.execute("DROP INDEX IF EXISTS examples_vocabulary")
+    _run(conn, EXAMPLES)
+    conn.execute(
+        "INSERT INTO examples (id, created_at, vocabulary_id, user_text, coach_text, seconds)"
+        " SELECT id, created_at, vocabulary_id, user_text, coach_text, seconds FROM examples_v6 WHERE vocabulary_id IS NOT NULL"
+    )
+    conn.execute("DROP TABLE examples_v6")
+    conn.execute("DELETE FROM sqlite_sequence WHERE name IN ('examples', 'examples_v6')")
+    conn.execute("INSERT INTO sqlite_sequence (name, seq) VALUES ('examples', ?)", (counter,))
+    conn.execute("PRAGMA user_version = 7")
 
 
 def _topics(conn: sqlite3.Connection) -> None:

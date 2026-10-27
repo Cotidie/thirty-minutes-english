@@ -100,7 +100,7 @@ def test_start_returns_upstream_answer(tmp_path, agent_dir):
     "path,body",
     [
         ("/api/read-aloud/sessions", {"paragraph": PARAGRAPH, "sdp": "v=0"}),
-        ("/api/example/sessions", {"sdp": "v=0", "expression": "x", "meaning": "y"}),
+        ("/api/example/sessions", {"sdp": "v=0", "word": "x", "meaning": "y", "pos": "noun"}),
     ],
 )
 def test_503_when_agent_not_configured(tmp_path, path, body):
@@ -236,7 +236,7 @@ def example_agent_dir(tmp_path):
                     {
                         "type": "message",
                         "role": "developer",
-                        "content": [{"type": "input_text", "text": "{{expression}} / {{meaning}} / {{usage_note}}"}],
+                        "content": [{"type": "input_text", "text": "{{word}} / {{meaning}} / {{pos}}"}],
                     }
                 ],
             }
@@ -245,16 +245,16 @@ def example_agent_dir(tmp_path):
     return directory
 
 
-def test_example_session_carries_the_expression(tmp_path, example_agent_dir):
+def test_example_session_carries_the_word(tmp_path, example_agent_dir):
     sessions = FakeLiveSessions()
     agents = {"example": LiveAgent("example", AgentDefinition(example_agent_dir), sessions)}
     with make_client(tmp_path, agents) as c:
         res = c.post(
             "/api/example/sessions",
-            json={"sdp": "v=0 offer", "expression": "read too much into", "meaning": "find a meaning that is not there"},
+            json={"sdp": "v=0 offer", "word": "bottleneck", "meaning": "the slowest point", "pos": "noun"},
         )
     assert res.status_code == 201
     session, sdp = sessions.calls[0]
     assert sdp == "v=0 offer"
-    assert session["input"][0]["content"][0]["text"] == "read too much into / find a meaning that is not there / none"
+    assert session["input"][0]["content"][0]["text"] == "bottleneck / the slowest point / noun"
     assert session["instructions"] == "You are Echo.\n"

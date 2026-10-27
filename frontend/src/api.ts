@@ -113,26 +113,18 @@ export const api = {
   startExample: (target: PracticeTarget, sdp?: string) =>
     request<LiveSession>('/api/example/sessions', {
       method: 'POST',
-      body: JSON.stringify({ sdp, expression: target.text, meaning: target.meaning, usage_note: target.note }),
+      body: JSON.stringify({ sdp, word: target.word, meaning: target.meaning, pos: target.pos }),
     }),
   /** The written half of a practice round: the sentence the native way, plus a short line per change. */
   exampleFeedback: (target: PracticeTarget, userText: string) =>
     request<ExampleFeedback>('/api/example/feedback', {
       method: 'POST',
-      body: JSON.stringify({
-        expression: target.text,
-        meaning: target.meaning,
-        usage_note: target.note,
-        user_text: userText,
-        kind: target.kind,
-        scene: target.scene ?? '',
-      }),
+      body: JSON.stringify({ word: target.word, pos: target.pos, meaning: target.meaning, user_text: userText, scene: target.scene ?? '' }),
     }),
-  /** One of `expression_id` and `vocabulary_id`, the one the sentence was made with. */
+  /** A sentence made with one of the session's words. */
   addExample: (example: {
     session_id: number
-    expression_id?: number
-    vocabulary_id?: number
+    vocabulary_id: number
     user_text: string
     coach_text: string
     seconds: number

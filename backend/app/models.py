@@ -334,12 +334,11 @@ class Summary(BaseModel):
 
 
 class Example(BaseModel):
-    """One sentence a reader made with an expression or a word (exactly one of the two ids), and the coach's echo of it."""
+    """One sentence a reader made with one of the session's words, and the coach's echo of it."""
 
     id: int
     created_at: datetime
-    expression_id: int | None = None
-    vocabulary_id: int | None = None
+    vocabulary_id: int
     user_text: str
     coach_text: str
     seconds: float

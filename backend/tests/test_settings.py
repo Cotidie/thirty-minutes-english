@@ -97,7 +97,7 @@ def test_put_stores_overrides_and_rebuilds_services(tmp_path):
         assert fields["VOICE_PROVIDER"]["value"] == "gemini"
         assert fields["GEMINI_API_KEY"]["value"] == "…5678"
         # The live endpoints now name the Gemini key when the provider has none.
-        assert "GEMINI_API_KEY" in c.post("/api/example/sessions", json={"expression": "x", "meaning": "y"}).json()["detail"]
+        assert "GEMINI_API_KEY" in c.post("/api/example/sessions", json={"word": "x", "meaning": "y", "pos": "noun"}).json()["detail"]
         # Overrides survive a fresh read.
         assert {f["key"]: f["value"] for f in c.get("/api/settings").json()["fields"]}["VOICE_PROVIDER"] == "gemini"
     assert seen == ["gemini"]

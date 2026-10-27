@@ -7,7 +7,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import TYPE_CHECKING
 
-from app.coaching.example_feedback import TEMPLATES, ExampleCoach
+from app.coaching.example_feedback import PROMPT, ExampleCoach
 from app.coaching.summary_feedback import SCHEMA as SUMMARY_SCHEMA
 from app.coaching.summary_feedback import TEMPLATE as SUMMARY_TEMPLATE
 from app.coaching.summary_feedback import SummaryCoach
@@ -155,8 +155,8 @@ def _live_agents(settings: Settings, agent_dirs: dict[str, Path]) -> dict[str, L
 
 def _example_coach(settings: Settings, agent_dir: Path, example_effort: str | None) -> ExampleCoach | None:
     """The text half of the example coach, once its folder carries the feedback prompt."""
-    if not all((agent_dir / "prompts" / name).is_file() for name in TEMPLATES.values()):
-        log.warning("example-coach feedback prompts not found: %s", agent_dir)
+    if not (agent_dir / "prompts" / PROMPT).is_file():
+        log.warning("example-coach feedback prompt not found: %s", agent_dir)
         return None
     return ExampleCoach.with_cli(agent_dir, settings.get("EXAMPLE_MODEL"), example_effort)
 

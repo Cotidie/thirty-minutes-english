@@ -217,13 +217,12 @@ def test_an_unmatched_reading_is_dropped_with_a_warning(tmp_path, caplog):
     assert (summary.paragraph_id, summary.feedback.fixes[0].better) == (paragraphs[2].id, "b")
 
 
-def test_examples_find_their_expression_by_key_or_their_word(tmp_path, caplog):
+def test_examples_keep_their_word_and_drop_the_rest(tmp_path, caplog):
     with caplog.at_level(logging.INFO):
         db = migrated(tmp_path)
-    content = db.sessions.get(11).content
     examples = db.records.list_examples(11)
-    assert [(x.id, x.expression_id, x.vocabulary_id) for x in examples] == [(1, content.expressions[0].id, None), (2, None, content.vocabulary[1].id)]
-    assert "examples_dropped=1" in caplog.text
+    assert [(x.id, x.vocabulary_id) for x in examples] == [(2, db.sessions.get(11).content.vocabulary[1].id)]
+    assert "examples_dropped=2" in caplog.text  # one made with an expression, one with nothing the session had
 
 
 def test_model_lists_topic_days_and_settings_keep_their_values(tmp_path):

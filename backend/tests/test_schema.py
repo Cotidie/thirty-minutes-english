@@ -135,3 +135,31 @@ def test_a_v5_file_gains_an_empty_korean_example_on_each_expression(tmp_path):
         assert conn.execute("PRAGMA user_version").fetchone()[0] == schema.VERSION
     assert list(tmp_path.glob("s.db.bak-v5-????-??-??"))
     assert db.expressions.get(expression).korean_example is None
+
+
+def test_a_v6_file_keeps_its_word_sentences_and_drops_the_expression_ones(tmp_path):
+    path = tmp_path / "s.db"
+    db = Database(path)
+    session = db.sessions.create(sample_draft(), seed_expressions(db, 1))
+    word = session.content.vocabulary[0].id
+    kept = db.records.add_example(session.id, word, "word use", "echo", 2)
+    with sqlite3.connect(path) as conn:
+        conn.execute("ALTER TABLE examples RENAME TO examples_v7")
+        conn.execute(
+            """CREATE TABLE examples (id INTEGER PRIMARY KEY AUTOINCREMENT, created_at TEXT NOT NULL,
+               session_expression_id INTEGER REFERENCES session_expressions(id) ON DELETE CASCADE,
+               vocabulary_id INTEGER REFERENCES vocabulary(id) ON DELETE CASCADE, user_text TEXT NOT NULL, coach_text TEXT NOT NULL,
+               seconds REAL NOT NULL DEFAULT 0, CHECK ((session_expression_id IS NULL) <> (vocabulary_id IS NULL))) STRICT"""
+        )
+        conn.execute("INSERT INTO examples SELECT id, created_at, NULL, vocabulary_id, user_text, coach_text, seconds FROM examples_v7")
+        conn.execute("DROP TABLE examples_v7")
+        [taught] = conn.execute("SELECT id FROM session_expressions").fetchone()
+        conn.execute("INSERT INTO examples (created_at, session_expression_id, user_text, coach_text) VALUES ('t', ?, 'mine', 'echo')", (taught,))
+        conn.execute("PRAGMA user_version = 6")
+    db = Database(path)
+    with db.connect() as conn:
+        assert conn.execute("PRAGMA user_version").fetchone()[0] == schema.VERSION
+        assert "session_expression_id" not in {row[1] for row in conn.execute("PRAGMA table_info(examples)")}
+    assert list(tmp_path.glob("s.db.bak-v6-????-??-??"))
+    assert [(x.id, x.vocabulary_id) for x in db.records.list_examples(session.id)] == [(kept.id, word)]
+    assert db.records.add_example(session.id, word, "next", "echo", 1).id > kept.id + 1  # ids carry on past the dropped one

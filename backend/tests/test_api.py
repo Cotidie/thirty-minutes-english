@@ -337,23 +337,22 @@ def test_note_endpoint_round_trips_and_404s_on_unknown_session(client):
 def test_examples_stack_under_a_session_in_the_order_made(client):
     sid = create(client, "X")["session_id"]
     assert client.get("/api/examples", params={"session_id": sid}).json() == []
-    content = content_of(client, sid)
-    expression, word = content["expressions"][0]["id"], content["vocabulary"][2]["id"]
+    words = [v["id"] for v in content_of(client, sid)["vocabulary"]]
 
-    body = {"session_id": sid, "expression_id": expression, "user_text": "I said it.", "coach_text": "I said it. Natural.", "seconds": 9}
+    body = {"session_id": sid, "vocabulary_id": words[2], "user_text": "I said it.", "coach_text": "I said it. Natural.", "seconds": 9}
     first = client.post("/api/examples", json=body)
     assert first.status_code == 201
-    assert (first.json()["expression_id"], first.json()["vocabulary_id"]) == (expression, None)
-    client.post("/api/examples", json={"session_id": sid, "vocabulary_id": word, "user_text": "Again.", "coach_text": "Good."})
+    assert first.json()["vocabulary_id"] == words[2] and "expression_id" not in first.json()
+    client.post("/api/examples", json={"session_id": sid, "vocabulary_id": words[0], "user_text": "Again.", "coach_text": "Good."})
 
     listed = client.get("/api/examples", params={"session_id": sid}).json()
-    assert [(e["user_text"], e["expression_id"], e["vocabulary_id"]) for e in listed] == [("I said it.", expression, None), ("Again.", None, word)]
+    assert [(e["user_text"], e["vocabulary_id"]) for e in listed] == [("I said it.", words[2]), ("Again.", words[0])]
     assert client.get("/api/examples", params={"session_id": sid + 1}).json() == []
 
     assert client.post("/api/examples", json={**body, "session_id": 999}).status_code == 404
     assert client.post("/api/examples", json={**body, "coach_text": " "}).status_code == 422
-    assert client.post("/api/examples", json={**body, "vocabulary_id": word}).status_code == 422  # one or the other
-    assert client.post("/api/examples", json={k: v for k, v in body.items() if k != "expression_id"}).status_code == 422
+    assert client.post("/api/examples", json={k: v for k, v in body.items() if k != "vocabulary_id"}).status_code == 422
+    assert client.post("/api/examples", json={**body, "expression_id": 1}).status_code == 422  # expressions take no sentences
 
     client.delete(f"/api/sessions/{sid}")
     assert client.get("/api/examples", params={"session_id": sid}).json() == []
@@ -388,15 +387,14 @@ def test_jobs_endpoint_drops_finished_jobs(tmp_path):
         assert client.get("/api/jobs").json() == []
 
 
-def test_an_example_for_an_expression_not_in_the_session_is_404(client):
+def test_an_example_for_a_word_not_in_the_session_is_404(client):
     first = create(client, "A")["session_id"]
     second = create(client, "B")["session_id"]
-    taught_elsewhere = {e["id"] for e in content_of(client, first)["expressions"]} - {e["id"] for e in content_of(client, second)["expressions"]}
     other_word = content_of(client, first)["vocabulary"][0]["id"]
     body = {"session_id": second, "user_text": "x", "coach_text": "y"}
-    for target in [{"expression_id": 999}, {"vocabulary_id": other_word}, *({"expression_id": e} for e in taught_elsewhere)]:
-        res = client.post("/api/examples", json={**body, **target})
-        assert (res.status_code, res.json()["detail"]) == (404, "not taught in this session")
+    for word in [999, other_word]:
+        res = client.post("/api/examples", json={**body, "vocabulary_id": word})
+        assert (res.status_code, res.json()["detail"]) == (404, "not a word of this session")
     assert client.get("/api/examples", params={"session_id": second}).json() == []
 
 

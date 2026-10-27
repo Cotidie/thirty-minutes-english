@@ -281,24 +281,20 @@ export interface Reading {
 }
 
 /** What a Practice round is about: an expression or a word, with what the coach needs to judge a sentence. */
+/** The word a Practice round is about: the coach rewords the sentence freely so it uses the word well. */
 export interface PracticeTarget {
-  /** The expression's id or the word's, as `kind` says. */
+  /** The word's vocabulary id. */
   id: number
-  text: string
+  word: string
   meaning: string
-  note: string
-  /** An expression gets the light native fix; a word gets a free rewording that uses it well. */
-  kind: 'expression' | 'word'
-  /** For a word: what its picture shows. */
+  /** Its part of speech. */
+  pos: string
+  /** What its picture shows. */
   scene?: string
 }
 
-export function practiceExpression(e: Expression): PracticeTarget {
-  return { id: e.id, text: e.phrase, meaning: e.meaning, note: e.usage_note, kind: 'expression' }
-}
-
 export function practiceWord(v: VocabularyItem): PracticeTarget {
-  return { id: v.id, text: v.word, meaning: v.definition, note: `part of speech: ${v.pos}`, kind: 'word', scene: v.scene ?? undefined }
+  return { id: v.id, word: v.word, meaning: v.definition, pos: v.pos, scene: v.scene ?? undefined }
 }
 
 /** One weakness in how the reader said it: their words and the better ones. */
@@ -327,12 +323,11 @@ export interface Summary {
   seconds: number
 }
 
-/** One sentence made with an expression or a word (exactly one of the two ids), and the coach's echo of it. */
+/** One sentence made with one of the session's words, and the coach's echo of it. */
 export interface Example {
   id: number
   created_at: string
-  expression_id: number | null
-  vocabulary_id: number | null
+  vocabulary_id: number
   user_text: string
   coach_text: string
   seconds: number

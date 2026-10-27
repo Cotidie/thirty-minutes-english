@@ -17,12 +17,10 @@ def test_a_swap_puts_a_fresh_expression_in_the_same_place(store):
     a, b, c = seed_expressions(store, 3)
     session = store.sessions.create(sample_draft(), [a, b]).id
     store.sessions.set_stars(session, store.sessions.get_stars(session).model_copy(update={"expressions": [a, b]}))
-    store.records.add_example(session, a, None, "mine", "echo", 1.0)
     swapped_in = store.sessions.swap_expression(session, a)
     assert swapped_in is not None and swapped_in.id == c
     assert taught(store, session) == [c, b]
     assert store.sessions.get_stars(session).expressions == [b]
-    assert store.records.list_examples(session) == []
 
 
 def test_a_swapped_out_expression_counts_as_used_and_is_picked_after_the_never_used(store):

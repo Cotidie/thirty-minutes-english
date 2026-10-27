@@ -198,35 +198,20 @@ class Migration:
                 (row["id"], row["created_at"], paragraph_id, row["user_text"], row["feedback_json"], row["seconds"]),
             )
 
-    def _target(self, session_id: int, text: str) -> tuple[str, int] | None:
-        """What a v1 example was made with: the session's expression or word with this exact text, else the
-        expression of the same normalized phrase. (Words are matched exactly: their keys collide too easily.)"""
-        conn = self.conn
-        taught = conn.execute(
-            "SELECT se.id, e.phrase, e.key FROM session_expressions se JOIN expressions e ON e.id = se.expression_id WHERE se.session_id = ?",
-            (session_id,),
-        ).fetchall()
-        words = conn.execute("SELECT id, word FROM vocabulary WHERE session_id = ?", (session_id,)).fetchall()
-        for found in (
-            next((("session_expression_id", t["id"]) for t in taught if t["phrase"] == text), None),
-            next((("vocabulary_id", w["id"]) for w in words if w["word"] == text), None),
-            next((("session_expression_id", t["id"]) for t in taught if t["key"] == key(text)), None),
-        ):
-            if found:
-                return found
-        return None
-
     def _examples(self) -> None:
+        """Each v1 example made with one of its session's words, matched by exact text; the rest go (sentences
+        are made with words only now)."""
         for row in self.conn.execute("SELECT * FROM examples_v1 ORDER BY id").fetchall():
-            target = self._target(row["session_id"], row["expression"])
-            if target is None:
-                log.warning("example %s of session %s names %r, which the session did not teach; dropped", row["id"], row["session_id"], row["expression"])
+            word = self.conn.execute(
+                "SELECT id FROM vocabulary WHERE session_id = ? AND word = ?", (row["session_id"], row["expression"])
+            ).fetchone()
+            if word is None:
+                log.warning("example %s of session %s names %r, not one of its words; dropped", row["id"], row["session_id"], row["expression"])
                 self.report.examples_dropped += 1
                 continue
-            column, target_id = target
             self.conn.execute(
-                f"INSERT INTO examples (id, created_at, {column}, user_text, coach_text, seconds) VALUES (?, ?, ?, ?, ?, ?)",
-                (row["id"], row["created_at"], target_id, row["user_text"], row["coach_text"], row["seconds"]),
+                "INSERT INTO examples (id, created_at, vocabulary_id, user_text, coach_text, seconds) VALUES (?, ?, ?, ?, ?, ?)",
+                (row["id"], row["created_at"], word[0], row["user_text"], row["coach_text"], row["seconds"]),
             )
 
     def _carry_counters(self) -> None:

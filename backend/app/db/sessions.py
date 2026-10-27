@@ -115,7 +115,7 @@ class SessionRepo:
 
     def swap_expression(self, session_id: int, expression_id: int, rng: random.Random | None = None) -> Expression | None:
         """The expression put in place of `expression_id`, picked as a new session picks one but never one this
-        session has had; the one swapped out counts as used here, and its star and practice sentences go.
+        session has had; the one swapped out counts as used here, and its star goes.
         None when the session does not teach `expression_id`, or the corpus has nothing else to offer."""
         had = self._had(session_id)
         if expression_id not in had:

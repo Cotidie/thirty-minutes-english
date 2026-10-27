@@ -11,7 +11,7 @@
       "content": [
         {
           "type": "input_text",
-          "text": "The expression or word the user is practicing: {{expression}}\nMeaning: {{meaning}}\nNote: {{usage_note}}"
+          "text": "The word the user is practicing: {{word}}\nMeaning: {{meaning}}\nPart of speech: {{pos}}"
         }
       ]
     }

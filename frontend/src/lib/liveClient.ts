@@ -22,7 +22,7 @@ export function connectSummary(paragraph: string, opts: RoundOptions): Promise<L
   return connectGeminiTranscription({ ...opts, start: () => api.startSummary(paragraph) })
 }
 
-/** One sentence made with an expression or word, said back the native way with a line of feedback. */
+/** One sentence made with a word, said back the native way with a line of feedback. */
 export function connectExample(target: PracticeTarget, opts: RoundOptions): Promise<LiveConnection> {
   return connectLive({ ...opts, start: (sdp) => api.startExample(target, sdp) })
 }

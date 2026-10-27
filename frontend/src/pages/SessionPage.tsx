@@ -94,11 +94,8 @@ export function SessionPage() {
         {tab === 0 && (
           <ExpressionsTab
             items={content.expressions}
-            sessionId={session.id}
             starred={stars.expressions}
             onToggleStar={(id) => toggle('expressions', id)}
-            examples={examples}
-            onExample={addExample}
             onSwap={async (id) => {
               const next = await api.swapExpression(session.id, id)
               setContent((c) => ({ expressions: c.expressions.map((e) => (e.id === id ? next : e)) }))
