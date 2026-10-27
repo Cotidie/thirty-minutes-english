@@ -168,7 +168,6 @@ class FakeIllustrator:
         self.error = error
         self.seconds = seconds
         self.job_ids: list[str] = []
-        self.styles: list[str] = []
 
     def expected_seconds(self, count: int) -> float | None:
         return None if self.seconds is None else self.seconds * count
@@ -193,12 +192,10 @@ class FakeIllustrator:
         if article_scene:
             on_article(self.draw())
 
-    def redraw(self, scene, style=""):
-        self.styles.append(style)
+    def redraw(self, scene):
         return self.draw()
 
-    def redraw_example(self, item, style=""):
-        self.styles.append(style)
+    def redraw_example(self, item):
         return self.draw()
 
 
@@ -265,27 +262,26 @@ class FakeSceneWriter:
         return Scene(f"another scene for {item.word}", f"why it is {item.word}")
 
 
-def test_a_word_can_be_redrawn_in_a_chosen_style_and_the_session_keeps_it(tmp_path):
+def test_a_word_can_be_redrawn_and_the_session_keeps_it(tmp_path):
     app, illustrator, db = with_pictures(tmp_path, scene_writer=FakeSceneWriter())
     files = PictureFiles(db.images_dir)
     with TestClient(app) as c:
         sid = c.post("/api/sessions", json={"topic": "X"}).json()["session_id"]  # word 1 shows pictures 3 and 4
-        res = c.post(f"/api/sessions/{sid}/pictures/1", json={"style": "comic"})
+        res = c.post(f"/api/sessions/{sid}/pictures/1", json={})
         assert res.status_code == 200
         assert (res.json()["scene"], res.json()["caption"], res.json()["image"]) == ("another scene for word1", "why it is word1", "22.png")
         assert content_of(c, sid)["vocabulary"][1]["image"] == "22.png"
         example = c.post(f"/api/sessions/{sid}/pictures/1", json={"face": "example"}).json()
         assert (example["example_image"], example["image"]) == ("23.png", "22.png")
         assert c.post(f"/api/sessions/{sid}/pictures/99", json={}).status_code == 404
-    assert illustrator.styles == ["comic", ""]
     assert not files.path(3).exists() and not files.path(4).exists()  # only the picture each redraw replaced
     assert files.path(5).exists() and files.path(22).exists() and files.path(23).exists()
 
 
 def test_redraw_after_the_session_went_away_leaves_no_file(tmp_path):
     class Vanishing(FakeIllustrator):
-        def redraw(self, scene, style=""):
-            picture = super().redraw(scene, style)
+        def redraw(self, scene):
+            picture = super().redraw(scene)
             assert c.delete(f"/api/sessions/{sid}").status_code == 204
             return picture
 

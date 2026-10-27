@@ -242,12 +242,6 @@ export interface SettingGroup {
   title: string
 }
 
-/** What the redraw menu shows: style keys with their labels, and the one Settings holds. */
-export interface PictureStyles {
-  current: string
-  options: SettingOption[]
-}
-
 export interface SettingsView {
   groups: SettingGroup[]
   fields: SettingField[]

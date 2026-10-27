@@ -117,10 +117,10 @@ def redraw_picture(session_id: int, index: int, body: RedrawRequest, db: Db, ser
     try:
         if body.face == "example":
             field, scene = "example_image", None
-            picture_id = illustrator.redraw_example(item, body.style)
+            picture_id = illustrator.redraw_example(item)
         else:
             field, scene = "image", writer.write(item)
-            picture_id = illustrator.redraw(scene, body.style)
+            picture_id = illustrator.redraw(scene)
     except GenerationError as e:
         raise failed("redraw", e) from e
     try:

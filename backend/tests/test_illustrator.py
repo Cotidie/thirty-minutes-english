@@ -235,16 +235,16 @@ def test_fetch_retries_a_flaky_link():
         asyncio.run(fetch_url("https://img/2", attempts=2, wait_s=0, transport=transport))
 
 
-def test_redraw_draws_the_new_scene_in_the_asked_style_as_a_new_picture_and_remove_drops_a_file(tmp_path):
+def test_redraw_draws_the_new_scene_in_the_configured_style_as_a_new_picture_and_remove_drops_a_file(tmp_path):
     painter = FakePainter()
-    illustrator, _, files = illustrator_for(tmp_path, painter)
-    picture = illustrator.redraw(Scene("a fresh scene", "why it fits"), "comic")
+    illustrator, _, files = illustrator_for(tmp_path, painter, style="comic")
+    picture = illustrator.redraw(Scene("a fresh scene", "why it fits"))
 
     assert painter.prompts == [f"{STYLES['comic']} {IMAGE_RULES} a fresh scene"]
     assert files.path(picture).read_bytes() == b"PNG0"
 
-    again = illustrator.redraw_example(sample_draft().vocabulary[2], "sketch")
-    assert painter.prompts[0].startswith(STYLES["sketch"]) and '"ex 2"' in painter.prompts[0]
+    again = illustrator.redraw_example(sample_draft().vocabulary[2])
+    assert painter.prompts[0].startswith(STYLES["comic"]) and '"ex 2"' in painter.prompts[0]
     assert again == picture + 1 and files.path(again).is_file()
 
     files.remove(picture)  # the caller drops the old file once the new id is stored

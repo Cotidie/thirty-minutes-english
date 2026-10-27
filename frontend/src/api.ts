@@ -12,7 +12,6 @@ import type {
   PictureFace,
   Summary,
   SummaryFeedback,
-  PictureStyles,
   PracticeTarget,
   Reading,
   Session,
@@ -63,11 +62,10 @@ export const api = {
     request<Expression>(`/api/sessions/${sessionId}/expressions/${expressionId}/swap`, { method: 'POST' }),
   /** One more corpus expression, taught after the others and picked as a swap picks one. */
   addExpression: (sessionId: number) => request<Expression>(`/api/sessions/${sessionId}/expressions`, { method: 'POST' }),
-  /** One of a word's pictures drawn again in `style` (blank: the configured one) and saved: the example
-   * sentence as it is, or a fresh scene for Practice. The item as it now is. */
-  redrawPicture: (sessionId: number, index: number, face: PictureFace, style = '') =>
-    request<VocabularyItem>(`/api/sessions/${sessionId}/pictures/${index}`, { method: 'POST', body: JSON.stringify({ face, style }) }),
-  /** The picture styles on offer and the configured one, from the IMAGE_STYLE setting. */
+  /** One of a word's pictures drawn again in the configured style and saved: the example sentence as it is,
+   * or a fresh scene for Practice. The item as it now is. */
+  redrawPicture: (sessionId: number, index: number, face: PictureFace) =>
+    request<VocabularyItem>(`/api/sessions/${sessionId}/pictures/${index}`, { method: 'POST', body: JSON.stringify({ face }) }),
   /** The sentence read aloud by the voice provider, as audio. */
   speak: async (text: string): Promise<Blob> => {
     const res = await fetch('/api/speech', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ text }) })
@@ -76,11 +74,6 @@ export const api = {
       throw new Error(body && typeof body.detail === 'string' ? body.detail : `${res.status} ${res.statusText}`)
     }
     return res.blob()
-  },
-  pictureStyles: async (): Promise<PictureStyles> => {
-    const { fields } = await request<SettingsView>('/api/settings')
-    const f = fields.find((x) => x.key === 'IMAGE_STYLE')
-    return { current: f?.value || f?.default || '', options: f?.options ?? [] }
   },
   getStars: (id: number) => request<Stars>(`/api/sessions/${id}/stars`),
   setStars: (id: number, stars: Stars) =>

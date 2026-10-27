@@ -258,43 +258,6 @@
   }
 }
 
-/* The style every ↻ draws in, picked once above the cards. */
-.vocab-style-bar {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 0.4rem;
-  margin: -1rem 0 1.5rem;
-  font-family: var(--sans);
-  font-size: 0.85rem;
-}
-
-.vocab-style-label {
-  margin-right: 0.3rem;
-  color: var(--muted);
-}
-
-.vocab-style {
-  min-height: 2.25rem;
-  padding: 0 0.85rem;
-  border: 1px solid var(--line);
-  border-radius: 999px;
-  background: var(--paper);
-  color: var(--ink);
-  font: inherit;
-  cursor: pointer;
-}
-
-.vocab-style:hover {
-  border-color: var(--ink);
-}
-
-.vocab-style[aria-checked='true'] {
-  border-color: var(--ink);
-  background: var(--ink);
-  color: var(--paper);
-}
-
 .vocab-redraw-error {
   margin: 0;
   padding: 0 1.25rem 0.6rem;

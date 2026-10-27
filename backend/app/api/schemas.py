@@ -129,10 +129,9 @@ class SpeechRequest(BaseModel):
 
 
 class RedrawRequest(BaseModel):
-    """Which of the word's two pictures to draw again, and in which style (blank: the configured IMAGE_STYLE)."""
+    """Which of the word's two pictures to draw again, in the configured IMAGE_STYLE."""
 
     face: Literal["example", "practice"] = "practice"
-    style: str = ""
 
 
 class LiveSession(BaseModel):

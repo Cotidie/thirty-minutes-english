@@ -59,13 +59,12 @@ class Illustrator:
         """How long `count` pictures usually take with the configured model; None until it drew one here."""
         return self._painter.expected_seconds(count)
 
-    def prompt(self, scene: str, style: str = "") -> str:
-        """`style` is a STYLES key to draw this one in; blank means the configured style."""
-        return f"{STYLES.get(style, self._style)} {IMAGE_RULES} {scene}"
+    def prompt(self, scene: str) -> str:
+        return f"{self._style} {IMAGE_RULES} {scene}"
 
-    def example_prompt(self, item: VocabularyDraft, style: str = "") -> str:
+    def example_prompt(self, item: VocabularyDraft) -> str:
         scene = EXAMPLE_SCENE.format(example=item.example, word=item.word, pos=item.pos, definition=item.definition)
-        return self.prompt(scene, style)
+        return self.prompt(scene)
 
     def _wanted(self, vocabulary: Sequence[VocabularyDraft]) -> list[tuple[int, PictureField, str]]:
         """Every picture the words call for, as (word index, the field it fills, its prompt)."""
@@ -115,14 +114,14 @@ class Illustrator:
             if drawn is None:
                 log.warning("job %s: no picture for %s", job_id, what(n))
 
-    def redraw(self, scene: Scene, style: str = "") -> int:
-        """`scene` drawn in `style`, as a new picture. The old one stays until the caller has stored the new id
+    def redraw(self, scene: Scene) -> int:
+        """`scene` drawn as a new picture. The old one stays until the caller has stored the new id
         and removes the old file. Raises GenerationError when no picture came back."""
-        return self._draw(self.prompt(scene.text, style))
+        return self._draw(self.prompt(scene.text))
 
-    def redraw_example(self, item: VocabularyDraft, style: str = "") -> int:
-        """The word's example sentence drawn again in `style`, as a new picture; the old file is the caller's to remove."""
-        return self._draw(self.example_prompt(item, style))
+    def redraw_example(self, item: VocabularyDraft) -> int:
+        """The word's example sentence drawn again as a new picture; the old file is the caller's to remove."""
+        return self._draw(self.example_prompt(item))
 
     def _draw(self, prompt: str) -> int:
         [drawn] = self._painter.paint([prompt])

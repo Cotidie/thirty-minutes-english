@@ -10,13 +10,6 @@ vi.mock('../api', () => ({
     addExample: vi.fn(),
     redrawPicture: vi.fn(),
     speak: vi.fn(async () => new Blob(['WAV'])),
-    pictureStyles: vi.fn(async () => ({
-      current: 'photo',
-      options: [
-        { id: 'photo', label: '', description: '', efforts: null },
-        { id: 'comic', label: '', description: 'comic panel', efforts: null },
-      ],
-    })),
   },
 }))
 vi.mock('../lib/liveClient', () => ({ connectExample: vi.fn() }))
@@ -29,7 +22,7 @@ const items = [
 ]
 
 describe('VocabularyTab', () => {
-  it('redraws one word at once in the style picked above the cards and hands the new item up', async () => {
+  it('redraws one word at once in the configured style and hands the new item up', async () => {
     const drawn = [{ ...items[0], scene: 'phones on a train', image: 'a.png' }, items[1]]
     const fresh = { ...drawn[0], scene: 'phones at a dinner table', image: 'b.png' }
     vi.mocked(api.redrawPicture).mockResolvedValue(fresh)
@@ -37,13 +30,9 @@ describe('VocabularyTab', () => {
     render(<VocabularyTab items={drawn} sessionId={3} onPicture={onPicture} starred={[]} onToggleStar={vi.fn()} examples={none} onExample={vi.fn()} />)
 
     expect(screen.queryByRole('button', { name: 'New picture for mitigate' })).not.toBeInTheDocument() // no scene yet
-    expect(await screen.findByRole('radio', { name: 'photo' })).toHaveAttribute('aria-checked', 'true') // the configured style
+    expect(screen.queryByText(/redraws in/)).not.toBeInTheDocument() // the style is Settings' to pick
     await userEvent.click(screen.getByRole('button', { name: 'New picture for ubiquitous' }))
-    expect(api.redrawPicture).toHaveBeenLastCalledWith(3, 0, 'practice', 'photo')
-
-    await userEvent.click(screen.getByRole('radio', { name: 'comic panel' }))
-    await userEvent.click(screen.getByRole('button', { name: 'New picture for ubiquitous' }))
-    expect(api.redrawPicture).toHaveBeenLastCalledWith(3, 0, 'practice', 'comic')
+    expect(api.redrawPicture).toHaveBeenLastCalledWith(3, 0, 'practice')
     expect(onPicture).toHaveBeenCalledWith(0, fresh)
   })
 
@@ -108,7 +97,7 @@ describe('VocabularyTab', () => {
     expect(screen.getByRole('img', { name: 'Phones are ubiquitous.' })).toHaveAttribute('src', '/api/images/e.png')
     expect(screen.queryByRole('button', { name: 'What the picture for ubiquitous shows' })).not.toBeInTheDocument()
     await userEvent.click(screen.getByRole('button', { name: 'New picture for ubiquitous' }))
-    expect(api.redrawPicture).toHaveBeenLastCalledWith(3, 0, 'example', 'photo') // the face on show
+    expect(api.redrawPicture).toHaveBeenLastCalledWith(3, 0, 'example') // the face on show
 
     await userEvent.click(screen.getByRole('button', { name: 'Show the practice picture for ubiquitous' }))
     expect(screen.getByRole('img', { name: 'phones on a train' })).toHaveAttribute('src', '/api/images/p.png')

@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react'
 import { api } from '../api'
-import { practiceWord, type Example, type PictureFace, type PictureStyles, type VocabularyItem } from '../types'
+import { practiceWord, type Example, type PictureFace, type VocabularyItem } from '../types'
 import { Practice } from './Practice'
 import { StarButton } from './StarButton'
 import { KoreanChip } from './KoreanChip'
@@ -167,14 +167,12 @@ interface CellProps {
   arriving: boolean
   /** Why the last redraw failed. */
   failed?: string
-  /** The style a redraw draws in, for the button's hint. */
-  style: string
   onRedraw: (face: PictureFace) => void
   children: React.ReactNode
 }
 
 /** One word: its card, with the picture face it shows, and the redraw button for that face. */
-function VocabCell({ item, drawing, arriving, failed, style, onRedraw, children }: CellProps) {
+function VocabCell({ item, drawing, arriving, failed, onRedraw, children }: CellProps) {
   /** The face the learner flipped to; until then the example, wherever one is drawn or on its way. */
   const [flipped, setFlipped] = useState<PictureFace | null>(null)
   const face = flipped ?? (item.example_image || arriving ? 'example' : 'practice')
@@ -191,7 +189,7 @@ function VocabCell({ item, drawing, arriving, failed, style, onRedraw, children 
           type="button"
           className="vocab-redraw"
           aria-label={`New picture for ${item.word}`}
-          title={drawing ? 'Drawing…' : `${hint}${style ? ` (${style})` : ''}`}
+          title={drawing ? 'Drawing…' : hint}
           disabled={drawing}
           onClick={() => onRedraw(face)}
         >
@@ -222,26 +220,12 @@ interface Props {
 export function VocabularyTab({ items, sessionId, arriving = false, onPicture, starred, onToggleStar, examples, onExample }: Props) {
   const [drawing, setDrawing] = useState<Set<number>>(new Set())
   const [failed, setFailed] = useState<Record<number, string>>({})
-  const [styles, setStyles] = useState<PictureStyles>({ current: '', options: [] })
-  /** The style every ↻ draws in; starts at the configured one, changes only this page. */
-  const [style, setStyle] = useState('')
-
-  useEffect(() => {
-    api
-      .pictureStyles()
-      .then((s) => {
-        setStyles(s)
-        setStyle(s.current)
-      })
-      .catch(() => undefined)
-  }, [])
-
-  /** One of a word's pictures again, in place, in the style picked above the cards. */
+  /** One of a word's pictures again, in place, in the style Settings holds. */
   const redraw = async (index: number, face: PictureFace) => {
     setDrawing((d) => new Set(d).add(index))
     setFailed(({ [index]: _, ...rest }) => rest)
     try {
-      onPicture(index, await api.redrawPicture(sessionId, index, face, style))
+      onPicture(index, await api.redrawPicture(sessionId, index, face))
     } catch (e) {
       setFailed((f) => ({ ...f, [index]: e instanceof Error ? e.message : String(e) }))
     } finally {
@@ -259,24 +243,6 @@ export function VocabularyTab({ items, sessionId, arriving = false, onPicture, s
         Take turns. Read the word and its sentence aloud, then explain in English what you think it means. Check only
         after both of you have tried.
       </p>
-      {styles.options.length > 0 && (
-        <div className="vocab-style-bar" role="radiogroup" aria-label="Style for new pictures">
-          <span className="vocab-style-label">↻ redraws in</span>
-          {styles.options.map((o) => (
-            <button
-              key={o.id}
-              type="button"
-              role="radio"
-              aria-checked={o.id === style}
-              title={o.description}
-              className="vocab-style"
-              onClick={() => setStyle(o.id)}
-            >
-              {o.description || o.id}
-            </button>
-          ))}
-        </div>
-      )}
       <div className="vocab-grid">
         {items.map((item, index) => (
           <VocabCell
@@ -285,7 +251,6 @@ export function VocabularyTab({ items, sessionId, arriving = false, onPicture, s
             drawing={drawing.has(index)}
             arriving={arriving}
             failed={failed[index]}
-            style={style}
             onRedraw={(face) => void redraw(index, face)}
           >
             <StarButton label={item.word} on={starred.includes(item.id)} onToggle={() => onToggleStar(item.id)} />
