@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { api } from '../api'
+import { useChunks } from '../lib/useChunks'
 import type { TopicEntry, TopicLibrary } from '../types'
 import { ConfirmDelete } from './ConfirmDelete'
 import { SessionLinks } from './SessionLinks'
@@ -18,7 +19,7 @@ export function TopicsPanel() {
     api.topicLibrary().then(setLibrary).catch((e: Error) => setError(e.message))
   }, [])
 
-  const shown = useMemo(() => {
+  const found = useMemo(() => {
     const q = query.trim().toLowerCase()
     return [...(library?.topics ?? [])]
       .reverse()
@@ -29,6 +30,7 @@ export function TopicsPanel() {
           (used === 'all' || (used === 'used') === t.sessions.length > 0),
       )
   }, [library, query, category, used])
+  const { shown, more, sentinel } = useChunks(found, [query, category, used].join('|'))
 
   async function remove(id: number) {
     await api.deleteTopic(id)
@@ -58,12 +60,13 @@ export function TopicsPanel() {
       </div>
 
       {error && <p className="error">Could not load the topics: {error}</p>}
-      {library && <p className="db-count">{`${shown.length} of ${library.topics.length}`}</p>}
+      {library && <p className="db-count">{`${found.length} of ${library.topics.length}`}</p>}
       <ol className="db-list">
         {shown.map((t) => (
           <TopicItem key={t.id} topic={t} label={library?.labels[t.category] ?? t.category} onDelete={() => remove(t.id)} />
         ))}
       </ol>
+      {more && <div ref={sentinel} className="db-more" aria-hidden="true" />}
     </>
   )
 }

@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { api } from '../api'
+import { useChunks } from '../lib/useChunks'
 import type { CorpusEntry } from '../types'
 import { ConfirmDelete } from './ConfirmDelete'
 import { SessionLinks } from './SessionLinks'
@@ -31,7 +32,7 @@ export function CorpusPanel() {
     api.corpus().then(setCorpus).catch((e: Error) => setError(e.message))
   }, [])
 
-  const shown = useMemo(() => {
+  const found = useMemo(() => {
     const q = query.trim().toLowerCase()
     return (corpus ?? []).filter(
       (e) =>
@@ -41,6 +42,7 @@ export function CorpusPanel() {
         (used === 'all' || (used === 'used') === isUsed(e)),
     )
   }, [corpus, query, setting, source, used])
+  const { shown, more, sentinel } = useChunks(found, [query, setting, source, used].join('|'))
 
   async function remove(id: number) {
     await api.deleteExpression(id)
@@ -80,12 +82,13 @@ export function CorpusPanel() {
       </div>
 
       {error && <p className="error">Could not load the corpus: {error}</p>}
-      {corpus && <p className="db-count">{`${shown.length} of ${corpus.length}`}</p>}
+      {corpus && <p className="db-count">{`${found.length} of ${corpus.length}`}</p>}
       <ol className="db-list">
         {shown.map((entry) => (
           <CorpusItem key={entry.id} entry={entry} onDelete={() => remove(entry.id)} />
         ))}
       </ol>
+      {more && <div ref={sentinel} className="db-more" aria-hidden="true" />}
     </>
   )
 }

@@ -128,3 +128,10 @@ it('keeps the expression and says so when the delete fails', async () => {
   expect(await screen.findByText(/Could not delete it: 500/)).toBeInTheDocument()
   expect(shown()).toContain('Be my guest')
 })
+
+it('draws the first fifty of a long corpus and counts them all', async () => {
+  vi.mocked(api.corpus).mockResolvedValue(Array.from({ length: 60 }, (_, i) => entry({ id: i + 1, phrase: `phrase ${i + 1}` })))
+  renderPage()
+  expect(await screen.findByText('60 of 60')).toBeInTheDocument()
+  expect(shown()).toHaveLength(50)
+})
