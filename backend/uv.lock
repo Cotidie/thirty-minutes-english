@@ -208,7 +208,7 @@ wheels = [
 
 [[package]]
 name = "english-speaking-backend"
-version = "0.4.1"
+version = "0.4.2"
 source = { virtual = "." }
 dependencies = [
     { name = "claude-agent-sdk" },
