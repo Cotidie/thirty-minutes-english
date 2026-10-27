@@ -30,6 +30,7 @@ vi.mock('../api', () => ({
     listSummaries: vi.fn(async () => []),
     pictureStyles: vi.fn(async () => ({ current: '', options: [] })),
     swapExpression: vi.fn(async () => ({ id: 5, phrase: 'touch base', meaning: 'contact briefly', usage_note: 'n', examples: ['e3', 'e4'] })),
+    addExpression: vi.fn(async () => ({ id: 6, phrase: 'circle back', meaning: 'return to it later', usage_note: 'n', examples: ['e5', 'e6'] })),
   },
 }))
 vi.mock('../lib/liveClient', () => ({ connectExample: vi.fn(), connectSummary: vi.fn() }))
@@ -86,5 +87,13 @@ describe('SessionPage', () => {
     expect(await screen.findByText('touch base')).toBeInTheDocument()
     expect(screen.queryByText('a moving target')).not.toBeInTheDocument()
     expect(api.swapExpression).toHaveBeenCalledWith(3, 1)
+  })
+
+  it('adds the expression the server picked after the others', async () => {
+    renderAt('/s/3')
+    await userEvent.click(await screen.findByRole('button', { name: 'Add another expression' }))
+    expect(await screen.findByText('circle back')).toBeInTheDocument()
+    expect(screen.getByText('a moving target')).toBeInTheDocument()
+    expect(api.addExpression).toHaveBeenCalledWith(3)
   })
 })

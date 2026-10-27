@@ -102,3 +102,27 @@
 .expression-examples li {
   margin-bottom: 0.3rem;
 }
+
+/* A full-width row under the last expression: one more from the corpus. */
+.expression-add {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  padding: 0.85rem;
+  border: 1px dashed var(--line);
+  border-radius: 12px;
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+}
+
+.expression-add:hover {
+  color: var(--ink);
+  border-color: var(--muted);
+}
+
+.expression-add:disabled {
+  opacity: 0.45;
+  cursor: progress;
+}

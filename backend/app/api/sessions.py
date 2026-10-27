@@ -94,6 +94,15 @@ def swap_expression(session_id: int, expression_id: int, db: Db) -> Expression:
     return expression
 
 
+@router.post("/sessions/{session_id}/expressions", response_model=Expression)
+def add_expression(session_id: int, db: Db) -> Expression:
+    """One more corpus expression, taught after the others and picked as a swap picks one."""
+    expression = db.sessions.add_expression(session_id)
+    if expression is None:
+        raise HTTPException(status_code=404, detail="no such session, or nothing is left to add")
+    return expression
+
+
 @router.post("/sessions/{session_id}/pictures/{index}", response_model=VocabularyItem)
 def redraw_picture(session_id: int, index: int, body: RedrawRequest, db: Db, services: Svc, files: Files) -> VocabularyItem:
     """One of a word's pictures drawn again and shown in place of the old one, whose file goes:

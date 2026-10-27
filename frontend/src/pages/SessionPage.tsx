@@ -12,7 +12,7 @@ import { PHASES } from '../lib/phases'
 import { useExamples } from '../lib/useExamples'
 import { useNote } from '../lib/useNote'
 import { useStars } from '../lib/useStars'
-import type { Session } from '../types'
+import type { Session, SessionContent } from '../types'
 import './SessionPage.css'
 
 /** Sits after the timed phases; the timer never sends you here. */
@@ -35,6 +35,8 @@ export function SessionPage() {
     api.getSession(Number(id)).then(setSession).catch((e: Error) => setError(e.message))
   }, [id])
   const arriving = useArrivingPictures(Number(id), setSession)
+  const setContent = (update: (content: SessionContent) => Partial<SessionContent>) =>
+    setSession((s) => s && { ...s, content: { ...s.content, ...update(s.content) } })
 
   const showTab = useCallback(
     (index: number) => {
@@ -99,7 +101,11 @@ export function SessionPage() {
             onExample={addExample}
             onSwap={async (id) => {
               const next = await api.swapExpression(session.id, id)
-              setSession((s) => s && { ...s, content: { ...s.content, expressions: s.content.expressions.map((e) => (e.id === id ? next : e)) } })
+              setContent((c) => ({ expressions: c.expressions.map((e) => (e.id === id ? next : e)) }))
+            }}
+            onAdd={async () => {
+              const added = await api.addExpression(session.id)
+              setContent((c) => ({ expressions: [...c.expressions, added] }))
             }}
           />
         )}
@@ -109,11 +115,7 @@ export function SessionPage() {
             items={content.vocabulary}
             sessionId={session.id}
             arriving={arriving}
-            onPicture={(index, item) =>
-              setSession((s) =>
-                s && { ...s, content: { ...s.content, vocabulary: s.content.vocabulary.map((v, i) => (i === index ? item : v)) } },
-              )
-            }
+            onPicture={(index, item) => setContent((c) => ({ vocabulary: c.vocabulary.map((v, i) => (i === index ? item : v)) }))}
             starred={stars.words}
             onToggleStar={(id) => toggle('words', id)}
             examples={examples}

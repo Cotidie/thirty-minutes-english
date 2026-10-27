@@ -18,29 +18,53 @@ interface Props {
   onExample: (example: Example) => void
   /** Puts another corpus expression in this one's place; rejects with what went wrong. */
   onSwap: (id: number) => Promise<void>
+  /** Teaches one more corpus expression after the others; rejects with what went wrong. */
+  onAdd: () => Promise<void>
 }
 
-export function ExpressionsTab({ items, sessionId, starred, onToggleStar, examples, onExample, onSwap }: Props) {
-  // One swap at a time, so two at once cannot pick the same expression.
-  const [swapping, setSwapping] = useState<number | null>(null)
-  const [swapError, setSwapError] = useState<{ id: number; message: string } | null>(null)
+/** What a failed change was about: an expression's swap, or the add. */
+type Failure = { at: number | 'add'; message: string }
 
-  async function swap(id: number) {
-    setSwapping(id)
-    setSwapError(null)
+export function ExpressionsTab({ items, sessionId, starred, onToggleStar, examples, onExample, onSwap, onAdd }: Props) {
+  // One change at a time, so two at once cannot pick the same expression.
+  const [busy, setBusy] = useState(false)
+  const [failure, setFailure] = useState<Failure | null>(null)
+
+  async function change(at: Failure['at'], run: () => Promise<void>) {
+    setBusy(true)
+    setFailure(null)
     try {
-      await onSwap(id)
+      await run()
     } catch (e) {
-      setSwapError({ id, message: (e as Error).message })
+      setFailure({ at, message: (e as Error).message })
     } finally {
-      setSwapping(null)
+      setBusy(false)
     }
   }
+
+  const add = (
+    <>
+      <button
+        type="button"
+        className="expression-add"
+        aria-label="Add another expression"
+        title="Add another expression"
+        disabled={busy}
+        onClick={() => void change('add', onAdd)}
+      >
+        <svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" aria-hidden="true">
+          <path d="M10 4v12M4 10h12" />
+        </svg>
+      </button>
+      {failure?.at === 'add' && <p className="error">Could not add one: {failure.message}</p>}
+    </>
+  )
 
   if (items.length === 0) {
     return (
       <section className="tab-panel">
         <p className="empty">This session has no expressions.</p>
+        {add}
       </section>
     )
   }
@@ -61,8 +85,8 @@ export function ExpressionsTab({ items, sessionId, starred, onToggleStar, exampl
                 className="expression-swap"
                 aria-label={`Swap ${item.phrase} for another expression`}
                 title="Swap for another expression"
-                disabled={swapping !== null}
-                onClick={() => void swap(item.id)}
+                disabled={busy}
+                onClick={() => void change(item.id, () => onSwap(item.id))}
               >
                 <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                   <path d="M13.5 8a5.5 5.5 0 0 1-9.7 3.6M2.5 8a5.5 5.5 0 0 1 9.7-3.6" />
@@ -75,7 +99,7 @@ export function ExpressionsTab({ items, sessionId, starred, onToggleStar, exampl
                 onToggle={() => onToggleStar(item.id)}
               />
             </div>
-            {swapError?.id === item.id && <p className="error">Could not swap it: {swapError.message}</p>}
+            {failure?.at === item.id && <p className="error">Could not swap it: {failure.message}</p>}
             <p className="expression-meaning">
               {item.meaning}
               <Synonyms words={item.synonyms} />
@@ -98,6 +122,7 @@ export function ExpressionsTab({ items, sessionId, starred, onToggleStar, exampl
           </li>
         ))}
       </ol>
+      {add}
     </section>
   )
 }

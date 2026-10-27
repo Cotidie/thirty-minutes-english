@@ -61,6 +61,8 @@ export const api = {
   /** Another corpus expression in this one's place; the one swapped out counts as used. */
   swapExpression: (sessionId: number, expressionId: number) =>
     request<Expression>(`/api/sessions/${sessionId}/expressions/${expressionId}/swap`, { method: 'POST' }),
+  /** One more corpus expression, taught after the others and picked as a swap picks one. */
+  addExpression: (sessionId: number) => request<Expression>(`/api/sessions/${sessionId}/expressions`, { method: 'POST' }),
   /** One of a word's pictures drawn again in `style` (blank: the configured one) and saved: the example
    * sentence as it is, or a fresh scene for Practice. The item as it now is. */
   redrawPicture: (sessionId: number, index: number, face: PictureFace, style = '') =>

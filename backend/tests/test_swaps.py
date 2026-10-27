@@ -71,3 +71,30 @@ def test_an_expression_is_swapped_over_http(tmp_path):
         assert res.status_code == 200 and res.json()["id"] == b
         assert c.post(f"/api/sessions/{session}/expressions/{a}/swap").status_code == 404
         assert c.get(f"/api/sessions/{session}").json()["content"]["expressions"][0]["id"] == b
+
+
+def test_an_added_expression_goes_last_and_is_never_one_the_session_had(store):
+    a, b, c, d = seed_expressions(store, 4)
+    session = store.sessions.create(sample_draft(), [a, b]).id
+    swapped_in = store.sessions.swap_expression(session, a)
+    added = store.sessions.add_expression(session)
+    assert added is not None and {swapped_in.id, added.id} == {c, d}
+    assert taught(store, session) == [swapped_in.id, b, added.id]
+    assert store.sessions.add_expression(session) is None
+
+
+def test_nothing_is_added_to_a_missing_session(store):
+    seed_expressions(store, 1)
+    assert store.sessions.add_expression(1) is None
+
+
+def test_an_expression_is_added_over_http(tmp_path):
+    db = Database(tmp_path / "s.db")
+    a, b = seed_expressions(db, 2)
+    session = db.sessions.create(sample_draft(), [a]).id
+    with TestClient(create_app(db, Services(FakeGenerator()), InlineExecutor())) as c:
+        res = c.post(f"/api/sessions/{session}/expressions")
+        assert res.status_code == 200 and res.json()["id"] == b
+        assert c.post(f"/api/sessions/{session}/expressions").status_code == 404
+        assert c.post(f"/api/sessions/{session + 1}/expressions").status_code == 404
+        assert [e["id"] for e in c.get(f"/api/sessions/{session}").json()["content"]["expressions"]] == [a, b]

@@ -161,6 +161,7 @@ CREATE TABLE stage_times (id INTEGER PRIMARY KEY AUTOINCREMENT, stage TEXT NOT N
 - 안 쓴 것이 5개 미만이면 가장 오래전에 쓴 것(마지막 세션 id 오름차순)으로 채운다. 표현에는 `REPEAT_ALLOWANCE` 안 씀(단어에만).
 - corpus가 비어 있으면 표현 0개인 세션. Expressions 탭은 "This session has no expressions."
 - 바꾸기(Expressions 탭의 ↻): 같은 규칙으로 하나를 뽑되 그 세션이 가르쳤거나 바꿔 뺀 표현은 빼고, 같은 position에 넣는다. 뺀 표현은 `swapped_expressions`에 남고, 그 자리의 별표와 연습 문장은 지운다. 남은 후보가 없으면 404.
+- 더하기(Expressions 탭 맨 아래 가로로 긴 +): 바꾸기와 같은 규칙으로 하나를 뽑아 맨 뒤 position에 넣는다. 세션이 없거나 남은 후보가 없으면 404.
 - 삭제(Database 페이지): 표현은 corpus와 그 표현을 가르친 모든 세션에서 지운다(별표, 연습 문장 포함). 주제는 그 주제로 쓴 세션이 없을 때만 지운다(있으면 409). 그날 뉴스 목록에서도 빠진다.
 - 주제 매칭 없음. 현재 프롬프트도 표현은 주제와 무관. 필요해지면 `expression_tags(expression_id, tag)` 추가.
 

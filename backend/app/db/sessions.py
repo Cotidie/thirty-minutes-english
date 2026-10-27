@@ -117,14 +117,7 @@ class SessionRepo:
         """The expression put in place of `expression_id`, picked as a new session picks one but never one this
         session has had; the one swapped out counts as used here, and its star and practice sentences go.
         None when the session does not teach `expression_id`, or the corpus has nothing else to offer."""
-        with self._db.connect() as conn:
-            had = {
-                row[0] for row in conn.execute(
-                    "SELECT expression_id FROM session_expressions WHERE session_id = ?"
-                    " UNION SELECT expression_id FROM swapped_expressions WHERE session_id = ?",
-                    (session_id, session_id),
-                )
-            }
+        had = self._had(session_id)
         if expression_id not in had:
             return None
         picked = self._db.expressions.pick(1, rng or random.Random(), exclude=had)
@@ -144,6 +137,33 @@ class SessionRepo:
                 (session_id, expression_id, datetime.now(UTC).isoformat()),
             )
         return picked[0]
+
+    def add_expression(self, session_id: int, rng: random.Random | None = None) -> Expression | None:
+        """One more expression taught after the others, picked as `swap_expression` picks one.
+        None when there is no such session, or the corpus has nothing else to offer."""
+        if not self.exists(session_id):
+            return None
+        picked = self._db.expressions.pick(1, rng or random.Random(), exclude=self._had(session_id))
+        if not picked:
+            return None
+        with self._db.connect() as conn:
+            conn.execute(
+                "INSERT INTO session_expressions (session_id, expression_id, position)"
+                " SELECT ?, ?, COALESCE(MAX(position) + 1, 0) FROM session_expressions WHERE session_id = ?",
+                (session_id, picked[0].id, session_id),
+            )
+        return picked[0]
+
+    def _had(self, session_id: int) -> set[int]:
+        """The expressions the session teaches or swapped out."""
+        with self._db.connect() as conn:
+            return {
+                row[0] for row in conn.execute(
+                    "SELECT expression_id FROM session_expressions WHERE session_id = ?"
+                    " UNION SELECT expression_id FROM swapped_expressions WHERE session_id = ?",
+                    (session_id, session_id),
+                )
+            }
 
     def exists(self, session_id: int) -> bool:
         with self._db.connect() as conn:
