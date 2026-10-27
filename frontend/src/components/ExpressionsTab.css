@@ -17,6 +17,11 @@
   border-radius: 16px;
 }
 
+/* Whatever ends the card leaves the bottom gap to the padding, so it matches the top. */
+.expression > :last-child {
+  margin-bottom: 0;
+}
+
 /* Phrase, chip and star share one centre line; the row carries the gap below. */
 .expression-head {
   display: flex;
@@ -105,8 +110,8 @@
   font-size: 1.2rem;
 }
 
-.expression-examples li {
-  margin-bottom: 0.3rem;
+.expression-examples li + li {
+  margin-top: 0.3rem;
 }
 
 /* A full-width row under the last expression: one more from the corpus. */
@@ -134,7 +139,6 @@
 }
 
 .korean-example {
-  margin: 0 0 1rem;
   padding-top: 1rem;
   border-top: 1px dashed var(--line);
 }
