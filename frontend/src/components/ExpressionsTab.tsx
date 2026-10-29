@@ -99,7 +99,7 @@ export function ExpressionsTab({ items, starred, onToggleStar, onSwap, onAdd }: 
               {item.meaning}
               <Synonyms words={item.synonyms} />
             </p>
-            <UsageNote text={item.usage_note} />
+            <p className="expression-note">{item.usage_note}</p>
             <ul className="expression-examples">
               {item.examples.map((ex) => (
                 <li key={ex}>
@@ -113,20 +113,6 @@ export function ExpressionsTab({ items, starred, onToggleStar, onSwap, onAdd }: 
       </ol>
       {add}
     </section>
-  )
-}
-
-function UsageNote({ text }: { text: string }) {
-  const [clamped, setClamped] = useState(true)
-  return (
-    <button
-      type="button"
-      className={`expression-note${clamped ? ' is-clamped' : ''}`}
-      title={clamped ? 'Show the full note' : 'Shorten the note'}
-      onClick={() => setClamped((c) => !c)}
-    >
-      {text}
-    </button>
   )
 }
 

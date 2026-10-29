@@ -32,12 +32,10 @@ describe('ExpressionsTab', () => {
     expect(screen.getAllByText('a moving target', { selector: 'mark' })).toHaveLength(2)
   })
 
-  it('clamps the usage note until it is clicked', async () => {
+  it('shows the usage note whole, as plain text', () => {
     render(<ExpressionsTab items={items} starred={[]} onToggleStar={vi.fn()} onSwap={vi.fn()} onAdd={vi.fn()} />)
-    const note = screen.getByRole('button', { name: /Neutral to workplace register/ })
-    expect(note).toHaveClass('is-clamped')
-    await userEvent.click(note)
-    expect(note).not.toHaveClass('is-clamped')
+    expect(screen.getByText(/Neutral to workplace register/)).toHaveClass('expression-note')
+    expect(screen.queryByRole('button', { name: /Neutral to workplace register/ })).not.toBeInTheDocument()
   })
 
   it('stars an expression by its id and shows it as pressed', async () => {
