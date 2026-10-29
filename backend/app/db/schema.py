@@ -8,20 +8,22 @@ from datetime import UTC, datetime
 from app.db import topics
 from app.models import Category
 
-VERSION = 8
+VERSION = 9
 
-# Added in v3: images under the article's paragraphs.
+# Added in v3, by session since v9: images under the article's paragraphs, and its cover (no paragraph) under the title.
 FIGURES = """
 CREATE TABLE figures (
     id           INTEGER PRIMARY KEY AUTOINCREMENT,
-    paragraph_id INTEGER NOT NULL REFERENCES paragraphs(id) ON DELETE CASCADE,
+    session_id   INTEGER NOT NULL REFERENCES sessions(id) ON DELETE CASCADE,
+    paragraph_id INTEGER REFERENCES paragraphs(id) ON DELETE CASCADE,
     picture_id   INTEGER NOT NULL REFERENCES pictures(id),
     caption      TEXT    NOT NULL,
     source_url   TEXT,
     credit       TEXT
 ) STRICT;
 
-CREATE INDEX figures_paragraph ON figures (paragraph_id);
+CREATE INDEX figures_session ON figures (session_id);
+CREATE UNIQUE INDEX figures_cover ON figures (session_id) WHERE paragraph_id IS NULL;
 """
 
 # Added in v4: topics are rows; a day's news lists them, and a session points at its own.
@@ -228,6 +230,23 @@ def upgrade(conn: sqlite3.Connection, version: int) -> None:
     if version < 8:
         _run(conn, RETIRED_PROVIDERS)
         conn.execute("PRAGMA user_version = 8")
+    if version < 9:
+        _figures_by_session(conn)
+
+
+def _figures_by_session(conn: sqlite3.Connection) -> None:
+    """v8 to v9: each figure points at its session, so one with no paragraph can be the article's cover."""
+    conn.execute("ALTER TABLE figures RENAME TO figures_v8")
+    for index in ("figures_paragraph", "figures_session", "figures_cover"):
+        conn.execute(f"DROP INDEX IF EXISTS {index}")
+    _run(conn, FIGURES)
+    conn.execute(
+        "INSERT INTO figures (id, session_id, paragraph_id, picture_id, caption, source_url, credit)"
+        " SELECT f.id, p.session_id, f.paragraph_id, f.picture_id, f.caption, f.source_url, f.credit"
+        " FROM figures_v8 f JOIN paragraphs p ON p.id = f.paragraph_id"
+    )
+    conn.execute("DROP TABLE figures_v8")
+    conn.execute("PRAGMA user_version = 9")
 
 
 def _examples_of_words(conn: sqlite3.Connection) -> None:

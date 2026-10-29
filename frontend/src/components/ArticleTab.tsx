@@ -23,6 +23,7 @@ export function ArticleTab({
   const { summaries, add: addSummary } = useSummaries(sessionId);
   const marks = useReadingMarks(sessionId);
   const paragraphs = article.paragraphs;
+  const cover = (article.figures ?? []).find((f) => f.paragraph_id === null);
   const sentences = pairSentences(
     paragraphs.map((p) => p.text),
     article.translation ?? [],
@@ -43,6 +44,7 @@ export function ArticleTab({
       </p>
       <article className="article" ref={bodyRef}>
         <h2 className="article-title">{article.title}</h2>
+        {cover && <ArticleFigure figure={cover} />}
         {paragraphs.map((p, i) => (
           <Fragment key={p.id}>
             <Paragraph
@@ -127,7 +129,7 @@ function QuestionItem({
   );
 }
 
-/** An image under its paragraph, with where it came from: the page and who it credits, or that it was drawn for the article. */
+/** An image under its paragraph or the title, with where it came from: the page and who it credits, or that it was drawn for the article. */
 function ArticleFigure({ figure }: { figure: Figure }) {
   const from = figure.source_url
     ? [figure.credit, hostOf(figure.source_url)].filter(Boolean).join(" · ")

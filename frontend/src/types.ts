@@ -56,10 +56,11 @@ export interface Paragraph {
   text: string
 }
 
-/** An image under a paragraph: from a page the article drew on (with its page and credit), or drawn for it (neither). */
+/** An image under a paragraph, or under the title as the cover (no paragraph): from a page the article drew on
+ * (with its page and credit), or drawn for it (neither). */
 export interface Figure {
   id: number
-  paragraph_id: number
+  paragraph_id: number | null
   /** A file name under /api/images/. */
   image: string
   caption: string

@@ -171,8 +171,8 @@ class JobRunner:
             picked = self._expressions.pick(EXPRESSION_COUNT, random.Random())
             session = self._sessions.create(draft, [e.id for e in picked])
             job.session_id = session.id
-            kept = self._keep_figures(session, draft.article.figures)
-            scene = None if kept else draft.article.picture
+            cover = self._keep_figures(session, draft.article.figures)
+            scene = None if cover else draft.article.picture
             if illustrator:
                 self._illustrate(job, illustrator, session, scene)
         except Cancelled:
@@ -204,25 +204,27 @@ class JobRunner:
         paragraphs = session.content.article.paragraphs
         return paragraphs[min(max(after, 1), len(paragraphs)) - 1].id
 
-    def _keep_figures(self, session: Session, figures: list[FigureDraft]) -> int:
-        """Downloads the images the generator found and shows them under their paragraphs; how many came through."""
+    def _keep_figures(self, session: Session, figures: list[FigureDraft]) -> bool:
+        """Downloads the images the generator found: the first with after 0 goes under the title as the cover,
+        the rest under their paragraphs. Whether a cover came through."""
         if self._sources is None or not session.content.article.paragraphs:
-            return 0
-        kept = 0
+            return False
+        cover = False
         for figure in figures:
             picture_id = self._sources.keep(figure.image_url)
             if picture_id is None:
                 continue
+            paragraph = None if figure.after == 0 and not cover else self._under(session, figure.after)
             try:
-                self._sessions.add_figure(self._under(session, figure.after), picture_id, figure.caption, figure.page_url or None, figure.credit or None)
+                self._sessions.add_figure(session.id, paragraph, picture_id, figure.caption, figure.page_url or None, figure.credit or None)
             except KeyError:
                 self._sources.drop(picture_id)
-                return kept
-            kept += 1
-        return kept
+                return cover
+            cover = cover or paragraph is None
+        return cover
 
     def _illustrate(self, job: Job, illustrator: Illustrator, session: Session, scene: PictureDraft | None) -> None:
-        """Each picture onto the saved session as it is drawn, the article's `scene` among them when given;
+        """Each picture onto the saved session as it is drawn, the article's cover `scene` among them when given;
         a painter failure leaves the session without the rest."""
         words = session.content.vocabulary
         if not session.content.article.paragraphs:
@@ -237,7 +239,7 @@ class JobRunner:
                 lambda done: job.apply(with_pictures(job.progress, done, total)),
                 lambda index, field, picture_id: self._sessions.replace_picture(words[index].id, field, picture_id),
                 scene.scene if scene else None,
-                lambda picture_id: self._sessions.add_figure(self._under(session, scene.after), picture_id, scene.caption, None, None),
+                lambda picture_id: self._sessions.add_figure(session.id, None, picture_id, scene.caption, None, None),
             )
         except GenerationError as e:
             log.warning("job %s: the session stays without the pictures not yet drawn: %s", job.id, e)

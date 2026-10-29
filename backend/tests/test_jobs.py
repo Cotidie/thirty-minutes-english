@@ -137,30 +137,39 @@ def figure(after: int, url: str = "https://news.example/tram.jpg") -> FigureDraf
     return FigureDraft(after=after, image_url=url, page_url="https://news.example/trams", credit="Yonhap", caption=f"Under {after}.")
 
 
-def test_source_images_are_kept_under_their_paragraph_and_the_scene_is_not_drawn(tmp_path):
+def test_the_cover_goes_under_the_title_the_other_image_under_its_paragraph_and_no_scene_is_drawn(tmp_path):
     from tests.test_illustrator import FakePainter
 
     db = Database(tmp_path / "s.db")
     painter = FakePainter()
     illustrator = Illustrator(painter, db.pictures, PictureFiles(db.images_dir))
-    job = runner_over(db).start("A", Recording([figure(3), figure(1, "https://gone.example/a.jpg")]), illustrator)
+    job = runner_over(db).start("A", Recording([figure(0), figure(3), figure(1, "https://gone.example/a.jpg")]), illustrator)
     article = db.sessions.get(job.session_id).content.article
     assert [(f.paragraph_id, f.source_url, f.credit, f.caption) for f in article.figures] == [
-        (article.paragraphs[2].id, "https://news.example/trams", "Yonhap", "Under 3.")
+        (None, "https://news.example/trams", "Yonhap", "Under 0."),
+        (article.paragraphs[2].id, "https://news.example/trams", "Yonhap", "Under 3."),
     ]
     assert len(painter.prompts) == 2 * len(sample_draft().vocabulary)  # the words' pictures only
 
 
-def test_with_no_source_image_the_articles_scene_is_drawn_under_its_paragraph(tmp_path):
+def test_with_no_cover_image_the_articles_scene_is_drawn_as_the_cover(tmp_path):
     from tests.test_illustrator import FakePainter
 
     db = Database(tmp_path / "s.db")
     illustrator = Illustrator(FakePainter(), db.pictures, PictureFiles(db.images_dir))
-    job = runner_over(db).start("A", Recording([figure(1, "https://gone.example/a.jpg")]), illustrator)
+    job = runner_over(db).start("A", Recording([figure(0, "https://gone.example/a.jpg"), figure(2)]), illustrator)
     article = db.sessions.get(job.session_id).content.article
-    [drawn] = article.figures
-    assert (drawn.paragraph_id, drawn.caption, drawn.source_url, drawn.credit) == (article.paragraphs[1].id, "Waiting for the tram.", None, None)
+    photo, drawn = article.figures
+    assert photo.paragraph_id == article.paragraphs[1].id
+    assert (drawn.paragraph_id, drawn.caption, drawn.source_url, drawn.credit) == (None, "Waiting for the tram.", None, None)
     assert job.progress.pictures_total == 2 * len(sample_draft().vocabulary) + 1
+
+
+def test_an_article_keeps_one_cover_and_a_second_goes_under_the_first_paragraph(tmp_path):
+    db = Database(tmp_path / "s.db")
+    job = runner_over(db).start("A", Recording([figure(0), figure(0, "https://news.example/b.jpg")]))
+    article = db.sessions.get(job.session_id).content.article
+    assert [f.paragraph_id for f in article.figures] == [None, article.paragraphs[0].id]
 
 
 def test_a_source_image_comes_through_with_pictures_off_and_a_late_paragraph_number_lands_on_the_last(tmp_path):

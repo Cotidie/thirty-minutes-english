@@ -23,7 +23,7 @@ def sample_draft(topic: str = "Digital twins", title: str = "Twins at Work") -> 
             ],
             sources=[Source(title="A page", url="https://example.com")],
             translation=[SentencePair(en="One.", ko="하나다.")],
-            picture=PictureDraft(after=2, scene="A tram stop in the rain at dusk, two students under one umbrella.", caption="Waiting for the tram."),
+            picture=PictureDraft(scene="A tram stop in the rain at dusk, two students under one umbrella.", caption="Waiting for the tram."),
         ),
         vocabulary=[
             VocabularyDraft(word=f"word{i}", pos="noun", definition=f"def {i}", example=f"ex {i}", synonyms=[f"same {i}"], korean=f"단어 {i}", scene=f"scene {i}", caption=f"caption {i}")

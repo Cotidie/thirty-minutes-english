@@ -195,17 +195,19 @@ def test_a_reading_kept_before_corrections_were_saved_has_none(store):
     assert reading.corrections is None
 
 
-def test_figures_hang_under_their_paragraph_and_go_with_the_session(store):
+def test_figures_hang_under_their_paragraph_or_the_title_and_go_with_the_session(store):
     session = store.sessions.create(sample_draft(), [])
-    first, second = (p.id for p in session.content.article.paragraphs[:2])
+    second = session.content.article.paragraphs[1].id
     photo, drawn = store.pictures.add(None, None, None), store.pictures.add("m", 3.0, None)
-    store.sessions.add_figure(second, photo, "Trams on Seoul's Wirye line.", "https://news.example/trams", "Yonhap")
-    store.sessions.add_figure(first, drawn, "A tram stop in the rain.", None, None)
+    store.sessions.add_figure(session.id, second, photo, "Trams on Seoul's Wirye line.", "https://news.example/trams", "Yonhap")
+    store.sessions.add_figure(session.id, None, drawn, "A tram stop in the rain.", None, None)
     figures = store.sessions.get(session.id).content.article.figures
     assert [(f.paragraph_id, f.image, f.source_url, f.credit) for f in figures] == [
         (second, f"{photo}.png", "https://news.example/trams", "Yonhap"),
-        (first, f"{drawn}.png", None, None),
+        (None, f"{drawn}.png", None, None),  # the cover
     ]
+    with pytest.raises(KeyError):
+        store.sessions.add_figure(session.id, None, photo, "a second cover", None, None)
     assert store.sessions.delete(session.id) == [photo, drawn]
     with pytest.raises(KeyError):
-        store.sessions.add_figure(first, photo, "too late", None, None)  # the session went while it was fetched
+        store.sessions.add_figure(session.id, None, photo, "too late", None, None)  # the session went while it was fetched

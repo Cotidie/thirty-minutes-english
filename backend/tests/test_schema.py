@@ -197,3 +197,31 @@ def test_a_v7_file_on_gemini_keeps_its_voice_model(tmp_path):
         conn.executemany("INSERT INTO settings VALUES (?, ?)", [("VOICE_PROVIDER", "gemini"), ("VOICE_MODEL", "gemini-3.8-live")])
         conn.execute("PRAGMA user_version = 7")
     assert Database(path).settings.load() == {"VOICE_MODEL": "gemini-3.8-live"}
+
+
+def test_a_v8_file_ties_its_figures_to_their_sessions(tmp_path):
+    path = tmp_path / "s.db"
+    db = Database(path)
+    session = db.sessions.create(sample_draft(), [])
+    second = session.content.article.paragraphs[1].id
+    photo = db.pictures.add(None, None, None)
+    db.sessions.add_figure(session.id, second, photo, "Trams.", "https://news.example/trams", "Yonhap")
+    with sqlite3.connect(path) as conn:  # back to how v8 kept figures: under a paragraph only
+        conn.execute("ALTER TABLE figures RENAME TO figures_v9")
+        conn.execute("DROP INDEX figures_session")
+        conn.execute("DROP INDEX figures_cover")
+        conn.execute(
+            """CREATE TABLE figures (id INTEGER PRIMARY KEY AUTOINCREMENT,
+               paragraph_id INTEGER NOT NULL REFERENCES paragraphs(id) ON DELETE CASCADE,
+               picture_id INTEGER NOT NULL REFERENCES pictures(id), caption TEXT NOT NULL, source_url TEXT, credit TEXT) STRICT"""
+        )
+        conn.execute("INSERT INTO figures SELECT id, paragraph_id, picture_id, caption, source_url, credit FROM figures_v9")
+        conn.execute("DROP TABLE figures_v9")
+        conn.execute("CREATE INDEX figures_paragraph ON figures (paragraph_id)")
+        conn.execute("PRAGMA user_version = 8")
+    db = Database(path)
+    with db.connect() as conn:
+        assert conn.execute("PRAGMA user_version").fetchone()[0] == schema.VERSION
+    [figure] = db.sessions.get(session.id).content.article.figures
+    assert (figure.paragraph_id, figure.image, figure.credit) == (second, f"{photo}.png", "Yonhap")
+    assert db.sessions.delete(session.id) == [photo]

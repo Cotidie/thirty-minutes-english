@@ -101,6 +101,17 @@ describe('ArticleTab', () => {
     expect(second.previousElementSibling).toHaveTextContent('A modest twin delivers more value.')
   })
 
+  it('shows the cover right under the title', () => {
+    const figures = [
+      { id: 1, paragraph_id: 1, image: '5.png', caption: 'Trams on the Wirye line.', source_url: null, credit: null },
+      { id: 2, paragraph_id: null, image: '7.png', caption: 'Seoul at rush hour.', source_url: null, credit: null },
+    ]
+    render(<ArticleTab article={{ ...article, figures }} sessionId={3} />)
+    const [cover] = screen.getAllByRole('figure')
+    expect(within(cover).getByRole('img', { name: 'Seoul at rush hour.' })).toHaveAttribute('src', '/api/images/7.png')
+    expect(cover.previousElementSibling).toHaveClass('article-title')
+  })
+
   it('offers Read aloud under each paragraph and lets only one paragraph hold the microphone', async () => {
     render(<ArticleTab article={article} sessionId={3} />)
     const buttons = screen.getAllByRole('button', { name: 'Read aloud' })

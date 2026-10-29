@@ -214,9 +214,9 @@ def test_pictures_are_drawn_after_the_text_and_saved_with_the_session(tmp_path):
     words, [figure] = content["vocabulary"], content["article"]["figures"]
     assert illustrator.job_ids == [job["id"]]
     assert job["stage"] == "illustrating"
-    assert job["pictures_done"] == 21  # both pictures of every word, and the article's drawn scene (no source image here)
+    assert job["pictures_done"] == 21  # both pictures of every word, and the article's drawn cover (no source image here)
     assert (words[0]["image"], words[0]["example_image"], words[9]["example_image"]) == ("1.png", "2.png", "20.png")
-    assert (figure["image"], figure["paragraph_id"], figure["source_url"]) == ("21.png", content["article"]["paragraphs"][1]["id"], None)
+    assert (figure["image"], figure["paragraph_id"], figure["source_url"]) == ("21.png", None, None)
     assert db.pictures.stats()["fake"].seconds == 1.0
 
 

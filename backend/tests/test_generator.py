@@ -99,15 +99,16 @@ def test_the_humanizer_rewrites_the_article_before_its_evidence_and_translation_
     assert (skill / "SKILL.md").read_text().startswith("---\nname: humanizer\n") and (skill / "LICENSE").is_file()
 
 
-def test_the_article_brings_up_to_two_source_images_and_always_a_scene_to_draw_instead():
+def test_the_article_brings_a_cover_and_one_more_source_image_and_always_a_scene_to_draw_instead():
     article = SESSION_SCHEMA["properties"]["article"]
     assert {"figures", "picture"} <= set(article["required"])
     assert article["properties"]["figures"]["maxItems"] == 2
     assert set(article["properties"]["figures"]["items"]["required"]) == {"after", "image_url", "page_url", "credit", "caption"}
-    assert set(article["properties"]["picture"]["required"]) == {"after", "scene", "caption"}
+    assert article["properties"]["figures"]["items"]["properties"]["after"]["minimum"] == 0  # 0: the cover
+    assert set(article["properties"]["picture"]["required"]) == {"scene", "caption"}
     prompt = ClaudeGenerator(model="m").build_prompt("t")
     figures = prompt.index("Then give figures:")
     assert prompt.index("Then give translation") < figures < prompt.index("2. vocabulary")
-    assert "firecrawl_scrape" in prompt[figures:] and "Never a logo" in prompt[figures:]
+    assert "firecrawl_scrape" in prompt[figures:] and "Never a logo" in prompt[figures:] and "after 0" in prompt[figures:]
     assert prompt.index("Always give picture") < prompt.index("2. vocabulary")
 

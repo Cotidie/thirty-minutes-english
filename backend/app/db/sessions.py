@@ -94,7 +94,7 @@ class SessionRepo:
             ).fetchall()
             words = conn.execute("SELECT * FROM vocabulary WHERE session_id = ? ORDER BY position", (session_id,)).fetchall()
             figures = conn.execute(
-                "SELECT f.* FROM figures f JOIN paragraphs p ON p.id = f.paragraph_id WHERE p.session_id = ? ORDER BY f.id", (session_id,)
+                "SELECT * FROM figures WHERE session_id = ? ORDER BY id", (session_id,)
             ).fetchall()
         article = Article(
             title=row["title"],
@@ -182,23 +182,25 @@ class SessionRepo:
                 "SELECT picture_id, example_picture_id FROM vocabulary WHERE session_id = ? ORDER BY position", (session_id,)
             ).fetchall()
             figures = conn.execute(
-                "SELECT f.picture_id FROM figures f JOIN paragraphs p ON p.id = f.paragraph_id WHERE p.session_id = ? ORDER BY f.id",
-                (session_id,),
+                "SELECT picture_id FROM figures WHERE session_id = ? ORDER BY id", (session_id,)
             ).fetchall()
             if conn.execute("DELETE FROM sessions WHERE id = ?", (session_id,)).rowcount == 0:
                 return None
         return [picture for row in rows for picture in row if picture is not None] + [f[0] for f in figures]
 
-    def add_figure(self, paragraph_id: int, picture_id: int, caption: str, source_url: str | None, credit: str | None) -> int:
-        """Shows the picture under the paragraph. Raises KeyError when the paragraph is gone (its session was deleted)."""
+    def add_figure(
+        self, session_id: int, paragraph_id: int | None, picture_id: int, caption: str, source_url: str | None, credit: str | None
+    ) -> int:
+        """Shows the picture under the paragraph, or under the title as the article's cover when `paragraph_id` is None.
+        Raises KeyError when the session is gone (it was deleted while the picture came)."""
         try:
             with self._db.connect() as conn:
                 cur = conn.execute(
-                    "INSERT INTO figures (paragraph_id, picture_id, caption, source_url, credit) VALUES (?, ?, ?, ?, ?)",
-                    (paragraph_id, picture_id, caption, source_url, credit),
+                    "INSERT INTO figures (session_id, paragraph_id, picture_id, caption, source_url, credit) VALUES (?, ?, ?, ?, ?, ?)",
+                    (session_id, paragraph_id, picture_id, caption, source_url, credit),
                 )
         except sqlite3.IntegrityError:
-            raise KeyError(paragraph_id) from None
+            raise KeyError(session_id) from None
         assert cur.lastrowid is not None
         return cur.lastrowid
 

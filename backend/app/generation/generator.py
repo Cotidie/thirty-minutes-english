@@ -45,7 +45,7 @@ SESSION_SCHEMA: dict = {
                         "additionalProperties": False,
                         "required": ["after", "image_url", "page_url", "credit", "caption"],
                         "properties": {
-                            "after": {"type": "integer", "minimum": 1},
+                            "after": {"type": "integer", "minimum": 0},
                             "image_url": {"type": "string"},
                             "page_url": {"type": "string"},
                             "credit": {"type": "string"},
@@ -56,8 +56,8 @@ SESSION_SCHEMA: dict = {
                 "picture": {
                     "type": "object",
                     "additionalProperties": False,
-                    "required": ["after", "scene", "caption"],
-                    "properties": {"after": {"type": "integer", "minimum": 1}, "scene": {"type": "string"}, "caption": {"type": "string"}},
+                    "required": ["scene", "caption"],
+                    "properties": {"scene": {"type": "string"}, "caption": {"type": "string"}},
                 },
                 "translation": {
                     "type": "array",
@@ -152,14 +152,16 @@ copied character for character from the body, final punctuation included, one se
 merge or split sentences. ko is that sentence in natural written Korean (해라체, "~다"로 끝맺기), translated \
 with its neighbors in mind so the Korean reads well in sequence; keep names, figures, and dates as they are. \
 Then give figures: up to 2 images you saw on the pages you drew on (firecrawl_scrape with the images format \
-lists a page's images) that show what a paragraph says: a photo of the place, people, or thing, a diagram, or \
-a map. Never a logo, ad, icon, author photo, or tracking pixel. For each give after (the paragraph it belongs \
-under, counted from 1), image_url (the exact image address from the page), page_url (the page it was on), \
-credit (the outlet or photographer the page names), and caption (one plain sentence on what it shows and why \
-it matters to that paragraph). Leave figures empty when no such image turned up. Always give picture too: one \
-moment from the article that a photo could capture, in two or three concrete sentences (the place, who is \
-there, what they are doing, details a viewer could point at; no text or signs), with after (the paragraph it \
-belongs under) and a one-sentence caption. It is drawn only when none of the figures can be used.
+lists a page's images): a photo of the place, people, or thing, a diagram, or a map. Never a logo, ad, icon, \
+author photo, or tracking pixel. The first is the cover, shown under the title: the image that best shows what \
+the whole article is about (often the lead photo of the main source); give it after 0. The second shows what \
+one paragraph says; give it after (the paragraph it belongs under, counted from 1). When only one image fits, \
+make it the cover. For each give after, image_url (the exact image address from the page), page_url (the page \
+it was on), credit (the outlet or photographer the page names), and caption (one plain sentence on what it \
+shows and why it matters to the article or to that paragraph). Leave figures empty when no such image turned \
+up. Always give picture too: one moment that captures the whole article and that a photo could capture, in two \
+or three concrete sentences (the place, who is there, what they are doing, details a viewer could point at; no \
+text or signs), and a one-sentence caption. It is drawn as the cover when no cover image can be used.
 
 2. vocabulary: {vocabulary_count} words at B2 to C1+ level connected to the topic. Draw from the \
 article body where it offers strong candidates, and fill the rest with words a well-read speaker would \

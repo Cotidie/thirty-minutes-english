@@ -101,7 +101,8 @@ class SentencePair(BaseModel):
 
 
 class FigureDraft(BaseModel):
-    """An image the generator saw on a page it drew on, to show under paragraph `after` (counted from 1)."""
+    """An image the generator saw on a page it drew on, to show under paragraph `after` (counted from 1),
+    or under the title as the article's cover when `after` is 0."""
 
     after: int
     image_url: str
@@ -111,9 +112,8 @@ class FigureDraft(BaseModel):
 
 
 class PictureDraft(BaseModel):
-    """A drawable moment from the article, drawn only when no source image could be kept."""
+    """A drawable moment that captures the whole article, drawn as its cover only when no cover image could be kept."""
 
-    after: int = 1
     scene: str
     caption: str = ""
 
@@ -144,11 +144,11 @@ class Paragraph(BaseModel):
 
 
 class Figure(BaseModel):
-    """An image shown under a paragraph: one from a page the article drew on (with its page and credit),
-    or one drawn for the article (neither)."""
+    """An image shown under a paragraph, or under the title as the cover (no paragraph): one from a page the
+    article drew on (with its page and credit), or one drawn for the article (neither)."""
 
     id: int
-    paragraph_id: int
+    paragraph_id: int | None
     """{picture id}.png, served at /api/images/{image}."""
     image: str
     caption: str
