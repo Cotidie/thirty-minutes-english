@@ -1,7 +1,7 @@
 // Gemini Live over WebSocket. The browser does the audio work itself: an
 // AudioWorklet turns the microphone into 16 kHz PCM chunks for the socket,
-// another plays the 24 kHz PCM that comes back through the same <audio>
-// element the OpenAI path uses. The backend already minted the one-use token
+// another plays the 24 kHz PCM that comes back through the page's <audio>
+// element. The backend already minted the one-use token
 // inside the URL and wrote the setup message. The same socket carries Summarize
 // to the transcription model, which only writes down what it hears.
 
@@ -42,7 +42,6 @@ export function connectGeminiTranscription(opts: LiveOptions): Promise<LiveConne
 
 async function join(round: GeminiRound, opts: LiveOptions): Promise<LiveConnection> {
   const session = await opts.start()
-  if (session.provider !== 'gemini') throw new Error(`Expected a Gemini session, got ${session.provider}`)
   try {
     await round.open(session.url, session.setup)
   } catch (e) {

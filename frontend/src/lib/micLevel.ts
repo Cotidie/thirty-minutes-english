@@ -1,5 +1,5 @@
 // Loudness of the live microphone, for the "we can hear you" meter. The Web
-// Audio graph is read-only: it taps the same track WebRTC is already sending.
+// Audio graph is read-only: it taps the same track the live round is already sending.
 
 import { useEffect, useState } from 'react'
 

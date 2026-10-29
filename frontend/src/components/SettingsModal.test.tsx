@@ -19,8 +19,6 @@ function field(partial: Partial<SettingField> & Pick<SettingField, 'key' | 'grou
     catalog: null,
     inline: false,
     testable: false,
-    follows: null,
-    variants: {},
     effort_of: null,
     shown_when: null,
     used_when: null,
@@ -30,20 +28,13 @@ function field(partial: Partial<SettingField> & Pick<SettingField, 'key' | 'grou
 }
 
 const FIELDS: SettingField[] = [
-  field({ key: 'VOICE_PROVIDER', group: 'voice', value: 'openai', options: [opt('openai'), opt('gemini')] }),
   field({
     key: 'VOICE_MODEL',
     group: 'voice',
-    follows: 'VOICE_PROVIDER',
+    default: 'gemini-3.8-live-extended-thinking',
     free: true,
-    variants: {
-      openai: { default: 'gpt-live-1', catalog: 'openai_voice', options: [opt('gpt-live-1')] },
-      gemini: {
-        default: 'gemini-3.8-live-extended-thinking',
-        catalog: 'gemini_live',
-        options: [opt('gemini-3.8-live-extended-thinking'), opt('gemini-3.8-live')],
-      },
-    },
+    catalog: 'gemini_live',
+    options: [opt('gemini-3.8-live-extended-thinking'), opt('gemini-3.8-live')],
   }),
   field({
     key: 'VOICE_THINKING',
@@ -51,7 +42,6 @@ const FIELDS: SettingField[] = [
     value: 'low',
     default: 'low',
     options: [opt('low'), opt('medium'), opt('high')],
-    shown_when: ['VOICE_PROVIDER', 'gemini'],
   }),
   field({
     key: 'VOICE_NAME',
@@ -59,10 +49,9 @@ const FIELDS: SettingField[] = [
     value: 'Kore',
     default: 'Kore',
     options: [opt('Kore', 'Firm'), opt('Puck', 'Upbeat')],
-    shown_when: ['VOICE_PROVIDER', 'gemini'],
   }),
-  field({ key: 'OPENAI_API_KEY', group: 'keys', value: '…1234', secret: true, testable: true }),
-  field({ key: 'GEMINI_API_KEY', group: 'keys', secret: true, testable: true }),
+  field({ key: 'GEMINI_API_KEY', group: 'keys', value: '…1234', secret: true, testable: true }),
+  field({ key: 'OPENROUTER_API_KEY', group: 'keys', secret: true, testable: true, used_when: ['IMAGE_PROVIDER', 'openrouter'] }),
   field({ key: 'AZURE_SPEECH_KEY', group: 'keys', secret: true, testable: true }),
   field({ key: 'AZURE_SPEECH_REGION', group: 'assess', value: 'koreacentral', default: 'koreacentral' }),
   field({
@@ -75,6 +64,16 @@ const FIELDS: SettingField[] = [
     options: [opt('opus', 'Most capable', 'Opus 5.5', ['low', 'max']), opt('sonnet', 'Efficient', 'Sonnet 5', ['low', 'high']), opt('haiku', 'Fastest', 'Haiku 4.5', [])],
   }),
   field({ key: 'CLAUDE_EFFORT', group: 'claude', value: 'high', default: 'xhigh', effort_of: 'CLAUDE_MODEL' }),
+  field({ key: 'IMAGE_PROVIDER', group: 'images', value: 'openrouter', default: 'openrouter', options: [opt('openrouter'), opt('off')] }),
+  field({
+    key: 'IMAGE_MODEL',
+    group: 'images',
+    default: 'google/gemini-3-pro-image',
+    free: true,
+    catalog: 'openrouter_images',
+    options: [opt('google/gemini-3-pro-image')],
+    shown_when: ['IMAGE_PROVIDER', 'openrouter'],
+  }),
 ]
 
 const GROUPS: SettingGroup[] = [
@@ -82,6 +81,7 @@ const GROUPS: SettingGroup[] = [
   { id: 'voice', title: 'Voice coach' },
   { id: 'assess', title: 'Read aloud assessor' },
   { id: 'claude', title: 'Claude generation' },
+  { id: 'images', title: 'Vocabulary pictures' },
 ]
 
 beforeEach(() => {
@@ -92,7 +92,7 @@ beforeEach(() => {
 
 async function open(onClose = () => undefined) {
   render(<SettingsModal open onClose={onClose} />)
-  await screen.findByLabelText('OPENAI_API_KEY')
+  await screen.findByLabelText('GEMINI_API_KEY')
 }
 
 async function showTab(title: string) {
@@ -119,7 +119,7 @@ describe('SettingsModal', () => {
   it('shows one group at a time, secrets masked, the saved value as the placeholder', async () => {
     await open()
     expect(screen.getAllByRole('tab').map((t) => t.textContent)).toEqual(GROUPS.map((g) => g.title))
-    const key = screen.getByLabelText('OPENAI_API_KEY') as HTMLInputElement
+    const key = screen.getByLabelText('GEMINI_API_KEY') as HTMLInputElement
     expect(key.type).toBe('password')
     expect(key.value).toBe('')
     expect(key.placeholder).toBe('Saved: …1234. Type to replace.')
@@ -129,13 +129,9 @@ describe('SettingsModal', () => {
     expect(screen.getByRole('combobox', { name: 'CLAUDE_MODEL' })).toHaveValue('sonnet')
   })
 
-  it('hides the Gemini-only fields under OpenAI and shows them once the provider flips', async () => {
+  it('offers the Gemini voices, the thinking level, and the live models', async () => {
     await open()
     await showTab('Voice coach')
-    expect(screen.queryByLabelText('VOICE_NAME')).not.toBeInTheDocument()
-    expect(screen.queryByLabelText('VOICE_THINKING')).not.toBeInTheDocument()
-
-    await pick('VOICE_PROVIDER', 'gemini')
     await userEvent.click(screen.getByRole('button', { name: /VOICE_NAME$/ }))
     expect((await screen.findAllByRole('option')).map((o) => o.textContent)).toEqual(['KoreFirm', 'PuckUpbeat'])
     await userEvent.keyboard('{Escape}')
@@ -149,27 +145,35 @@ describe('SettingsModal', () => {
     ])
   })
 
+  it('hides the image model once pictures are off', async () => {
+    await open()
+    await showTab('Vocabulary pictures')
+    expect(screen.getByRole('combobox', { name: 'IMAGE_MODEL' })).toBeInTheDocument()
+    await pick('IMAGE_PROVIDER', 'off')
+    expect(screen.queryByRole('combobox', { name: 'IMAGE_MODEL' })).not.toBeInTheDocument()
+  })
+
   it('saves only what changed across groups, counts the edits, and discards on request', async () => {
     await open()
     const save = screen.getByRole('button', { name: 'Save' })
     expect(save).toBeDisabled()
     expect(screen.getByText('No changes')).toBeInTheDocument()
 
-    await userEvent.type(screen.getByLabelText('GEMINI_API_KEY'), 'AIza-new')
+    await userEvent.type(screen.getByLabelText('AZURE_SPEECH_KEY'), 'az-new')
     await showTab('Voice coach')
-    await pick('VOICE_PROVIDER', 'gemini')
+    await pick('VOICE_NAME', 'Puck')
     expect(screen.getByText('2 unsaved changes')).toBeInTheDocument()
     expect(screen.getByRole('tab', { name: /API keys/ })).toHaveTextContent('edited')
 
     await userEvent.click(save)
     await waitFor(() => expect(api.putSettings).toHaveBeenCalledTimes(1))
     expect(vi.mocked(api.putSettings).mock.calls[0][0]).toEqual({
-      VOICE_PROVIDER: 'gemini',
-      GEMINI_API_KEY: 'AIza-new',
+      VOICE_NAME: 'Puck',
+      AZURE_SPEECH_KEY: 'az-new',
     })
     expect(await screen.findByText('Saved. The next round uses these.')).toBeInTheDocument()
 
-    await pick('VOICE_PROVIDER', 'gemini')
+    await pick('VOICE_NAME', 'Puck')
     await userEvent.click(screen.getByRole('button', { name: 'Discard' }))
     expect(screen.getByText('No changes')).toBeInTheDocument()
   })
@@ -177,12 +181,12 @@ describe('SettingsModal', () => {
   it('tests the typed key and shows the verdict on its name line', async () => {
     vi.mocked(api.testKey).mockResolvedValueOnce({ ok: false, message: '401: Incorrect API key provided' })
     await open()
-    const row = rowOf('OPENAI_API_KEY')
+    const row = rowOf('GEMINI_API_KEY')
     expect(row).toHaveTextContent('Not checked')
-    await userEvent.type(screen.getByLabelText('OPENAI_API_KEY'), 'sk-typed')
+    await userEvent.type(screen.getByLabelText('GEMINI_API_KEY'), 'AIza-typed')
     await userEvent.click(within(row).getByRole('button', { name: 'Test' }))
 
-    expect(api.testKey).toHaveBeenCalledWith('OPENAI_API_KEY', 'sk-typed')
+    expect(api.testKey).toHaveBeenCalledWith('GEMINI_API_KEY', 'AIza-typed')
     expect(await within(row).findByRole('status')).toHaveTextContent('✗ 401: Incorrect API key provided')
     expect(screen.getByRole('tab', { name: /API keys/ })).toHaveTextContent('1 refused')
 
@@ -194,18 +198,18 @@ describe('SettingsModal', () => {
   it('marks a key idle while its provider is not selected', async () => {
     vi.mocked(api.getSettings).mockResolvedValue({
       groups: GROUPS,
-      fields: FIELDS.map((f) => (f.key === 'GEMINI_API_KEY' ? { ...f, used_when: ['VOICE_PROVIDER', 'gemini'] } : f)),
+      fields: FIELDS.map((f) => (f.key === 'IMAGE_PROVIDER' ? { ...f, value: 'off' } : f)),
     })
     await open()
-    expect(rowOf('GEMINI_API_KEY')).toHaveTextContent('Not in use now')
-    expect(rowOf('OPENAI_API_KEY')).not.toHaveTextContent('Not in use now')
+    expect(rowOf('OPENROUTER_API_KEY')).toHaveTextContent('Not in use now')
+    expect(rowOf('GEMINI_API_KEY')).not.toHaveTextContent('Not in use now')
   })
 
   it('shows the backend error when saving fails', async () => {
-    vi.mocked(api.putSettings).mockRejectedValueOnce(new Error('VOICE_PROVIDER must be one of openai, gemini'))
+    vi.mocked(api.putSettings).mockRejectedValueOnce(new Error('VOICE_NAME must be one of Kore, Puck'))
     await open()
     await showTab('Voice coach')
-    await pick('VOICE_PROVIDER', 'gemini')
+    await pick('VOICE_NAME', 'Puck')
     await userEvent.click(screen.getByRole('button', { name: 'Save' }))
     expect(await screen.findByText(/must be one of/)).toBeInTheDocument()
   })
@@ -215,12 +219,12 @@ describe('SettingsModal help', () => {
   it('explains a setting in a tooltip tied to its info button', async () => {
     vi.mocked(api.getSettings).mockResolvedValue({
       groups: GROUPS,
-      fields: FIELDS.map((f) => (f.key === 'OPENAI_API_KEY' ? { ...f, help: 'Runs the OpenAI voice coaches.' } : f)),
+      fields: FIELDS.map((f) => (f.key === 'GEMINI_API_KEY' ? { ...f, help: 'Runs the voice coaches.' } : f)),
     })
     await open()
-    const info = screen.getByRole('button', { name: 'About OPENAI_API_KEY' })
-    expect(info).toHaveAccessibleDescription('Runs the OpenAI voice coaches.')
-    expect(screen.queryByRole('button', { name: 'About GEMINI_API_KEY' })).not.toBeInTheDocument()
+    const info = screen.getByRole('button', { name: 'About GEMINI_API_KEY' })
+    expect(info).toHaveAccessibleDescription('Runs the voice coaches.')
+    expect(screen.queryByRole('button', { name: 'About AZURE_SPEECH_KEY' })).not.toBeInTheDocument()
   })
 })
 
@@ -303,14 +307,14 @@ describe('SettingsModal closing', () => {
   it('asks before dropping unsaved edits', async () => {
     const onClose = vi.fn()
     await open(onClose)
-    await userEvent.type(screen.getByLabelText('OPENAI_API_KEY'), 'sk-new')
+    await userEvent.type(screen.getByLabelText('GEMINI_API_KEY'), 'AIza-new')
     await userEvent.click(screen.getByRole('button', { name: 'Close settings' }))
     expect(onClose).not.toHaveBeenCalled()
     expect(screen.getByRole('alertdialog')).toHaveTextContent('1 unsaved change will be dropped.')
 
     await userEvent.click(screen.getByRole('button', { name: 'Keep editing' }))
     expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument()
-    expect(screen.getByLabelText('OPENAI_API_KEY')).toHaveValue('sk-new')
+    expect(screen.getByLabelText('GEMINI_API_KEY')).toHaveValue('AIza-new')
 
     await userEvent.click(screen.getByRole('button', { name: 'Close settings' }))
     await userEvent.click(screen.getByRole('button', { name: 'Discard and close' }))

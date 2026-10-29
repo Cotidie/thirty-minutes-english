@@ -20,14 +20,7 @@ from app.pictures.scenes import SceneWriter
 from app.topics.daily import ClaudeTopicSource, TopicSource
 from app.voice.assessor import AzureAssessor
 from app.voice.speech import Speaker, speaker_for
-from app.voice.live import (
-    AgentDefinition,
-    GeminiTranscriber,
-    GeminiVoice,
-    LiveAgent,
-    OpenAIVoice,
-    VoiceProvider,
-)
+from app.voice.live import AgentDefinition, GeminiTranscriber, GeminiVoice, LiveAgent
 
 if TYPE_CHECKING:
     from app.db.pictures import PictureRepo
@@ -56,7 +49,6 @@ class Services:
     scene_writer: SceneWriter | None = None
     assessor: AzureAssessor | None = None
     speaker: Speaker | None = None
-    voice_key_name: str = "OPENAI_API_KEY"
 
 
 def agent_dirs(env: Mapping[str, str], agents_dir: Path) -> dict[str, Path]:
@@ -100,13 +92,7 @@ def build_services(
         illustrator=_illustrator(settings, pictures, files),
         scene_writer=SceneWriter.with_cli(settings.get("EXAMPLE_MODEL")),
         assessor=_assessor(settings),
-        speaker=speaker_for(
-            settings.get("VOICE_PROVIDER"),
-            {"openai": settings.get("OPENAI_API_KEY"), "gemini": settings.get("GEMINI_API_KEY")},
-            settings.get("VOICE_NAME"),
-            speech_dir,
-        ),
-        voice_key_name=settings.voice_api_key_name,
+        speaker=speaker_for(settings.get("GEMINI_API_KEY"), settings.get("VOICE_NAME"), speech_dir),
     )
 
 
@@ -119,7 +105,7 @@ def _assessor(settings: Settings) -> AzureAssessor | None:
 
 
 def _transcriber(settings: Settings, agent_dir: Path) -> GeminiTranscriber | None:
-    """Summarize's transcriber, once the Gemini key is set. It does not follow the voice provider."""
+    """Summarize's transcriber, once the Gemini key is set."""
     key = settings.get("GEMINI_API_KEY")
     if not key:
         return None
@@ -129,25 +115,17 @@ def _transcriber(settings: Settings, agent_dir: Path) -> GeminiTranscriber | Non
     return GeminiTranscriber(key, agent_dir)
 
 
-def voice_provider(settings: Settings) -> VoiceProvider | None:
-    """The configured provider, or None while its key is missing."""
-    key = settings.voice_api_key
-    if not key:
-        return None
-    if settings.get("VOICE_PROVIDER") == "gemini":
-        return GeminiVoice(key, settings.voice_model, settings.get("VOICE_NAME"), settings.voice_thinking)
-    return OpenAIVoice(key, settings.voice_model)
-
-
 def _live_agents(settings: Settings, agent_dirs: dict[str, Path]) -> dict[str, LiveAgent]:
-    provider = voice_provider(settings)
-    if provider is None:
+    """The talking coaches on Gemini Live, once the Gemini key is set."""
+    key = settings.get("GEMINI_API_KEY")
+    if not key:
         return {}
+    voice = GeminiVoice(key, settings.voice_model, settings.get("VOICE_NAME"), settings.voice_thinking)
     agents = {}
     for name in LIVE_AGENTS:
         agent_dir = agent_dirs[name]
-        if (agent_dir / "session.json").is_file():
-            agents[name] = LiveAgent(name, AgentDefinition(agent_dir), provider)
+        if all((agent_dir / "prompts" / f).is_file() for f in ("live.md", "context.md")):
+            agents[name] = LiveAgent(name, AgentDefinition(agent_dir), voice)
         else:
             log.warning("%s agent folder not found: %s", name, agent_dir)
     return agents
@@ -170,11 +148,11 @@ def _summary_coach(settings: Settings, agent_dir: Path, summary_effort: str | No
 
 
 def _illustrator(settings: Settings, pictures: "PictureRepo | None", files: PictureFiles | None) -> Illustrator | None:
-    """Pictures for the words, once a provider is chosen, its key is set, and there is a place to keep them."""
-    if pictures is None or files is None:
+    """Pictures for the words, unless they are off, once the OpenRouter key is set and there is a place to keep them."""
+    if pictures is None or files is None or settings.get("IMAGE_PROVIDER") == "off":
         return None
-    keys = {"openrouter": settings.get("OPENROUTER_API_KEY"), "comfy": settings.get("COMFY_API_KEY")}
-    painter = painter_for(settings.get("IMAGE_PROVIDER"), settings.get("IMAGE_MODEL"), keys, pictures)
-    if painter is None and settings.get("IMAGE_PROVIDER") != "off":
-        log.warning("pictures are off: no key for IMAGE_PROVIDER=%s", settings.get("IMAGE_PROVIDER"))
-    return Illustrator(painter, pictures, files, settings.get("IMAGE_STYLE")) if painter else None
+    painter = painter_for(settings.get("OPENROUTER_API_KEY"), settings.get("IMAGE_MODEL"), pictures)
+    if painter is None:
+        log.warning("pictures are off: OPENROUTER_API_KEY is not set")
+        return None
+    return Illustrator(painter, pictures, files, settings.get("IMAGE_STYLE"))

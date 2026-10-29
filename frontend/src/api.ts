@@ -22,7 +22,6 @@ import type {
   TopicLibrary,
   TopicListing,
   VocabularyItem,
-  VoiceProvider,
 } from './types'
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
@@ -93,20 +92,14 @@ export const api = {
   /** One authenticated call to the provider with the typed key, or the saved one when blank. */
   testKey: (key: string, value: string) =>
     request<KeyTestResult>('/api/settings/test-key', { method: 'POST', body: JSON.stringify({ key, value }) }),
-  /** Which voice provider a round will land on, read right before opening one. */
-  voiceProvider: async (): Promise<VoiceProvider> => {
-    const { fields } = await request<SettingsView>('/api/settings')
-    return fields.find((f) => f.key === 'VOICE_PROVIDER')?.value === 'gemini' ? 'gemini' : 'openai'
-  },
-  /** `sdp` is the WebRTC offer; only the OpenAI provider takes one. */
-  startReadAloud: (paragraph: string, sdp?: string) =>
-    request<LiveSession>('/api/read-aloud/sessions', { method: 'POST', body: JSON.stringify({ paragraph, sdp }) }),
+  startReadAloud: (paragraph: string) =>
+    request<LiveSession>('/api/read-aloud/sessions', { method: 'POST', body: JSON.stringify({ paragraph }) }),
   /** Azure token for the assessor; 503 until AZURE_SPEECH_KEY is set. */
   assessorToken: () => request<AssessorSession>('/api/assessor/token'),
-  startExample: (target: PracticeTarget, sdp?: string) =>
+  startExample: (target: PracticeTarget) =>
     request<LiveSession>('/api/example/sessions', {
       method: 'POST',
-      body: JSON.stringify({ sdp, word: target.word, meaning: target.meaning, pos: target.pos }),
+      body: JSON.stringify({ word: target.word, meaning: target.meaning, pos: target.pos }),
     }),
   /** The written half of a practice round: the sentence the native way, plus a short line per change. */
   exampleFeedback: (target: PracticeTarget, userText: string) =>

@@ -1,13 +1,10 @@
-import json
-from contextlib import asynccontextmanager
 
 import pytest
 
 from fastapi.testclient import TestClient
-from mcp.types import CallToolResult, TextContent
 
 from app.config import catalog as catalog_module
-from app.config.catalog import Catalog, ModelOption, claude_models, newest_first, comfy_images, gemini_live, openai_voice, openrouter_images
+from app.config.catalog import Catalog, ModelOption, claude_models, gemini_live, newest_first, openrouter_images
 from app.config.settings import Settings
 from app.db import Database
 from app.db.pictures import PictureRepo, PictureStat
@@ -32,18 +29,18 @@ def test_a_missing_list_is_fetched_and_a_fresh_one_is_not(tmp_path):
     calls = []
 
     def fetch(keys):
-        calls.append(keys["OPENAI_API_KEY"])
-        return [ModelOption("gpt-live-1")]
+        calls.append(keys["GEMINI_API_KEY"])
+        return [ModelOption("gemini-3.8-live")]
 
     clock = Clock()
-    cat = catalog_with(tmp_path, {"openai_voice": fetch}, clock)
-    assert cat.options("openai_voice", {"OPENAI_API_KEY": "sk"}) == []  # answered from the (empty) cache; fetched after
-    assert cat.options("openai_voice", {"OPENAI_API_KEY": "sk"}) == [ModelOption("gpt-live-1")]
-    assert calls == ["sk"]
+    cat = catalog_with(tmp_path, {"gemini_live": fetch}, clock)
+    assert cat.options("gemini_live", {"GEMINI_API_KEY": "AIza"}) == []  # answered from the (empty) cache; fetched after
+    assert cat.options("gemini_live", {"GEMINI_API_KEY": "AIza"}) == [ModelOption("gemini-3.8-live")]
+    assert calls == ["AIza"]
 
     clock.now += Catalog.TTL_S + 1
-    cat.options("openai_voice", {"OPENAI_API_KEY": "sk"})
-    assert calls == ["sk", "sk"]
+    cat.options("gemini_live", {"GEMINI_API_KEY": "AIza"})
+    assert calls == ["AIza", "AIza"]
 
 
 def test_a_failed_or_empty_fetch_keeps_the_last_list(tmp_path):
@@ -101,17 +98,6 @@ def test_claude_models_come_from_claude_code(monkeypatch):
     ]
 
 
-def test_openai_voice_lists_live_models_and_drops_snapshots(http):
-    http.json = {"data": [{"id": i} for i in [
-        "gpt-live-1", "gpt-realtime-2", "gpt-live-transcribe", "gpt-realtime-2025-08-28",
-        "gpt-5.6-luna", "gpt-5-codex", "gpt-image-2", "gpt-5-2025-08-07", "gpt-3.5-turbo-0125", "text-embedding-3", "o3",
-    ]]}
-    keys = {"OPENAI_API_KEY": "sk"}
-    assert {o.id for o in openai_voice(keys)} == {"gpt-live-1", "gpt-realtime-2"}
-    assert http.requests[0].headers["Authorization"] == "Bearer sk"
-    assert openai_voice({}) == []  # no key, no call
-
-
 def test_gemini_lists_live_models_only(http):
     http.json = {"models": [
         {"name": "models/gemini-3.8-live", "displayName": "Gemini 3.8 Live", "description": "Live audio. More text.", "supportedGenerationMethods": ["bidiGenerateContent"]},
@@ -133,30 +119,6 @@ def test_openrouter_lists_image_models_by_id(http):
     assert "output_modalities=image" in str(http.requests[0].url)
 
 
-def test_comfy_lists_text_to_image_partner_models(monkeypatch):
-    class FakeServer:
-        def __init__(self, url, key):
-            pass
-
-        @asynccontextmanager
-        async def session(self):
-            yield self
-
-        async def call(self, tool, args):
-            data = {"data": [
-                {"model_name": "vertexai/nano-banana-pro", "tags": ["text-to-image"]},
-                {"model_name": "xai/grok-image-generate", "tags": ["text-to-image"], "description": "Generates an image. Fast."},
-                {"model_name": "bfl/flux-pro-fill", "tags": ["inpaint", "edit"]},
-            ]}
-            return CallToolResult(content=[TextContent(type="text", text=json.dumps(data))])
-
-    monkeypatch.setattr(catalog_module, "McpHttp", FakeServer)
-    assert comfy_images({"COMFY_API_KEY": "c"}) == [
-        ModelOption("vertexai/nano-banana-pro"),
-        ModelOption("xai/grok-image-generate"),
-    ]
-
-
 def test_image_models_carry_what_a_picture_cost_and_took_here(tmp_path):
     db = Database(tmp_path / "s.db")
     for seconds, cost in ((10, 0.10), (None, 0.20), (20, None)):
@@ -173,7 +135,7 @@ def test_image_models_carry_what_a_picture_cost_and_took_here(tmp_path):
     app = create_app(db, Services(FakeGenerator()), InlineExecutor(), env={}, catalog=cat)
     with TestClient(app) as c:
         image = {f["key"]: f for f in c.get("/api/settings").json()["fields"]}["IMAGE_MODEL"]
-    z = next(o for o in image["variants"]["openrouter"]["options"] if o["id"] == "z/img")
+    z = next(o for o in image["options"] if o["id"] == "z/img")
     assert (z["image_per_m"], z["per_image"], z["seconds_per_image"]) == (120.0, pytest.approx(0.15), pytest.approx(15))
 
 
@@ -220,8 +182,8 @@ def test_undated_lists_go_by_the_version_in_the_name_with_aliases_on_top():
         "gemini-2.5-flash-native-audio-preview-12-2025",
         "gemini-2.5-flash-native-audio-preview-09-2025",
     ]
-    comfy = [ModelOption("bfl/flux-pro-1.1-ultra"), ModelOption("qwen/qwen-image-3"), ModelOption("vertexai/nano-banana-pro")]
-    assert [o.id for o in newest_first(comfy)] == ["vertexai/nano-banana-pro", "qwen/qwen-image-3", "bfl/flux-pro-1.1-ultra"]
+    undated = [ModelOption("black-forest-labs/flux-pro-1.1-ultra"), ModelOption("qwen/qwen-image-3"), ModelOption("google/nano-banana-pro")]
+    assert [o.id for o in newest_first(undated)] == ["google/nano-banana-pro", "qwen/qwen-image-3", "black-forest-labs/flux-pro-1.1-ultra"]
 
 
 def test_a_pinned_model_leads_its_menu(tmp_path):
@@ -232,7 +194,7 @@ def test_a_pinned_model_leads_its_menu(tmp_path):
     app = create_app(db, Services(FakeGenerator()), InlineExecutor(), env={}, catalog=cat)
 
     def menu(view) -> list[tuple[str, bool]]:
-        image = {f["key"]: f for f in view["fields"]}["IMAGE_MODEL"]["variants"]["openrouter"]
+        image = {f["key"]: f for f in view["fields"]}["IMAGE_MODEL"]
         assert image["catalog"] == "openrouter_images"
         return [(o["id"], o["pinned"]) for o in image["options"]]
 

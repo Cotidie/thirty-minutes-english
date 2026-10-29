@@ -1,5 +1,5 @@
-// Pure translation of one Gemini Live server message into the events the
-// rest of the app already understands (the OpenAI names), plus the audio
+// Pure translation of one Gemini Live server message into the live events the
+// rest of the app understands (session.*), plus the audio
 // chunks and turn signals the transport itself acts on. A coach and the
 // transcription model speak the same protocol but mean different things by it.
 

@@ -163,3 +163,37 @@ def test_a_v6_file_keeps_its_word_sentences_and_drops_the_expression_ones(tmp_pa
     assert list(tmp_path.glob("s.db.bak-v6-????-??-??"))
     assert [(x.id, x.vocabulary_id) for x in db.records.list_examples(session.id)] == [(kept.id, word)]
     assert db.records.add_example(session.id, word, "next", "echo", 1).id > kept.id + 1  # ids carry on past the dropped one
+
+
+def test_a_v7_file_forgets_openai_and_comfy(tmp_path):
+    path = tmp_path / "s.db"
+    db = Database(path)
+    db.settings.save({"VOICE_NAME": "Puck", "IMAGE_STYLE": "comic", "OPENROUTER_API_KEY": "sk-or"})
+    with sqlite3.connect(path) as conn:
+        conn.executemany(
+            "INSERT INTO settings VALUES (?, ?)",
+            [("OPENAI_API_KEY", "sk"), ("COMFY_API_KEY", "c"), ("VOICE_PROVIDER", "openai"), ("VOICE_MODEL", "gpt-live-1"),
+             ("IMAGE_PROVIDER", "comfy"), ("IMAGE_MODEL", "vertexai/nano-banana-pro")],
+        )
+        conn.executemany(
+            "INSERT INTO model_pins VALUES (?, ?, 't')", [("comfy_images", "vertexai/nano-banana-pro"), ("openrouter_images", "m")]
+        )
+        conn.executemany(
+            "INSERT INTO model_lists VALUES (?, 0, '[]')", [("openai_voice",), ("openai_text",), ("comfy_images",), ("gemini_live",)]
+        )
+        conn.execute("PRAGMA user_version = 7")
+    db = Database(path)
+    with db.connect() as conn:
+        assert conn.execute("PRAGMA user_version").fetchone()[0] == schema.VERSION
+        assert [r[0] for r in conn.execute("SELECT source FROM model_pins")] == ["openrouter_images"]
+        assert [r[0] for r in conn.execute("SELECT source FROM model_lists")] == ["gemini_live"]
+    assert db.settings.load() == {"VOICE_NAME": "Puck", "IMAGE_STYLE": "comic", "OPENROUTER_API_KEY": "sk-or"}
+
+
+def test_a_v7_file_on_gemini_keeps_its_voice_model(tmp_path):
+    path = tmp_path / "s.db"
+    Database(path)  # a fresh file, set back to v7 below
+    with sqlite3.connect(path) as conn:
+        conn.executemany("INSERT INTO settings VALUES (?, ?)", [("VOICE_PROVIDER", "gemini"), ("VOICE_MODEL", "gemini-3.8-live")])
+        conn.execute("PRAGMA user_version = 7")
+    assert Database(path).settings.load() == {"VOICE_MODEL": "gemini-3.8-live"}

@@ -15,9 +15,7 @@ from dataclasses import asdict, dataclass, fields
 from claude_agent_sdk import ClaudeAgentOptions, ClaudeSDKClient
 
 from app.db.caches import CacheRepo
-from app.mcp_client import McpHttp, payload
 from app.net import get_json
-from app.pictures.painters import COMFY_MCP
 
 log = logging.getLogger(__name__)
 
@@ -41,7 +39,7 @@ MONTH_YEAR = re.compile(r"(\d{2})-(\d{4})")
 def recency(o: ModelOption) -> tuple:
     """Newer sorts higher. With a release time, that; else the version in the name ("Opus 5.5",
     "gemini-3.8-live", "flux-2-pro"), a month-year ("preview-09-2025") breaking ties. A name
-    without a number is an alias for the latest release ("default", "nano-banana-pro"): on top."""
+    without a number is an alias for the latest release ("default"): on top."""
     if o.created:
         return (2, o.created)
     name = o.resolved or o.label or o.id.split("/")[-1]
@@ -60,9 +58,6 @@ def newest_first(options: list[ModelOption]) -> list[ModelOption]:
 Keys = Mapping[str, str]
 Fetcher = Callable[[Keys], list[ModelOption]]
 
-DATED = re.compile(r"-\d{4}(-\d{2}-\d{2}|\d{4})?$")  # snapshot ids (-0125, -20250805, -2025-08-07); the alias is enough
-
-
 def claude_models(_: Keys) -> list[ModelOption]:
     """What Claude Code itself offers on this subscription, with each model's effort levels."""
 
@@ -79,19 +74,6 @@ def claude_models(_: Keys) -> list[ModelOption]:
         )
         for m in asyncio.run(fetch())
     ]
-
-
-def openai_models(keys: Keys) -> list[ModelOption]:
-    key = keys.get("OPENAI_API_KEY", "")
-    if not key:
-        return []
-    data = get_json("https://api.openai.com/v1/models", {"Authorization": f"Bearer {key}"})["data"]
-    return [ModelOption(m["id"], created=m.get("created")) for m in data if not DATED.search(m["id"])]
-
-
-def openai_voice(keys: Keys) -> list[ModelOption]:
-    """Speech-to-speech models: GPT-Live and the realtime line, minus transcription and translation."""
-    return [o for o in openai_models(keys) if ("live" in o.id or "realtime" in o.id) and not re.search(r"transcribe|translate", o.id)]
 
 
 def gemini_live(keys: Keys) -> list[ModelOption]:
@@ -129,29 +111,10 @@ def per_million(per_token: str | None) -> float | None:
         return None
 
 
-def comfy_images(keys: Keys) -> list[ModelOption]:
-    """comfy's partner text-to-image models; edit-only ones (inpaint, expand) are left out."""
-    key = keys.get("COMFY_API_KEY", "")
-    if not key:
-        return []
-
-    async def fetch() -> dict:
-        async with McpHttp(COMFY_MCP, key).session() as session:
-            return payload(await session.call("search_models", {"source": "partner", "type": "image", "limit": 100}))
-
-    return [
-        ModelOption(m["model_name"])
-        for m in asyncio.run(fetch()).get("data", [])
-        if "text-to-image" in m.get("tags", [])
-    ]
-
-
 FETCHERS: dict[str, Fetcher] = {
     "claude": claude_models,
-    "openai_voice": openai_voice,
     "gemini_live": gemini_live,
     "openrouter_images": openrouter_images,
-    "comfy_images": comfy_images,
 }
 
 

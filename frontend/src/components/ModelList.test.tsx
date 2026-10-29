@@ -95,9 +95,9 @@ describe('ModelList without prices', () => {
       <ModelList
         name="image"
         labelledBy="l"
-        options={[model('vertexai/nano-banana-pro'), model('xai/grok-image-generate')]}
+        options={[model('google/gemini-3-pro-image'), model('x-ai/grok-imagine-image-2.0')]}
         value=""
-        default="vertexai/nano-banana-pro"
+        default="google/gemini-3-pro-image"
         onChange={vi.fn()}
         onPin={vi.fn()}
       />,
@@ -106,14 +106,14 @@ describe('ModelList without prices', () => {
     expect(screen.queryByText('no picture yet')).not.toBeInTheDocument()
   })
 
-  it('shows the time a comfy picture took, with a sort by it and no list price', () => {
+  it('shows the time a picture took, with a sort by it, when no model has a list price', () => {
     render(
       <ModelList
         name="image"
         labelledBy="l"
-        options={[model('vertexai/nano-banana-pro', { seconds_per_image: 30 }), model('xai/grok-image-generate')]}
+        options={[model('google/gemini-3-pro-image', { seconds_per_image: 30 }), model('x-ai/grok-imagine-image-2.0')]}
         value=""
-        default="vertexai/nano-banana-pro"
+        default="google/gemini-3-pro-image"
         onChange={vi.fn()}
         onPin={vi.fn()}
       />,

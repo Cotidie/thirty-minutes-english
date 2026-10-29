@@ -165,22 +165,11 @@ export interface Session {
   content: SessionContent
 }
 
-/** OpenAI answers the browser's WebRTC offer. */
-interface OpenAILiveSession {
-  provider: 'openai'
-  session: { id: string }
-  transport: { type: 'webrtc'; sdp: string }
-}
-
-/** Gemini hands out a one-use token in the socket URL and the setup message to send first. */
-interface GeminiLiveSession {
-  provider: 'gemini'
+/** A Gemini Live round: a one-use token in the socket URL and the setup message to send first. */
+export interface LiveSession {
   url: string
   setup: Record<string, unknown>
 }
-
-export type LiveSession = OpenAILiveSession | GeminiLiveSession
-export type VoiceProvider = LiveSession['provider']
 
 /** One runtime setting, its effective value; secrets come masked. */
 /** One menu entry: a model, a provider, a style, a skill. */
@@ -201,13 +190,6 @@ export interface SettingOption {
   pinned?: boolean
 }
 
-interface SettingVariant {
-  default: string
-  /** The model list behind `options`; pins are kept per list. */
-  catalog: string
-  options: SettingOption[]
-}
-
 export interface SettingField {
   key: string
   group: string
@@ -224,9 +206,6 @@ export interface SettingField {
   inline: boolean
   /** A Test button can check this key. */
   testable: boolean
-  /** The setting whose current value picks one of `variants` (its default and menu). */
-  follows: string | null
-  variants: Record<string, SettingVariant>
   /** An effort level: the menu is what the model in that field takes. */
   effort_of: string | null
   /** [key, value]: the field only shows while that setting holds that value. */

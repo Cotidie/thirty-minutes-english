@@ -77,7 +77,7 @@ const audioChunks = () => FakeSocket.last.sent.filter((m) => JSON.stringify(m).i
 
 async function openRound(events: LiveEvent[]) {
   const round = await connectGeminiTranscription({
-    start: async () => ({ provider: 'gemini', url: 'wss://live', setup: {} }) as never,
+    start: async () => ({ url: 'wss://live', setup: {} }),
     audio: { srcObject: null, play: async () => undefined } as unknown as HTMLAudioElement,
     onEvent: (e) => events.push(e),
     onDisconnect: () => undefined,

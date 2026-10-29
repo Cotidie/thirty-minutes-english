@@ -1,9 +1,6 @@
-import asyncio
 import base64
-import json
 from contextlib import asynccontextmanager
 
-import httpx2
 import pytest
 from mcp.types import CallToolResult, ImageContent, TextContent
 
@@ -12,14 +9,7 @@ from app.llm import GenerationError
 from app.mcp_client import McpError
 from app.pictures.files import PictureFiles
 from app.pictures.illustrator import IMAGE_RULES, STYLES, Illustrator
-from app.pictures.painters import (
-    ComfyPainter,
-    Drawn,
-    OpenRouterPainter,
-    fetch_url,
-    finished,
-    painter_for,
-)
+from app.pictures.painters import Drawn, OpenRouterPainter, painter_for
 from app.pictures.scenes import Scene, SceneWriter, Spark
 from tests.conftest import sample_draft
 
@@ -151,10 +141,6 @@ class RefusedServer:
         yield
 
 
-def text(data) -> CallToolResult:
-    return CallToolResult(content=[TextContent(type="text", text=json.dumps(data))])
-
-
 def test_openrouter_draws_every_prompt_on_one_session_and_shrugs_off_a_failed_one():
     png = base64.b64encode(b"PNG-a").decode()
     server = FakeServer({"generate-image": {
@@ -170,69 +156,11 @@ def test_openrouter_draws_every_prompt_on_one_session_and_shrugs_off_a_failed_on
 
 def test_a_refused_key_leaves_every_picture_blank():
     assert OpenRouterPainter(RefusedServer(), "m").paint(["a", "b"]) == [None, None]
-    assert ComfyPainter(RefusedServer(), "m").paint(["a"]) == [None]
 
 
-def test_comfy_submits_one_batch_waits_and_fetches_each_job_in_order():
-    server = FakeServer({
-        "submit_batch": [text({"batch_id": "b1", "job_ids": ["j0", "j1", "j2"]})],
-        "wait_for_batch": [
-            text({"timed_out": True, "summary": {"pending": 2, "ready": 1, "failed": 0}}),
-            text({"timed_out": False, "summary": {"pending": 0, "ready": 2, "failed": 1}}),
-        ],
-        "get_batch_output": [text({"outputs": [{"job_id": "j2", "url": "https://x/2"}, {"job_id": "j0", "url": "https://x/0"}]})],
-    })
-    fetched = []
-    counts: list[int] = []
-
-    async def fetch(url):
-        fetched.append(url)
-        if url.endswith("/2"):
-            raise httpx2.ConnectError("gone")
-        return b"PNG" + url[-1].encode()
-
-    pictures = ComfyPainter(server, "vertexai/nano-banana-pro", fetch=fetch).paint(["a", "b", "c"], counts.append)
-
-    assert [p and p.png for p in pictures] == [b"PNG0", None, None]
-    assert counts == [1, 3]  # each wait round reports the batch's finished pictures
-    submit = server.calls[0][1]
-    assert submit["confirm"] is True
-    assert [i["prompt"] for i in submit["items"]] == ["a", "b", "c"]
-    assert submit["items"][0]["model"] == "vertexai/nano-banana-pro"
-    assert [c[0] for c in server.calls] == ["submit_batch", "wait_for_batch", "wait_for_batch", "get_batch_output"]
-    assert sorted(fetched) == ["https://x/0", "https://x/2"]
-
-
-def test_comfy_spells_an_openai_model_as_the_partner_slug_plus_variant_and_survives_a_refused_batch():
-    server = FakeServer({"submit_batch": [McpError("submit_batch: no credits")]})
-    assert ComfyPainter(server, "openai/gpt-image-2.5-flare").paint(["a", "b"]) == [None, None]
-    item = server.calls[0][1]["items"][0]
-    assert item["model"] == "openai/images-generations"
-    assert item["params"] == {"model": "gpt-image-2.5-flare"}
-
-
-def test_painter_for_picks_the_provider_and_needs_its_key():
-    keys = {"openrouter": "sk-or", "comfy": ""}
-    assert isinstance(painter_for("openrouter", "", keys), OpenRouterPainter)
-    assert painter_for("comfy", "", keys) is None
-    assert isinstance(painter_for("comfy", "", {"comfy": "comfyui-1"}), ComfyPainter)
-    assert painter_for("off", "", keys) is None
-
-
-def test_fetch_retries_a_flaky_link():
-    calls = []
-
-    def answer(request):
-        calls.append(str(request.url))
-        if calls.count(str(request.url)) < 3:
-            return httpx2.Response(502)
-        return httpx2.Response(200, content=b"PNG")
-
-    transport = httpx2.MockTransport(answer)
-    assert asyncio.run(fetch_url("https://img/1", wait_s=0, transport=transport)) == b"PNG"
-    assert calls == ["https://img/1"] * 3
-    with pytest.raises(httpx2.HTTPError):
-        asyncio.run(fetch_url("https://img/2", attempts=2, wait_s=0, transport=transport))
+def test_painter_for_needs_the_key():
+    assert isinstance(painter_for("sk-or", ""), OpenRouterPainter)
+    assert painter_for("", "") is None
 
 
 def test_redraw_draws_the_new_scene_in_the_configured_style_as_a_new_picture_and_remove_drops_a_file(tmp_path):
@@ -292,48 +220,6 @@ def test_the_illustrator_reports_each_finished_picture(tmp_path):
     assert files.path(kept[0][2]).exists()
 
 
-def test_a_batch_without_a_summary_is_counted_from_its_jobs():
-    assert finished({"jobs": [{"state": "ready"}, {"state": "pending"}, {"state": "failed"}]}) == 2
-    assert finished({"timed_out": True}) == 0
-
-
-async def fetch_ok(url):
-    return b"PNG" + url[-1].encode()
-
-
-def comfy_server(waits: list, outputs: list[str]) -> FakeServer:
-    return FakeServer({
-        "submit_batch": [text({"batch_id": "b1", "job_ids": ["j0", "j1"]})],
-        "wait_for_batch": waits,
-        "get_batch_output": [text({"outputs": [{"job_id": j, "url": f"https://x/{j[-1]}"} for j in outputs]})],
-        "cancel_job": [text("cancelled"), McpError("cancel_job: already finished")],
-    })
-
-
-def test_comfy_reconnects_when_the_connection_drops_and_waits_on():
-    server = comfy_server(
-        [McpError("dropped"), text({"timed_out": False, "summary": {"ready": 2}})], ["j0", "j1"]
-    )
-    assert [p and p.png for p in ComfyPainter(server, "m", fetch=fetch_ok).paint(["a", "b"])] == [b"PNG0", b"PNG1"]
-    assert [c[0] for c in server.calls] == ["submit_batch", "wait_for_batch", "wait_for_batch", "get_batch_output"]
-
-
-def test_comfy_keeps_the_pictures_already_drawn_when_it_gives_up():
-    server = comfy_server([McpError("dropped")] * 3, ["j0"])
-    assert [p and p.png for p in ComfyPainter(server, "m", fetch=fetch_ok).paint(["a", "b"])] == [b"PNG0", None]
-
-
-def test_a_cancel_during_the_wait_cancels_every_comfy_job():
-    server = comfy_server([text({"timed_out": True, "summary": {"ready": 0}})], [])
-
-    def cancel(_):
-        raise KeyError("cancelled")
-
-    with pytest.raises(KeyError):
-        ComfyPainter(server, "m", fetch=fetch_ok).paint(["a", "b"], cancel)
-    assert [c[1] for c in server.calls if c[0] == "cancel_job"] == [{"prompt_id": "j0"}, {"prompt_id": "j1"}]
-
-
 class Stats:
     """Knows `known` seconds per picture for every model."""
 
@@ -354,14 +240,6 @@ def test_openrouter_times_each_picture_and_keeps_what_it_cost():
     assert [d and (d.model, d.seconds >= 0, d.cost) for d in drawn] == [("m", True, 0.134), ("m", True, None), None]
 
 
-def test_comfy_shares_the_batch_time_over_the_pictures_that_came_back():
-    server = comfy_server([text({"timed_out": False, "summary": {"ready": 1, "failed": 1}})], ["j0"])
-    [first, second] = ComfyPainter(server, "m", fetch=fetch_ok).paint(["a", "b"])
-    assert (first.png, first.model, first.cost, second) == (b"PNG0", "m", None, None)
-    assert first.seconds >= 0
-
-
-def test_the_wait_foreseen_for_a_batch_follows_how_each_provider_draws():
+def test_a_batch_is_foreseen_to_take_as_long_as_one_picture():
     assert OpenRouterPainter(FakeServer({}), "m", Stats(20)).expected_seconds(10) == 20  # side by side
-    assert ComfyPainter(FakeServer({}), "m", Stats(20)).expected_seconds(10) == 200  # one after another
-    assert ComfyPainter(FakeServer({}), "m").expected_seconds(10) is None  # nothing drawn yet
+    assert OpenRouterPainter(FakeServer({}), "m").expected_seconds(10) is None  # nothing drawn yet

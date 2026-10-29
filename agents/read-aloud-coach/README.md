@@ -9,6 +9,6 @@
 | 파일 | 내용 |
 |---|---|
 | `AGENT.md` | 에이전트 계약. 역할, 한 번의 호출, 지시 형식, 한계 |
-| `session.json` | `POST /v1/live/sessions`에 넣는 `session` 객체. `{{paragraph}}` 자리만 채운다 |
+| `prompts/context.md` | 라운드마다 채우는 문맥. `{{paragraph}}` 자리만 채워 `prompts/live.md` 뒤에 붙인다 |
 | `prompts/live.md` | 코치 `instructions` 원문 |
 | `evals/cases.md` | 프롬프트를 고칠 때 사람이 직접 읽어 확인하는 시나리오 11개 |

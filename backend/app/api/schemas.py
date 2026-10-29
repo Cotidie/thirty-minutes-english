@@ -1,6 +1,6 @@
 """Request and response bodies of the HTTP API; the domain models live in app.models."""
 
-from typing import Literal
+from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
@@ -46,16 +46,9 @@ class ParagraphRequest(BaseModel):
     _check = field_validator("paragraph")(_not_blank)
 
 
-class ReadAloudRequest(ParagraphRequest):
-    """The paragraph read aloud. `sdp` is the browser's WebRTC offer; only the OpenAI provider needs one."""
-
-    sdp: str | None = None
-
-
 class ExampleSessionRequest(BaseModel):
     """A live round for one sentence made with one of the session's words."""
 
-    sdp: str | None = None
     word: str
     meaning: str
     """Its part of speech."""
@@ -135,12 +128,10 @@ class RedrawRequest(BaseModel):
 
 
 class LiveSession(BaseModel):
-    """Passthrough of the provider's answer, tagged with `provider`. OpenAI:
-    {session: {id}, transport: {type, sdp}}. Gemini: {url, setup}."""
+    """A Gemini Live round: the WebSocket URL with its one-use token, and the setup message to send first."""
 
-    model_config = ConfigDict(extra="allow")
-
-    provider: Literal["openai", "gemini"]
+    url: str
+    setup: dict[str, Any]
 
 
 class AssessorSession(BaseModel):
@@ -165,12 +156,6 @@ class Option(BaseModel):
     pinned: bool = False  # kept on the menu, at the top, however old
 
 
-class Variant(BaseModel):
-    default: str
-    catalog: str  # the model list these options come from, the key pins are kept under
-    options: list[Option]
-
-
 class SettingField(BaseModel):
     """One setting as the modal draws it. Every rule the modal applies comes from here."""
 
@@ -184,8 +169,6 @@ class SettingField(BaseModel):
     catalog: str | None = None  # the model list behind `options` (pins are kept per list)
     inline: bool = False  # draw the model menu as a list in the panel, with prices
     testable: bool = False  # a Test button checks the key
-    follows: str | None = None  # the setting whose value picks one of `variants`
-    variants: dict[str, Variant] = {}
     effort_of: str | None = None  # options come from that model field's option `efforts`
     shown_when: tuple[str, str] | None = None  # (key, value): hidden otherwise
     used_when: tuple[str, str] | None = None  # (key, value): the key sits idle otherwise

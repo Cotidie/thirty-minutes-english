@@ -8,7 +8,7 @@ from datetime import UTC, datetime
 from app.db import topics
 from app.models import Category
 
-VERSION = 7
+VERSION = 8
 
 # Added in v3: images under the article's paragraphs.
 FIGURES = """
@@ -73,6 +73,19 @@ CREATE TABLE examples (
 ) STRICT;
 
 CREATE INDEX examples_vocabulary ON examples (vocabulary_id);
+"""
+
+# v8: OpenAI and Comfy are gone. Their keys, the voice provider switch, their pins and their cached model
+# lists leave; a voice model saved while OpenAI was the provider, and a Comfy image choice, fall back to
+# the defaults. A file that never chose Gemini was on OpenAI, the old default.
+RETIRED_PROVIDERS = """
+DELETE FROM settings WHERE key = 'VOICE_MODEL'
+    AND NOT EXISTS (SELECT 1 FROM settings WHERE key = 'VOICE_PROVIDER' AND value = 'gemini');
+DELETE FROM settings WHERE key IN ('IMAGE_PROVIDER', 'IMAGE_MODEL')
+    AND EXISTS (SELECT 1 FROM settings WHERE key = 'IMAGE_PROVIDER' AND value = 'comfy');
+DELETE FROM settings WHERE key IN ('OPENAI_API_KEY', 'COMFY_API_KEY', 'VOICE_PROVIDER');
+DELETE FROM model_pins WHERE source IN ('comfy_images', 'openai_voice', 'openai_text');
+DELETE FROM model_lists WHERE source IN ('comfy_images', 'openai_voice', 'openai_text');
 """
 
 SESSIONS = """
@@ -212,6 +225,9 @@ def upgrade(conn: sqlite3.Connection, version: int) -> None:
         conn.execute("PRAGMA user_version = 6")
     if version < 7:
         _examples_of_words(conn)
+    if version < 8:
+        _run(conn, RETIRED_PROVIDERS)
+        conn.execute("PRAGMA user_version = 8")
 
 
 def _examples_of_words(conn: sqlite3.Connection) -> None:

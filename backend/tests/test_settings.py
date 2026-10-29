@@ -15,7 +15,7 @@ def store(tmp_path):
 
 
 def test_default_when_neither_env_nor_db(store):
-    assert Settings({}, store.settings.load()).get("VOICE_PROVIDER") == "openai"
+    assert Settings({}, store.settings.load()).get("VOICE_NAME") == "Kore"
 
 
 def test_env_beats_default_and_blank_env_counts_as_unset(store):
@@ -25,36 +25,29 @@ def test_env_beats_default_and_blank_env_counts_as_unset(store):
 
 
 def test_saved_beats_env(store):
-    store.settings.save({"VOICE_PROVIDER": "gemini"})
-    assert Settings({"VOICE_PROVIDER": "openai"}, store.settings.load()).get("VOICE_PROVIDER") == "gemini"
+    store.settings.save({"VOICE_NAME": "Puck"})
+    assert Settings({"VOICE_NAME": "Iapetus"}, store.settings.load()).get("VOICE_NAME") == "Puck"
 
 
 def test_rejects_unknown_key_and_bad_choice(store):
     with pytest.raises(InvalidSetting):
         store.settings.save({"NOPE": "x"})
     with pytest.raises(InvalidSetting):
-        store.settings.save({"VOICE_PROVIDER": "anthropic"})
+        store.settings.save({"IMAGE_PROVIDER": "comfy"})
     with pytest.raises(InvalidSetting):
         store.settings.save({"VOICE_NAME": "Siri"})
     assert store.settings.load() == {}
 
 
-def test_voice_model_defaults_per_provider(store):
-    assert Settings({}, {}).voice_model == "gpt-live-1"
-    assert Settings({}, {"VOICE_PROVIDER": "gemini"}).voice_model == "gemini-3.8-live-extended-thinking"
-    assert Settings({}, {"VOICE_PROVIDER": "gemini", "VOICE_MODEL": "gemini-3.8-live"}).voice_model == "gemini-3.8-live"
+def test_voice_model_defaults_when_blank(store):
+    assert Settings({}, {}).voice_model == "gemini-3.8-live-extended-thinking"
+    assert Settings({}, {"VOICE_MODEL": ""}).voice_model == "gemini-3.8-live-extended-thinking"
+    assert Settings({}, {"VOICE_MODEL": "gemini-3.8-live"}).voice_model == "gemini-3.8-live"
 
 
 def test_thinking_only_for_extended_thinking_model():
-    assert Settings({}, {"VOICE_PROVIDER": "gemini"}).voice_thinking == "low"
-    assert Settings({}, {"VOICE_PROVIDER": "gemini", "VOICE_MODEL": "gemini-3.8-live"}).voice_thinking is None
-    assert Settings({}, {}).voice_thinking is None
-
-
-def test_voice_api_key_follows_provider():
-    env = {"OPENAI_API_KEY": "sk-openai-1234", "GEMINI_API_KEY": "AIza-gemini-5678"}
-    assert Settings(env, {}).voice_api_key == "sk-openai-1234"
-    assert Settings(env, {"VOICE_PROVIDER": "gemini"}).voice_api_key == "AIza-gemini-5678"
+    assert Settings({}, {}).voice_thinking == "low"
+    assert Settings({}, {"VOICE_MODEL": "gemini-3.8-live"}).voice_thinking is None
 
 
 def settings_client(tmp_path, env, rebuild=None):
@@ -64,21 +57,21 @@ def settings_client(tmp_path, env, rebuild=None):
 
 
 def test_get_masks_secrets_and_carries_the_rules_the_modal_applies(tmp_path):
-    with settings_client(tmp_path, {"OPENAI_API_KEY": "sk-openai-1234", "CLAUDE_MODEL": "sonnet"}) as c:
+    with settings_client(tmp_path, {"GEMINI_API_KEY": "AIza-gemini-1234", "CLAUDE_MODEL": "sonnet"}) as c:
         view = c.get("/api/settings").json()
     fields = {f["key"]: f for f in view["fields"]}
-    assert fields["OPENAI_API_KEY"]["value"] == "…1234" and fields["OPENAI_API_KEY"]["testable"] is True
+    assert fields["GEMINI_API_KEY"]["value"] == "…1234" and fields["GEMINI_API_KEY"]["testable"] is True
     assert fields["CLAUDE_MODEL"]["value"] == "sonnet" and fields["CLAUDE_MODEL"]["testable"] is False
     model = fields["VOICE_MODEL"]
-    assert model["follows"] == "VOICE_PROVIDER" and model["free"] is True
-    gemini = model["variants"]["gemini"]
-    assert [o["id"] for o in gemini["options"]] == [gemini["default"]]  # nothing fetched yet: the default alone
+    assert model["catalog"] == "gemini_live" and model["free"] is True
+    assert [o["id"] for o in model["options"]] == [model["default"]]  # nothing fetched yet: the default alone
     assert fields["CLAUDE_EFFORT"]["effort_of"] == "CLAUDE_MODEL"
     assert fields["IMAGE_MODEL"]["inline"] is True and fields["CLAUDE_MODEL"]["inline"] is False
-    assert [o["id"] for o in fields["VOICE_PROVIDER"]["options"]] == ["openai", "gemini"] and not fields["VOICE_PROVIDER"]["free"]
-    assert fields["VOICE_NAME"]["shown_when"] == ["VOICE_PROVIDER", "gemini"]
-    assert fields["COMFY_API_KEY"]["used_when"] == ["IMAGE_PROVIDER", "comfy"]
-    assert fields["OPENAI_API_KEY"]["used_when"] is None
+    assert fields["IMAGE_MODEL"]["shown_when"] == ["IMAGE_PROVIDER", "openrouter"]
+    assert [o["id"] for o in fields["IMAGE_PROVIDER"]["options"]] == ["openrouter", "off"] and not fields["IMAGE_PROVIDER"]["free"]
+    assert fields["OPENROUTER_API_KEY"]["used_when"] == ["IMAGE_PROVIDER", "openrouter"]
+    assert fields["GEMINI_API_KEY"]["used_when"] is None
+    assert not {"OPENAI_API_KEY", "COMFY_API_KEY", "VOICE_PROVIDER"} & fields.keys()
     assert all(f["help"] for f in view["fields"])  # every setting explains itself in the modal
     assert {f["group"] for f in view["fields"]} == {g["id"] for g in view["groups"]}
 
@@ -87,27 +80,27 @@ def test_put_stores_overrides_and_rebuilds_services(tmp_path):
     seen = []
 
     def rebuild(settings):
-        seen.append(settings.get("VOICE_PROVIDER"))
-        return Services(FakeGenerator(), voice_key_name=settings.voice_api_key_name)
+        seen.append(settings.get("VOICE_NAME"))
+        return Services(FakeGenerator())
 
     with settings_client(tmp_path, {}, rebuild) as c:
-        res = c.put("/api/settings", json={"values": {"VOICE_PROVIDER": "gemini", "GEMINI_API_KEY": "AIza-x-5678"}})
+        res = c.put("/api/settings", json={"values": {"VOICE_NAME": "Puck", "GEMINI_API_KEY": "AIza-x-5678"}})
         assert res.status_code == 200
         fields = {f["key"]: f for f in res.json()["fields"]}
-        assert fields["VOICE_PROVIDER"]["value"] == "gemini"
+        assert fields["VOICE_NAME"]["value"] == "Puck"
         assert fields["GEMINI_API_KEY"]["value"] == "…5678"
-        # The live endpoints now name the Gemini key when the provider has none.
+        # The rebuilt services have no coach here, and the live endpoints name the Gemini key.
         assert "GEMINI_API_KEY" in c.post("/api/example/sessions", json={"word": "x", "meaning": "y", "pos": "noun"}).json()["detail"]
         # Overrides survive a fresh read.
-        assert {f["key"]: f["value"] for f in c.get("/api/settings").json()["fields"]}["VOICE_PROVIDER"] == "gemini"
-    assert seen == ["gemini"]
+        assert {f["key"]: f["value"] for f in c.get("/api/settings").json()["fields"]}["VOICE_NAME"] == "Puck"
+    assert seen == ["Puck"]
 
 
 def test_put_rejects_bad_values_without_saving(tmp_path):
     with settings_client(tmp_path, {}) as c:
-        assert c.put("/api/settings", json={"values": {"VOICE_PROVIDER": "anthropic"}}).status_code == 400
+        assert c.put("/api/settings", json={"values": {"VOICE_NAME": "Siri"}}).status_code == 400
         assert c.put("/api/settings", json={"values": {"NOPE": "x"}}).status_code == 400
-        assert {f["key"]: f["value"] for f in c.get("/api/settings").json()["fields"]}["VOICE_PROVIDER"] == "openai"
+        assert {f["key"]: f["value"] for f in c.get("/api/settings").json()["fields"]}["VOICE_NAME"] == "Kore"
 
 
 def test_key_test_uses_the_typed_value_with_the_provider_header(tmp_path, http):

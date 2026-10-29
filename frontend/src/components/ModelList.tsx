@@ -55,7 +55,7 @@ interface Props {
  * price. A model the provider does not list goes in the id field under the list.
  */
 export function ModelList({ name, labelledBy, options, value, default: fallback, onChange, onPin }: Props) {
-  // A column or a sort shows only when some model has its figure: comfy has no list prices.
+  // A column or a sort shows only when some model has its figure: a list not fetched yet has no list prices.
   const listed = options.some((o) => o.image_per_m != null)
   const measured = options.some((o) => o.per_image != null || o.seconds_per_image != null)
   const sorts = (Object.keys(SORTS) as Sort[]).filter((s) => options.some(SORTS[s].has))

@@ -4,9 +4,9 @@
 
 | 항목 | 값 |
 |---|---|
-| 모델 | `gpt-live-1` 또는 Gemini Live. 오디오 출력, transcript 텍스트 동봉. 입력 마이크는 꺼 둔다 |
-| 세션 | `session.json`의 `{{paragraph}}`를 채우고 `instructions`에 `prompts/live.md` 원문 |
-| 길이 | 클릭 하나에 세션 하나. 교정 한 줄(4초) 뒤 2초 침묵이면 호스트가 끊는다. GPT-Live는 15초 최소 과금 |
+| 모델 | Gemini Live. 오디오 출력, transcript 텍스트 동봉. 입력 마이크는 꺼 둔다 |
+| 세션 | `prompts/context.md`의 `{{paragraph}}`를 채워 `prompts/live.md` 원문 뒤에 붙인 system instruction |
+| 길이 | 클릭 하나에 세션 하나. 교정 한 줄(4초) 뒤 2초 침묵이면 호스트가 끊는다 |
 
 ## 한 번의 호출
 
@@ -15,7 +15,7 @@
 3. 코치가 두 박자로 말한다: "You said berify. It's verify. Try it." 인사도 마무리도 없다.
 4. 코치 transcript가 2초간 멈추면 호스트가 `close`. 최대 15초.
 
-GPT-Live는 `session.instructions.append`, Gemini는 text turn으로 보낸다. 자막은 `session.output_transcript.delta`를 이어 붙인다(Gemini의 `<no speech>` 태그는 호스트가 지운다).
+지시는 text turn으로 보낸다. 자막은 `session.output_transcript.delta`를 이어 붙인다(Gemini의 `<no speech>` 태그는 호스트가 지운다).
 
 ## 한계
 

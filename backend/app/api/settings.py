@@ -12,7 +12,6 @@ from app.api.schemas import (
     SettingGroup,
     SettingsUpdate,
     SettingsView,
-    Variant,
 )
 from app.config.catalog import NEWEST, Catalog, ModelOption
 from app.config.keycheck import KEYS, check_key
@@ -56,7 +55,7 @@ class ModelMenus:
 
 def options_of(spec: Spec, settings: Settings, menus: ModelMenus) -> list[Option]:
     if spec.catalog:
-        return menus.listed(spec.catalog, spec.default, settings.get(spec.key))
+        return menus.listed(spec.catalog, spec.default, settings.get(spec.key), spec.inline)
     labels = spec.labels or {}
     return [Option(id=c, description=labels.get(c, "")) for c in spec.choices or ()]
 
@@ -69,17 +68,10 @@ def field_of(spec: Spec, settings: Settings, menus: ModelMenus) -> SettingField:
         secret=spec.secret,
         default=spec.default,
         options=options_of(spec, settings, menus),
-        free=bool(spec.catalog or spec.variants),
+        free=bool(spec.catalog),
         catalog=spec.catalog,
         inline=spec.inline,
         testable=spec.key in KEYS,
-        follows=spec.follows,
-        variants={
-            value: Variant(
-                default=v.default, catalog=v.catalog, options=menus.listed(v.catalog, v.default, settings.get(spec.key), spec.inline)
-            )
-            for value, v in (spec.variants or {}).items()
-        },
         effort_of=spec.effort_of,
         shown_when=spec.shown_when,
         used_when=spec.used_when,

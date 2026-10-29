@@ -1,10 +1,12 @@
+import asyncio
 from io import BytesIO
 
 import httpx2
+import pytest
 from PIL import Image
 
 from app.db import Database
-from app.pictures.figures import MAX_SIDE, SourceImages, as_png
+from app.pictures.figures import MAX_SIDE, SourceImages, as_png, fetch_url
 from app.pictures.files import PictureFiles
 
 
@@ -50,3 +52,19 @@ def test_an_image_that_will_not_download_or_open_is_skipped(tmp_path):
     assert sources_over(tmp_path, refuse)[0].keep("https://gone.example/a.jpg") is None
     sources, _, files = sources_over(tmp_path, lambda url: b"not an image")
     assert sources.keep("https://x.example/a.jpg") is None and not files.dir.exists()
+
+
+def test_fetch_retries_a_flaky_link():
+    calls = []
+
+    def answer(request):
+        calls.append(str(request.url))
+        if calls.count(str(request.url)) < 3:
+            return httpx2.Response(502)
+        return httpx2.Response(200, content=b"PNG")
+
+    transport = httpx2.MockTransport(answer)
+    assert asyncio.run(fetch_url("https://img/1", wait_s=0, transport=transport)) == b"PNG"
+    assert calls == ["https://img/1"] * 3
+    with pytest.raises(httpx2.HTTPError):
+        asyncio.run(fetch_url("https://img/2", attempts=2, wait_s=0, transport=transport))

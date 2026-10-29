@@ -9,7 +9,6 @@ from app.api.schemas import (
     ExampleSessionRequest,
     LiveSession,
     ParagraphRequest,
-    ReadAloudRequest,
     SpeechRequest,
     SummaryFeedbackRequest,
 )
@@ -21,19 +20,19 @@ from app.wiring import Services
 router = APIRouter(prefix="/api")
 
 
-def start_live(services: Services, name: str, sdp: str | None, **values: str) -> dict:
+def start_live(services: Services, name: str, **values: str) -> dict:
     agent = services.agents.get(name)
     if agent is None:
-        raise off(f"{name} is off: set {services.voice_key_name} in Settings")
+        raise off(f"{name} is off: set GEMINI_API_KEY in Settings")
     try:
-        return agent.start(sdp, **values)
+        return agent.start(**values)
     except HttpError as e:
         raise failed("voice session", e) from e
 
 
 @router.post("/read-aloud/sessions", response_model=LiveSession, status_code=201)
-def start_read_aloud(body: ReadAloudRequest, services: Svc) -> dict:
-    return start_live(services, "read-aloud", body.sdp, paragraph=body.paragraph)
+def start_read_aloud(body: ParagraphRequest, services: Svc) -> dict:
+    return start_live(services, "read-aloud", paragraph=body.paragraph)
 
 
 @router.post("/summary/sessions", response_model=LiveSession, status_code=201)
@@ -61,7 +60,7 @@ def summary_feedback(body: SummaryFeedbackRequest, services: Svc) -> SummaryFeed
 
 @router.post("/example/sessions", response_model=LiveSession, status_code=201)
 def start_example(body: ExampleSessionRequest, services: Svc) -> dict:
-    return start_live(services, "example", body.sdp, word=body.word, meaning=body.meaning, pos=body.pos)
+    return start_live(services, "example", word=body.word, meaning=body.meaning, pos=body.pos)
 
 
 @router.get("/assessor/token", response_model=AssessorSession)
@@ -87,9 +86,9 @@ def example_feedback(body: ExampleFeedbackRequest, services: Svc) -> ExampleFeed
 
 @router.post("/speech", response_class=Response)
 def speech(body: SpeechRequest, services: Svc) -> Response:
-    """The sentence read aloud in the voice provider's voice; a sentence read before comes from disk."""
+    """The sentence read aloud in the coaches' voice; a sentence read before comes from disk."""
     if services.speaker is None:
-        raise off(f"reading aloud is off: set {services.voice_key_name} in Settings")
+        raise off("reading aloud is off: set GEMINI_API_KEY in Settings")
     try:
         audio = services.speaker.read(body.text)
     except GenerationError as e:

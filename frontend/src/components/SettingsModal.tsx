@@ -23,18 +23,10 @@ interface Menu {
 }
 
 /**
- * A model field follows its provider; an effort field offers what the chosen Claude
- * model takes (all levels any listed model takes when that model is not listed).
+ * An effort field offers what the chosen Claude model takes (all levels any listed
+ * model takes when that model is not listed).
  */
 function menuFor(f: SettingField, draft: Record<string, string>, byKey: Map<string, SettingField>): Menu {
-  if (f.follows) {
-    const variant = f.variants[draft[f.follows]]
-    return {
-      options: variant?.options ?? [],
-      placeholder: variant?.default ?? '',
-      catalog: variant?.catalog,
-    }
-  }
   if (f.effort_of) {
     const model = byKey.get(f.effort_of)
     const picked = draft[f.effort_of] || model?.default || ''

@@ -19,8 +19,8 @@ GROUPS: dict[str, str] = {
     "images": "Vocabulary pictures",
 }
 
-IMAGE_PROVIDERS = (*IMAGE_DEFAULT_MODEL, "off")
-VOICE_DEFAULT_MODEL = {"openai": "gpt-live-1", "gemini": "gemini-3.8-live-extended-thinking"}
+IMAGE_PROVIDERS = ("openrouter", "off")
+VOICE_DEFAULT_MODEL = "gemini-3.8-live-extended-thinking"
 THINKING_LEVELS = ("low", "medium", "high")
 # The Gemini API has no voices.list; this is the TTS list the Live native-audio
 # models share (ai.google.dev/gemini-api/docs/speech-generation#voices).
@@ -59,14 +59,6 @@ GEMINI_VOICES = {
 
 
 @dataclass(frozen=True)
-class Variant:
-    """What a model field offers while the provider it follows holds one value."""
-
-    default: str
-    catalog: str  # the model list (app.config.catalog) for that provider
-
-
-@dataclass(frozen=True)
 class Spec:
     key: str
     group: str
@@ -75,8 +67,6 @@ class Spec:
     choices: tuple[str, ...] | None = None  # strict: a value outside is rejected
     labels: Mapping[str, str] | None = None  # a short description per choice, for the menu
     catalog: str | None = None  # free text with the provider's model list as the menu
-    follows: str | None = None  # the provider setting whose value picks a Variant below
-    variants: Mapping[str, Variant] | None = None
     effort_of: str | None = None  # an effort level, offered as the chosen Claude model allows
     inline: bool = False  # the model menu shows as a list in the panel (with prices), not a dropdown
     number: tuple[float, float] | None = None  # strict: must parse as a number inside [lo, hi]
@@ -85,36 +75,20 @@ class Spec:
     help: str = ""  # one or two sentences for the modal's info tooltip
 
 
-VOICE_VARIANTS = {
-    "openai": Variant(VOICE_DEFAULT_MODEL["openai"], "openai_voice"),
-    "gemini": Variant(VOICE_DEFAULT_MODEL["gemini"], "gemini_live"),
-}
-IMAGE_VARIANTS = {
-    "openrouter": Variant(IMAGE_DEFAULT_MODEL["openrouter"], "openrouter_images"),
-    "comfy": Variant(IMAGE_DEFAULT_MODEL["comfy"], "comfy_images"),
-}
-
-
 SPECS: tuple[Spec, ...] = (
-    Spec("OPENAI_API_KEY", "keys", secret=True,
-         help="Runs the voice coaches when the voice provider is OpenAI."),
     Spec("GEMINI_API_KEY", "keys", secret=True,
-         help="Runs the voice coaches when the voice provider is Gemini, and writes down Summarize with either provider."),
+         help="Runs the voice coaches, reads sentences aloud, and writes down Summarize."),
     Spec("AZURE_SPEECH_KEY", "keys", secret=True,
          help="Azure Pronunciation Assessment. Read aloud scores each word with it; without it, Read aloud is off."),
     Spec("OPENROUTER_API_KEY", "keys", secret=True, used_when=("IMAGE_PROVIDER", "openrouter"),
          help="Draws the vocabulary pictures when the picture provider is OpenRouter. Pays per picture."),
-    Spec("COMFY_API_KEY", "keys", secret=True, used_when=("IMAGE_PROVIDER", "comfy"),
-         help="Draws the vocabulary pictures when the picture provider is Comfy Cloud. Your plan sets how many draw at once."),
     Spec("FIRECRAWL_API_KEY", "keys", secret=True,
          help="Optional. Web search for sessions and daily topics works without a key, at a lower rate limit."),
-    Spec("VOICE_PROVIDER", "voice", "openai", choices=("openai", "gemini"),
-         help="Which live voice model the two coaches (Read aloud, Practice) talk through."),
-    Spec("VOICE_MODEL", "voice", follows="VOICE_PROVIDER", variants=VOICE_VARIANTS,
-         help="The live model. Blank uses the provider's default."),
-    Spec("VOICE_THINKING", "voice", "low", choices=THINKING_LEVELS, shown_when=("VOICE_PROVIDER", "gemini"),
+    Spec("VOICE_MODEL", "voice", VOICE_DEFAULT_MODEL, catalog="gemini_live",
+         help="The Gemini Live model the two coaches (Read aloud, Practice) talk through. Blank uses the default."),
+    Spec("VOICE_THINKING", "voice", "low", choices=THINKING_LEVELS,
          help="How long Gemini thinks before it answers. Higher is more careful and slower to reply."),
-    Spec("VOICE_NAME", "voice", "Kore", choices=tuple(GEMINI_VOICES), labels=GEMINI_VOICES, shown_when=("VOICE_PROVIDER", "gemini"),
+    Spec("VOICE_NAME", "voice", "Kore", choices=tuple(GEMINI_VOICES), labels=GEMINI_VOICES,
          help="The Gemini voice the coaches speak with."),
     Spec("AZURE_SPEECH_REGION", "assess", "koreacentral",
          help="The region of your Azure Speech resource. It must match the key."),
@@ -137,9 +111,9 @@ SPECS: tuple[Spec, ...] = (
     Spec("SUMMARY_EFFORT", "claude", "medium", effort_of="SUMMARY_MODEL",
          help="How much the summary judge thinks. Medium keeps it quick; low gets shallow."),
     Spec("IMAGE_PROVIDER", "images", "openrouter", choices=IMAGE_PROVIDERS,
-         help="Who draws the vocabulary pictures. OpenRouter draws them all at once; Comfy draws as many at once as your plan allows; off skips pictures."),
-    Spec("IMAGE_MODEL", "images", follows="IMAGE_PROVIDER", variants=IMAGE_VARIANTS, inline=True,
-         help="The image model. Blank uses the provider's default."),
+         help="Who draws the vocabulary pictures. OpenRouter draws them all at once; off skips pictures."),
+    Spec("IMAGE_MODEL", "images", IMAGE_DEFAULT_MODEL, catalog="openrouter_images", inline=True, shown_when=("IMAGE_PROVIDER", "openrouter"),
+         help="The image model. Blank uses the default."),
     Spec("IMAGE_STYLE", "images", "photo", choices=tuple(STYLES), labels=STYLE_LABELS,
          help="The look of new pictures. A photo gives the most to describe."),
 )
@@ -180,15 +154,6 @@ class Settings:
             return self._saved[key]
         return self._env.get(key) or SPEC_BY_KEY[key].default
 
-    def effective(self, key: str) -> str:
-        """The value a service uses: a blank field that follows another takes that value's default."""
-        spec = SPEC_BY_KEY[key]
-        value = self.get(key)
-        if not value and spec.variants:
-            variant = spec.variants.get(self.get(spec.follows or ""))
-            return variant.default if variant else ""
-        return value
-
     def shown(self, key: str) -> str:
         """The value for the modal: secrets masked."""
         value = self.get(key)
@@ -198,20 +163,12 @@ class Settings:
 
     @property
     def voice_model(self) -> str:
-        return self.effective("VOICE_MODEL")
+        return self.get("VOICE_MODEL") or VOICE_DEFAULT_MODEL
 
     @property
     def voice_thinking(self) -> str | None:
         """Only the extended-thinking model accepts a thinking level."""
         return self.get("VOICE_THINKING") if self.voice_model.endswith("-extended-thinking") else None
-
-    @property
-    def voice_api_key_name(self) -> str:
-        return "GEMINI_API_KEY" if self.get("VOICE_PROVIDER") == "gemini" else "OPENAI_API_KEY"
-
-    @property
-    def voice_api_key(self) -> str:
-        return self.get(self.voice_api_key_name)
 
     @property
     def assess_word_score(self) -> int:

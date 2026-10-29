@@ -1,13 +1,9 @@
-// One live round, whichever provider is on: microphone in, coach audio out,
-// transcript events to the caller. The backend picks the provider from
-// settings; each transport turns its answer into the same LiveConnection.
+// What a live round hands its caller: microphone in, coach audio out,
+// transcript events out. lib/live/geminiWebsocket.ts carries the rounds.
 
-import { api } from '../../api'
 import type { Finding } from '../assessor/judge'
 import type { LiveEvent } from '../liveSession'
 import type { LiveSession } from '../../types'
-import { connectGemini } from './geminiWebsocket'
-import { connectOpenAI } from './openaiWebrtc'
 
 export interface LiveConnection {
   /** The live microphone track, so the UI can show that sound is going in. */
@@ -23,8 +19,8 @@ export interface LiveConnection {
 }
 
 export interface LiveOptions {
-  /** Opens the upstream round. Gets our SDP offer on the OpenAI path only. */
-  start: (sdp?: string) => Promise<LiveSession>
+  /** Opens the upstream round. */
+  start: () => Promise<LiveSession>
   audio: HTMLAudioElement
   onEvent: (event: LiveEvent) => void
   onDisconnect: () => void
@@ -34,8 +30,3 @@ export const sayInstruction = (text: string) => `Now say exactly this, word for 
 
 /** The finding the reader clicked; the prompt says how to say it. */
 export const correctionInstruction = (f: Finding) => `Correction: "${f.word}", heard ${f.heard}.`
-
-export async function connectLive(opts: LiveOptions): Promise<LiveConnection> {
-  const provider = await api.voiceProvider()
-  return provider === 'gemini' ? connectGemini(opts) : connectOpenAI(opts)
-}

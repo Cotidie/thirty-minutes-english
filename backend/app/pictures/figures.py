@@ -11,7 +11,6 @@ import httpx2
 from PIL import Image
 
 from app.pictures.files import PictureFiles
-from app.pictures.painters import fetch_url
 
 if TYPE_CHECKING:
     from app.db.pictures import PictureRepo
@@ -36,6 +35,21 @@ def as_png(data: bytes) -> bytes | None:
     out = BytesIO()
     picture.save(out, "PNG", optimize=True)
     return out.getvalue()
+
+
+async def fetch_url(url: str, attempts: int = 3, wait_s: float = 2, transport: httpx2.AsyncBaseTransport | None = None) -> bytes:
+    """The bytes at `url`; a failed try is repeated after a short wait, since pages' image hosts flake."""
+    async with httpx2.AsyncClient(timeout=60, transport=transport) as client:
+        for attempt in range(attempts):
+            try:
+                response = await client.get(url)
+                response.raise_for_status()
+                return response.content
+            except httpx2.HTTPError:
+                if attempt == attempts - 1:
+                    raise
+                await asyncio.sleep(wait_s)
+    raise AssertionError("unreachable")
 
 
 class SourceImages:
