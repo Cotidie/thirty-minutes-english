@@ -1,6 +1,6 @@
 import random
 
-from fastapi.testclient import TestClient
+from tests.conftest import admin_client
 
 from app.db import Database
 from app.main import create_app
@@ -64,7 +64,7 @@ def test_an_expression_is_swapped_over_http(tmp_path):
     db = Database(tmp_path / "s.db")
     a, b = seed_expressions(db, 2)
     session = db.sessions.create(sample_draft(), [a]).id
-    with TestClient(create_app(db, Services(FakeGenerator()), InlineExecutor())) as c:
+    with admin_client(create_app(db, Services(FakeGenerator()), InlineExecutor())) as c:
         res = c.post(f"/api/sessions/{session}/expressions/{a}/swap")
         assert res.status_code == 200 and res.json()["id"] == b
         assert c.post(f"/api/sessions/{session}/expressions/{a}/swap").status_code == 404
@@ -90,7 +90,7 @@ def test_an_expression_is_added_over_http(tmp_path):
     db = Database(tmp_path / "s.db")
     a, b = seed_expressions(db, 2)
     session = db.sessions.create(sample_draft(), [a]).id
-    with TestClient(create_app(db, Services(FakeGenerator()), InlineExecutor())) as c:
+    with admin_client(create_app(db, Services(FakeGenerator()), InlineExecutor())) as c:
         res = c.post(f"/api/sessions/{session}/expressions")
         assert res.status_code == 200 and res.json()["id"] == b
         assert c.post(f"/api/sessions/{session}/expressions").status_code == 404

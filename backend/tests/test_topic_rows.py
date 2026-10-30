@@ -1,5 +1,5 @@
 import pytest
-from fastapi.testclient import TestClient
+from tests.conftest import admin_client
 
 from app.db import Database
 from app.db.topics import TopicInUse
@@ -40,7 +40,7 @@ def test_a_session_points_at_its_topic_and_a_typed_one_becomes_a_row(store):
 def test_every_topic_is_served_with_the_names_of_all_categories(tmp_path):
     db = Database(tmp_path / "s.db")
     session = db.sessions.create(sample_draft(topic="Typed one"), [])
-    with TestClient(create_app(db, Services(FakeGenerator()), InlineExecutor())) as c:
+    with admin_client(create_app(db, Services(FakeGenerator()), InlineExecutor())) as c:
         body = c.get("/api/topics/all").json()
     assert len(body["topics"]) == len(CURATED_TOPICS) + 1
     last = body["topics"][-1]
@@ -74,7 +74,7 @@ def test_a_topic_is_deleted_over_http_unless_a_session_uses_it(tmp_path):
     db = Database(tmp_path / "s.db")
     db.sessions.create(sample_draft(topic="Mine"), [])
     ids = ids_by_text(db)
-    with TestClient(create_app(db, Services(FakeGenerator()), InlineExecutor())) as c:
+    with admin_client(create_app(db, Services(FakeGenerator()), InlineExecutor())) as c:
         assert c.delete(f"/api/topics/{ids['Mine']}").status_code == 409
         assert c.delete(f"/api/topics/{ids[CURATED_TOPICS[0].text]}").status_code == 204
         assert c.delete(f"/api/topics/{ids[CURATED_TOPICS[0].text]}").status_code == 404

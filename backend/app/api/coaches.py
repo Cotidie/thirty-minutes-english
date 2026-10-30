@@ -1,8 +1,8 @@
 """The voice coaches, the pronunciation assessor, reading aloud, and the text runs behind Practice and Summarize."""
 
-from fastapi import APIRouter, Response
+from fastapi import APIRouter, Depends, Response
 
-from app.api.deps import Svc, failed, off
+from app.api.deps import Svc, can_practice, failed, off
 from app.api.schemas import (
     AssessorSession,
     ExampleFeedbackRequest,
@@ -17,7 +17,7 @@ from app.models import ExampleFeedback, SummaryFeedback
 from app.net import HttpError
 from app.wiring import Services
 
-router = APIRouter(prefix="/api")
+router = APIRouter(prefix="/api", dependencies=[Depends(can_practice)])
 
 
 def start_live(services: Services, name: str, **values: str) -> dict:

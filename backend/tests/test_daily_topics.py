@@ -1,7 +1,7 @@
 from datetime import date
 
 import pytest
-from fastapi.testclient import TestClient
+from tests.conftest import admin_client
 
 from app.db import Database
 from app.llm import GenerationError
@@ -120,7 +120,7 @@ def test_without_a_source_nothing_is_pending(store):
 def test_endpoint_serves_the_news_half_once_it_lands(tmp_path):
     store = Database(tmp_path / "s.db")
     app = create_app(store, Services(FakeGenerator(), topic_source=FakeSource()), InlineExecutor())
-    with TestClient(app) as c:
+    with admin_client(app) as c:
         first = c.get("/api/topics").json()
         # InlineExecutor runs the fetch during that first request
         assert [t["text"] for t in first["topics"][:FRESH_COUNT]] == NEWS or first["pending"] is True
@@ -167,7 +167,7 @@ def test_refresh_endpoint_reports_pending_until_the_news_lands(tmp_path):
     store = Database(tmp_path / "s.db")
     executor = SlowExecutor()
     app = create_app(store, Services(FakeGenerator(), topic_source=FakeSource()), executor)
-    with TestClient(app) as c:
+    with admin_client(app) as c:
         c.get("/api/topics")
         for fn, args in executor.queued:
             fn(*args)
@@ -211,7 +211,7 @@ def test_endpoint_reports_the_failure_until_a_fetch_succeeds(tmp_path):
     store = Database(tmp_path / "s.db")
     source = FakeSource(GenerationError("claude exited 1: no such tool"))
     app = create_app(store, Services(FakeGenerator(), topic_source=source), InlineExecutor())
-    with TestClient(app) as c:
+    with admin_client(app) as c:
         assert c.get("/api/topics").json()["error"] == "claude exited 1: no such tool"
         source.error = None
         assert c.post("/api/topics/refresh").json()["error"] is None

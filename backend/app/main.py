@@ -3,11 +3,13 @@ import os
 from collections.abc import Mapping
 from pathlib import Path
 
-from fastapi import FastAPI
+from fastapi import Depends, FastAPI
 from fastapi.staticfiles import StaticFiles
 
+from app.accounts.limits import FailedLogins, SignupLimit
 from app.api import ROUTERS
-from app.api.deps import Rebuild
+from app.api.auth import public_router
+from app.api.deps import Rebuild, signed_in
 from app.config.catalog import Catalog
 from app.config.settings import Settings
 from app.db import Database
@@ -41,8 +43,11 @@ def create_app(
     app.state.catalog = catalog or Catalog(db.caches, fetchers={})
     app.state.jobs = JobRunner(db.sessions, db.expressions, db.stages, executor, SourceImages(db.pictures, app.state.files))
     app.state.topics = DailyTopics(db.topics, app.state.jobs.executor)
+    app.state.failed_logins = FailedLogins()
+    app.state.signups = SignupLimit()
+    app.include_router(public_router)
     for router in ROUTERS:
-        app.include_router(router)
+        app.include_router(router, dependencies=[Depends(signed_in)])
     if image_dir is not None:
         image_dir.mkdir(parents=True, exist_ok=True)
         app.mount("/api/images", StaticFiles(directory=image_dir), name="images")

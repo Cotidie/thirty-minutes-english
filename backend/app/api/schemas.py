@@ -9,6 +9,11 @@ from app.generation.progress import Stage
 from app.models import Correction, SummaryFeedback
 
 
+class Credentials(BaseModel):
+    email: str
+    password: str
+
+
 class CreateSessionRequest(BaseModel):
     topic: str | None = None
 

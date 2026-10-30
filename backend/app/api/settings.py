@@ -1,8 +1,8 @@
 from dataclasses import asdict
 
-from fastapi import APIRouter, HTTPException, Request
+from fastapi import APIRouter, Depends, HTTPException, Request
 
-from app.api.deps import CurrentSettings, Db, Models, Rebuild
+from app.api.deps import CurrentSettings, Db, Models, Rebuild, admin_only
 from app.api.schemas import (
     KeyTestRequest,
     KeyTestResult,
@@ -19,7 +19,7 @@ from app.config.settings import GROUPS, SPEC_BY_KEY, SPECS, InvalidSetting, Sett
 from app.db import Database
 from app.db.pictures import PictureStat
 
-router = APIRouter(prefix="/api/settings")
+router = APIRouter(prefix="/api/settings", dependencies=[Depends(admin_only)])
 
 
 def keys_of(settings: Settings) -> dict[str, str]:

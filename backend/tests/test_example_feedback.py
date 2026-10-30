@@ -3,6 +3,8 @@ from pathlib import Path
 import pytest
 from fastapi.testclient import TestClient
 
+from tests.conftest import admin_client
+
 from app.coaching.example_feedback import ExampleCoach
 from app.db import Database
 from app.llm import GenerationError
@@ -65,7 +67,7 @@ class FakeCoach:
 
 def client_with(tmp_path, coach) -> TestClient:
     app = create_app(Database(tmp_path / "s.db"), Services(FakeGenerator(), example_coach=coach), InlineExecutor())
-    return TestClient(app)
+    return admin_client(app)
 
 
 def test_feedback_endpoint_returns_paraphrase_and_feedback(tmp_path):

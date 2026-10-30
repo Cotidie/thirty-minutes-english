@@ -1,6 +1,6 @@
 import random
 
-from fastapi.testclient import TestClient
+from tests.conftest import admin_client
 
 from app.db import Database
 from app.main import create_app
@@ -66,7 +66,7 @@ def test_list_all_carries_each_source_and_the_sessions_that_taught_it(store):
 def test_the_corpus_is_served_whole(tmp_path):
     db = Database(tmp_path / "s.db")
     db.expressions.add("touch base", "m", [], ["Let's touch base."], "n", "연락하다", "workplace", "session")
-    with TestClient(create_app(db, Services(FakeGenerator()), InlineExecutor())) as c:
+    with admin_client(create_app(db, Services(FakeGenerator()), InlineExecutor())) as c:
         [entry] = c.get("/api/expressions").json()
     assert (entry["phrase"], entry["setting"], entry["source"], entry["sessions"]) == ("touch base", "workplace", "session", [])
 
@@ -85,7 +85,7 @@ def test_delete_takes_an_expression_out_of_the_corpus_and_every_session_that_tau
 def test_an_expression_is_deleted_over_http_once(tmp_path):
     db = Database(tmp_path / "s.db")
     [expression] = seed_expressions(db, 1)
-    with TestClient(create_app(db, Services(FakeGenerator()), InlineExecutor())) as c:
+    with admin_client(create_app(db, Services(FakeGenerator()), InlineExecutor())) as c:
         assert c.delete(f"/api/expressions/{expression}").status_code == 204
         assert c.delete(f"/api/expressions/{expression}").status_code == 404
         assert c.get("/api/expressions").json() == []

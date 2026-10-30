@@ -1,7 +1,7 @@
 from pathlib import Path
 
 import pytest
-from fastapi.testclient import TestClient
+from tests.conftest import admin_client
 
 from app.db import Database
 from app.main import create_app
@@ -48,7 +48,7 @@ class FakeVoice:
 
 def make_client(tmp_path, agents, transcriber=None):
     services = Services(FakeGenerator(), agents=agents, transcriber=transcriber)
-    return TestClient(create_app(Database(tmp_path / "s.db"), services, InlineExecutor()))
+    return admin_client(create_app(Database(tmp_path / "s.db"), services, InlineExecutor()))
 
 
 def read_aloud(agent_dir, voice=None):

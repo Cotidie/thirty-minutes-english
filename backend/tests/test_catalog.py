@@ -1,7 +1,7 @@
 
 import pytest
 
-from fastapi.testclient import TestClient
+from tests.conftest import admin_client
 
 from app.config import catalog as catalog_module
 from app.config.catalog import Catalog, ModelOption, claude_models, gemini_live, newest_first, openrouter_images
@@ -133,7 +133,7 @@ def test_image_models_carry_what_a_picture_cost_and_took_here(tmp_path):
     cat = Catalog(db.caches, {"openrouter_images": lambda _: [ModelOption("z/img", image_per_m=120.0)]}, background=False)
     cat.refresh({})
     app = create_app(db, Services(FakeGenerator()), InlineExecutor(), env={}, catalog=cat)
-    with TestClient(app) as c:
+    with admin_client(app) as c:
         image = {f["key"]: f for f in c.get("/api/settings").json()["fields"]}["IMAGE_MODEL"]
     z = next(o for o in image["options"] if o["id"] == "z/img")
     assert (z["image_per_m"], z["per_image"], z["seconds_per_image"]) == (120.0, pytest.approx(0.15), pytest.approx(15))
@@ -144,7 +144,7 @@ def test_the_modal_gets_the_cached_models_with_the_default_kept_and_can_refresh(
     db = Database(tmp_path / "s.db")
     cat = Catalog(db.caches, {"claude": lambda _: lists["claude"]}, background=False)
     app = create_app(db, Services(FakeGenerator()), InlineExecutor(), env={}, catalog=cat)
-    with TestClient(app) as c:
+    with admin_client(app) as c:
         c.get("/api/settings")  # first open fetches in the background (inline here)
         field = {f["key"]: f for f in c.get("/api/settings").json()["fields"]}["CLAUDE_MODEL"]
         assert [o["id"] for o in field["options"]] == ["opus", "sonnet", "haiku"]  # default opus not listed: kept on top
@@ -198,7 +198,7 @@ def test_a_pinned_model_leads_its_menu(tmp_path):
         assert image["catalog"] == "openrouter_images"
         return [(o["id"], o["pinned"]) for o in image["options"]]
 
-    with TestClient(app) as c:
+    with admin_client(app) as c:
         pinned = menu(c.post("/api/settings/models/pin", json={"catalog": "openrouter_images", "model": "m1", "pinned": True}).json())
         assert pinned[0] == ("m1", True)
         assert pinned[1] == ("google/gemini-3-pro-image", False)  # the default, which this provider does not list

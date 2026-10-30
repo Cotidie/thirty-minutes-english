@@ -2,7 +2,10 @@ import json
 
 import httpx2
 import pytest
+from fastapi import FastAPI
+from fastapi.testclient import TestClient
 
+from app.api.deps import LOGIN_COOKIE
 from app.db import Database
 from app.generation.generator import VOCABULARY_COUNT
 from app.models import ArticleDraft, Draft, ParagraphPictureDraft, PictureDraft, Question, SentencePair, Source, Topic, User, VocabularyDraft
@@ -56,6 +59,18 @@ def add_user(db: Database, email: str = "a@example.com", *, admin: bool = False,
     result = db.accounts.get(user.id)
     assert result is not None
     return result
+
+
+def sign_in(client: TestClient, db: Database, user: User) -> None:
+    client.cookies.set(LOGIN_COOKIE, db.accounts.start_login(user.id))
+
+
+def admin_client(app: FastAPI) -> TestClient:
+    """A client logged in as the admin, for tests of what a route does rather than who may call it."""
+    db = app.state.db
+    client = TestClient(app)
+    sign_in(client, db, db.accounts.by_email("admin@example.com") or add_user(db, "admin@example.com", admin=True))
+    return client
 
 
 @pytest.fixture

@@ -1,6 +1,6 @@
 
 import pytest
-from fastapi.testclient import TestClient
+from tests.conftest import admin_client
 
 from app.config.settings import InvalidSetting, Settings
 from app.db import Database
@@ -53,7 +53,7 @@ def test_thinking_only_for_extended_thinking_model():
 def settings_client(tmp_path, env, rebuild=None):
     store = Database(tmp_path / "s.db")
     app = create_app(store, Services(FakeGenerator()), InlineExecutor(), rebuild=rebuild, env=env)
-    return TestClient(app)
+    return admin_client(app)
 
 
 def test_get_masks_secrets_and_carries_the_rules_the_modal_applies(tmp_path):

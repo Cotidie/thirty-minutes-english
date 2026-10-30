@@ -1,6 +1,8 @@
 import pytest
 from fastapi.testclient import TestClient
 
+from tests.conftest import admin_client
+
 from app.db import Database
 from app.main import create_app
 from app.net import HttpError
@@ -27,7 +29,7 @@ def test_azure_errors_become_http_errors(http):
 
 def test_token_endpoint_is_503_until_azure_is_configured(tmp_path):
     app = create_app(Database(tmp_path / "s.db"), Services(FakeGenerator()), InlineExecutor())
-    with TestClient(app) as c:
+    with admin_client(app) as c:
         res = c.get("/api/assessor/token")
     assert res.status_code == 503
     assert "AZURE_SPEECH_KEY" in res.json()["detail"]
@@ -35,7 +37,7 @@ def test_token_endpoint_is_503_until_azure_is_configured(tmp_path):
 
 def token_client(tmp_path) -> TestClient:
     services = Services(FakeGenerator(), assessor=AzureAssessor("k", "koreacentral", 55))
-    return TestClient(create_app(Database(tmp_path / "s.db"), services, InlineExecutor()))
+    return admin_client(create_app(Database(tmp_path / "s.db"), services, InlineExecutor()))
 
 
 def test_token_endpoint_returns_the_azure_session(tmp_path, http):

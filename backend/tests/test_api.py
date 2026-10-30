@@ -1,5 +1,5 @@
 import pytest
-from fastapi.testclient import TestClient
+from tests.conftest import admin_client
 
 from app.db import Database
 from app.generation.generator import VOCABULARY_COUNT
@@ -47,7 +47,7 @@ def client(tmp_path):
     db = Database(tmp_path / "s.db")
     seed_expressions(db, EXPRESSION_COUNT)
     app = create_app(db, Services(gen), InlineExecutor())
-    with TestClient(app) as c:
+    with admin_client(app) as c:
         c.generator = gen
         yield c
 
@@ -104,7 +104,7 @@ def test_list_and_get(client):
 
 def test_a_session_with_an_empty_corpus_has_no_expressions(tmp_path):
     app = create_app(Database(tmp_path / "s.db"), Services(FakeGenerator()), InlineExecutor())
-    with TestClient(app) as c:
+    with admin_client(app) as c:
         sid = c.post("/api/sessions", json={"topic": "X"}).json()["session_id"]
         assert content_of(c, sid)["expressions"] == []
 
@@ -130,7 +130,7 @@ def test_topics_endpoint_offers_a_stable_daily_slice(client):
 
 def test_job_reports_failure_when_generator_fails(tmp_path):
     app = create_app(Database(tmp_path / "s.db"), Services(FailingGenerator()), InlineExecutor())
-    with TestClient(app) as c:
+    with admin_client(app) as c:
         job = c.post("/api/sessions", json={"topic": "X"}).json()
     assert job["status"] == "failed"
     assert "claude exited 1" in job["error"]
@@ -139,7 +139,7 @@ def test_job_reports_failure_when_generator_fails(tmp_path):
 
 def test_a_failed_job_says_why_in_the_log(tmp_path, caplog):
     app = create_app(Database(tmp_path / "s.db"), Services(FailingGenerator()), InlineExecutor())
-    with TestClient(app) as c, caplog.at_level("WARNING", logger="app.generation.jobs"):
+    with admin_client(app) as c, caplog.at_level("WARNING", logger="app.generation.jobs"):
         job = c.post("/api/sessions", json={"topic": "X"}).json()
     assert f"job {job['id']}: failed after" in caplog.text
     assert "claude exited 1" in caplog.text
@@ -147,7 +147,7 @@ def test_a_failed_job_says_why_in_the_log(tmp_path, caplog):
 
 def test_a_failed_job_stays_listed_until_it_is_dismissed(tmp_path):
     app = create_app(Database(tmp_path / "s.db"), Services(FailingGenerator()), InlineExecutor())
-    with TestClient(app) as c:
+    with admin_client(app) as c:
         job = c.post("/api/sessions", json={"topic": "X"}).json()
         listed = c.get("/api/jobs").json()
         assert [(j["id"], j["status"]) for j in listed] == [(job["id"], "failed")]
@@ -208,7 +208,7 @@ def with_pictures(tmp_path, illustrator_of=FakeIllustrator, **services):
 
 def test_pictures_are_drawn_after_the_text_and_saved_with_the_session(tmp_path):
     app, illustrator, db = with_pictures(tmp_path)
-    with TestClient(app) as c:
+    with admin_client(app) as c:
         job = c.post("/api/sessions", json={"topic": "X"}).json()
         content = content_of(c, job["session_id"])
     words, [cover, inner] = content["vocabulary"], content["article"]["figures"]
@@ -231,7 +231,7 @@ def test_the_session_can_be_opened_while_its_pictures_are_drawn(tmp_path):
             seen.update(job=job, session=c.get(f"/api/sessions/{job['session_id']}").json())
 
     app, _, _ = with_pictures(tmp_path, Watched)
-    with TestClient(app) as c:
+    with admin_client(app) as c:
         c.post("/api/sessions", json={"topic": "X"})
     assert (seen["job"]["status"], seen["job"]["stage"]) == ("running", "illustrating")
     words = seen["session"]["content"]["vocabulary"]
@@ -240,7 +240,7 @@ def test_the_session_can_be_opened_while_its_pictures_are_drawn(tmp_path):
 
 def test_a_session_still_goes_out_when_the_pictures_fail(tmp_path):
     app, _, _ = with_pictures(tmp_path, lambda db: FakeIllustrator(db, GenerationError("openrouter down")))
-    with TestClient(app) as c:
+    with admin_client(app) as c:
         job = c.post("/api/sessions", json={"topic": "X"}).json()
         words = content_of(c, job["session_id"])["vocabulary"]
     assert job["status"] == "done"
@@ -249,7 +249,7 @@ def test_a_session_still_goes_out_when_the_pictures_fail(tmp_path):
 
 def test_deleting_a_session_removes_its_picture_files(tmp_path):
     app, _, db = with_pictures(tmp_path)
-    with TestClient(app) as c:
+    with admin_client(app) as c:
         kept = c.post("/api/sessions", json={"topic": "Kept"}).json()["session_id"]
         gone = c.post("/api/sessions", json={"topic": "Gone"}).json()["session_id"]
         assert len(list(db.images_dir.iterdir())) == 44  # 20 word pictures and the article's two, twice
@@ -266,7 +266,7 @@ class FakeSceneWriter:
 def test_a_word_can_be_redrawn_and_the_session_keeps_it(tmp_path):
     app, illustrator, db = with_pictures(tmp_path, scene_writer=FakeSceneWriter())
     files = PictureFiles(db.images_dir)
-    with TestClient(app) as c:
+    with admin_client(app) as c:
         sid = c.post("/api/sessions", json={"topic": "X"}).json()["session_id"]  # word 1 shows pictures 3 and 4
         res = c.post(f"/api/sessions/{sid}/pictures/1", json={})
         assert res.status_code == 200
@@ -287,7 +287,7 @@ def test_redraw_after_the_session_went_away_leaves_no_file(tmp_path):
             return picture
 
     app, _, db = with_pictures(tmp_path, Vanishing, scene_writer=FakeSceneWriter())
-    with TestClient(app) as c:
+    with admin_client(app) as c:
         sid = c.post("/api/sessions", json={"topic": "X"}).json()["session_id"]
         assert c.post(f"/api/sessions/{sid}/pictures/1", json={}).status_code == 404
     assert list(db.images_dir.iterdir()) == []
@@ -373,7 +373,7 @@ class HeldExecutor:
 def test_jobs_endpoint_drops_finished_jobs(tmp_path):
     executor = HeldExecutor()
     app = create_app(Database(tmp_path / "s.db"), Services(FakeGenerator()), executor)
-    with TestClient(app) as client:
+    with admin_client(app) as client:
         assert client.get("/api/jobs").json() == []
         first = create(client, "First")
         second = create(client, "Second")
@@ -455,7 +455,7 @@ class DeferredExecutor:
 def test_a_cancelled_job_stops_and_saves_nothing(tmp_path):
     executor = DeferredExecutor()
     app = create_app(Database(tmp_path / "s.db"), Services(FakeGenerator()), executor)
-    with TestClient(app) as c:
+    with admin_client(app) as c:
         job = c.post("/api/sessions", json={"topic": "X"}).json()
         cancelled = c.delete(f"/api/jobs/{job['id']}").json()
         executor.run()
@@ -469,7 +469,7 @@ def test_a_cancelled_job_stops_and_saves_nothing(tmp_path):
 
 def test_a_fresh_job_expects_the_default_time_of_every_stage(tmp_path):
     app = create_app(Database(tmp_path / "s.db"), Services(FakeGenerator()), DeferredExecutor())
-    with TestClient(app) as c:
+    with admin_client(app) as c:
         job = c.post("/api/sessions", json={"topic": "X"}).json()
     assert job["expected_seconds"] == sum(DEFAULT_STAGE_SECONDS.values())
     assert job["stage_expected_seconds"] == DEFAULT_STAGE_SECONDS[Stage.STARTING]
@@ -478,7 +478,7 @@ def test_a_fresh_job_expects_the_default_time_of_every_stage(tmp_path):
 def test_a_job_foresees_its_pictures_from_the_picture_model_time_here(tmp_path):
     db = Database(tmp_path / "s.db")
     app = create_app(db, Services(FakeGenerator(), illustrator=FakeIllustrator(db, seconds=7)), DeferredExecutor())
-    with TestClient(app) as c:
+    with admin_client(app) as c:
         job = c.post("/api/sessions", json={"topic": "X"}).json()
     others = sum(s for stage, s in DEFAULT_STAGE_SECONDS.items() if stage != Stage.ILLUSTRATING)
     assert job["expected_seconds"] == others + 7 * 20  # two pictures a word
@@ -486,8 +486,8 @@ def test_a_job_foresees_its_pictures_from_the_picture_model_time_here(tmp_path):
 
 def test_stage_estimates_survive_a_restart(tmp_path):
     path = tmp_path / "s.db"
-    with TestClient(create_app(Database(path), Services(FakeGenerator()), InlineExecutor())) as c:
+    with admin_client(create_app(Database(path), Services(FakeGenerator()), InlineExecutor())) as c:
         c.post("/api/sessions", json={"topic": "X"})
-    with TestClient(create_app(Database(path), Services(FakeGenerator()), DeferredExecutor())) as c:
+    with admin_client(create_app(Database(path), Services(FakeGenerator()), DeferredExecutor())) as c:
         job = c.post("/api/sessions", json={"topic": "Y"}).json()
     assert job["stage_expected_seconds"] < DEFAULT_STAGE_SECONDS[Stage.STARTING]  # the first run's time, not the default

@@ -1,6 +1,6 @@
 from pathlib import Path
 
-from fastapi.testclient import TestClient
+from tests.conftest import admin_client
 
 from app.coaching.summary_feedback import SummaryCoach
 from app.db import Database
@@ -31,7 +31,7 @@ def test_a_spoken_summary_is_judged_against_its_paragraph_and_kept_with_the_sess
     services = Services(FakeGenerator(), summary_coach=SummaryCoach(cli, AGENT_DIR))
     app = create_app(Database(tmp_path / "s.db"), services, InlineExecutor())
     said = "Seoul was remove the tram at 1968 and now making again."
-    with TestClient(app) as c:
+    with admin_client(app) as c:
         sid = c.post("/api/sessions", json={"topic": "X"}).json()["session_id"]
         feedback = c.post("/api/summary/feedback", json={"paragraph": PARAGRAPH, "user_text": said})
         assert feedback.json() == ANSWER
@@ -51,6 +51,6 @@ def test_a_spoken_summary_is_judged_against_its_paragraph_and_kept_with_the_sess
 
 def test_the_summary_round_is_503_without_a_voice_key(tmp_path):
     app = create_app(Database(tmp_path / "s.db"), Services(FakeGenerator()), InlineExecutor())
-    with TestClient(app) as c:
+    with admin_client(app) as c:
         assert c.post("/api/summary/sessions", json={"paragraph": PARAGRAPH}).status_code == 503
         assert c.post("/api/summary/feedback", json={"paragraph": PARAGRAPH, "user_text": "x"}).status_code == 503

@@ -1,7 +1,7 @@
 import json
 
 import httpx2
-from fastapi.testclient import TestClient
+from tests.conftest import admin_client
 
 from app.db import Database
 from app.main import create_app
@@ -56,11 +56,11 @@ def test_the_speech_route_returns_audio_and_says_why_when_it_cannot(tmp_path):
     def app_with(speaker):
         return create_app(Database(tmp_path / "s.db"), Services(FakeGenerator(), speaker=speaker), InlineExecutor())
 
-    with TestClient(app_with(Speaker(CountingVoice(), tmp_path / "a"))) as c:
+    with admin_client(app_with(Speaker(CountingVoice(), tmp_path / "a"))) as c:
         res = c.post("/api/speech", json={"text": "Read me."})
         assert (res.status_code, res.content, res.headers["content-type"]) == (200, b"WAV:Read me.", "audio/wav")
         assert c.post("/api/speech", json={"text": "  "}).status_code == 422
-    with TestClient(app_with(Speaker(CountingVoice(fail=True), tmp_path / "b"))) as c:
+    with admin_client(app_with(Speaker(CountingVoice(fail=True), tmp_path / "b"))) as c:
         assert c.post("/api/speech", json={"text": "Read me."}).status_code == 502
-    with TestClient(app_with(None)) as c:
+    with admin_client(app_with(None)) as c:
         assert c.post("/api/speech", json={"text": "Read me."}).status_code == 503

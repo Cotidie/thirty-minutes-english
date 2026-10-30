@@ -1,9 +1,9 @@
-from fastapi import APIRouter, HTTPException, Response
+from fastapi import APIRouter, Depends, HTTPException, Response
 
-from app.api.deps import Db
+from app.api.deps import Db, admin_only
 from app.models import CorpusEntry
 
-router = APIRouter(prefix="/api")
+router = APIRouter(prefix="/api", dependencies=[Depends(admin_only)])
 
 
 @router.get("/expressions", response_model=list[CorpusEntry])
