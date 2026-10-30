@@ -9,11 +9,13 @@ from app.accounts.admin import ensure_admin_from
 from app.accounts.limits import FailedLogins, SignupLimit
 from app.api import ROUTERS
 from app.api.auth import public_router
+from app.api.presence import router as presence_router
 from app.api.deps import Rebuild, signed_in
 from app.config.catalog import Catalog
 from app.config.settings import Settings
 from app.db import Database
 from app.generation.jobs import Executor, JobRunner
+from app.live.presence import Rooms
 from app.pictures.figures import SourceImages
 from app.pictures.files import PictureFiles
 from app.topics.daily import DailyTopics
@@ -45,7 +47,9 @@ def create_app(
     app.state.topics = DailyTopics(db.topics, app.state.jobs.executor)
     app.state.failed_logins = FailedLogins()
     app.state.signups = SignupLimit()
+    app.state.presence = Rooms()
     app.include_router(public_router)
+    app.include_router(presence_router)
     for router in ROUTERS:
         app.include_router(router, dependencies=[Depends(signed_in)])
     return app

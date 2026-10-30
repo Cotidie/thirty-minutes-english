@@ -8,12 +8,19 @@ from fastapi.concurrency import run_in_threadpool
 from fastapi.responses import StreamingResponse
 
 from app.api.deps import LOGIN_COOKIE, Db, Me, require_access
+from app.db import Database
 from app.live.changes import Changes, SessionChange, Subscription
 
 router = APIRouter(prefix="/api")
 
 HEARTBEAT_S = 25.0  # well inside what proxies allow an idle connection, and often enough for a browser to notice silence
 RETRY_MS = 5000
+
+
+def may_open(db: Database, token: str, session_id: int) -> bool:
+    """Whether the login still stands and may still open the session: what a connection left open checks as it goes."""
+    user = db.accounts.user_of_login(token)
+    return user is not None and db.shares.can_access(user, session_id)
 
 
 def _event(name: str) -> str:
@@ -57,12 +64,7 @@ def _streaming(changes: Changes, key: int, allowed: Callable[[], bool]) -> Strea
 async def session_events(session_id: int, request: Request, db: Db, me: Me) -> StreamingResponse:
     await run_in_threadpool(require_access, db, me, session_id)
     token = request.cookies.get(LOGIN_COOKIE, "")
-
-    def allowed() -> bool:
-        user = db.accounts.user_of_login(token)
-        return user is not None and db.shares.can_access(user, session_id)
-
-    return _streaming(db.changes, session_id, allowed)
+    return _streaming(db.changes, session_id, lambda: may_open(db, token, session_id))
 
 
 @router.get("/me/events")
