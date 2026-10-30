@@ -19,7 +19,7 @@
 | 스택 | `compose.yaml` 하나. 로컬과 서버가 같은 파일, 같은 명령 | 서버인지는 `.env`가 정한다. overlay 없음 |
 | 호스트 포트 | frontend `127.0.0.1:${FRONTEND_PORT:-5173}:80` | 앱에 로그인이 없으니 서버 공인 IP로 직접 열지 않는다. 호스트 네트워크의 nginx·cloudflared는 이 주소로 닿는다 |
 | 서버 요건 | Linux x86_64, Docker Engine ≥ 23(BuildKit), root 아닌 계정 | Dockerfile의 `--mount=type=cache`, `useradd --uid` |
-| 배포 | `scripts/deploy <user@host> [dir]`: ssh → `git pull --ff-only` → `docker compose up -d --build` → nginx 거쳐 `/api/sessions` 스모크 | 레포 public이라 clone에 키 불필요. 레지스트리 없음 |
+| 배포 | 서버에서 `git pull && docker compose up -d --build`. 전용 스크립트 없음 | 명령 두 개로 끝난다. 레포 public이라 clone에 키 불필요. 레지스트리 없음 |
 | 비밀값 | 서버 `.env`(권한 600): `CLAUDE_CODE_OAUTH_TOKEN`, `UID`. API 키·모델은 DB(⚙ 모달) | 기존 구조 유지. `UID`는 서버 계정 uid와 맞춰 `backend/data` 소유권 유지 |
 | 데이터 이전 | 서버 이미지 빌드 → 로컬 `docker compose down` → `sessions.db` + `images/` rsync → 서버 `up` | 정지 후 복사라 DB 일관성 보장. 빌드를 먼저 끝내 중단 시간을 줄인다 |
 | 백업 | `scripts/backup <user@host> [dir]`: SQLite 온라인 백업(`Connection.backup`) → `backups/<날짜>/sessions.db`, 그림은 `backups/images/`에 rsync | 원본이 원격으로 가므로 당기는 복사본이 필요. 실행 중 DB를 그냥 rsync하면 찢어질 수 있음 |
@@ -48,7 +48,6 @@
 |---|---|
 | `compose.yaml` | frontend 포트를 `127.0.0.1`에 묶음 |
 | `.env.example` | 포트 설명, `UID` 항목 |
-| `scripts/deploy` | 신규 |
 | `scripts/backup` | 신규 |
 | `.gitignore` | `backups/` |
 | `README.md` | 서버 배포 절 |
@@ -68,7 +67,6 @@
 | 서버 `curl -s 127.0.0.1:5173/api/sessions` | 200, 세션 수가 로컬과 같음 |
 | 서버 `ss -ltn` | 5173은 `127.0.0.1`에만, 8765 없음 |
 | 다른 머신 `curl http://<서버IP>:5173` | 연결 실패 |
-| `scripts/deploy <user@host>` | 끝에 `smoke ok: v0.5.0` |
 | 서버에서 세션 생성 1회 | 끝까지 진행, 그림 포함 |
 | `scripts/backup <user@host>` 후 복사본의 세션 수 | 서버와 같음 |
 

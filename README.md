@@ -60,11 +60,12 @@ mkdir -p backend/data              # otherwise Docker creates it owned by root
 docker compose up -d --build
 ```
 
-From your own machine:
+To update, run `git pull && docker compose up -d --build` on the server.
+
+To copy the server's database and pictures into `backups/` on your own machine:
 
 ```sh
-scripts/deploy user@host           # pull main on the server, rebuild, check that it answers
-scripts/backup user@host           # copy the database and pictures into backups/
+scripts/backup user@host
 ```
 
 The app has no login yet. Anyone who reaches the address can generate sessions on your Claude subscription, delete them, and change the settings.
