@@ -213,7 +213,7 @@ Server-Sent Events(서버가 브라우저로 한 방향으로 알림을 보내�
 - **밀림 방지:** 구독자마다 큐 대신 "아직 안 보낸 이벤트 이름의 집합"을 둔다. 느린 브라우저가 있어도 메모리가 늘지 않고, 그림 20장이 연달아 도착해도 `session` 한 번으로 합쳐진다.
 - **스레드:** 저장소는 스레드풀과 job 스레드에서 돌므로 `publish`는 스레드 안전해야 하고, 스트림의 이벤트 루프는 `loop.call_soon_threadsafe`로 깨운다. 스트림은 비동기 제너레이터로 만들어 스레드풀을 점유하지 않는다.
 - **재확인:** 25초마다 `alive`를 보내면서 로그인과 접근권을 다시 확인한다. 없어졌으면 `gone`을 보내고 닫는다.
-- **프록시:** 응답 헤더는 `Content-Type: text/event-stream`, `Cache-Control: no-cache`, `X-Accel-Buffering: no`다. `frontend/nginx.conf`에 이 경로 전용 `location`을 더해 `proxy_buffering off`, `proxy_http_version 1.1`, `proxy_set_header Connection ""`, 긴 `proxy_read_timeout`을 준다. 공개 주소는 Cloudflare를 거치며 유휴 연결 제한이 있으므로 하트비트로 연결을 유지한다.
+- **프록시:** 응답 헤더는 `Content-Type: text/event-stream`, `Cache-Control: no-cache`, `X-Accel-Buffering: no`다. `frontend/nginx.conf`에 이 경로 전용 `location`을 더해 `proxy_buffering off`, `proxy_http_version 1.1`, `proxy_set_header Connection ""`, 긴 `proxy_read_timeout`을 주고, `add_header X-Accel-Buffering no`로 그 헤더를 다시 내보낸다. nginx는 upstream의 이 헤더를 소비하므로, 다시 내보내지 않으면 앞단의 nginx(`lab-server`)가 스트림을 버퍼링해 브라우저에 아무것도 도착하지 않는다. 공개 주소는 Cloudflare도 거치며 유휴 연결 제한이 있으므로 하트비트로 연결을 유지한다.
 - **종료:** 열린 스트림이 재시작을 막지 않도록 `Dockerfile`과 `compose.dev.yaml`의 uvicorn에 `--timeout-graceful-shutdown 5`를 더한다.
 - **프로세스 수:** 구독자 목록이 메모리에 있어 uvicorn 프로세스가 하나여야 한다. 지금 구성이 그렇다. 워커를 늘리려면 이 부분을 바꿔야 한다.
 
