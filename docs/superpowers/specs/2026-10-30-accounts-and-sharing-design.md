@@ -47,6 +47,7 @@
 | `GET`, `DELETE /api/jobs...` | 그 job을 시작한 사람만 |
 | `GET /api/sessions/{id}`, 별표와 노트의 `GET`/`PUT`, 표현 교체와 추가, `examples`, `summaries`, `readings` | 세션 접근권 |
 | `GET /api/sessions/{id}/events` | 세션 접근권 |
+| `GET /api/me/events` | 로그인. 그 계정에 대한 알림만 |
 | `DELETE /api/sessions/{id}`, 다른 사람의 공유 해제 | 세션을 만든 사람만 |
 | `DELETE /api/sessions/{id}/shares/me` | 공유받은 사람. 내 공유만 풀리고 세션은 남는다 |
 | 그림 다시 그리기, 공유 추가 | 세션을 만든 사람이면서 `can_create` 또는 `is_admin` |
@@ -164,12 +165,13 @@ app/api/deps.py                  Me, 역할 검사, 세션 접근 검사
 
 ### 통신의 경계
 
-앱의 통신은 네 가지이고, 각각 맡는 일이 겹치지 않는다.
+앱의 통신은 다섯 가지이고, 각각 맡는 일이 겹치지 않는다.
 
 | 통신 | 방향 | 맡는 일 | 쓰는 곳 |
 |---|---|---|---|
 | REST | 요청과 응답 | **모든 상태의 읽기와 쓰기** | 앱 전체 |
-| 이벤트 스트림 `GET /api/sessions/{id}/events` | 서버에서 브라우저로 | 공유되는 세션 상태 중 무엇을 다시 읽어야 하는지 알림. 데이터는 없다 | 세션 화면 |
+| 세션 이벤트 스트림 `GET /api/sessions/{id}/events` | 서버에서 브라우저로 | 공유되는 세션 상태 중 무엇을 다시 읽어야 하는지 알림. 데이터는 없다 | 세션 화면 |
+| 계정 이벤트 스트림 `GET /api/me/events` | 서버에서 브라우저로 | 그 계정의 세션 목록을 다시 읽어야 한다는 알림. 데이터는 없다 | 홈 |
 | 폴링 `GET /api/jobs` | 브라우저에서 서버로 | 세션 생성 진행률. 시작한 사람만 보는 임시 상태다 | 홈, 세션 화면의 그림 진행 표시 |
 | WebSocket (브라우저와 Gemini, Azure 사이) | 양방향 | 말하기 연습의 음성. 우리 서버를 거치지 않는다 | 연습 화면 |
 
@@ -177,10 +179,10 @@ app/api/deps.py                  Me, 역할 검사, 세션 접근 검사
 
 - **상태는 REST로만 읽고 쓴다.** 이벤트에는 자원 이름만 있고 데이터가 없다. 응답 형식과 권한 검사는 GET 라우트 한 곳에만 있다. 브라우저에서 서버로 쓰는 일도 REST로만 한다.
 - **이벤트는 "이 자원을 다시 읽어라"만 뜻한다.** 이벤트 이름 하나는 아래 표의 GET과 일대일로 대응한다. 이벤트 처리는 화면을 직접 고치지 않고 다시 읽기만 한다.
-- **스트림은 하나다.** 세션 화면 전용이고, 다른 화면과 다른 자원은 쓰지 않는다.
+- **스트림은 둘이다.** 세션 스트림은 세션 화면이, 계정 스트림은 홈이 쓴다. 공유받는 사람은 그 세션을 아직 열지 않았으므로 세션 스트림으로는 알릴 수 없다. 탭 하나가 스트림을 하나만 연다.
 - **발행은 저장소에서만 한다.** 라우트, job, 그림 콜백, 컴포넌트는 발행하지 않는다. 쓰기 경로가 여러 곳이어도 모두 `SessionRepo`, `RecordRepo`, `ShareRepo`, `ExpressionRepo`를 지나므로, 경로를 새로 만들어도 알림을 빠뜨리지 않는다. 커밋이 끝난 뒤에 발행한다.
-- **구독은 훅 하나로만 한다.** `useSessionResource`만 스트림에 연결한다. 컴포넌트나 다른 훅이 `EventSource`를 직접 만들지 않는다.
-- **새 기능의 판단 기준:** 여러 사람이 보는 세션 상태면 GET을 만들고 이벤트 이름을 더한다. 한 사람의 임시 진행 상황이면 폴링한다. 스트림에 데이터를 실으면 안 된다.
+- **구독은 훅으로만 한다.** `useSessionResource`와 `useAccountResource`만 스트림에 연결한다. 컴포넌트나 다른 훅이 `EventSource`를 직접 만들지 않는다.
+- **새 기능의 판단 기준:** 여러 사람의 행동으로 바뀌는 상태면 GET을 만들고 이벤트 이름을 더한다. 세션에 속하면 세션 스트림, 계정에 속하면 계정 스트림이다. 한 사람의 임시 진행 상황이면 폴링한다. 스트림에 데이터를 실으면 안 된다.
 
 이 규칙은 `AGENTS.md`에도 적어 앞으로의 작업에 적용한다.
 
@@ -193,16 +195,19 @@ app/api/deps.py                  Me, 역할 검사, 세션 접근 검사
 | `note` | `GET /api/sessions/{id}/note` | `set_note` |
 | `records` | `examples`, `summaries`, `readings`의 GET | `add_example`, `add_summary`, `add_reading` |
 | `gone` | 없음. 화면을 "This session is no longer available."로 바꾼다 | 저장소가 아니라 스트림이 판단한다 (아래) |
+| `sessions` (계정 스트림) | `GET /api/sessions` | `SessionRepo.create`(만든 사람에게), `SessionRepo.delete`(만든 사람과 공유받은 사람 모두에게), `ShareRepo.share`, `ShareRepo.unshare`(그 사람에게) |
 
 스트림은 연결이 살아 있음을 알리는 `alive`도 25초마다 보낸다. 다시 읽을 것은 없다.
 
 내부 신호 `access`는 `SessionRepo.delete`와 `ShareRepo.unshare`가 발행하며 브라우저로 나가지 않는다. 스트림은 이 신호를 받으면 접근권을 다시 확인해, 없어졌으면 `gone`을 보내고 닫는다. 그래서 "누가 못 보게 됐는가"의 판단은 접근 검사 한 곳에만 있다.
 
+계정 스트림의 `gone`은 로그인이 끝났을 때만 온다. 홈은 목록을 한 번 더 읽고, 그 401이 로그인 화면으로 보낸다.
+
 ```
 브라우저 A ── PUT /stars/words/12 ──▶ 라우트 ──▶ SessionRepo.set_star ──▶ 커밋
                                                       │ publish(세션, stars)
                                                       ▼
-브라우저 B ◀── event: stars ──── 스트림 ◀──── SessionChanges
+브라우저 B ◀── event: stars ──── 스트림 ◀──── Changes
 브라우저 B ── GET /stars ──▶ 라우트 (권한 검사) ──▶ 최신 상태
 ```
 
@@ -210,11 +215,11 @@ app/api/deps.py                  Me, 역할 검사, 세션 접근 검사
 
 Server-Sent Events(서버가 브라우저로 한 방향으로 알림을 보내는 표준 HTTP 스트림)를 쓴다. 쓰기는 REST로 충분하므로 양방향인 WebSocket이 필요 없고, 폴링은 지연과 요청 수 사이에서 손해를 본다. 새 의존성은 없다.
 
-- **구독자 목록:** `app/live/changes.py`의 `SessionChanges`. 웹 프레임워크를 모른다. `Database`가 하나 가지고 저장소는 `publish`만 안다.
+- **구독자 목록:** `app/live/changes.py`의 `Changes`. 웹 프레임워크를 모른다. `Database`가 세션용(`changes`)과 계정용(`account_changes`)으로 하나씩 가지고 저장소는 `publish`만 안다.
 - **밀림 방지:** 구독자마다 큐 대신 "아직 안 보낸 이벤트 이름의 집합"을 둔다. 느린 브라우저가 있어도 메모리가 늘지 않고, 그림 20장이 연달아 도착해도 `session` 한 번으로 합쳐진다.
 - **스레드:** 저장소는 스레드풀과 job 스레드에서 돌므로 `publish`는 스레드 안전해야 하고, 스트림의 이벤트 루프는 `loop.call_soon_threadsafe`로 깨운다. 스트림은 비동기 제너레이터로 만들어 스레드풀을 점유하지 않는다.
 - **재확인:** 25초마다 `alive`를 보내면서 로그인과 접근권을 다시 확인한다. 없어졌으면 `gone`을 보내고 닫는다.
-- **프록시:** 응답 헤더는 `Content-Type: text/event-stream`, `Cache-Control: no-cache`, `X-Accel-Buffering: no`다. `frontend/nginx.conf`에 이 경로 전용 `location`을 더해 `proxy_buffering off`, `proxy_http_version 1.1`, `proxy_set_header Connection ""`, 긴 `proxy_read_timeout`을 주고, `add_header X-Accel-Buffering no`로 그 헤더를 다시 내보낸다. nginx는 upstream의 이 헤더를 소비하므로, 다시 내보내지 않으면 앞단의 nginx(`lab-server`)가 스트림을 버퍼링해 브라우저에 아무것도 도착하지 않는다. 공개 주소는 Cloudflare도 거치며 유휴 연결 제한이 있으므로 하트비트로 연결을 유지한다.
+- **프록시:** 응답 헤더는 `Content-Type: text/event-stream`, `Cache-Control: no-cache`, `X-Accel-Buffering: no`다. `frontend/nginx.conf`에 두 스트림 경로 전용 `location`을 더해 `proxy_buffering off`, `proxy_http_version 1.1`, `proxy_set_header Connection ""`, 긴 `proxy_read_timeout`을 주고, `add_header X-Accel-Buffering no`로 그 헤더를 다시 내보낸다. nginx는 upstream의 이 헤더를 소비하므로, 다시 내보내지 않으면 앞단의 nginx(`lab-server`)가 스트림을 버퍼링해 브라우저에 아무것도 도착하지 않는다. 공개 주소는 Cloudflare도 거치며 유휴 연결 제한이 있으므로 하트비트로 연결을 유지한다.
 - **종료:** 열린 스트림이 재시작을 막지 않도록 `Dockerfile`과 `compose.dev.yaml`의 uvicorn에 `--timeout-graceful-shutdown 5`를 더한다.
 - **프로세스 수:** 구독자 목록이 메모리에 있어 uvicorn 프로세스가 하나여야 한다. 지금 구성이 그렇다. 워커를 늘리려면 이 부분을 바꿔야 한다.
 
@@ -227,7 +232,8 @@ useSessionResource(sessionId, 'records', () => api.listExamples(sessionId), setE
 ```
 
 - `useSessionResource`는 처음 한 번 읽고, 그 이벤트가 오면 다시 읽고, 스트림이 연결될 때마다 또 읽는다. 끊긴 동안의 이벤트는 재전송하지 않기 때문이다. 읽은 값은 훅이 넘겨받은 함수로 전달하므로, 화면을 떠난 뒤 도착한 값은 버린다.
-- `lib/sessionChanges.ts`가 세션당 `EventSource` 하나를 참조 수로 관리한다. 첫 사용자가 열고 마지막 사용자가 닫는다.
+- `lib/sessionChanges.ts`가 스트림당 `EventSource` 하나를 참조 수로 관리한다. 첫 사용자가 열고 마지막 사용자가 닫는다.
+- `useAccountResource`는 같은 동작을 계정 스트림으로 한다. 홈의 세션 목록이 이것으로 읽으므로, 공유받거나 공유가 끝나거나 세션이 삭제되면 새로고침 없이 목록이 바뀐다.
 - 읽기는 한 번에 하나만 돈다. 도중에 이벤트가 오면 끝난 뒤 한 번 더 읽는다. 응답 순서가 뒤바뀌어 옛 내용이 새 내용을 덮는 일이 없다.
 - 내 변경도 나에게 돌아오지만 같은 내용을 다시 읽을 뿐이다. 쓰기 응답으로 화면을 바로 고치는 지금의 동작은 그대로 둔다.
 - **별표:** 내 저장이 진행 중이면 다시 읽은 결과를 버린다. 마지막 저장의 응답이 최신 상태다.

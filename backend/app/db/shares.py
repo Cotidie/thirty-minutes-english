@@ -4,7 +4,7 @@ from datetime import UTC, datetime
 from typing import TYPE_CHECKING
 
 from app.db.accounts import user_from
-from app.live.changes import SessionChange
+from app.live.changes import AccountChange, SessionChange
 from app.models import User
 
 if TYPE_CHECKING:
@@ -14,6 +14,11 @@ if TYPE_CHECKING:
 # The sessions an account made or had shared with it: what its home page lists and what it has already seen.
 # Takes the account's id twice.
 VISIBLE_SESSIONS = "SELECT id FROM sessions WHERE created_by = ? UNION SELECT session_id FROM session_shares WHERE user_id = ?"
+# The other way round: the accounts whose home page lists a session. Takes the session's id twice.
+ACCOUNTS_LISTING = (
+    "SELECT created_by FROM sessions WHERE id = ? AND created_by IS NOT NULL"
+    " UNION SELECT user_id FROM session_shares WHERE session_id = ?"
+)
 
 
 class ShareRepo:
@@ -23,10 +28,12 @@ class ShareRepo:
     def share(self, session_id: int, user_id: int) -> None:
         """Sharing again changes nothing."""
         with self._db.connect() as conn:
-            conn.execute(
+            cur = conn.execute(
                 "INSERT OR IGNORE INTO session_shares (session_id, user_id, created_at) VALUES (?, ?, ?)",
                 (session_id, user_id, datetime.now(UTC).isoformat()),
             )
+        if cur.rowcount > 0:
+            self._db.account_changes.publish(user_id, AccountChange.SESSIONS)
 
     def unshare(self, session_id: int, user_id: int) -> bool:
         """Whether there was a share to end."""
@@ -35,6 +42,7 @@ class ShareRepo:
         if cur.rowcount == 0:
             return False
         self._db.changes.publish(session_id, SessionChange.ACCESS)
+        self._db.account_changes.publish(user_id, AccountChange.SESSIONS)
         return True
 
     def shared_with(self, session_id: int) -> list[User]:

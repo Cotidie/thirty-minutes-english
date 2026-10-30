@@ -6,7 +6,7 @@ from fastapi.testclient import TestClient
 
 from app.api.events import events_of
 from app.db import Database
-from app.live.changes import SessionChange, SessionChanges
+from app.live.changes import AccountChange, Changes, SessionChange
 from app.main import create_app
 from app.models import Note, SummaryFeedback
 from app.wiring import Services
@@ -29,6 +29,7 @@ def world(store):
     ids = seed_expressions(store, 3)
     session = store.sessions.create(sample_draft(), ids[:2])
     store.changes = Recorder()
+    store.account_changes = Recorder()
     return store, session
 
 
@@ -80,6 +81,50 @@ def test_unsharing_signals_access_and_a_share_that_was_not_there_does_not(world)
     assert db.changes.published == [(session.id, SessionChange.ACCESS)]
 
 
+def test_sharing_tells_the_account_its_list_changed_and_sharing_again_does_not(world):
+    db, session = world
+    friend = add_user(db, "friend@example.com")
+    db.shares.share(session.id, friend.id)
+    db.shares.share(session.id, friend.id)
+    assert db.account_changes.published == [(friend.id, AccountChange.SESSIONS)]
+
+
+def test_ending_a_share_tells_that_account_and_a_share_that_was_not_there_does_not(world):
+    db, session = world
+    friend = add_user(db, "friend@example.com")
+    db.shares.share(session.id, friend.id)
+    db.account_changes.published.clear()
+    db.shares.unshare(session.id, friend.id)
+    db.shares.unshare(session.id, friend.id)
+    assert db.account_changes.published == [(friend.id, AccountChange.SESSIONS)]
+
+
+def test_a_new_session_tells_its_maker_and_one_without_a_maker_tells_nobody(world):
+    db, _ = world
+    maker = add_user(db, "maker@example.com")
+    db.sessions.create(sample_draft(), [])
+    assert db.account_changes.published == []
+    db.sessions.create(sample_draft(), [], created_by=maker.id)
+    assert db.account_changes.published == [(maker.id, AccountChange.SESSIONS)]
+
+
+def test_deleting_a_session_tells_its_maker_and_everyone_it_was_shared_with(world):
+    db, _ = world
+    maker, friend, stranger = (add_user(db, f"{name}@example.com") for name in ("maker", "friend", "stranger"))
+    session = db.sessions.create(sample_draft(), [], created_by=maker.id)
+    db.shares.share(session.id, friend.id)
+    db.account_changes.published.clear()
+    db.sessions.delete(session.id)
+    assert set(db.account_changes.published) == {(maker.id, AccountChange.SESSIONS), (friend.id, AccountChange.SESSIONS)}
+    assert stranger.id not in {account for account, _ in db.account_changes.published}
+
+
+def test_deleting_a_session_that_is_not_there_tells_no_account(world):
+    db, _ = world
+    assert db.sessions.delete(999) is None
+    assert db.account_changes.published == []
+
+
 def test_a_write_that_fails_says_nothing(world):
     db, session = world
     with pytest.raises(KeyError):
@@ -105,13 +150,28 @@ def test_what_is_announced_is_already_committed(store):
     assert seen == ["saved"]
 
 
+def test_what_an_account_hears_is_already_committed(store):
+    maker, friend = add_user(store, "maker@example.com"), add_user(store, "friend@example.com")
+    session = store.sessions.create(sample_draft(), [], created_by=maker.id)
+    seen = []
+
+    class ReadsBack:
+        def publish(self, user_id, change):
+            seen.append([s.id for s in Database(store.path).sessions.list_visible(user_id)])
+
+    store.account_changes = ReadsBack()
+    store.shares.share(session.id, friend.id)
+    store.shares.unshare(session.id, friend.id)
+    assert seen == [[session.id], []]
+
+
 def run(coroutine):
     return asyncio.run(asyncio.wait_for(coroutine, 5))
 
 
 def test_a_change_published_from_another_thread_wakes_the_reader():
     async def scenario():
-        changes = SessionChanges()
+        changes = Changes()
         subscription = changes.subscribe(1)
         threading.Thread(target=changes.publish, args=(1, SessionChange.STARS)).start()
         assert await subscription.next(5) == {SessionChange.STARS}
@@ -122,7 +182,7 @@ def test_a_change_published_from_another_thread_wakes_the_reader():
 
 def test_only_the_readers_of_that_session_hear():
     async def scenario():
-        changes = SessionChanges()
+        changes = Changes()
         one, two = changes.subscribe(1), changes.subscribe(2)
         changes.publish(1, SessionChange.NOTE)
         await asyncio.sleep(0)
@@ -134,7 +194,7 @@ def test_only_the_readers_of_that_session_hear():
 
 def test_a_burst_of_one_change_arrives_as_one_however_slow_the_reader():
     async def scenario():
-        changes = SessionChanges()
+        changes = Changes()
         subscription = changes.subscribe(1)
         for _ in range(1000):
             changes.publish(1, SessionChange.SESSION)
@@ -148,7 +208,7 @@ def test_a_burst_of_one_change_arrives_as_one_however_slow_the_reader():
 
 def test_a_closed_reader_hears_nothing_and_publishing_with_no_readers_is_fine():
     async def scenario():
-        changes = SessionChanges()
+        changes = Changes()
         changes.publish(1, SessionChange.NOTE)
         subscription = changes.subscribe(1)
         subscription.close()
@@ -160,7 +220,7 @@ def test_a_closed_reader_hears_nothing_and_publishing_with_no_readers_is_fine():
 
 
 def test_publishing_after_the_readers_loop_is_gone_does_not_raise():
-    changes = SessionChanges()
+    changes = Changes()
 
     async def leave_without_closing():
         changes.subscribe(1)
@@ -184,7 +244,7 @@ async def allowed():
 
 def test_events_carry_only_a_name():
     async def scenario():
-        changes = SessionChanges()
+        changes = Changes()
         subscription = changes.subscribe(1)
         changes.publish(1, SessionChange.STARS)
         await asyncio.sleep(0)
@@ -195,7 +255,7 @@ def test_events_carry_only_a_name():
 
 def test_a_quiet_stream_says_it_is_alive_in_a_way_a_browser_can_see():
     async def scenario():
-        subscription = SessionChanges().subscribe(1)
+        subscription = Changes().subscribe(1)
         return await collect(events_of(subscription, allowed, heartbeat_s=0.01), 2)
 
     assert run(scenario())[1] == "event: alive\ndata: {}\n\n"
@@ -203,7 +263,7 @@ def test_a_quiet_stream_says_it_is_alive_in_a_way_a_browser_can_see():
 
 def test_access_never_reaches_the_browser_while_i_am_allowed():
     async def scenario():
-        changes = SessionChanges()
+        changes = Changes()
         subscription = changes.subscribe(1)
         changes.publish(1, SessionChange.ACCESS)
         await asyncio.sleep(0)
@@ -218,7 +278,7 @@ def test_losing_access_sends_gone_and_ends():
         return False
 
     async def scenario():
-        changes = SessionChanges()
+        changes = Changes()
         subscription = changes.subscribe(1)
         changes.publish(1, SessionChange.ACCESS)
         await asyncio.sleep(0)
@@ -234,7 +294,7 @@ def test_a_login_gone_stale_ends_the_stream_at_the_next_heartbeat():
         return allowed_now.pop(0)
 
     async def scenario():
-        subscription = SessionChanges().subscribe(1)
+        subscription = Changes().subscribe(1)
         return await collect(events_of(subscription, still, heartbeat_s=0.01), 10)
 
     assert run(scenario()) == ["retry: 5000\n\n", "event: alive\ndata: {}\n\n", "event: gone\ndata: {}\n\n"]
@@ -250,3 +310,9 @@ def test_opening_the_stream_needs_a_login_and_access(tmp_path):
     sign_in(client, db, stranger)
     assert client.get(f"/api/sessions/{session.id}/events").status_code == 404
     assert client.get("/api/sessions/999/events").status_code == 404
+
+
+def test_opening_the_account_stream_needs_a_login(tmp_path):
+    db = Database(tmp_path / "s.db")
+    client = TestClient(create_app(db, Services(FakeGenerator()), InlineExecutor()))
+    assert client.get("/api/me/events").status_code == 401

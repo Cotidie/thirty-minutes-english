@@ -1,7 +1,7 @@
 import { act, renderHook } from '@testing-library/react'
 import { afterEach, beforeEach, expect, test, vi } from 'vitest'
 import { FakeEventSource } from '../test/fakeEventSource'
-import { useSessionGone, useSessionResource } from './sessionChanges'
+import { useAccountResource, useSessionGone, useSessionResource } from './sessionChanges'
 
 const settle = () => act(async () => {})
 
@@ -231,4 +231,64 @@ test('leaving the session stops watching', async () => {
   })
   act(() => vi.advanceTimersByTime(120000))
   expect(FakeEventSource.open).toHaveLength(0)
+})
+
+test('the account has one stream of its own, read again when its sessions change', async () => {
+  const list = vi.fn(async () => ['a'])
+  const show = vi.fn()
+  const { unmount } = renderHook(() => useAccountResource('sessions', list, show))
+  await settle()
+  expect(FakeEventSource.open.map((s) => s.url)).toEqual(['/api/me/events'])
+  expect(list).toHaveBeenCalledTimes(1)
+  expect(show).toHaveBeenCalledWith(['a'])
+
+  act(() => stream().send('sessions'))
+  await settle()
+  expect(list).toHaveBeenCalledTimes(2)
+
+  unmount()
+  expect(FakeEventSource.open).toHaveLength(0)
+})
+
+test('the account stream comes up to a fresh read, since nothing missed is sent', async () => {
+  const list = vi.fn(async () => [])
+  renderHook(() => useAccountResource('sessions', list, vi.fn()))
+  await settle()
+  act(() => stream().connect())
+  await settle()
+  expect(list).toHaveBeenCalledTimes(2)
+})
+
+test('a session stream and the account stream stay apart', async () => {
+  const list = vi.fn(async () => [])
+  const note = vi.fn(async () => 'text')
+  renderHook(() => useAccountResource('sessions', list, vi.fn()))
+  renderHook(() => useSessionResource(3, 'note', note, vi.fn()))
+  await settle()
+  expect(FakeEventSource.open.map((s) => s.url)).toEqual(['/api/me/events', '/api/sessions/3/events'])
+  act(() => FakeEventSource.open[1].send('note'))
+  await settle()
+  expect([list.mock.calls.length, note.mock.calls.length]).toEqual([1, 2])
+})
+
+test('when the login ends the account stream closes, and a read finds out', async () => {
+  vi.useFakeTimers()
+  const list = vi.fn(async () => [])
+  renderHook(() => useAccountResource('sessions', list, vi.fn()))
+  await settle()
+  act(() => stream().send('gone'))
+  await settle()
+  expect(list).toHaveBeenCalledTimes(2)
+  expect(FakeEventSource.open).toHaveLength(0)
+  act(() => vi.advanceTimersByTime(60000))
+  expect(FakeEventSource.open).toHaveLength(0)
+})
+
+test('an account stream refused outright makes the list be read, which finds out why', async () => {
+  const list = vi.fn(async () => [])
+  renderHook(() => useAccountResource('sessions', list, vi.fn()))
+  await settle()
+  act(() => stream().drop(true))
+  await settle()
+  expect(list).toHaveBeenCalledTimes(2)
 })

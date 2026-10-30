@@ -1,9 +1,10 @@
-import { render, screen, waitFor } from '@testing-library/react'
+import { act, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter } from 'react-router-dom'
 import { beforeEach, expect, test, vi } from 'vitest'
 import { api } from '../api'
 import { useAuth } from '../lib/auth'
+import { FakeEventSource } from '../test/fakeEventSource'
 import type { Me, SessionSummary } from '../types'
 import { HomePage } from './HomePage'
 
@@ -29,6 +30,7 @@ function open() {
 }
 
 beforeEach(() => {
+  FakeEventSource.instances = []
   vi.mocked(api.listSessions).mockReset().mockResolvedValue([])
   vi.mocked(api.topics).mockReset().mockResolvedValue({ topics: [], pending: false, error: null, labels: {} })
   vi.mocked(api.listJobs).mockReset().mockResolvedValue([])
@@ -72,4 +74,30 @@ test('my session can be deleted, and a shared one only taken off my list', async
   await userEvent.click(screen.getByRole('button', { name: 'Delete My trams' }))
   expect(api.deleteSession).toHaveBeenCalledWith(7)
   await waitFor(() => expect(screen.queryByText('My trams')).not.toBeInTheDocument())
+})
+
+test('a session shared while the page is open appears, and leaves when the share ends', async () => {
+  logIn(NEWCOMER)
+  open()
+  expect(await screen.findByText('Nothing here yet. Sessions shared with you appear here.')).toBeInTheDocument()
+
+  vi.mocked(api.listSessions).mockResolvedValue([SHARED])
+  act(() => FakeEventSource.open[0].send('sessions'))
+  expect(await screen.findByText('Shared by mina@example.com')).toBeInTheDocument()
+
+  vi.mocked(api.listSessions).mockResolvedValue([])
+  act(() => FakeEventSource.open[0].send('sessions'))
+  await waitFor(() => expect(screen.queryByText('Shared by mina@example.com')).not.toBeInTheDocument())
+})
+
+test('a failed read says so, and the next good one clears it', async () => {
+  logIn(NEWCOMER)
+  vi.mocked(api.listSessions).mockRejectedValue(new Error('offline'))
+  open()
+  expect(await screen.findByText('Could not load past sessions: offline')).toBeInTheDocument()
+
+  vi.mocked(api.listSessions).mockResolvedValue([SHARED])
+  act(() => FakeEventSource.open[0].send('sessions'))
+  expect(await screen.findByText('Shared by mina@example.com')).toBeInTheDocument()
+  expect(screen.queryByText('Could not load past sessions: offline')).not.toBeInTheDocument()
 })

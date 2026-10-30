@@ -1,8 +1,9 @@
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { api } from '../api'
 import { SessionCreator } from '../components/SessionCreator'
 import { useAuth } from '../lib/auth'
+import { useAccountResource } from '../lib/sessionChanges'
 import type { SessionSummary } from '../types'
 import './HomePage.css'
 
@@ -12,9 +13,15 @@ export function HomePage() {
   const [sessions, setSessions] = useState<SessionSummary[]>([])
   const [loadError, setLoadError] = useState<string | null>(null)
 
-  useEffect(() => {
-    api.listSessions().then(setSessions).catch((e: Error) => setLoadError(e.message))
-  }, [])
+  useAccountResource(
+    'sessions',
+    api.listSessions,
+    (list) => {
+      setSessions(list)
+      setLoadError(null)
+    },
+    (e) => setLoadError(e.message),
+  )
 
   /** My own session is deleted; a shared one only leaves my list. */
   async function remove(session: SessionSummary) {

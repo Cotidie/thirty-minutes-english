@@ -1,31 +1,36 @@
 import { useCallback, useEffect, useRef } from 'react'
 
 /**
- * What the server's event stream says: which resource of an open session to read again over REST.
- * The stream holds no data, and this file is the only place that connects to it.
+ * What the server's event streams say: which resource to read again over REST, of an open session or of the
+ * account. The streams hold no data, and this file is the only place that connects to them.
  */
 export type SessionChange = 'session' | 'stars' | 'note' | 'records'
+export type AccountChange = 'sessions'
+type Change = SessionChange | AccountChange
 
-const CHANGES: SessionChange[] = ['session', 'stars', 'note', 'records']
+const CHANGES: Change[] = ['session', 'stars', 'note', 'records', 'sessions']
+const ACCOUNT_STREAM = '/api/me/events'
 const REOPEN_MS = 5000
 /** The server speaks at least every 25 seconds. A connection that died quietly tells a browser nothing, so this does. */
 const SILENCE_LIMIT_MS = 60000
 /** Coming back to the page after this long without a word, the connection is not worth trusting. */
 const QUIET_ON_RETURN_MS = 30000
 
-type Heard = SessionChange | 'gone'
+type Heard = Change | 'gone'
 
-/** One stream per open session, however many hooks read from it. */
+const sessionStream = (sessionId: number) => `/api/sessions/${sessionId}/events`
+
+/** One connection per stream, however many hooks read from it. */
 class Channel {
   private readonly listeners = new Map<Heard, Set<() => void>>()
   private source: EventSource | null = null
   private reopen: ReturnType<typeof setTimeout> | undefined
   private watchdog: ReturnType<typeof setTimeout> | undefined
   private lastHeard = 0
-  private readonly sessionId: number
+  private readonly url: string
 
-  constructor(sessionId: number) {
-    this.sessionId = sessionId
+  constructor(url: string) {
+    this.url = url
     window.addEventListener('online', this.restart)
     document.addEventListener('visibilitychange', this.returned)
     this.open()
@@ -48,7 +53,7 @@ class Channel {
   }
 
   private open() {
-    const source = new EventSource(`/api/sessions/${this.sessionId}/events`)
+    const source = new EventSource(this.url)
     this.source = source
     this.heardFromServer()
     source.addEventListener('alive', () => this.heardFromServer())
@@ -69,8 +74,9 @@ class Channel {
     }
     source.onerror = () => {
       if (source.readyState !== EventSource.CLOSED) return // the browser is already trying again
-      // An answer that is not a stream. Reading the session finds out why: a login gone, or the session gone.
+      // An answer that is not a stream. Reading finds out why: a login gone, or the session gone.
       this.hear('session')
+      this.hear('sessions')
       this.reopen = setTimeout(() => this.open(), REOPEN_MS)
     }
   }
@@ -99,16 +105,16 @@ class Channel {
   }
 }
 
-const channels = new Map<number, Channel>()
+const channels = new Map<string, Channel>()
 
-function listen(sessionId: number, what: Heard, listener: () => void): () => void {
-  const channel = channels.get(sessionId) ?? new Channel(sessionId)
-  channels.set(sessionId, channel)
+function listen(url: string, what: Heard, listener: () => void): () => void {
+  const channel = channels.get(url) ?? new Channel(url)
+  channels.set(url, channel)
   channel.listen(what, listener)
   return () => {
     if (channel.stopListening(what, listener)) return
     channel.close()
-    channels.delete(sessionId)
+    channels.delete(url)
   }
 }
 
@@ -122,14 +128,14 @@ function useLatest<T>(value: T) {
 }
 
 /**
- * The one way to read a session's data: `read` over REST at first, again when `change` is announced, and
- * again whenever the stream comes up, each result going to `show`. One read runs at a time, and changes
- * during it make one more after it, so an old answer never lands on a newer one. What lands after the
- * session is left is dropped. Returns a way to ask for another read, in the same line.
+ * `read` over REST at first, again when `change` is announced, and again whenever the stream comes up, each
+ * result going to `show`. One read runs at a time, and changes during it make one more after it, so an old
+ * answer never lands on a newer one. What lands after leaving is dropped. Returns a way to ask for another
+ * read, in the same line.
  */
-export function useSessionResource<T>(
-  sessionId: number,
-  change: SessionChange,
+function useStreamedResource<T>(
+  url: string,
+  change: Change,
   read: () => Promise<T>,
   show: (value: T) => void,
   onError?: (error: Error) => void,
@@ -166,19 +172,43 @@ export function useSessionResource<T>(
     }
 
     readNow.current = run
-    const stop = listen(sessionId, change, run)
+    const stop = listen(url, change, run)
     run()
     return () => {
       live = false
       stop()
     }
-  }, [sessionId, change, latest])
+  }, [url, change, latest])
 
   return useCallback(() => readNow.current(), [])
+}
+
+/** The one way to read a session's data. */
+export function useSessionResource<T>(
+  sessionId: number,
+  change: SessionChange,
+  read: () => Promise<T>,
+  show: (value: T) => void,
+  onError?: (error: Error) => void,
+): () => void {
+  return useStreamedResource(sessionStream(sessionId), change, read, show, onError)
+}
+
+/** The one way to read what belongs to the account rather than to one session. */
+export function useAccountResource<T>(
+  change: AccountChange,
+  read: () => Promise<T>,
+  show: (value: T) => void,
+  onError?: (error: Error) => void,
+): () => void {
+  const readAgain = useStreamedResource(ACCOUNT_STREAM, change, read, show, onError)
+  // This stream only ends with the login, and a read is what takes the page to the login form.
+  useEffect(() => listen(ACCOUNT_STREAM, 'gone', readAgain), [readAgain])
+  return readAgain
 }
 
 /** Tells when the session was deleted, or this account can no longer open it. */
 export function useSessionGone(sessionId: number, onGone: () => void): void {
   const latest = useLatest(onGone)
-  useEffect(() => listen(sessionId, 'gone', () => latest.current()), [sessionId, latest])
+  useEffect(() => listen(sessionStream(sessionId), 'gone', () => latest.current()), [sessionId, latest])
 }

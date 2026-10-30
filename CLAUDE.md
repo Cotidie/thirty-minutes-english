@@ -52,7 +52,7 @@ The app version (`X.Y.Z`) lives in `frontend/package.json` and `backend/pyprojec
 
 # Client-server communication
 
-- REST owns all state: every read and write goes through it. The event stream `GET /api/sessions/{id}/events` carries only the name of what to read again, never data.
+- REST owns all state: every read and write goes through it. The event streams `GET /api/sessions/{id}/events` and `GET /api/me/events` carry only the name of what to read again, never data.
 - Only repositories in `backend/app/db` publish events, after they commit. Routes, jobs, and callbacks do not.
-- In the browser, only `useSessionResource` subscribes. Nothing else opens an `EventSource`.
-- New shared session state gets a GET route and an event name. One person's temporary progress is polled.
+- In the browser, only `useSessionResource` and `useAccountResource` subscribe. Nothing else opens an `EventSource`.
+- New shared state gets a GET route and an event name: on the session's stream if it belongs to a session, on the account's if it belongs to an account. One person's temporary progress is polled.

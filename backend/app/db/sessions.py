@@ -12,8 +12,8 @@ from typing import TYPE_CHECKING, Literal
 from app.db.expressions import COLUMNS as EXPRESSION_COLUMNS
 from app.db import topics
 from app.db.expressions import expression_from
-from app.db.shares import VISIBLE_SESSIONS
-from app.live.changes import SessionChange
+from app.db.shares import ACCOUNTS_LISTING, VISIBLE_SESSIONS
+from app.live.changes import AccountChange, SessionChange
 from app.models import Article, Category, Draft, Expression, Figure, Note, Paragraph, Question, SentencePair, Session, SessionContent, SessionSummary, Source, Stars, VocabularyItem
 
 if TYPE_CHECKING:
@@ -82,6 +82,8 @@ class SessionRepo:
                 "INSERT INTO session_expressions (session_id, expression_id, position) VALUES (?, ?, ?)",
                 [(session_id, expression_id, i) for i, expression_id in enumerate(expression_ids)],
             )
+        if created_by is not None:
+            self._db.account_changes.publish(created_by, AccountChange.SESSIONS)
         session = self.get(session_id)
         assert session is not None
         return session
@@ -212,9 +214,12 @@ class SessionRepo:
             figures = conn.execute(
                 "SELECT picture_id FROM figures WHERE session_id = ? ORDER BY id", (session_id,)
             ).fetchall()
+            listing = conn.execute(ACCOUNTS_LISTING, (session_id, session_id)).fetchall()
             if conn.execute("DELETE FROM sessions WHERE id = ?", (session_id,)).rowcount == 0:
                 return None
         self._db.changes.publish(session_id, SessionChange.ACCESS)
+        for account in listing:
+            self._db.account_changes.publish(account[0], AccountChange.SESSIONS)
         return [picture for row in rows for picture in row if picture is not None] + [f[0] for f in figures]
 
     def add_figure(
