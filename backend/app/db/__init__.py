@@ -16,6 +16,7 @@ from app.db.settings import SettingsRepo
 from app.db.shares import ShareRepo
 from app.db.stages import StageRepo
 from app.db.topics import TopicRepo
+from app.live.changes import SessionChanges
 
 log = logging.getLogger(__name__)
 
@@ -38,6 +39,7 @@ class Database:
                 saved = migrate.backup(self.path, version)
                 schema.upgrade(conn, version)
                 log.info("upgraded %s from schema v%d to v%d (copy: %s)", self.path, version, schema.VERSION, saved.name)
+        self.changes = SessionChanges()
         self.sessions = SessionRepo(self)
         self.expressions = ExpressionRepo(self)
         self.records = RecordRepo(self)

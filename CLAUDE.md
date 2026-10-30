@@ -49,3 +49,10 @@ The app version (`X.Y.Z`) lives in `frontend/package.json` and `backend/pyprojec
 
 - After every merge into `main`, run `scripts/bump-version patch` on `main`, then push with `--follow-tags`.
 - Never bump minor or major on your own. The owner decides those and asks for them.
+
+# Client-server communication
+
+- REST owns all state: every read and write goes through it. The event stream `GET /api/sessions/{id}/events` carries only the name of what to read again, never data.
+- Only repositories in `backend/app/db` publish events, after they commit. Routes, jobs, and callbacks do not.
+- In the browser, only `useSessionResource` subscribes. Nothing else opens an `EventSource`.
+- New shared session state gets a GET route and an event name. One person's temporary progress is polled.

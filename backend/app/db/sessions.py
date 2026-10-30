@@ -13,6 +13,7 @@ from app.db.expressions import COLUMNS as EXPRESSION_COLUMNS
 from app.db import topics
 from app.db.expressions import expression_from
 from app.db.shares import VISIBLE_SESSIONS
+from app.live.changes import SessionChange
 from app.models import Article, Category, Draft, Expression, Figure, Note, Paragraph, Question, SentencePair, Session, SessionContent, SessionSummary, Source, Stars, VocabularyItem
 
 if TYPE_CHECKING:
@@ -142,6 +143,8 @@ class SessionRepo:
                 "INSERT INTO swapped_expressions (session_id, expression_id, swapped_at) VALUES (?, ?, ?)",
                 (session_id, expression_id, datetime.now(UTC).isoformat()),
             )
+        self._db.changes.publish(session_id, SessionChange.SESSION)
+        self._db.changes.publish(session_id, SessionChange.STARS)
         return picked[0]
 
     def add_expression(self, session_id: int, rng: random.Random | None = None, seen_by: int | None = None) -> Expression | None:
@@ -158,6 +161,7 @@ class SessionRepo:
                 " SELECT ?, ?, COALESCE(MAX(position) + 1, 0) FROM session_expressions WHERE session_id = ?",
                 (session_id, picked[0].id, session_id),
             )
+        self._db.changes.publish(session_id, SessionChange.SESSION)
         return picked[0]
 
     def _had(self, session_id: int) -> set[int]:
@@ -210,6 +214,7 @@ class SessionRepo:
             ).fetchall()
             if conn.execute("DELETE FROM sessions WHERE id = ?", (session_id,)).rowcount == 0:
                 return None
+        self._db.changes.publish(session_id, SessionChange.ACCESS)
         return [picture for row in rows for picture in row if picture is not None] + [f[0] for f in figures]
 
     def add_figure(
@@ -226,6 +231,7 @@ class SessionRepo:
         except sqlite3.IntegrityError:
             raise KeyError(session_id) from None
         assert cur.lastrowid is not None
+        self._db.changes.publish(session_id, SessionChange.SESSION)
         return cur.lastrowid
 
     def recent_topics(self, limit: int) -> list[str]:
@@ -257,7 +263,7 @@ class SessionRepo:
         column = PICTURE_COLUMNS[field]
         with self._db.connect() as conn:
             conn.execute("BEGIN IMMEDIATE")
-            row = conn.execute(f"SELECT {column} FROM vocabulary WHERE id = ?", (vocabulary_id,)).fetchone()
+            row = conn.execute(f"SELECT {column}, session_id FROM vocabulary WHERE id = ?", (vocabulary_id,)).fetchone()
             if row is None:
                 raise KeyError(vocabulary_id)
             if scene is None:
@@ -267,6 +273,7 @@ class SessionRepo:
                     f"UPDATE vocabulary SET {column} = ?, scene = ?, caption = ? WHERE id = ?",
                     (picture_id, scene.text, scene.caption or None, vocabulary_id),
                 )
+        self._db.changes.publish(row["session_id"], SessionChange.SESSION)
         return row[0]
 
     def session_of_paragraph(self, paragraph_id: int) -> int | None:
@@ -288,6 +295,7 @@ class SessionRepo:
         table, column = STAR_COLUMNS[kind]
         with self._db.connect() as conn:
             conn.execute(f"UPDATE {table} SET starred = ? WHERE session_id = ? AND {column} = ?", (int(starred), session_id, item))
+        self._db.changes.publish(session_id, SessionChange.STARS)
         return self.get_stars(session_id)
 
     def get_note(self, session_id: int) -> Note:
@@ -298,4 +306,5 @@ class SessionRepo:
     def set_note(self, session_id: int, note: Note) -> Note:
         with self._db.connect() as conn:
             conn.execute("UPDATE sessions SET note = ? WHERE id = ?", (note.text, session_id))
+        self._db.changes.publish(session_id, SessionChange.NOTE)
         return self.get_note(session_id)

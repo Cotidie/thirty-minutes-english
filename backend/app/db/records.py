@@ -5,6 +5,7 @@ import json
 from datetime import UTC, datetime
 from typing import TYPE_CHECKING
 
+from app.live.changes import SessionChange
 from app.models import Correction, Example, Reading, Summary, SummaryFeedback
 
 if TYPE_CHECKING:
@@ -14,6 +15,11 @@ if TYPE_CHECKING:
 class RecordRepo:
     def __init__(self, db: "Database") -> None:
         self._db = db
+
+    def _announce(self, paragraph_id: int) -> None:
+        session_id = self._db.sessions.session_of_paragraph(paragraph_id)
+        if session_id is not None:
+            self._db.changes.publish(session_id, SessionChange.RECORDS)
 
     # A sentence made with a word, and the coach's echo.
 
@@ -27,6 +33,7 @@ class RecordRepo:
                 "INSERT INTO examples (created_at, vocabulary_id, user_text, coach_text, seconds) VALUES (?, ?, ?, ?, ?)",
                 (created_at.isoformat(), vocabulary_id, user_text, coach_text, seconds),
             )
+        self._db.changes.publish(session_id, SessionChange.RECORDS)
         return Example(
             id=cur.lastrowid, created_at=created_at, vocabulary_id=vocabulary_id, user_text=user_text, coach_text=coach_text, seconds=seconds
         )
@@ -51,6 +58,7 @@ class RecordRepo:
                 "INSERT INTO summaries (created_at, paragraph_id, user_text, feedback, seconds) VALUES (?, ?, ?, ?, ?)",
                 (created_at.isoformat(), paragraph_id, user_text, feedback.model_dump_json(), seconds),
             )
+        self._announce(paragraph_id)
         return Summary(id=cur.lastrowid, created_at=created_at, paragraph_id=paragraph_id, user_text=user_text, feedback=feedback, seconds=seconds)
 
     def list_summaries(self, session_id: int) -> list[Summary]:
@@ -71,6 +79,7 @@ class RecordRepo:
                 "INSERT INTO readings (created_at, paragraph_id, user_text, seconds, corrections) VALUES (?, ?, ?, ?, ?)",
                 (created_at.isoformat(), paragraph_id, user_text, seconds, json.dumps([c.model_dump() for c in corrections])),
             )
+        self._announce(paragraph_id)
         return Reading(id=cur.lastrowid, created_at=created_at, paragraph_id=paragraph_id, user_text=user_text, seconds=seconds, corrections=corrections)
 
     def list_readings(self, session_id: int) -> list[Reading]:

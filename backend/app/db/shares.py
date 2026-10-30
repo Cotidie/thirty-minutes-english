@@ -4,6 +4,7 @@ from datetime import UTC, datetime
 from typing import TYPE_CHECKING
 
 from app.db.accounts import user_from
+from app.live.changes import SessionChange
 from app.models import User
 
 if TYPE_CHECKING:
@@ -31,7 +32,10 @@ class ShareRepo:
         """Whether there was a share to end."""
         with self._db.connect() as conn:
             cur = conn.execute("DELETE FROM session_shares WHERE session_id = ? AND user_id = ?", (session_id, user_id))
-        return cur.rowcount > 0
+        if cur.rowcount == 0:
+            return False
+        self._db.changes.publish(session_id, SessionChange.ACCESS)
+        return True
 
     def shared_with(self, session_id: int) -> list[User]:
         with self._db.connect() as conn:

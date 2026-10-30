@@ -12,6 +12,7 @@ from typing import TYPE_CHECKING
 
 from app.db.shares import VISIBLE_SESSIONS
 from app.generation.exclusions import key
+from app.live.changes import SessionChange
 from app.models import CorpusEntry, Expression
 
 if TYPE_CHECKING:
@@ -99,8 +100,12 @@ class ExpressionRepo:
         """Takes the expression out of the corpus and out of every session that taught it, with its stars
         there; False when there was no such expression."""
         with self._db.connect() as conn:
+            sessions = conn.execute("SELECT session_id FROM session_expressions WHERE expression_id = ?", (expression_id,)).fetchall()
             conn.execute("DELETE FROM session_expressions WHERE expression_id = ?", (expression_id,))
-            return conn.execute("DELETE FROM expressions WHERE id = ?", (expression_id,)).rowcount > 0
+            deleted = conn.execute("DELETE FROM expressions WHERE id = ?", (expression_id,)).rowcount > 0
+        for session in sessions:
+            self._db.changes.publish(session[0], SessionChange.SESSION)
+        return deleted
 
     def count(self) -> int:
         with self._db.connect() as conn:
