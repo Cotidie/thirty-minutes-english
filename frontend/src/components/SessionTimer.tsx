@@ -1,17 +1,9 @@
-import { useEffect, useState } from 'react'
 import { PHASES, SESSION_SECONDS, formatClock, phaseIndexAt } from '../lib/phases'
+import { useSharedTimer } from '../lib/presence/useSharedTimer'
 import './SessionTimer.css'
 
 export function SessionTimer() {
-  const [elapsed, setElapsed] = useState(0)
-  const [running, setRunning] = useState(false)
-
-  useEffect(() => {
-    if (!running) return
-    const id = window.setInterval(() => setElapsed((e) => Math.min(SESSION_SECONDS, e + 1)), 1000)
-    return () => window.clearInterval(id)
-  }, [running])
-
+  const { elapsed, running, start, pause, reset } = useSharedTimer()
   const phase = phaseIndexAt(elapsed)
   const finished = elapsed >= SESSION_SECONDS
   const progress = elapsed / SESSION_SECONDS
@@ -32,7 +24,7 @@ export function SessionTimer() {
         {finished ? (
           <span className="timer-done">Time. Well done.</span>
         ) : (
-          <button type="button" className="btn btn-ghost" onClick={() => setRunning((r) => !r)}>
+          <button type="button" className="btn btn-ghost" onClick={running ? pause : start}>
             {running ? 'Pause' : elapsed === 0 ? 'Start 30 min' : 'Resume'}
           </button>
         )}
@@ -40,10 +32,7 @@ export function SessionTimer() {
           <button
             type="button"
             className="btn btn-link"
-            onClick={() => {
-              setRunning(false)
-              setElapsed(0)
-            }}
+            onClick={reset}
           >
             Reset
           </button>
