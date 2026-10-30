@@ -49,6 +49,26 @@ Only the Claude token is required. Add the other keys in the app's ⚙ settings 
 | `OPENROUTER_API_KEY` | Word pictures |
 | `FIRECRAWL_API_KEY` | Faster web search (works without it, rate-limited) |
 
+## Server
+
+The same stack runs on any Linux server with Docker. It listens on the server's `127.0.0.1:5173` only, so put your own HTTPS proxy or tunnel in front. The microphone needs HTTPS.
+
+```sh
+git clone https://github.com/Cotidie/thirty-minutes-english && cd thirty-minutes-english
+cp .env.example .env               # set CLAUDE_CODE_OAUTH_TOKEN, and UID=$(id -u) if it is not 1000
+mkdir -p backend/data              # otherwise Docker creates it owned by root
+docker compose up -d --build
+```
+
+From your own machine:
+
+```sh
+scripts/deploy user@host           # pull main on the server, rebuild, check that it answers
+scripts/backup user@host           # copy the database and pictures into backups/
+```
+
+The app has no login yet. Anyone who reaches the address can generate sessions on your Claude subscription, delete them, and change the settings.
+
 ## Versioning
 
 Versions start at 0.3.0. Every merge into `main` bumps the patch; minor and major move only when the owner decides. `scripts/bump-version patch|minor|major` updates both packages, commits, and tags `vX.Y.Z`. The version shows in the Settings modal.

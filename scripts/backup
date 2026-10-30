@@ -1,0 +1,25 @@
+#!/usr/bin/env bash
+# Pulls a copy of the server's data here: backups/<date>/sessions.db, and backups/images/ for the pictures.
+# Picture files are named by id and never rewritten, so one folder accumulates them across backups.
+#
+#   scripts/backup user@host [dir]   dir is relative to the server's home
+set -euo pipefail
+
+target=${1:?usage: scripts/backup user@host [dir]}
+dir=${2:-repositories/thirty-minutes-english}
+
+root=$(git rev-parse --show-toplevel)
+out="$root/backups/$(date +%F)"
+mkdir -p "$out" "$root/backups/images"
+
+# SQLite's online backup, since a plain copy of a live database can tear.
+ssh "$target" "cd '$dir' && docker compose exec -T backend python -c \"
+import sqlite3
+with sqlite3.connect('/data/sessions.db') as live, sqlite3.connect('/data/backup.db') as copy:
+    live.backup(copy)
+\""
+rsync -az "$target:$dir/backend/data/backup.db" "$out/sessions.db"
+ssh "$target" "rm '$dir/backend/data/backup.db'"
+rsync -az "$target:$dir/backend/data/images/" "$root/backups/images/"
+
+echo "$out/sessions.db"
