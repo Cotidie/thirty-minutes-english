@@ -1,6 +1,7 @@
 """Accounts and their logins. A login is a random token in the browser's cookie; only its hash is kept."""
 
 import hashlib
+import re
 import secrets
 import sqlite3
 from datetime import UTC, datetime, timedelta
@@ -13,6 +14,7 @@ if TYPE_CHECKING:
 
 LOGIN_LIFETIME = timedelta(days=30)
 USER_COLUMNS = "id, created_at, email, is_admin, can_create"
+EMAIL = re.compile(r"[^\s@]+@[^\s@]+\.[^\s@]+")
 
 
 class EmailTaken(Exception):
@@ -21,6 +23,10 @@ class EmailTaken(Exception):
 
 def normalize_email(email: str) -> str:
     return email.strip().lower()
+
+
+def is_email(address: str) -> bool:
+    return EMAIL.fullmatch(address) is not None
 
 
 def user_from(row: sqlite3.Row) -> User:

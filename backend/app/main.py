@@ -5,6 +5,7 @@ from pathlib import Path
 
 from fastapi import Depends, FastAPI
 
+from app.accounts.admin import ensure_admin_from
 from app.accounts.limits import FailedLogins, SignupLimit
 from app.api import ROUTERS
 from app.api.auth import public_router
@@ -54,6 +55,7 @@ def default_app() -> FastAPI:
     """The app over the real data folder; uvicorn calls it (--factory), so importing this module opens nothing."""
     logging.basicConfig(level=logging.INFO, format="%(levelname)s %(name)s: %(message)s")
     db = Database(os.environ.get("DB_PATH", ROOT / "data" / "sessions.db"))
+    ensure_admin_from(db, os.environ)
     dirs = agent_dirs(os.environ, ROOT.parent / "agents")
     image_dir = db.images_dir
     catalog = Catalog(db.caches)

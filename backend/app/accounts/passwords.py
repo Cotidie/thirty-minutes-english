@@ -8,6 +8,7 @@ import secrets
 N, R, P = 2**15, 8, 1
 MAX_MEMORY = 64 * 1024 * 1024  # scrypt takes 128 * N * R bytes, about 32 MB
 SALT_BYTES = 16
+MIN_LENGTH, MAX_LENGTH = 8, 1024
 
 
 def _derive(password: str, salt: bytes, n: int, r: int, p: int) -> bytes:

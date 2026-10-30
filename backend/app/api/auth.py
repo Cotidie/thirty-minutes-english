@@ -1,21 +1,17 @@
 """Signing up, logging in and out. `public_router` is the only one open without a login."""
 
-import re
 from datetime import timedelta
 
 from fastapi import APIRouter, HTTPException, Request, Response
 
-from app.accounts.passwords import burn_time, hash_password, verify_password
+from app.accounts.passwords import MAX_LENGTH, MIN_LENGTH, burn_time, hash_password, verify_password
 from app.api.deps import LOGIN_COOKIE, Db, Me
 from app.api.schemas import Credentials
-from app.db.accounts import EmailTaken, LOGIN_LIFETIME, normalize_email
+from app.db.accounts import LOGIN_LIFETIME, EmailTaken, is_email, normalize_email
 from app.models import User
 
 public_router = APIRouter(prefix="/api/auth")
 router = APIRouter(prefix="/api/auth")
-
-EMAIL = re.compile(r"[^\s@]+@[^\s@]+\.[^\s@]+")
-MIN_PASSWORD, MAX_PASSWORD = 8, 1024
 
 
 def _start_login(request: Request, response: Response, user: User) -> None:
@@ -31,12 +27,12 @@ def _start_login(request: Request, response: Response, user: User) -> None:
 
 
 def _check_signup(email: str, password: str) -> None:
-    if not EMAIL.fullmatch(email):
+    if not is_email(email):
         raise HTTPException(status_code=400, detail="Enter an email address, like you@example.com.")
-    if len(password) < MIN_PASSWORD:
-        raise HTTPException(status_code=400, detail=f"Use at least {MIN_PASSWORD} characters.")
-    if len(password) > MAX_PASSWORD:
-        raise HTTPException(status_code=400, detail=f"Use at most {MAX_PASSWORD} characters.")
+    if len(password) < MIN_LENGTH:
+        raise HTTPException(status_code=400, detail=f"Use at least {MIN_LENGTH} characters.")
+    if len(password) > MAX_LENGTH:
+        raise HTTPException(status_code=400, detail=f"Use at most {MAX_LENGTH} characters.")
 
 
 @public_router.post("/signup", response_model=User, status_code=201)

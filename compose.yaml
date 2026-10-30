@@ -23,7 +23,7 @@ services:
   frontend:
     restart: unless-stopped
     build: ./frontend
-    # This machine only. The app has no login, so a public address is the job of a proxy or tunnel in front.
+    # This machine only: a public address, with HTTPS for the login cookie, is the job of a proxy or tunnel in front.
     ports:
       - "127.0.0.1:${FRONTEND_PORT:-5173}:80"
     depends_on:

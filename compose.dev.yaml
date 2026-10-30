@@ -3,6 +3,8 @@
 services:
   backend:
     command: ["uv", "run", "uvicorn", "--factory", "app.main:default_app", "--host", "0.0.0.0", "--port", "8765", "--reload"]
+    environment:
+      COOKIE_SECURE: "false"
     volumes:
       - ./backend/app:/app/app
       - ./backend/plugin:/app/plugin

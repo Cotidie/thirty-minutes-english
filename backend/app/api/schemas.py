@@ -14,6 +14,10 @@ class Credentials(BaseModel):
     password: str
 
 
+class AccountUpdate(BaseModel):
+    can_create: bool
+
+
 class ShareRequest(BaseModel):
     email: str
 
