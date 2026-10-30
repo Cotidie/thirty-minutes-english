@@ -30,6 +30,11 @@ test('shows who has it, and sharing adds someone and clears the box', async () =
   expect(box).toHaveValue('')
 })
 
+test('an address cut short on its line still shows in full on hover', async () => {
+  render(<SharePanel sessionId={7} canAdd />)
+  expect(await screen.findByText('mina@example.com')).toHaveAttribute('title', 'mina@example.com')
+})
+
 test('an email nobody uses says so and stays in the box', async () => {
   vi.mocked(api.addShare).mockRejectedValue(new ApiError(404, 'No account uses that email.'))
   render(<SharePanel sessionId={7} canAdd />)

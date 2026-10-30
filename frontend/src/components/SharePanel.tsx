@@ -86,7 +86,9 @@ export function SharePanel({ sessionId, canAdd }: Props) {
         <ul className="share-list">
           {shares.map((entry) => (
             <li key={entry.user_id} className="share-item">
-              <span className="share-email">{entry.email}</span>
+              <span className="share-email" title={entry.email}>
+                {entry.email}
+              </span>
               <button
                 type="button"
                 className="btn-link share-stop"

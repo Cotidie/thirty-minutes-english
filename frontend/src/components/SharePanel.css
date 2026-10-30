@@ -43,6 +43,7 @@
 
 .share-list {
   display: grid;
+  grid-template-columns: minmax(0, 1fr);
   gap: 0.2rem;
   margin: 0;
   padding: 0;
@@ -58,7 +59,9 @@
 
 .share-email {
   min-width: 0;
-  overflow-wrap: anywhere;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .share-stop {
