@@ -165,6 +165,30 @@ def test_with_no_cover_image_the_articles_scene_is_drawn_as_the_cover(tmp_path):
     assert job.progress.pictures_total == 2 * len(sample_draft().vocabulary) + 1
 
 
+def test_with_only_a_cover_image_the_paragraph_scene_is_drawn_under_its_paragraph(tmp_path):
+    from tests.test_illustrator import FakePainter
+
+    db = Database(tmp_path / "s.db")
+    illustrator = Illustrator(FakePainter(), db.pictures, PictureFiles(db.images_dir))
+    job = runner_over(db).start("A", Recording([figure(0)]), illustrator)
+    article = db.sessions.get(job.session_id).content.article
+    photo, drawn = article.figures
+    assert (photo.paragraph_id, photo.source_url) == (None, "https://news.example/trams")
+    assert (drawn.paragraph_id, drawn.caption, drawn.source_url, drawn.credit) == (article.paragraphs[1].id, "Boarding the last tram.", None, None)
+    assert job.progress.pictures_total == 2 * len(sample_draft().vocabulary) + 1
+
+
+def test_with_no_image_at_all_both_scenes_are_drawn_so_the_article_still_shows_two(tmp_path):
+    from tests.test_illustrator import FakePainter
+
+    db = Database(tmp_path / "s.db")
+    illustrator = Illustrator(FakePainter(), db.pictures, PictureFiles(db.images_dir))
+    job = runner_over(db).start("A", Recording([figure(0, "https://gone.example/a.jpg")]), illustrator)
+    article = db.sessions.get(job.session_id).content.article
+    assert [(f.paragraph_id, f.caption) for f in article.figures] == [(None, "Waiting for the tram."), (article.paragraphs[1].id, "Boarding the last tram.")]
+    assert job.progress.pictures_total == 2 * len(sample_draft().vocabulary) + 2
+
+
 def test_an_article_keeps_one_cover_and_a_second_goes_under_the_first_paragraph(tmp_path):
     db = Database(tmp_path / "s.db")
     job = runner_over(db).start("A", Recording([figure(0), figure(0, "https://news.example/b.jpg")]))

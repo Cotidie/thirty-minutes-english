@@ -54,6 +54,15 @@ def test_an_image_that_will_not_download_or_open_is_skipped(tmp_path):
     assert sources.keep("https://x.example/a.jpg") is None and not files.dir.exists()
 
 
+def test_fetch_gets_past_a_host_that_refuses_the_http_librarys_own_name():
+    def wikimedia(request):
+        refused = request.headers["user-agent"].startswith("python-")
+        return httpx2.Response(403 if refused else 200, content=b"PNG")
+
+    transport = httpx2.MockTransport(wikimedia)
+    assert asyncio.run(fetch_url("https://upload.wikimedia.org/a.png", attempts=1, wait_s=0, transport=transport)) == b"PNG"
+
+
 def test_fetch_retries_a_flaky_link():
     calls = []
 

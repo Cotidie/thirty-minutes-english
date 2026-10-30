@@ -5,7 +5,7 @@ import pytest
 
 from app.db import Database
 from app.generation.generator import VOCABULARY_COUNT
-from app.models import ArticleDraft, Draft, PictureDraft, Question, SentencePair, Source, Topic, VocabularyDraft
+from app.models import ArticleDraft, Draft, ParagraphPictureDraft, PictureDraft, Question, SentencePair, Source, Topic, VocabularyDraft
 from app.topics.curated import CURATED
 
 
@@ -24,6 +24,7 @@ def sample_draft(topic: str = "Digital twins", title: str = "Twins at Work") -> 
             sources=[Source(title="A page", url="https://example.com")],
             translation=[SentencePair(en="One.", ko="하나다.")],
             picture=PictureDraft(scene="A tram stop in the rain at dusk, two students under one umbrella.", caption="Waiting for the tram."),
+            paragraph_picture=ParagraphPictureDraft(after=2, scene="A driver waves two students onto the last tram.", caption="Boarding the last tram."),
         ),
         vocabulary=[
             VocabularyDraft(word=f"word{i}", pos="noun", definition=f"def {i}", example=f"ex {i}", synonyms=[f"same {i}"], korean=f"단어 {i}", scene=f"scene {i}", caption=f"caption {i}")

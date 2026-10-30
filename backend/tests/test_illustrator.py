@@ -83,15 +83,15 @@ def test_a_picture_whose_word_went_away_loses_its_file(tmp_path):
     assert sorted(f.name for f in (tmp_path / "images").iterdir()) == sorted(files.name(pid) for pid in landed)
 
 
-def test_the_article_scene_is_drawn_with_the_words_and_handed_over_on_its_own(tmp_path):
+def test_the_article_scenes_are_drawn_with_the_words_and_each_handed_over_on_its_own(tmp_path):
     painter = FakePainter()
     illustrator, _, files = illustrator_for(tmp_path, painter)
     words = sample_draft().vocabulary[:1]
     landed, article = [], []
-    assert illustrator.count(words, "a tram stop") == 3 and illustrator.count(words) == 2
-    illustrator.illustrate("j", words, None, landing(landed), "a tram stop", article.append)
-    assert painter.prompts[-1] == f"{STYLES['photo']} {IMAGE_RULES} a tram stop"
-    assert len(landed) == 2 and len(article) == 1 and files.path(article[0]).is_file()
+    assert illustrator.count(words, ["a tram stop", "a platform"]) == 4 and illustrator.count(words) == 2
+    illustrator.illustrate("j", words, None, landing(landed), ["a tram stop", "a platform"], lambda n, picture_id: article.append((n, picture_id)))
+    assert painter.prompts[-2:] == [f"{STYLES['photo']} {IMAGE_RULES} a tram stop", f"{STYLES['photo']} {IMAGE_RULES} a platform"]
+    assert len(landed) == 2 and [n for n, _ in article] == [0, 1] and all(files.path(p).is_file() for _, p in article)
 
 
 def test_the_chosen_style_leads_the_prompt_and_an_unknown_one_falls_back_to_photo(tmp_path):

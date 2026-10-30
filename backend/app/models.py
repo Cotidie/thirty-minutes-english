@@ -118,6 +118,12 @@ class PictureDraft(BaseModel):
     caption: str = ""
 
 
+class ParagraphPictureDraft(PictureDraft):
+    """A drawable moment from paragraph `after` (counted from 1), drawn under it only when no image landed under a paragraph."""
+
+    after: int = 1
+
+
 class ArticleDraft(BaseModel):
     """The article as the generator writes it: one body, its paragraphs split by blank lines."""
 
@@ -128,6 +134,7 @@ class ArticleDraft(BaseModel):
     translation: list[SentencePair] = []
     figures: list[FigureDraft] = []
     picture: PictureDraft | None = None
+    paragraph_picture: ParagraphPictureDraft | None = None
 
     @model_validator(mode="after")
     def keep_only_sentences_found_in_the_body(self) -> "ArticleDraft":

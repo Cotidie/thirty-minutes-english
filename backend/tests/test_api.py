@@ -172,25 +172,25 @@ class FakeIllustrator:
     def expected_seconds(self, count: int) -> float | None:
         return None if self.seconds is None else self.seconds * count
 
-    def count(self, words, article_scene=None) -> int:
-        return 2 * len(words) + (1 if article_scene else 0)
+    def count(self, words, article_scenes=()) -> int:
+        return 2 * len(words) + len(article_scenes)
 
     def draw(self) -> int:
         picture_id = self.pictures.add("fake", 1.0, None)
         self.files.write(picture_id, b"PNG")
         return picture_id
 
-    def illustrate(self, job_id: str, words, on_drawn=None, on_picture=None, article_scene=None, on_article=None):
+    def illustrate(self, job_id: str, words, on_drawn=None, on_picture=None, article_scenes=(), on_article=None):
         self.job_ids.append(job_id)
         if on_drawn:
-            on_drawn(self.count(words, article_scene))
+            on_drawn(self.count(words, article_scenes))
         if self.error:
             raise self.error
         for i in range(len(words)):
             on_picture(i, "image", self.draw())
             on_picture(i, "example_image", self.draw())
-        if article_scene:
-            on_article(self.draw())
+        for n in range(len(article_scenes)):
+            on_article(n, self.draw())
 
     def redraw(self, scene):
         return self.draw()
@@ -211,12 +211,13 @@ def test_pictures_are_drawn_after_the_text_and_saved_with_the_session(tmp_path):
     with TestClient(app) as c:
         job = c.post("/api/sessions", json={"topic": "X"}).json()
         content = content_of(c, job["session_id"])
-    words, [figure] = content["vocabulary"], content["article"]["figures"]
+    words, [cover, inner] = content["vocabulary"], content["article"]["figures"]
     assert illustrator.job_ids == [job["id"]]
     assert job["stage"] == "illustrating"
-    assert job["pictures_done"] == 21  # both pictures of every word, and the article's drawn cover (no source image here)
+    assert job["pictures_done"] == 22  # both pictures of every word, and the article's two drawn images (no source image here)
     assert (words[0]["image"], words[0]["example_image"], words[9]["example_image"]) == ("1.png", "2.png", "20.png")
-    assert (figure["image"], figure["paragraph_id"], figure["source_url"]) == ("21.png", None, None)
+    assert (cover["image"], cover["paragraph_id"], cover["source_url"]) == ("21.png", None, None)
+    assert (inner["image"], inner["paragraph_id"], inner["source_url"]) == ("22.png", content["article"]["paragraphs"][1]["id"], None)
     assert db.pictures.stats()["fake"].seconds == 1.0
 
 
@@ -224,7 +225,7 @@ def test_the_session_can_be_opened_while_its_pictures_are_drawn(tmp_path):
     seen: dict = {}
 
     class Watched(FakeIllustrator):
-        def illustrate(self, job_id, words, on_drawn=None, on_picture=None, article_scene=None, on_article=None):
+        def illustrate(self, job_id, words, on_drawn=None, on_picture=None, article_scenes=(), on_article=None):
             on_picture(0, "example_image", self.draw())
             job = c.get(f"/api/jobs/{job_id}").json()
             seen.update(job=job, session=c.get(f"/api/sessions/{job['session_id']}").json())
@@ -251,9 +252,9 @@ def test_deleting_a_session_removes_its_picture_files(tmp_path):
     with TestClient(app) as c:
         kept = c.post("/api/sessions", json={"topic": "Kept"}).json()["session_id"]
         gone = c.post("/api/sessions", json={"topic": "Gone"}).json()["session_id"]
-        assert len(list(db.images_dir.iterdir())) == 42  # 20 word pictures and the article's, twice
+        assert len(list(db.images_dir.iterdir())) == 44  # 20 word pictures and the article's two, twice
         assert c.delete(f"/api/sessions/{gone}").status_code == 204
-    assert sorted(f.name for f in db.images_dir.iterdir()) == sorted(f"{i}.png" for i in range(1, 22))
+    assert sorted(f.name for f in db.images_dir.iterdir()) == sorted(f"{i}.png" for i in range(1, 23))
     assert kept != gone
 
 
@@ -269,13 +270,13 @@ def test_a_word_can_be_redrawn_and_the_session_keeps_it(tmp_path):
         sid = c.post("/api/sessions", json={"topic": "X"}).json()["session_id"]  # word 1 shows pictures 3 and 4
         res = c.post(f"/api/sessions/{sid}/pictures/1", json={})
         assert res.status_code == 200
-        assert (res.json()["scene"], res.json()["caption"], res.json()["image"]) == ("another scene for word1", "why it is word1", "22.png")
-        assert content_of(c, sid)["vocabulary"][1]["image"] == "22.png"
+        assert (res.json()["scene"], res.json()["caption"], res.json()["image"]) == ("another scene for word1", "why it is word1", "23.png")
+        assert content_of(c, sid)["vocabulary"][1]["image"] == "23.png"
         example = c.post(f"/api/sessions/{sid}/pictures/1", json={"face": "example"}).json()
-        assert (example["example_image"], example["image"]) == ("23.png", "22.png")
+        assert (example["example_image"], example["image"]) == ("24.png", "23.png")
         assert c.post(f"/api/sessions/{sid}/pictures/99", json={}).status_code == 404
     assert not files.path(3).exists() and not files.path(4).exists()  # only the picture each redraw replaced
-    assert files.path(5).exists() and files.path(22).exists() and files.path(23).exists()
+    assert files.path(5).exists() and files.path(23).exists() and files.path(24).exists()
 
 
 def test_redraw_after_the_session_went_away_leaves_no_file(tmp_path):

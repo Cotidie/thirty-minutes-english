@@ -19,6 +19,7 @@ log = logging.getLogger(__name__)
 
 MIN_SIDE = 300  # anything smaller is a logo, an icon, or a thumbnail
 MAX_SIDE = 1600  # enough for the article column; a 6000px original would only cost disk
+USER_AGENT = "thirty-minutes-english (https://github.com/Cotidie/thirty-minutes-english)"  # Wikimedia answers 403 to the HTTP library's own name
 
 
 def as_png(data: bytes) -> bytes | None:
@@ -39,7 +40,7 @@ def as_png(data: bytes) -> bytes | None:
 
 async def fetch_url(url: str, attempts: int = 3, wait_s: float = 2, transport: httpx2.AsyncBaseTransport | None = None) -> bytes:
     """The bytes at `url`; a failed try is repeated after a short wait, since pages' image hosts flake."""
-    async with httpx2.AsyncClient(timeout=60, transport=transport) as client:
+    async with httpx2.AsyncClient(timeout=60, transport=transport, headers={"User-Agent": USER_AGENT}) as client:
         for attempt in range(attempts):
             try:
                 response = await client.get(url)

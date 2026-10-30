@@ -75,8 +75,8 @@ class Illustrator:
                 wanted.append((i, "image", self.prompt(item.scene)))
         return wanted
 
-    def count(self, vocabulary: Sequence[VocabularyDraft], article_scene: str | None = None) -> int:
-        return len(self._wanted(vocabulary)) + (1 if article_scene else 0)
+    def count(self, vocabulary: Sequence[VocabularyDraft], article_scenes: Sequence[str] = ()) -> int:
+        return len(self._wanted(vocabulary)) + len(article_scenes)
 
     def illustrate(
         self,
@@ -84,15 +84,15 @@ class Illustrator:
         vocabulary: Sequence[VocabularyDraft],
         on_drawn: OnDrawn | None = None,
         on_picture: OnPicture | None = None,
-        article_scene: str | None = None,
-        on_article: Callable[[int], None] | None = None,
+        article_scenes: Sequence[str] = (),
+        on_article: Callable[[int, int], None] | None = None,
     ) -> None:
-        """Draws the example of every word, the scene of every word that has one, and `article_scene` when
-        given, all in one batch. `on_picture` hears of a word's picture and `on_article` of the article's, as
-        soon as its row and file are there; a picture that failed is not heard of. When either raises KeyError
-        (its session went away while drawing), the picture's file goes too."""
+        """Draws the example of every word, the scene of every word that has one, and each of `article_scenes`,
+        all in one batch. `on_picture` hears of a word's picture and `on_article` of an article scene's (its index,
+        its picture id), as soon as its row and file are there; a picture that failed is not heard of. When either
+        raises KeyError (its session went away while drawing), the picture's file goes too."""
         wanted = self._wanted(vocabulary)
-        prompts = [prompt for _, _, prompt in wanted] + ([self.prompt(article_scene)] if article_scene else [])
+        prompts = [prompt for _, _, prompt in wanted] + [self.prompt(scene) for scene in article_scenes]
 
         def what(n: int) -> str:
             return repr(vocabulary[wanted[n][0]].word) if n < len(wanted) else "the article"
@@ -105,7 +105,7 @@ class Illustrator:
                     if on_picture:
                         on_picture(i, field, picture_id)
                 elif on_article:
-                    on_article(picture_id)
+                    on_article(n - len(wanted), picture_id)
             except KeyError:
                 self._files.remove(picture_id)
                 log.info("job %s: %s went away while drawing; dropped picture %s", job_id, what(n), picture_id)
