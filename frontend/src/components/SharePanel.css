@@ -1,5 +1,6 @@
 .share {
   display: grid;
+  grid-template-columns: minmax(0, 1fr);
   gap: 0.5rem;
   font-size: 0.9rem;
 }
