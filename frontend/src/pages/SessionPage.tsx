@@ -1,9 +1,10 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useState } from 'react'
 import { Link, useLocation, useNavigate, useParams } from 'react-router-dom'
-import { api } from '../api'
+import { api, type ApiError } from '../api'
 import { SharePanel } from '../components/SharePanel'
 import { useAuth } from '../lib/auth'
-import { useArrivingPictures } from '../lib/useArrivingPictures'
+import { useDrawingPictures } from '../lib/useDrawingPictures'
+import { useSessionGone, useSessionResource } from '../lib/sessionChanges'
 import { ArticleTab } from '../components/ArticleTab'
 import { ExpressionsTab } from '../components/ExpressionsTab'
 import { NoteBox } from '../components/NoteBox'
@@ -22,22 +23,41 @@ const SUMMARY_TAB = PHASES.length
 /** Each tab's name in the address (/s/19#vocabulary), so a reload stays on it. */
 const TAB_KEYS = [...PHASES.map((p) => p.key), 'summary']
 
+/** The session, or a plain notice once it cannot be opened: leaving `OpenSession` also closes its stream. */
 export function SessionPage() {
   const { id } = useParams()
+  const [goneId, setGoneId] = useState<string | null>(null)
+  if (goneId !== null && goneId === id) {
+    return (
+      <main className="session">
+        <p className="empty">This session is no longer available.</p>
+        <Link to="/">Back to sessions</Link>
+      </main>
+    )
+  }
+  return <OpenSession key={id} id={Number(id)} onGone={() => setGoneId(id ?? null)} />
+}
+
+function OpenSession({ id, onGone }: { id: number; onGone: () => void }) {
   const { me } = useAuth()
-  const { stars, toggle } = useStars(Number(id))
-  const { examples, add: addExample } = useExamples(Number(id))
-  const note = useNote(Number(id))
+  const { stars, toggle } = useStars(id)
+  const { examples, add: addExample } = useExamples(id)
+  const note = useNote(id)
   const [session, setSession] = useState<Session | null>(null)
   const [error, setError] = useState<string | null>(null)
   const { hash, search } = useLocation()
   const navigate = useNavigate()
   const tab = Math.max(0, TAB_KEYS.indexOf(hash.slice(1)))
 
-  useEffect(() => {
-    api.getSession(Number(id)).then(setSession).catch((e: Error) => setError(e.message))
-  }, [id])
-  const arriving = useArrivingPictures(Number(id), setSession)
+  useSessionResource(
+    id,
+    'session',
+    () => api.getSession(id),
+    setSession,
+    (e) => ((e as ApiError).status === 404 ? onGone() : setError(e.message)),
+  )
+  useSessionGone(id, onGone)
+  const arriving = useDrawingPictures(id)
   const setContent = (update: (content: SessionContent) => Partial<SessionContent>) =>
     setSession((s) => s && { ...s, content: { ...s.content, ...update(s.content) } })
 
@@ -49,7 +69,7 @@ export function SessionPage() {
     [navigate, search],
   )
 
-  if (error) {
+  if (error && !session) {
     return (
       <main className="session">
         <p className="error">Could not load this session: {error}</p>

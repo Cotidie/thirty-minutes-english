@@ -220,10 +220,10 @@ Server-Sent Events(서버가 브라우저로 한 방향으로 알림을 보내�
 세션 데이터를 읽는 코드는 모두 같은 형태가 된다.
 
 ```ts
-useSessionResource(sessionId, 'records', read)   // read: () => Promise<unknown>
+useSessionResource(sessionId, 'records', () => api.listExamples(sessionId), setExamples)
 ```
 
-- `useSessionResource`는 처음 한 번 읽고, 그 이벤트가 오면 다시 읽고, 다시 연결되면 또 읽는다. 끊긴 동안의 이벤트는 재전송하지 않기 때문이다.
+- `useSessionResource`는 처음 한 번 읽고, 그 이벤트가 오면 다시 읽고, 스트림이 연결될 때마다 또 읽는다. 끊긴 동안의 이벤트는 재전송하지 않기 때문이다. 읽은 값은 훅이 넘겨받은 함수로 전달하므로, 화면을 떠난 뒤 도착한 값은 버린다.
 - `lib/sessionChanges.ts`가 세션당 `EventSource` 하나를 참조 수로 관리한다. 첫 사용자가 열고 마지막 사용자가 닫는다.
 - 읽기는 한 번에 하나만 돈다. 도중에 이벤트가 오면 끝난 뒤 한 번 더 읽는다. 응답 순서가 뒤바뀌어 옛 내용이 새 내용을 덮는 일이 없다.
 - 내 변경도 나에게 돌아오지만 같은 내용을 다시 읽을 뿐이다. 쓰기 응답으로 화면을 바로 고치는 지금의 동작은 그대로 둔다.

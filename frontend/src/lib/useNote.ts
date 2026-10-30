@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { api } from '../api'
+import { useSessionResource } from './sessionChanges'
 
 export type NoteStatus = 'saved' | 'saving' | 'failed'
 
@@ -16,8 +17,9 @@ type Write = (text: string, keepalive: boolean) => Promise<unknown>
 class NoteSaver {
   private shown = ''
   private stored = ''
-  private touched = false
   private inFlight = false
+  /** How many writes have begun, so a read begun before one can tell it is out of date. */
+  writes = 0
   private timer: ReturnType<typeof setTimeout> | undefined
   private readonly write: Write
   private readonly onStatus: (status: NoteStatus) => void
@@ -27,15 +29,14 @@ class NoteSaver {
     this.onStatus = onStatus
   }
 
-  /** The server's copy arrived. It shows only if nothing was typed first. */
+  /** The server's copy arrived, maybe someone else's. It shows only if all that was typed here is saved. */
   loaded(text: string): boolean {
-    if (this.touched) return false
+    if (this.inFlight || this.shown !== this.stored) return false
     this.shown = this.stored = text
     return true
   }
 
   edit(text: string) {
-    this.touched = true
     this.shown = text
     this.onStatus('saving')
     clearTimeout(this.timer)
@@ -49,6 +50,7 @@ class NoteSaver {
     if (this.shown === this.stored) return this.onStatus('saved')
     const text = this.shown
     this.inFlight = true
+    this.writes += 1
     this.onStatus('saving')
     try {
       await this.write(text, keepalive)
@@ -71,21 +73,26 @@ export function useNote(sessionId: number) {
   useEffect(() => {
     const s = new NoteSaver((t, keepalive) => api.setNote(sessionId, t, keepalive), setStatus)
     saver.current = s
-    let live = true
-    api
-      .getNote(sessionId)
-      .then((n) => {
-        if (live && s.loaded(n.text)) setText(n.text)
-      })
-      .catch(() => {})
     const leave = () => void s.flush(true)
     window.addEventListener('pagehide', leave)
     return () => {
-      live = false
       window.removeEventListener('pagehide', leave)
       void s.flush()
     }
   }, [sessionId])
+
+  useSessionResource(
+    sessionId,
+    'note',
+    () => {
+      const begunAt = saver.current?.writes
+      return api.getNote(sessionId).then((note) => ({ note, begunAt }))
+    },
+    ({ note, begunAt }) => {
+      const s = saver.current
+      if (s && begunAt === s.writes && s.loaded(note.text)) setText(note.text)
+    },
+  )
 
   const edit = useCallback((t: string) => {
     setText(t)

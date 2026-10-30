@@ -1,6 +1,7 @@
 import { act, renderHook } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { api } from '../api'
+import { FakeEventSource } from '../test/fakeEventSource'
 import { useNote } from './useNote'
 
 vi.mock('../api', () => ({ api: { getNote: vi.fn(), setNote: vi.fn() } }))
@@ -118,5 +119,44 @@ describe('useNote', () => {
     act(() => result.current.edit('before leaving'))
     unmount()
     expect(api.setNote).toHaveBeenCalledWith(3, 'before leaving', false)
+  })
+
+  it("shows someone else's note when it is announced", async () => {
+    const { result } = renderHook(() => useNote(3))
+    await settle()
+    vi.mocked(api.getNote).mockResolvedValueOnce({ text: 'from the other one' })
+    act(() => FakeEventSource.open[0].send('note'))
+    await settle()
+    expect(result.current.text).toBe('from the other one')
+  })
+
+  it('keeps what is being typed when someone else saves', async () => {
+    const { result } = renderHook(() => useNote(3))
+    await settle()
+    act(() => result.current.edit('hedge: mine, unsaved'))
+    vi.mocked(api.getNote).mockResolvedValueOnce({ text: 'from the other one' })
+    act(() => FakeEventSource.open[0].send('note'))
+    await settle()
+    expect(result.current.text).toBe('hedge: mine, unsaved')
+
+    act(() => vi.advanceTimersByTime(700))
+    await settle()
+    expect(api.setNote).toHaveBeenLastCalledWith(3, 'hedge: mine, unsaved', false)
+    expect(result.current.text).toBe('hedge: mine, unsaved')
+  })
+
+  it('ignores a read that started before a save and lands after it', async () => {
+    const { result } = renderHook(() => useNote(3))
+    await settle()
+    const slow = deferred<{ text: string }>()
+    vi.mocked(api.getNote).mockReturnValueOnce(slow.promise)
+    act(() => FakeEventSource.open[0].send('note'))
+
+    act(() => result.current.edit('hedge: saved now'))
+    act(() => vi.advanceTimersByTime(700))
+    await settle()
+    expect(result.current.status).toBe('saved')
+    await act(async () => slow.resolve({ text: 'hedge' }))
+    expect(result.current.text).toBe('hedge: saved now')
   })
 })

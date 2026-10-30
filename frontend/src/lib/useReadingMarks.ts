@@ -1,7 +1,8 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useMemo, useState } from 'react'
 import { api } from '../api'
 import type { Shown } from './assessor/judge'
 import type { Reading } from '../types'
+import { useSessionResource } from './sessionChanges'
 
 /**
  * The marks the latest read-aloud round of each paragraph left, by paragraph id, so they stay
@@ -10,16 +11,7 @@ import type { Reading } from '../types'
 export function useReadingMarks(sessionId: number): Map<number, Shown[]> {
   const [readings, setReadings] = useState<Reading[]>([])
 
-  useEffect(() => {
-    let live = true
-    api
-      .listReadings(sessionId)
-      .then((r) => live && setReadings(r))
-      .catch(() => undefined)
-    return () => {
-      live = false
-    }
-  }, [sessionId])
+  useSessionResource(sessionId, 'records', () => api.listReadings(sessionId), setReadings)
 
   return useMemo(() => {
     const marks = new Map<number, Shown[]>()

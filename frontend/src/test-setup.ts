@@ -1,4 +1,5 @@
 import '@testing-library/jest-dom/vitest'
+import { FakeEventSource } from './test/fakeEventSource'
 
 // jsdom has no AnimationEvent. Without one, React DOM listens for the
 // webkit-prefixed name only and a fired `animationend` never lands.
@@ -12,3 +13,6 @@ if (!('IntersectionObserver' in w)) {
     disconnect() {}
   }
 }
+
+// jsdom has no EventSource either.
+w.EventSource = FakeEventSource

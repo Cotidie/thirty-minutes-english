@@ -1,5 +1,6 @@
-import { type ReactNode, useEffect, useState } from 'react'
+import { type ReactNode, useState } from 'react'
 import { api } from '../api'
+import { useSessionResource } from '../lib/sessionChanges'
 import type { Example, SessionContent, Stars, Summary } from '../types'
 import { SummaryCard } from './SummaryCard'
 import './SummaryTab.css'
@@ -19,19 +20,17 @@ export function SummaryTab({ sessionId, content, stars }: Props) {
   const [summaries, setSummaries] = useState<Summary[] | null>(null)
   const [error, setError] = useState<string | null>(null)
 
-  useEffect(() => {
-    let live = true
-    Promise.all([api.listExamples(sessionId), api.listSummaries(sessionId)])
-      .then(([e, s]) => {
-        if (!live) return
-        setExamples(e)
-        setSummaries(s)
-      })
-      .catch((e: Error) => live && setError(e.message))
-    return () => {
-      live = false
-    }
-  }, [sessionId])
+  useSessionResource(
+    sessionId,
+    'records',
+    () => Promise.all([api.listExamples(sessionId), api.listSummaries(sessionId)]),
+    ([e, s]) => {
+      setExamples(e)
+      setSummaries(s)
+      setError(null)
+    },
+    (e) => setError(e.message),
+  )
 
   // Session order, so the list reads the way the tabs did.
   const starredExpressions = content.expressions.filter((e) => stars.expressions.includes(e.id))

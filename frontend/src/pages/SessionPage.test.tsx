@@ -1,8 +1,9 @@
-import { render, screen, within } from '@testing-library/react'
+import { act, render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom'
 import { describe, expect, it, vi } from 'vitest'
 import { api } from '../api'
+import { FakeEventSource } from '../test/fakeEventSource'
 import { SessionPage } from './SessionPage'
 
 const session = {
@@ -99,5 +100,41 @@ describe('SessionPage', () => {
     expect(await screen.findByText('circle back')).toBeInTheDocument()
     expect(screen.getByText('a moving target')).toBeInTheDocument()
     expect(api.addExpression).toHaveBeenCalledWith(3)
+  })
+})
+
+describe('SessionPage, with someone else in the session', () => {
+  it('shows a new expression without a reload', async () => {
+    renderAt('/s/3')
+    expect(await screen.findByText('a moving target')).toBeInTheDocument()
+    const changed = { ...session.content.expressions[0], id: 9, phrase: 'touch base' }
+    vi.mocked(api.getSession).mockResolvedValueOnce({ ...session, content: { ...session.content, expressions: [changed] } } as never)
+    act(() => FakeEventSource.open[0].send('session'))
+    expect(await screen.findByText('touch base')).toBeInTheDocument()
+    expect(screen.queryByText('a moving target')).not.toBeInTheDocument()
+  })
+
+  it('says so when the session goes away, and closes the stream', async () => {
+    renderAt('/s/3')
+    expect(await screen.findByText('a moving target')).toBeInTheDocument()
+    act(() => FakeEventSource.open[0].send('gone'))
+    expect(await screen.findByText('This session is no longer available.')).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: 'Back to sessions' })).toHaveAttribute('href', '/')
+    expect(FakeEventSource.open).toHaveLength(0)
+  })
+
+  it('says the same when the session cannot be found', async () => {
+    vi.mocked(api.getSession).mockRejectedValueOnce(Object.assign(new Error('session not found'), { status: 404 }))
+    renderAt('/s/3')
+    expect(await screen.findByText('This session is no longer available.')).toBeInTheDocument()
+  })
+
+  it('keeps showing the session when a read fails for another reason', async () => {
+    renderAt('/s/3')
+    expect(await screen.findByText('a moving target')).toBeInTheDocument()
+    vi.mocked(api.getSession).mockRejectedValueOnce(Object.assign(new Error('offline'), { status: 502 }))
+    act(() => FakeEventSource.open[0].send('session'))
+    await act(async () => {})
+    expect(screen.getByText('a moving target')).toBeInTheDocument()
   })
 })
