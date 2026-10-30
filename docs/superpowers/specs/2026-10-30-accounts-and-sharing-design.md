@@ -193,6 +193,8 @@ app/api/deps.py                  Me, 역할 검사, 세션 접근 검사
 | `records` | `examples`, `summaries`, `readings`의 GET | `add_example`, `add_summary`, `add_reading` |
 | `gone` | 없음. 화면을 "This session is no longer available."로 바꾼다 | 저장소가 아니라 스트림이 판단한다 (아래) |
 
+스트림은 연결이 살아 있음을 알리는 `alive`도 25초마다 보낸다. 다시 읽을 것은 없다.
+
 내부 신호 `access`는 `SessionRepo.delete`와 `ShareRepo.unshare`가 발행하며 브라우저로 나가지 않는다. 스트림은 이 신호를 받으면 접근권을 다시 확인해, 없어졌으면 `gone`을 보내고 닫는다. 그래서 "누가 못 보게 됐는가"의 판단은 접근 검사 한 곳에만 있다.
 
 ```
@@ -210,7 +212,7 @@ Server-Sent Events(서버가 브라우저로 한 방향으로 알림을 보내�
 - **구독자 목록:** `app/live/changes.py`의 `SessionChanges`. 웹 프레임워크를 모른다. `Database`가 하나 가지고 저장소는 `publish`만 안다.
 - **밀림 방지:** 구독자마다 큐 대신 "아직 안 보낸 이벤트 이름의 집합"을 둔다. 느린 브라우저가 있어도 메모리가 늘지 않고, 그림 20장이 연달아 도착해도 `session` 한 번으로 합쳐진다.
 - **스레드:** 저장소는 스레드풀과 job 스레드에서 돌므로 `publish`는 스레드 안전해야 하고, 스트림의 이벤트 루프는 `loop.call_soon_threadsafe`로 깨운다. 스트림은 비동기 제너레이터로 만들어 스레드풀을 점유하지 않는다.
-- **재확인:** 25초마다 하트비트 주석을 보내면서 로그인과 접근권을 다시 확인한다. 없어졌으면 `gone`을 보내고 닫는다.
+- **재확인:** 25초마다 `alive`를 보내면서 로그인과 접근권을 다시 확인한다. 없어졌으면 `gone`을 보내고 닫는다.
 - **프록시:** 응답 헤더는 `Content-Type: text/event-stream`, `Cache-Control: no-cache`, `X-Accel-Buffering: no`다. `frontend/nginx.conf`에 이 경로 전용 `location`을 더해 `proxy_buffering off`, `proxy_http_version 1.1`, `proxy_set_header Connection ""`, 긴 `proxy_read_timeout`을 준다. 공개 주소는 Cloudflare를 거치며 유휴 연결 제한이 있으므로 하트비트로 연결을 유지한다.
 - **종료:** 열린 스트림이 재시작을 막지 않도록 `Dockerfile`과 `compose.dev.yaml`의 uvicorn에 `--timeout-graceful-shutdown 5`를 더한다.
 - **프로세스 수:** 구독자 목록이 메모리에 있어 uvicorn 프로세스가 하나여야 한다. 지금 구성이 그렇다. 워커를 늘리려면 이 부분을 바꿔야 한다.
@@ -231,6 +233,7 @@ useSessionResource(sessionId, 'records', () => api.listExamples(sessionId), setE
 - **노트:** 저장하지 않은 입력이 있으면 들어온 내용으로 덮어쓰지 않는다. 저장되면 나중에 저장한 내용이 남는다. 동시 입력을 글자 단위로 합치지는 않는다.
 - **그림 도착:** `useArrivingPictures`의 세션 폴링을 없앤다. 그림은 `session` 이벤트로 받는다. 남는 폴링은 "지금 그리는 중인가"(job 상태)만 묻는다. 이름도 `useDrawingPictures`로 바꾼다.
 - **세션 삭제와 공유 해제:** 스트림의 `gone`과, 다시 읽다가 받은 404를 같은 화면으로 처리한다.
+- **죽은 연결:** 폰 잠금이나 네트워크 전환으로 연결이 조용히 죽으면 브라우저는 오류를 내지 않고 계속 기다린다. 그래서 60초 동안 서버에서 아무것도 오지 않으면 스트림을 다시 연다. 온라인으로 돌아오면 바로, 페이지로 돌아왔을 때 30초 넘게 조용했으면 바로 다시 연다.
 - 스트림이 실패해도 앱은 그대로 동작한다. 다만 다시 연결될 때까지 상대의 변경이 보이지 않는다.
 
 ## 화면

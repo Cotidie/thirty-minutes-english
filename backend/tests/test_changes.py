@@ -193,12 +193,12 @@ def test_events_carry_only_a_name():
     assert run(scenario()) == ["retry: 5000\n\n", "event: stars\ndata: {}\n\n"]
 
 
-def test_a_quiet_stream_sends_a_heartbeat():
+def test_a_quiet_stream_says_it_is_alive_in_a_way_a_browser_can_see():
     async def scenario():
         subscription = SessionChanges().subscribe(1)
         return await collect(events_of(subscription, allowed, heartbeat_s=0.01), 2)
 
-    assert run(scenario())[1] == ": keep-alive\n\n"
+    assert run(scenario())[1] == "event: alive\ndata: {}\n\n"
 
 
 def test_access_never_reaches_the_browser_while_i_am_allowed():
@@ -210,7 +210,7 @@ def test_access_never_reaches_the_browser_while_i_am_allowed():
         stream = events_of(subscription, allowed, heartbeat_s=0.05)
         return await collect(stream, 2)
 
-    assert run(scenario()) == ["retry: 5000\n\n", ": keep-alive\n\n"]
+    assert run(scenario()) == ["retry: 5000\n\n", "event: alive\ndata: {}\n\n"]
 
 
 def test_losing_access_sends_gone_and_ends():
@@ -237,7 +237,7 @@ def test_a_login_gone_stale_ends_the_stream_at_the_next_heartbeat():
         subscription = SessionChanges().subscribe(1)
         return await collect(events_of(subscription, still, heartbeat_s=0.01), 10)
 
-    assert run(scenario()) == ["retry: 5000\n\n", ": keep-alive\n\n", "event: gone\ndata: {}\n\n"]
+    assert run(scenario()) == ["retry: 5000\n\n", "event: alive\ndata: {}\n\n", "event: gone\ndata: {}\n\n"]
 
 
 def test_opening_the_stream_needs_a_login_and_access(tmp_path):

@@ -11,7 +11,7 @@ from app.live.changes import SessionChange, Subscription
 
 router = APIRouter(prefix="/api")
 
-HEARTBEAT_S = 25.0  # well inside what proxies allow an idle connection
+HEARTBEAT_S = 25.0  # well inside what proxies allow an idle connection, and often enough for a browser to notice silence
 RETRY_MS = 5000
 
 
@@ -30,7 +30,7 @@ async def events_of(
             yield _event("gone")
             return
         if not changed:
-            yield ": keep-alive\n\n"
+            yield _event("alive")  # an event, not a comment: a browser's EventSource never shows it a comment
         for change in sorted(changed - {SessionChange.ACCESS}):
             yield _event(change)
 

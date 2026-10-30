@@ -156,3 +156,79 @@ test('a failed read is told to the page and does not stop the next', async () =>
   await settle()
   expect(show).toHaveBeenCalledWith('back')
 })
+
+test('a stream that falls silent is replaced, since a dead connection tells a browser nothing', async () => {
+  vi.useFakeTimers()
+  const read = vi.fn(async () => 1)
+  renderHook(() => useSessionResource(3, 'note', read, vi.fn()))
+  await settle()
+  const first = stream()
+  act(() => first.connect())
+  await settle()
+  const reads = read.mock.calls.length
+
+  act(() => vi.advanceTimersByTime(59000))
+  expect(stream()).toBe(first)
+  act(() => vi.advanceTimersByTime(1000))
+  expect(FakeEventSource.open).toHaveLength(1)
+  expect(stream()).not.toBe(first)
+  expect(first.readyState).toBe(FakeEventSource.CLOSED)
+
+  act(() => stream().connect())
+  await settle()
+  expect(read.mock.calls.length).toBe(reads + 1)
+})
+
+test('hearing anything from the server keeps the stream', async () => {
+  vi.useFakeTimers()
+  renderHook(() => useSessionResource(3, 'note', async () => 1, vi.fn()))
+  await settle()
+  const first = stream()
+  act(() => vi.advanceTimersByTime(50000))
+  act(() => first.send('alive'))
+  act(() => vi.advanceTimersByTime(50000))
+  act(() => first.send('stars'))
+  act(() => vi.advanceTimersByTime(50000))
+  expect(stream()).toBe(first)
+})
+
+test('coming back online reopens at once', async () => {
+  renderHook(() => useSessionResource(3, 'note', async () => 1, vi.fn()))
+  await settle()
+  const first = stream()
+  act(() => {
+    window.dispatchEvent(new Event('online'))
+  })
+  expect(FakeEventSource.open).toHaveLength(1)
+  expect(stream()).not.toBe(first)
+})
+
+test('returning to the page reopens only after a silence', async () => {
+  vi.useFakeTimers()
+  renderHook(() => useSessionResource(3, 'note', async () => 1, vi.fn()))
+  await settle()
+  const first = stream()
+  act(() => vi.advanceTimersByTime(20000))
+  act(() => {
+    document.dispatchEvent(new Event('visibilitychange'))
+  })
+  expect(stream()).toBe(first)
+
+  act(() => vi.advanceTimersByTime(20000))
+  act(() => {
+    document.dispatchEvent(new Event('visibilitychange'))
+  })
+  expect(stream()).not.toBe(first)
+})
+
+test('leaving the session stops watching', async () => {
+  vi.useFakeTimers()
+  const { unmount } = renderHook(() => useSessionResource(3, 'note', async () => 1, vi.fn()))
+  await settle()
+  unmount()
+  act(() => {
+    window.dispatchEvent(new Event('online'))
+  })
+  act(() => vi.advanceTimersByTime(120000))
+  expect(FakeEventSource.open).toHaveLength(0)
+})

@@ -17,7 +17,7 @@
 - 쿠키: 이름 `login`, `HttpOnly`, `SameSite=Lax`, `Path=/`, 30일. `Secure`는 `COOKIE_SECURE` 환경변수를 따르고 기본은 켜짐.
 - 제한: 이메일별 15분에 로그인 실패 10회, 전체 시간당 가입 20건을 넘으면 429.
 - 응답: 비로그인 401, 역할 부족 403, 없는 세션과 접근권 없는 세션은 똑같이 404.
-- 이벤트 이름: `session`, `stars`, `note`, `records`, `gone`. 내부 신호 `access`는 브라우저로 나가지 않는다.
+- 이벤트 이름: `session`, `stars`, `note`, `records`, `gone`, 연결 확인용 `alive`. 내부 신호 `access`는 브라우저로 나가지 않는다.
 - 이벤트에는 데이터를 싣지 않는다. 이벤트 발행은 저장소에서만, 구독은 `useSessionResource`에서만 한다.
 - UI 문구는 영어이고 스펙의 문구를 그대로 쓴다.
 - 편집 전 `node .gitnexus/run.cjs impact "<symbol>" --direction upstream --repo .`, 커밋 전 `node .gitnexus/run.cjs detect-changes --scope all --repo .`를 실행하고 HIGH 이상이면 보고한다.

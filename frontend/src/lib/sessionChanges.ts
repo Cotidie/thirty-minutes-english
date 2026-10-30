@@ -8,6 +8,10 @@ export type SessionChange = 'session' | 'stars' | 'note' | 'records'
 
 const CHANGES: SessionChange[] = ['session', 'stars', 'note', 'records']
 const REOPEN_MS = 5000
+/** The server speaks at least every 25 seconds. A connection that died quietly tells a browser nothing, so this does. */
+const SILENCE_LIMIT_MS = 60000
+/** Coming back to the page after this long without a word, the connection is not worth trusting. */
+const QUIET_ON_RETURN_MS = 30000
 
 type Heard = SessionChange | 'gone'
 
@@ -16,23 +20,53 @@ class Channel {
   private readonly listeners = new Map<Heard, Set<() => void>>()
   private source: EventSource | null = null
   private reopen: ReturnType<typeof setTimeout> | undefined
+  private watchdog: ReturnType<typeof setTimeout> | undefined
+  private lastHeard = 0
   private readonly sessionId: number
 
   constructor(sessionId: number) {
     this.sessionId = sessionId
+    window.addEventListener('online', this.restart)
+    document.addEventListener('visibilitychange', this.returned)
     this.open()
+  }
+
+  private readonly restart = () => {
+    this.source?.close()
+    clearTimeout(this.reopen)
+    this.open()
+  }
+
+  private readonly returned = () => {
+    if (document.visibilityState === 'visible' && Date.now() - this.lastHeard >= QUIET_ON_RETURN_MS) this.restart()
+  }
+
+  private heardFromServer() {
+    this.lastHeard = Date.now()
+    clearTimeout(this.watchdog)
+    this.watchdog = setTimeout(this.restart, SILENCE_LIMIT_MS)
   }
 
   private open() {
     const source = new EventSource(`/api/sessions/${this.sessionId}/events`)
     this.source = source
-    for (const change of CHANGES) source.addEventListener(change, () => this.hear(change))
+    this.heardFromServer()
+    source.addEventListener('alive', () => this.heardFromServer())
+    for (const change of CHANGES) {
+      source.addEventListener(change, () => {
+        this.heardFromServer()
+        this.hear(change)
+      })
+    }
     source.addEventListener('gone', () => {
       this.close()
       this.hear('gone')
     })
     // Nothing missed while down is sent again, so every connection starts from what the server has now.
-    source.onopen = () => CHANGES.forEach((change) => this.hear(change))
+    source.onopen = () => {
+      this.heardFromServer()
+      CHANGES.forEach((change) => this.hear(change))
+    }
     source.onerror = () => {
       if (source.readyState !== EventSource.CLOSED) return // the browser is already trying again
       // An answer that is not a stream. Reading the session finds out why: a login gone, or the session gone.
@@ -58,6 +92,9 @@ class Channel {
 
   close() {
     clearTimeout(this.reopen)
+    clearTimeout(this.watchdog)
+    window.removeEventListener('online', this.restart)
+    document.removeEventListener('visibilitychange', this.returned)
     this.source?.close()
   }
 }
