@@ -46,7 +46,7 @@ def test_a_spoken_summary_is_judged_against_its_paragraph_and_kept_with_the_sess
 
         assert c.post("/api/summary/feedback", json={"paragraph": PARAGRAPH, "user_text": " "}).status_code == 422
         c.delete(f"/api/sessions/{sid}")
-        assert c.get(f"/api/summaries?session_id={sid}").json() == []
+        assert c.get(f"/api/summaries?session_id={sid}").status_code == 404
 
 
 def test_the_summary_round_is_503_without_a_voice_key(tmp_path):

@@ -90,15 +90,23 @@ def can_practice(me: Me, db: Db) -> User:
     return me
 
 
-def require_session(db: Database, session_id: int) -> None:
-    """404 unless `session_id` names a stored session."""
-    if not db.sessions.exists(session_id):
+def require_access(db: Database, me: User, session_id: int) -> None:
+    """404 unless `me` may open the session, so a session's number says nothing about whether it exists."""
+    if not db.shares.can_access(me, session_id):
         raise HTTPException(status_code=404, detail="session not found")
 
 
-def require_paragraph(db: Database, paragraph_id: int) -> None:
-    """404 unless `paragraph_id` names a paragraph of a stored session."""
-    if db.sessions.session_of_paragraph(paragraph_id) is None:
+def require_creator(db: Database, me: User, session_id: int) -> None:
+    """404 as `require_access`; 403 for someone who can open the session but did not make it."""
+    require_access(db, me, session_id)
+    if db.shares.created_by(session_id) != me.id:
+        raise HTTPException(status_code=403, detail="Only who made this session can do this.")
+
+
+def require_paragraph(db: Database, me: User, paragraph_id: int) -> None:
+    """404 unless `paragraph_id` names a paragraph of a session `me` may open."""
+    session_id = db.sessions.session_of_paragraph(paragraph_id)
+    if session_id is None or not db.shares.can_access(me, session_id):
         raise HTTPException(status_code=404, detail="paragraph not found")
 
 

@@ -63,6 +63,7 @@ class Job:
     stage_seconds: dict[Stage, float] = field(default_factory=dict)  # time in each stage left so far, summed over visits
     foreseen: dict[Stage, float] = field(default_factory=dict)  # what this job's own setup says a stage takes
     session_id: int | None = None
+    created_by: int | None = None
     error: str | None = None
     failed_at: float | None = None  # stops the clock, so the failure keeps its time while it waits to be read
 
@@ -119,12 +120,13 @@ class JobRunner:
         self._jobs: dict[str, Job] = {}
         self._lock = Lock()
 
-    def start(self, topic: str, generator: Generator, illustrator: Illustrator | None = None) -> Job:
+    def start(self, topic: str, generator: Generator, illustrator: Illustrator | None = None, created_by: int | None = None) -> Job:
         """Generates in the background; the pictures follow when an illustrator is given."""
-        job = Job(id=uuid.uuid4().hex[:12], topic=topic)
+        job = Job(id=uuid.uuid4().hex[:12], topic=topic, created_by=created_by)
         self._foresee_pictures(job, illustrator, 2 * VOCABULARY_COUNT)  # the example and the scene
         with self._lock:
-            self._jobs = {id: j for id, j in self._jobs.items() if j.status != "failed"}  # a new try answers the old failure
+            # A new try answers the same person's old failure.
+            self._jobs = {id: j for id, j in self._jobs.items() if j.status != "failed" or j.created_by != created_by}
             self._jobs[job.id] = job
         self.executor.submit(self._run, job, generator, illustrator)
         return job
@@ -179,7 +181,7 @@ class JobRunner:
             if job.status == "cancelled":
                 return
             picked = self._expressions.pick(EXPRESSION_COUNT, random.Random())
-            session = self._sessions.create(draft, [e.id for e in picked])
+            session = self._sessions.create(draft, [e.id for e in picked], job.created_by)
             job.session_id = session.id
             landed = self._keep_figures(session, draft.article.figures)
             if illustrator:

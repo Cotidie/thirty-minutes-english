@@ -344,7 +344,7 @@ def test_examples_stack_under_a_session_in_the_order_made(client):
 
     listed = client.get("/api/examples", params={"session_id": sid}).json()
     assert [(e["user_text"], e["vocabulary_id"]) for e in listed] == [("I said it.", words[2]), ("Again.", words[0])]
-    assert client.get("/api/examples", params={"session_id": sid + 1}).json() == []
+    assert client.get("/api/examples", params={"session_id": sid + 1}).status_code == 404
 
     assert client.post("/api/examples", json={**body, "session_id": 999}).status_code == 404
     assert client.post("/api/examples", json={**body, "coach_text": " "}).status_code == 422
@@ -352,7 +352,7 @@ def test_examples_stack_under_a_session_in_the_order_made(client):
     assert client.post("/api/examples", json={**body, "expression_id": 1}).status_code == 422  # expressions take no sentences
 
     client.delete(f"/api/sessions/{sid}")
-    assert client.get("/api/examples", params={"session_id": sid}).json() == []
+    assert client.get("/api/examples", params={"session_id": sid}).status_code == 404
 
 
 class HeldExecutor:
@@ -421,7 +421,7 @@ def test_readings_keep_their_marks_and_list_per_session(client):
     [mark] = listed[0]["corrections"]
     assert (mark["repeated_ok"], mark["at"], mark["score"]) == (True, 1, 41)
     assert [(s["phoneme"], s["heard"]) for s in mark["sounds"]] == [("v", "b"), ("ɛ", None)]
-    assert client.get("/api/readings", params={"session_id": session_id + 1}).json() == []
+    assert client.get("/api/readings", params={"session_id": session_id + 1}).status_code == 404
 
 
 def test_a_reading_kept_before_marks_were_saved_has_no_place_on_the_paragraph(client):

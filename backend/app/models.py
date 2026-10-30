@@ -231,6 +231,8 @@ class SessionSummary(BaseModel):
     created_at: datetime
     topic: str
     title: str
+    mine: bool = True
+    shared_by: str | None = None
 
 
 class Session(BaseModel):
@@ -238,6 +240,8 @@ class Session(BaseModel):
     created_at: datetime
     topic: str
     content: SessionContent
+    mine: bool = True
+    shared_by: str | None = None
 
 
 class Stars(BaseModel):

@@ -169,10 +169,28 @@ class SessionRepo:
         with self._db.connect() as conn:
             return conn.execute("SELECT 1 FROM sessions WHERE id = ?", (session_id,)).fetchone() is not None
 
-    def list_all(self) -> list[SessionSummary]:
+    def list_visible(self, user_id: int) -> list[SessionSummary]:
+        """The sessions the account made or had shared with it, newest first, each saying whose it is."""
         with self._db.connect() as conn:
-            rows = conn.execute(f"SELECT s.id, s.created_at, t.text AS topic, s.title FROM {WITH_TOPIC} ORDER BY s.id DESC").fetchall()
+            rows = conn.execute(
+                f"""SELECT s.id, s.created_at, t.text AS topic, s.title, s.created_by = ? AS mine,
+                           CASE WHEN s.created_by = ? THEN NULL ELSE u.email END AS shared_by
+                    FROM {WITH_TOPIC} LEFT JOIN users u ON u.id = s.created_by
+                    WHERE s.created_by = ? OR s.id IN (SELECT session_id FROM session_shares WHERE user_id = ?)
+                    ORDER BY s.id DESC""",
+                (user_id, user_id, user_id, user_id),
+            ).fetchall()
         return [SessionSummary(**dict(row)) for row in rows]
+
+    def viewpoint(self, session_id: int, user_id: int) -> tuple[bool, str | None]:
+        """Whether the account made the session, and if not, the email of who did."""
+        with self._db.connect() as conn:
+            row = conn.execute(
+                "SELECT s.created_by, u.email FROM sessions s LEFT JOIN users u ON u.id = s.created_by WHERE s.id = ?", (session_id,)
+            ).fetchone()
+        if row is None or row["created_by"] == user_id:
+            return row is not None, None
+        return False, row["email"]
 
     def delete(self, session_id: int) -> list[int] | None:
         """The ids of the pictures the session showed (its words', then its figures'), whose files the caller removes;

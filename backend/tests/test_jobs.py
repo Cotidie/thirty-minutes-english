@@ -4,6 +4,7 @@ import httpx2
 from PIL import Image as PILImage
 
 from app.db import Database
+from app.llm import GenerationError
 from app.models import FigureDraft
 from app.pictures.figures import SourceImages
 from app.pictures.files import PictureFiles
@@ -111,6 +112,19 @@ def test_a_fresh_runner_expects_the_default_time_of_every_stage(tmp_path):
     assert runner_over(Database(tmp_path / "s.db")).expected_seconds(Job(id="j", topic="t")) == sum(DEFAULT_STAGE_SECONDS.values())
 
 
+def test_a_new_try_clears_only_the_same_persons_failed_job(tmp_path):
+    class Failing:
+        def generate(self, topic, on_progress=None, exclude=None):
+            raise GenerationError("no")
+
+    runner = runner_over(Database(tmp_path / "s.db"))
+    mine = runner.start("A", Failing(), created_by=1)
+    theirs = runner.start("B", Failing(), created_by=2)
+    assert {j.id for j in runner.open()} == {mine.id, theirs.id}
+    again = runner.start("A", Failing(), created_by=1)
+    assert {j.id for j in runner.open()} == {theirs.id, again.id}
+
+
 def test_deleting_the_session_while_its_pictures_are_drawn_leaves_no_files(tmp_path):
     db = Database(tmp_path / "s.db")
 
@@ -121,7 +135,7 @@ def test_deleting_the_session_while_its_pictures_are_drawn_leaves_no_files(tmp_p
             return None
 
         def paint(self, prompts, on_drawn=None, on_picture=None):
-            db.sessions.delete(db.sessions.list_all()[0].id)
+            db.sessions.delete(db.connect().execute("SELECT MAX(id) FROM sessions").fetchone()[0])
             pictures = [Drawn(b"PNG", "m", 1.0) for _ in prompts]
             for i, drawn in enumerate(pictures):
                 on_picture(i, drawn)

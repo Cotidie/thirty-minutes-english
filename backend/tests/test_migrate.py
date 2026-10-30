@@ -161,7 +161,7 @@ def test_a_v1_file_is_backed_up_and_comes_up_current_with_everything_in_rows(tmp
         names = {r[0] for r in conn.execute("SELECT name FROM sqlite_master WHERE type = 'table'")}
     assert names >= {"paragraphs", "vocabulary", "expressions", "session_expressions", "pictures"}
     assert not {n for n in names if n.endswith("_v1")} and not names & {"stars", "notes", "image_stats"}
-    [s2, s1] = db.sessions.list_all()
+    s1, s2 = db.sessions.get(11), db.sessions.get(12)
     assert (s1.id, s2.id) == (11, 12)  # ids survive: the address /s/11 still opens it
     got = db.sessions.get(11)
     assert [p.text for p in got.content.article.paragraphs] == ["Para one.", "Para two here.", "Para three."]

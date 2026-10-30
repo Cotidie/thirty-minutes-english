@@ -4,7 +4,6 @@ from collections.abc import Mapping
 from pathlib import Path
 
 from fastapi import Depends, FastAPI
-from fastapi.staticfiles import StaticFiles
 
 from app.accounts.limits import FailedLogins, SignupLimit
 from app.api import ROUTERS
@@ -48,9 +47,6 @@ def create_app(
     app.include_router(public_router)
     for router in ROUTERS:
         app.include_router(router, dependencies=[Depends(signed_in)])
-    if image_dir is not None:
-        image_dir.mkdir(parents=True, exist_ok=True)
-        app.mount("/api/images", StaticFiles(directory=image_dir), name="images")
     return app
 
 

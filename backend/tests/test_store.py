@@ -3,7 +3,7 @@ import pytest
 from app.generation.generator import VOCABULARY_COUNT
 from app.models import Correction, Note, Stars, SummaryFeedback, SummaryFix
 from app.pictures.scenes import Scene
-from tests.conftest import sample_draft, seed_expressions
+from tests.conftest import add_user, sample_draft, seed_expressions
 
 
 def test_create_then_get_roundtrip(store, draft):
@@ -32,9 +32,10 @@ def test_create_splits_paragraphs_links_expressions_in_order_and_get_puts_it_bac
 
 
 def test_list_returns_newest_first_with_title(store):
-    first = store.sessions.create(sample_draft(topic="A", title="First"), [])
-    second = store.sessions.create(sample_draft(topic="B", title="Second"), [])
-    summaries = store.sessions.list_all()
+    me = add_user(store)
+    first = store.sessions.create(sample_draft(topic="A", title="First"), [], me.id)
+    second = store.sessions.create(sample_draft(topic="B", title="Second"), [], me.id)
+    summaries = store.sessions.list_visible(me.id)
     assert [s.id for s in summaries] == [second.id, first.id]
     assert (summaries[0].title, summaries[0].topic) == ("Second", "B")
 

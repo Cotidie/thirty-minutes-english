@@ -119,7 +119,7 @@ def test_a_v3_file_moves_its_topics_into_rows_and_keeps_everything_else(tmp_path
         assert conn.execute("PRAGMA foreign_keys").fetchone()[0] == 1
     assert list(tmp_path.glob("s.db.bak-v3-????-??-??"))
     assert db.topics.news("2026-10-25") == ["News A", "News B"]
-    assert [(s.id, s.topic) for s in db.sessions.list_all()] == [(curated.id, CURATED_TOPICS[0].text), (typed.id, "My own topic")]
+    assert [(s.id, s.topic) for s in (db.sessions.get(curated.id), db.sessions.get(typed.id))] == [(curated.id, CURATED_TOPICS[0].text), (typed.id, "My own topic")]
     assert db.sessions.get(typed.id).content.article.paragraphs == typed.content.article.paragraphs
     entries = {t.text: t for t in db.topics.list_all()}
     assert (entries["My own topic"].category, entries["My own topic"].sessions) == (Category.TYPED, [typed.id])
