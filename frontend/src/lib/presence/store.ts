@@ -44,6 +44,11 @@ export type ServerMessage =
   | { type: 'timer'; running: boolean; elapsed: number; by: string; seq: number }
 
 const TIMER_KEY = ' timer' // a space, which no view key has
+const PERSON_COLORS = 6 // the --person-N tokens in base.css
+
+export function personColor(color: number): string {
+  return `var(--person-${(color % PERSON_COLORS) + 1})`
+}
 
 export function timerElapsed(timer: TimerValue, now = Date.now()): number {
   return Math.floor(timer.elapsed + (timer.running ? (now - timer.at) / 1000 : 0))

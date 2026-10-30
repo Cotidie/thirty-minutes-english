@@ -62,6 +62,7 @@
 }
 
 .tab {
+  position: relative;
   display: grid;
   grid-template-columns: 1.5rem 1fr auto;
   align-items: baseline;

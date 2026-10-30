@@ -4,6 +4,8 @@ import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom'
 import { describe, expect, it, vi } from 'vitest'
 import { api } from '../api'
 import { FakeEventSource } from '../test/fakeEventSource'
+import { FakeWebSocket } from '../test/fakeWebSocket'
+import { WELCOME } from '../test/presenceRoom'
 import { SessionPage } from './SessionPage'
 
 const session = {
@@ -151,5 +153,77 @@ describe('SessionPage, with someone else in the session', () => {
     act(() => FakeEventSource.open[0].send('session'))
     await act(async () => {})
     expect(screen.getByText('a moving target')).toBeInTheDocument()
+  })
+})
+
+describe('SessionPage with someone else in the session', () => {
+  const HERE = 'Someone else is here'
+  const tabNamed = (name: RegExp) => screen.getByRole('button', { name })
+
+  async function open(people: object[] = [], path = '/s/3') {
+    renderAt(path)
+    await screen.findByRole('navigation', { name: 'Session parts' })
+    const socket = FakeWebSocket.only
+    act(() => {
+      socket.connect()
+      socket.receive({ ...WELCOME, people })
+    })
+    return socket
+  }
+
+  it('says which tab the other person is on, in their color', async () => {
+    await open([{ id: 'b', color: 1, tab: 2 }])
+    expect(within(tabNamed(/Vocabulary/)).getByRole('img', { name: HERE }).getAttribute('style')).toContain('--person-2')
+    expect(within(tabNamed(/Article/)).queryByRole('img')).toBeNull()
+  })
+
+  it('moves the mark when they move, and takes it away when they leave', async () => {
+    const socket = await open([{ id: 'b', color: 1, tab: 2 }])
+    act(() => socket.receive({ type: 'tab', id: 'b', tab: 1 }))
+    expect(within(tabNamed(/Vocabulary/)).queryByRole('img')).toBeNull()
+    expect(within(tabNamed(/Article/)).getByRole('img', { name: HERE })).toBeInTheDocument()
+    act(() => socket.receive({ type: 'left', id: 'b' }))
+    expect(within(tabNamed(/Article/)).queryByRole('img')).toBeNull()
+  })
+
+  it('marks whoever comes in, once they say where they are', async () => {
+    const socket = await open()
+    act(() => socket.receive({ type: 'joined', id: 'b', color: 1, tab: null }))
+    expect(screen.queryByRole('img', { name: HERE })).toBeNull()
+    act(() => socket.receive({ type: 'tab', id: 'b', tab: 0 }))
+    expect(within(tabNamed(/Expressions/)).getByRole('img', { name: HERE })).toBeInTheDocument()
+  })
+
+  it('tells the others which tab I am on, and again after reconnecting', async () => {
+    const socket = await open([], '/s/3#article')
+    expect(socket.sent).toEqual([{ type: 'tab', tab: 1 }])
+    await userEvent.click(tabNamed(/Vocabulary/))
+    expect(socket.sent).toEqual([{ type: 'tab', tab: 1 }, { type: 'tab', tab: 2 }])
+    socket.sent = []
+    act(() => {
+      socket.drop()
+      socket.connect()
+      socket.receive(WELCOME)
+    })
+    expect(socket.sent).toEqual([{ type: 'tab', tab: 2 }])
+  })
+
+  it('shows one mark for one person on two connections, and one each for two people', async () => {
+    await open([
+      { id: 'b', color: 1, tab: 0 },
+      { id: 'c', color: 1, tab: 0 },
+      { id: 'd', color: 2, tab: 0 },
+    ])
+    expect(within(tabNamed(/Expressions/)).getAllByRole('img', { name: HERE })).toHaveLength(2)
+  })
+
+  it('marks the Summary tab too', async () => {
+    await open([{ id: 'b', color: 0, tab: 3 }])
+    expect(within(tabNamed(/Summary/)).getByRole('img', { name: HERE })).toBeInTheDocument()
+  })
+
+  it('goes round the colors past the last one', async () => {
+    await open([{ id: 'b', color: 6, tab: 0 }])
+    expect(within(tabNamed(/Expressions/)).getByRole('img', { name: HERE }).getAttribute('style')).toContain('--person-1')
   })
 })

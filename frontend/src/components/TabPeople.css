@@ -1,0 +1,17 @@
+/* In the rail's padding, left of the tab's grid, so the row keeps its columns. */
+.tab-people {
+  position: absolute;
+  top: 50%;
+  left: -0.75rem;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  transform: translateY(-50%);
+}
+
+.tab-person {
+  width: 0.5rem;
+  height: 0.5rem;
+  border-radius: 50%;
+  background: var(--person);
+}

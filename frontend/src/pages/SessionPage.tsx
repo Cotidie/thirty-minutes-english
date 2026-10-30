@@ -2,8 +2,10 @@ import { useState } from 'react'
 import { Link, useLocation, useNavigate, useParams } from 'react-router-dom'
 import { api, type ApiError } from '../api'
 import { SharePanel } from '../components/SharePanel'
+import { TabPeople } from '../components/TabPeople'
 import { useAuth } from '../lib/auth'
 import { PresenceProvider } from '../lib/presence/PresenceProvider'
+import { useTellMyTab } from '../lib/presence/useOthersOnTab'
 import { useDrawingPictures } from '../lib/useDrawingPictures'
 import { useSessionGone, useSessionResource } from '../lib/sessionChanges'
 import { ArticleTab } from '../components/ArticleTab'
@@ -53,6 +55,7 @@ function OpenSession({ id, onGone }: { id: number; onGone: () => void }) {
   const { hash, search } = useLocation()
   const navigate = useNavigate()
   const tab = Math.max(0, TAB_KEYS.indexOf(hash.slice(1)))
+  useTellMyTab(tab)
 
   useSessionResource(
     id,
@@ -101,6 +104,7 @@ function OpenSession({ id, onGone }: { id: number; onGone: () => void }) {
               <span className="tab-index">{i + 1}</span>
               <span className="tab-label">{p.label}</span>
               <span className="tab-minutes">{p.minutes} min</span>
+              <TabPeople tab={i} />
             </button>
           ))}
           <button
@@ -112,6 +116,7 @@ function OpenSession({ id, onGone }: { id: number; onGone: () => void }) {
             <span className="tab-index">{SUMMARY_TAB + 1}</span>
             <span className="tab-label">Summary</span>
             <span className="tab-minutes">after</span>
+            <TabPeople tab={SUMMARY_TAB} />
           </button>
         </nav>
         {session.mine && <SharePanel sessionId={session.id} canAdd={mayCreate} />}
