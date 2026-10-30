@@ -161,3 +161,58 @@ def test_a_record_on_someone_elses_session_is_a_404(world):
     assert world.sharee.post("/api/readings", json=reading).status_code == 201
     assert world.sharee.post("/api/examples", json=example).status_code == 201
     assert len(world.creator.get(f"/api/readings?session_id={world.sid}").json()) == 1
+
+
+def test_the_creator_shares_by_email_and_the_friend_can_open_it(world):
+    assert world.newcomer.get(f"/api/sessions/{world.sid}").status_code == 404
+    res = world.creator.post(f"/api/sessions/{world.sid}/shares", json={"email": " Newcomer@Example.com "})
+    assert res.status_code == 201
+    assert [e["email"] for e in res.json()] == ["newcomer@example.com", "sharee@example.com"]
+    assert res.json()[0]["user_id"] == world.accounts["newcomer"].id
+    assert world.newcomer.get(f"/api/sessions/{world.sid}").status_code == 200
+    assert [e["email"] for e in world.creator.get(f"/api/sessions/{world.sid}/shares").json()] == ["newcomer@example.com", "sharee@example.com"]
+
+
+def test_sharing_with_an_email_nobody_uses_is_a_404_saying_so(world):
+    res = world.creator.post(f"/api/sessions/{world.sid}/shares", json={"email": "nobody@example.com"})
+    assert res.status_code == 404 and res.json()["detail"] == "No account uses that email."
+
+
+def test_sharing_twice_or_with_myself_changes_nothing(world):
+    before = world.creator.get(f"/api/sessions/{world.sid}/shares").json()
+    assert world.creator.post(f"/api/sessions/{world.sid}/shares", json={"email": "sharee@example.com"}).json() == before
+    assert world.creator.post(f"/api/sessions/{world.sid}/shares", json={"email": "creator@example.com"}).json() == before
+
+
+def test_only_the_creator_manages_shares(world):
+    sharee_id = world.accounts["sharee"].id
+    for who in (world.sharee, world.admin):
+        assert who.get(f"/api/sessions/{world.sid}/shares").status_code == 403
+        assert who.post(f"/api/sessions/{world.sid}/shares", json={"email": "stranger@example.com"}).status_code == 403
+        assert who.delete(f"/api/sessions/{world.sid}/shares/{sharee_id}").status_code == 403
+    assert world.stranger.get(f"/api/sessions/{world.sid}/shares").status_code == 404
+
+
+def test_an_approval_taken_away_stops_new_shares_but_not_ending_them(world):
+    world.db.accounts.set_can_create(world.accounts["creator"].id, False)
+    assert world.creator.post(f"/api/sessions/{world.sid}/shares", json={"email": "stranger@example.com"}).status_code == 403
+    assert world.creator.get(f"/api/sessions/{world.sid}/shares").status_code == 200
+    assert world.creator.delete(f"/api/sessions/{world.sid}/shares/{world.accounts['sharee'].id}").status_code == 204
+    assert world.sharee.get(f"/api/sessions/{world.sid}").status_code == 404
+
+
+def test_ending_a_share_that_is_not_there_is_a_404(world):
+    assert world.creator.delete(f"/api/sessions/{world.sid}/shares/{world.accounts['stranger'].id}").status_code == 404
+
+
+def test_removing_a_session_from_my_list_keeps_it_for_everyone_else(world):
+    assert world.sharee.delete(f"/api/sessions/{world.sid}/shares/me").status_code == 204
+    assert world.sharee.get(f"/api/sessions/{world.sid}").status_code == 404
+    assert world.sharee.get("/api/sessions").json() == []
+    assert world.creator.get(f"/api/sessions/{world.sid}").status_code == 200
+
+
+def test_shares_me_is_a_404_for_whoever_has_no_share(world):
+    assert world.creator.delete(f"/api/sessions/{world.sid}/shares/me").status_code == 404
+    assert world.stranger.delete(f"/api/sessions/{world.sid}/shares/me").status_code == 404
+    assert world.admin.delete(f"/api/sessions/{world.sid}/shares/me").status_code == 404

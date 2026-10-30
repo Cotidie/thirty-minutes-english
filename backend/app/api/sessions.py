@@ -3,7 +3,8 @@ from dataclasses import asdict
 from fastapi import APIRouter, HTTPException, Response
 
 from app.api.deps import Creator, Db, Files, Jobs, Me, Svc, failed, off, require_access, require_creator
-from app.api.schemas import CreateSessionRequest, JobStatus, RedrawRequest
+from app.api.schemas import CreateSessionRequest, JobStatus, RedrawRequest, ShareEntry, ShareRequest
+from app.db import Database
 from app.generation.jobs import Job, JobRunner
 from app.llm import GenerationError
 from app.models import Expression, Note, Session, SessionSummary, Stars, User, VocabularyItem
@@ -91,6 +92,44 @@ def delete_session(session_id: int, db: Db, files: Files, me: Me) -> Response:
         raise HTTPException(status_code=404, detail="session not found")
     for picture_id in pictures:
         files.remove(picture_id)
+    return Response(status_code=204)
+
+
+def _shares_of(db: Database, session_id: int) -> list[ShareEntry]:
+    return [ShareEntry(user_id=user.id, email=user.email) for user in db.shares.shared_with(session_id)]
+
+
+@router.get("/sessions/{session_id}/shares", response_model=list[ShareEntry])
+def list_shares(session_id: int, db: Db, me: Me) -> list[ShareEntry]:
+    require_creator(db, me, session_id)
+    return _shares_of(db, session_id)
+
+
+@router.post("/sessions/{session_id}/shares", response_model=list[ShareEntry], status_code=201)
+def add_share(session_id: int, body: ShareRequest, db: Db, me: Creator) -> list[ShareEntry]:
+    """Only an account that exists; sharing with oneself or sharing again changes nothing."""
+    require_creator(db, me, session_id)
+    user = db.accounts.by_email(body.email)
+    if user is None:
+        raise HTTPException(status_code=404, detail="No account uses that email.")
+    if user.id != me.id:
+        db.shares.share(session_id, user.id)
+    return _shares_of(db, session_id)
+
+
+@router.delete("/sessions/{session_id}/shares/me", status_code=204)
+def leave_session(session_id: int, db: Db, me: Me) -> Response:
+    """The session off my list; it stays for its creator and the others it is shared with."""
+    if not db.shares.unshare(session_id, me.id):
+        raise HTTPException(status_code=404, detail="not shared with you")
+    return Response(status_code=204)
+
+
+@router.delete("/sessions/{session_id}/shares/{user_id}", status_code=204)
+def remove_share(session_id: int, user_id: int, db: Db, me: Me) -> Response:
+    require_creator(db, me, session_id)
+    if not db.shares.unshare(session_id, user_id):
+        raise HTTPException(status_code=404, detail="not shared with that account")
     return Response(status_code=204)
 
 

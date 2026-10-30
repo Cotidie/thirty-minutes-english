@@ -14,6 +14,15 @@ class Credentials(BaseModel):
     password: str
 
 
+class ShareRequest(BaseModel):
+    email: str
+
+
+class ShareEntry(BaseModel):
+    user_id: int
+    email: str
+
+
 class CreateSessionRequest(BaseModel):
     topic: str | None = None
 
