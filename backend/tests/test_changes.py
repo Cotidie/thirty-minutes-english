@@ -70,15 +70,22 @@ def test_a_new_session_says_nothing_since_nobody_has_it_open(world):
     assert db.changes.published == []
 
 
-def test_unsharing_signals_access_and_a_share_that_was_not_there_does_not(world):
+def test_sharing_says_the_shares_changed_and_sharing_again_does_not(world):
     db, session = world
     friend = add_user(db, "friend@example.com")
     db.shares.share(session.id, friend.id)
-    assert db.changes.published == []
+    db.shares.share(session.id, friend.id)
+    assert db.changes.published == [(session.id, SessionChange.SHARES)]
+
+
+def test_unsharing_signals_access_and_the_shares_and_a_share_that_was_not_there_does_not(world):
+    db, session = world
+    friend = add_user(db, "friend@example.com")
+    db.shares.share(session.id, friend.id)
+    db.changes.published.clear()
     db.shares.unshare(session.id, friend.id)
-    assert db.changes.published == [(session.id, SessionChange.ACCESS)]
     db.shares.unshare(session.id, friend.id)
-    assert db.changes.published == [(session.id, SessionChange.ACCESS)]
+    assert sorted(db.changes.published) == [(session.id, SessionChange.ACCESS), (session.id, SessionChange.SHARES)]
 
 
 def test_sharing_tells_the_account_its_list_changed_and_sharing_again_does_not(world):

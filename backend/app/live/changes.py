@@ -14,6 +14,7 @@ class SessionChange(StrEnum):
     STARS = "stars"
     NOTE = "note"
     RECORDS = "records"
+    SHARES = "shares"
     ACCESS = "access"  # someone may have lost the session; the stream checks, and this never reaches a browser
 
 

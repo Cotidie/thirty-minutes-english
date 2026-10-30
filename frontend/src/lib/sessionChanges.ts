@@ -4,11 +4,11 @@ import { useCallback, useEffect, useRef } from 'react'
  * What the server's event streams say: which resource to read again over REST, of an open session or of the
  * account. The streams hold no data, and this file is the only place that connects to them.
  */
-export type SessionChange = 'session' | 'stars' | 'note' | 'records'
+export type SessionChange = 'session' | 'stars' | 'note' | 'records' | 'shares'
 export type AccountChange = 'sessions'
 type Change = SessionChange | AccountChange
 
-const CHANGES: Change[] = ['session', 'stars', 'note', 'records', 'sessions']
+const CHANGES: Change[] = ['session', 'stars', 'note', 'records', 'shares', 'sessions']
 const ACCOUNT_STREAM = '/api/me/events'
 const REOPEN_MS = 5000
 /** The server speaks at least every 25 seconds. A connection that died quietly tells a browser nothing, so this does. */

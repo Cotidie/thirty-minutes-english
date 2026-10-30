@@ -33,6 +33,7 @@ class ShareRepo:
                 (session_id, user_id, datetime.now(UTC).isoformat()),
             )
         if cur.rowcount > 0:
+            self._db.changes.publish(session_id, SessionChange.SHARES)
             self._db.account_changes.publish(user_id, AccountChange.SESSIONS)
 
     def unshare(self, session_id: int, user_id: int) -> bool:
@@ -42,6 +43,7 @@ class ShareRepo:
         if cur.rowcount == 0:
             return False
         self._db.changes.publish(session_id, SessionChange.ACCESS)
+        self._db.changes.publish(session_id, SessionChange.SHARES)
         self._db.account_changes.publish(user_id, AccountChange.SESSIONS)
         return True
 

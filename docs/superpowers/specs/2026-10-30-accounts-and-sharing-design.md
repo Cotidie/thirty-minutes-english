@@ -194,6 +194,7 @@ app/api/deps.py                  Me, 역할 검사, 세션 접근 검사
 | `stars` | `GET /api/sessions/{id}/stars` | `set_star`, `swap_expression`(빠진 표현의 별표도 사라진다) |
 | `note` | `GET /api/sessions/{id}/note` | `set_note` |
 | `records` | `examples`, `summaries`, `readings`의 GET | `add_example`, `add_summary`, `add_reading` |
+| `shares` | `GET /api/sessions/{id}/shares`. 만든 사람의 공유 목록만 듣는다 | `ShareRepo.share`, `ShareRepo.unshare` |
 | `gone` | 없음. 화면을 "This session is no longer available."로 바꾼다 | 저장소가 아니라 스트림이 판단한다 (아래) |
 | `sessions` (계정 스트림) | `GET /api/sessions` | `SessionRepo.create`(만든 사람에게), `SessionRepo.delete`(만든 사람과 공유받은 사람 모두에게), `ShareRepo.share`, `ShareRepo.unshare`(그 사람에게) |
 

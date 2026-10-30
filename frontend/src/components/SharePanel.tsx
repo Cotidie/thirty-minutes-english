@@ -1,5 +1,6 @@
-import { useEffect, useState, type FormEvent } from 'react'
+import { useState, type FormEvent } from 'react'
 import { api } from '../api'
+import { useSessionResource } from '../lib/sessionChanges'
 import type { ShareEntry } from '../types'
 import './SharePanel.css'
 
@@ -13,41 +14,43 @@ interface Props {
 export function SharePanel({ sessionId, canAdd }: Props) {
   const [shares, setShares] = useState<ShareEntry[]>([])
   const [email, setEmail] = useState('')
-  const [error, setError] = useState<string | null>(null)
+  const [readError, setReadError] = useState<string | null>(null)
+  const [writeError, setWriteError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
+  const error = writeError ?? readError
 
-  useEffect(() => {
-    let live = true
-    api
-      .listShares(sessionId)
-      .then((s) => live && setShares(s))
-      .catch((e: Error) => live && setError(e.message))
-    return () => {
-      live = false
-    }
-  }, [sessionId])
+  useSessionResource(
+    sessionId,
+    'shares',
+    () => api.listShares(sessionId),
+    (list) => {
+      setShares(list)
+      setReadError(null)
+    },
+    (e) => setReadError(e.message),
+  )
 
   async function add(event: FormEvent) {
     event.preventDefault()
     setBusy(true)
-    setError(null)
+    setWriteError(null)
     try {
       setShares(await api.addShare(sessionId, email))
       setEmail('')
     } catch (e) {
-      setError((e as Error).message)
+      setWriteError((e as Error).message)
     } finally {
       setBusy(false)
     }
   }
 
   async function remove(entry: ShareEntry) {
-    setError(null)
+    setWriteError(null)
     try {
       await api.removeShare(sessionId, entry.user_id)
       setShares((all) => all.filter((s) => s.user_id !== entry.user_id))
     } catch (e) {
-      setError((e as Error).message)
+      setWriteError((e as Error).message)
     }
   }
 
