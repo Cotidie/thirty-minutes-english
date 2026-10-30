@@ -10,6 +10,7 @@ from collections.abc import Collection
 from datetime import UTC, datetime
 from typing import TYPE_CHECKING
 
+from app.db.shares import VISIBLE_SESSIONS
 from app.generation.exclusions import key
 from app.models import CorpusEntry, Expression
 
@@ -105,14 +106,17 @@ class ExpressionRepo:
         with self._db.connect() as conn:
             return conn.execute("SELECT COUNT(*) FROM expressions").fetchone()[0]
 
-    def pick(self, count: int, rng: random.Random, exclude: Collection[int] = ()) -> list[Expression]:
+    def pick(self, count: int, rng: random.Random, exclude: Collection[int] = (), seen_by: int | None = None) -> list[Expression]:
         """Up to `count` expressions for a session, none of `exclude`: never-used ones first, taken in turn
-        from each setting so a session mixes them; when those run out, the ones used longest ago."""
+        from each setting so a session mixes them; when those run out, the ones used longest ago.
+        With `seen_by`, used means in the sessions that account made or had shared with it."""
+        uses, params = (USES, ()) if seen_by is None else (f"SELECT * FROM ({USES}) WHERE session_id IN ({VISIBLE_SESSIONS})", (seen_by, seen_by))
         with self._db.connect() as conn:
             rows = conn.execute(
                 f"""SELECT {COLUMNS}, MAX(u.session_id) AS last_used FROM expressions e
-                    LEFT JOIN ({USES}) u ON u.expression_id = e.id
-                    GROUP BY e.id ORDER BY e.id"""
+                    LEFT JOIN ({uses}) u ON u.expression_id = e.id
+                    GROUP BY e.id ORDER BY e.id""",
+                params,
             ).fetchall()
         rows = [row for row in rows if row["id"] not in exclude]
         by_setting: dict[str | None, list[sqlite3.Row]] = defaultdict(list)

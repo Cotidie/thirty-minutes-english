@@ -1,12 +1,12 @@
 
 import pytest
-from tests.conftest import admin_client
 
 from app.config.settings import InvalidSetting, Settings
 from app.db import Database
 from app.main import create_app
 from app.wiring import Services
 from tests.test_api import FakeGenerator, InlineExecutor
+from tests.conftest import admin_client
 
 
 @pytest.fixture

@@ -3,7 +3,6 @@ from pathlib import Path
 import pytest
 from fastapi.testclient import TestClient
 
-from tests.conftest import admin_client
 
 from app.coaching.example_feedback import ExampleCoach
 from app.db import Database
@@ -12,6 +11,7 @@ from app.main import create_app
 from app.models import ExampleFeedback
 from app.wiring import Services
 from tests.test_api import FakeGenerator, InlineExecutor
+from tests.conftest import admin_client
 
 PROMPT = "Word: {{word}} ({{pos}}; {{meaning}})\nPicture: {{scene}}\nSentence: {{sentence}}"
 

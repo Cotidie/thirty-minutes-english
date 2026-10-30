@@ -1,5 +1,4 @@
 import pytest
-from tests.conftest import admin_client
 
 from app.db import Database
 from app.generation.generator import VOCABULARY_COUNT
@@ -11,7 +10,7 @@ from app.wiring import Services
 from app.pictures.files import PictureFiles
 from app.pictures.scenes import Scene
 
-from tests.conftest import CURATED_TOPICS, sample_draft, seed_expressions
+from tests.conftest import CURATED_TOPICS, admin_client, sample_draft, seed_expressions
 
 TOPIC_TEXTS = {t.text for t in CURATED_TOPICS}
 

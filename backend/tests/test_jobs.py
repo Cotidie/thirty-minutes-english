@@ -12,7 +12,7 @@ from app.pictures.illustrator import Illustrator
 from app.pictures.painters import Drawn
 from app.generation.jobs import DEFAULT_STAGE_SECONDS, EXPRESSION_COUNT, Job, JobRunner
 from app.generation.progress import Progress, Stage
-from tests.conftest import sample_draft, seed_expressions
+from tests.conftest import add_user, sample_draft, seed_expressions
 
 
 class InlineExecutor:
@@ -235,3 +235,19 @@ def test_a_source_image_comes_through_with_pictures_off_and_a_late_paragraph_num
     article = db.sessions.get(job.session_id).content.article
     assert [f.paragraph_id for f in article.figures] == [article.paragraphs[-1].id]
     assert PictureFiles(db.images_dir).path(int(article.figures[0].image.removesuffix(".png"))).is_file()
+
+
+def test_a_job_picks_by_what_its_starter_has_seen(tmp_path):
+    db = Database(tmp_path / "s.db")
+    ids = seed_expressions(db, EXPRESSION_COUNT + 1)
+    me, other = add_user(db, "me@example.com", can_create=True), add_user(db, "other@example.com", can_create=True)
+    theirs = sample_draft()
+    theirs.vocabulary[0] = theirs.vocabulary[0].model_copy(update={"word": "theirs"})
+    db.sessions.create(theirs, [ids[1]], created_by=other.id)
+    db.sessions.create(sample_draft(), [ids[0]], created_by=me.id)
+    generator = Recording()
+    job = runner_over(db).start("A", generator, created_by=me.id)
+    session = db.sessions.get(job.session_id)
+    assert {e.id for e in session.content.expressions} == set(ids) - {ids[0]}
+    assert "theirs" not in generator.excluded[0].words
+    assert db.shares.created_by(session.id) == me.id

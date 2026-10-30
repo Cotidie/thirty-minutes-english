@@ -1,12 +1,10 @@
 import random
 
-from tests.conftest import admin_client
-
 from app.db import Database
 from app.main import create_app
 from app.models import KoreanExample
 from app.wiring import Services
-from tests.conftest import NAMES, sample_draft, seed_expressions
+from tests.conftest import NAMES, add_user, admin_client, sample_draft, seed_expressions
 from tests.test_api import FakeGenerator, InlineExecutor
 
 
@@ -101,3 +99,54 @@ def test_a_korean_example_comes_with_its_expression_wherever_it_is_read(store):
     assert [e.korean_example for e in store.sessions.get(session).content.expressions] == [example, None]
     assert store.expressions.get(a).korean_example == example
     assert [e.korean_example for e in store.expressions.list_all()] == [example, None]
+
+
+def people(store):
+    return add_user(store, "me@example.com"), add_user(store, "other@example.com")
+
+
+def test_what_someone_else_was_taught_stays_new_for_me(store):
+    ids = seed_expressions(store, 2)
+    me, other = people(store)
+    store.sessions.create(sample_draft(), [ids[0]], created_by=other.id)
+    assert {e.id for e in store.expressions.pick(2, random.Random(1), seen_by=me.id)} == set(ids)
+    assert [e.id for e in store.expressions.pick(1, random.Random(1), seen_by=other.id)] == [ids[1]]
+
+
+def test_what_was_shared_with_me_counts_as_seen(store):
+    ids = seed_expressions(store, 2)
+    me, other = people(store)
+    shared = store.sessions.create(sample_draft(), [ids[0]], created_by=other.id)
+    store.shares.share(shared.id, me.id)
+    assert [e.id for e in store.expressions.pick(1, random.Random(1), seen_by=me.id)] == [ids[1]]
+
+
+def test_once_all_are_seen_my_own_oldest_comes_first(store):
+    ids = seed_expressions(store, 2)
+    me, other = people(store)
+    store.sessions.create(sample_draft(), [ids[0]], created_by=me.id)
+    store.sessions.create(sample_draft(), [ids[1]], created_by=me.id)
+    store.sessions.create(sample_draft(), [ids[0]], created_by=other.id)  # newer, but not mine
+    assert [e.id for e in store.expressions.pick(1, random.Random(1), seen_by=me.id)] == [ids[0]]
+
+
+def test_with_no_one_named_every_session_counts(store):
+    ids = seed_expressions(store, 2)
+    other = add_user(store, "other@example.com")
+    store.sessions.create(sample_draft(), [ids[0]], created_by=other.id)
+    assert [e.id for e in store.expressions.pick(1, random.Random(1))] == [ids[1]]
+
+
+def test_the_words_to_avoid_come_from_my_sessions_and_those_shared_with_me(store):
+    me, other = people(store)
+    def draft_with(word):
+        draft = sample_draft()
+        draft.vocabulary[0] = draft.vocabulary[0].model_copy(update={"word": word})
+        return draft
+    store.sessions.create(draft_with("mine"), [], created_by=me.id)
+    shared = store.sessions.create(draft_with("shared"), [], created_by=other.id)
+    store.shares.share(shared.id, me.id)
+    store.sessions.create(draft_with("theirs"), [], created_by=other.id)
+    words = store.sessions.used_words(seen_by=me.id)
+    assert "mine" in words and "shared" in words and "theirs" not in words
+    assert "theirs" in store.sessions.used_words()

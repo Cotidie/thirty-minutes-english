@@ -10,6 +10,11 @@ if TYPE_CHECKING:
     from app.db import Database
 
 
+# The sessions an account made or had shared with it: what its home page lists and what it has already seen.
+# Takes the account's id twice.
+VISIBLE_SESSIONS = "SELECT id FROM sessions WHERE created_by = ? UNION SELECT session_id FROM session_shares WHERE user_id = ?"
+
+
 class ShareRepo:
     def __init__(self, db: "Database") -> None:
         self._db = db

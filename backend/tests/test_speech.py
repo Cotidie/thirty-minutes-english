@@ -1,13 +1,13 @@
 import json
 
 import httpx2
-from tests.conftest import admin_client
 
 from app.db import Database
 from app.main import create_app
 from app.voice.speech import GeminiTts, Speaker, speaker_for
 from app.wiring import Services
 from tests.test_api import FakeGenerator, InlineExecutor
+from tests.conftest import admin_client
 
 
 class CountingVoice:

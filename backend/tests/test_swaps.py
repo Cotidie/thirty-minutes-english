@@ -1,11 +1,11 @@
 import random
 
-from tests.conftest import admin_client
+from fastapi.testclient import TestClient
 
 from app.db import Database
 from app.main import create_app
 from app.wiring import Services
-from tests.conftest import sample_draft, seed_expressions
+from tests.conftest import add_user, admin_client, sample_draft, seed_expressions, sign_in
 from tests.test_api import FakeGenerator, InlineExecutor
 
 
@@ -96,3 +96,17 @@ def test_an_expression_is_added_over_http(tmp_path):
         assert c.post(f"/api/sessions/{session}/expressions").status_code == 404
         assert c.post(f"/api/sessions/{session + 1}/expressions").status_code == 404
         assert [e["id"] for e in c.get(f"/api/sessions/{session}").json()["content"]["expressions"]] == [a, b]
+
+
+def test_a_swap_and_an_add_avoid_what_the_one_asking_saw(tmp_path):
+    db = Database(tmp_path / "s.db")
+    a, b, c, d = seed_expressions(db, 4)
+    me, other = add_user(db, "me@example.com"), add_user(db, "other@example.com")
+    db.sessions.create(sample_draft(), [b, d], created_by=me.id)
+    shared = db.sessions.create(sample_draft(), [a], created_by=other.id)
+    db.shares.share(shared.id, me.id)
+    client = TestClient(create_app(db, Services(FakeGenerator()), InlineExecutor()))
+    sign_in(client, db, me)
+    assert client.post(f"/api/sessions/{shared.id}/expressions/{a}/swap").json()["id"] == c
+    # a and c are this session's, and I saw b and d in one session: the earlier in the corpus comes first.
+    assert client.post(f"/api/sessions/{shared.id}/expressions").json()["id"] == b

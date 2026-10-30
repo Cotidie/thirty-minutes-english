@@ -1,7 +1,6 @@
 from pathlib import Path
 
 import pytest
-from tests.conftest import admin_client
 
 from app.db import Database
 from app.main import create_app
@@ -9,6 +8,7 @@ from app.net import HttpError
 from app.voice.live import AgentDefinition, GeminiTranscriber, GeminiVoice, LiveAgent, vocabulary
 from app.wiring import Services
 from tests.test_api import FakeGenerator, InlineExecutor
+from tests.conftest import admin_client
 
 PARAGRAPH = "Researchers verified that the new battery lasts twice as long."
 SUMMARY_DIR = Path(__file__).parents[2] / "agents" / "summary-coach"

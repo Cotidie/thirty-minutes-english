@@ -1,12 +1,12 @@
 from pathlib import Path
 
-from tests.conftest import admin_client
 
 from app.coaching.summary_feedback import SummaryCoach
 from app.db import Database
 from app.main import create_app
 from app.wiring import Services
 from tests.test_api import FakeGenerator, InlineExecutor
+from tests.conftest import admin_client
 
 AGENT_DIR = Path(__file__).parents[2] / "agents" / "summary-coach"
 PARAGRAPH = "Seoul scrapped its trams in 1968. Now it is laying tracks again."

@@ -1,7 +1,6 @@
 from datetime import date
 
 import pytest
-from tests.conftest import admin_client
 
 from app.db import Database
 from app.llm import GenerationError
@@ -10,7 +9,7 @@ from app.models import Category
 from app.topics.daily import FRESH_COUNT, POOL_COUNT, DailyTopics
 from app.topics.pool import pool_for_day
 from app.wiring import Services
-from tests.conftest import CURATED_TOPICS as TOPICS
+from tests.conftest import CURATED_TOPICS as TOPICS, admin_client
 from tests.test_api import FakeGenerator, InlineExecutor
 
 NEWS = [f"news topic {i}" for i in range(FRESH_COUNT)]

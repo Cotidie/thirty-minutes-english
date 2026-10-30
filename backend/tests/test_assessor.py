@@ -1,7 +1,6 @@
 import pytest
 from fastapi.testclient import TestClient
 
-from tests.conftest import admin_client
 
 from app.db import Database
 from app.main import create_app
@@ -9,6 +8,7 @@ from app.net import HttpError
 from app.voice.assessor import AzureAssessor
 from app.wiring import Services
 from tests.test_api import FakeGenerator, InlineExecutor
+from tests.conftest import admin_client
 
 
 def test_session_carries_the_token_region_and_threshold(http):

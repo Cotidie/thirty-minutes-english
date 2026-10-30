@@ -137,7 +137,7 @@ def remove_share(session_id: int, user_id: int, db: Db, me: Me) -> Response:
 def swap_expression(session_id: int, expression_id: int, db: Db, me: Me) -> Expression:
     """Another corpus expression in this one's place; the one swapped out counts as used, so new sessions pick it last."""
     require_access(db, me, session_id)
-    expression = db.sessions.swap_expression(session_id, expression_id)
+    expression = db.sessions.swap_expression(session_id, expression_id, seen_by=me.id)
     if expression is None:
         raise HTTPException(status_code=404, detail="the session does not teach this expression, or nothing is left to swap in")
     return expression
@@ -147,7 +147,7 @@ def swap_expression(session_id: int, expression_id: int, db: Db, me: Me) -> Expr
 def add_expression(session_id: int, db: Db, me: Me) -> Expression:
     """One more corpus expression, taught after the others and picked as a swap picks one."""
     require_access(db, me, session_id)
-    expression = db.sessions.add_expression(session_id)
+    expression = db.sessions.add_expression(session_id, seen_by=me.id)
     if expression is None:
         raise HTTPException(status_code=404, detail="no such session, or nothing is left to add")
     return expression

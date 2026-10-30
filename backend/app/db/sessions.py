@@ -12,6 +12,7 @@ from typing import TYPE_CHECKING
 from app.db.expressions import COLUMNS as EXPRESSION_COLUMNS
 from app.db import topics
 from app.db.expressions import expression_from
+from app.db.shares import VISIBLE_SESSIONS
 from app.models import Article, Category, Draft, Expression, Figure, Note, Paragraph, Question, SentencePair, Session, SessionContent, SessionSummary, Source, Stars, VocabularyItem
 
 if TYPE_CHECKING:
@@ -113,14 +114,16 @@ class SessionRepo:
         )
         return Session(id=row["id"], created_at=row["created_at"], topic=row["topic"], content=content)
 
-    def swap_expression(self, session_id: int, expression_id: int, rng: random.Random | None = None) -> Expression | None:
-        """The expression put in place of `expression_id`, picked as a new session picks one but never one this
-        session has had; the one swapped out counts as used here, and its star goes.
+    def swap_expression(
+        self, session_id: int, expression_id: int, rng: random.Random | None = None, seen_by: int | None = None
+    ) -> Expression | None:
+        """The expression put in place of `expression_id`, picked as a new session picks one for `seen_by` but never
+        one this session has had; the one swapped out counts as used here, and its star goes.
         None when the session does not teach `expression_id`, or the corpus has nothing else to offer."""
         had = self._had(session_id)
         if expression_id not in had:
             return None
-        picked = self._db.expressions.pick(1, rng or random.Random(), exclude=had)
+        picked = self._db.expressions.pick(1, rng or random.Random(), exclude=had, seen_by=seen_by)
         if not picked:
             return None
         with self._db.connect() as conn:
@@ -138,12 +141,12 @@ class SessionRepo:
             )
         return picked[0]
 
-    def add_expression(self, session_id: int, rng: random.Random | None = None) -> Expression | None:
+    def add_expression(self, session_id: int, rng: random.Random | None = None, seen_by: int | None = None) -> Expression | None:
         """One more expression taught after the others, picked as `swap_expression` picks one.
         None when there is no such session, or the corpus has nothing else to offer."""
         if not self.exists(session_id):
             return None
-        picked = self._db.expressions.pick(1, rng or random.Random(), exclude=self._had(session_id))
+        picked = self._db.expressions.pick(1, rng or random.Random(), exclude=self._had(session_id), seen_by=seen_by)
         if not picked:
             return None
         with self._db.connect() as conn:
@@ -176,7 +179,7 @@ class SessionRepo:
                 f"""SELECT s.id, s.created_at, t.text AS topic, s.title, s.created_by = ? AS mine,
                            CASE WHEN s.created_by = ? THEN NULL ELSE u.email END AS shared_by
                     FROM {WITH_TOPIC} LEFT JOIN users u ON u.id = s.created_by
-                    WHERE s.created_by = ? OR s.id IN (SELECT session_id FROM session_shares WHERE user_id = ?)
+                    WHERE s.id IN ({VISIBLE_SESSIONS})
                     ORDER BY s.id DESC""",
                 (user_id, user_id, user_id, user_id),
             ).fetchall()
@@ -229,13 +232,18 @@ class SessionRepo:
             ).fetchall()
         return [row["topic"] for row in rows]
 
-    def used_words(self, limit_sessions: int = 40) -> tuple[str, ...]:
-        """Distinct words of the most recent sessions, newest session first."""
+    def used_words(self, limit_sessions: int = 40, seen_by: int | None = None) -> tuple[str, ...]:
+        """Distinct words of the most recent sessions, newest session first; with `seen_by`, of the sessions
+        that account made or had shared with it."""
+        recent, params = (
+            ("SELECT id FROM sessions ORDER BY id DESC LIMIT ?", (limit_sessions,))
+            if seen_by is None
+            else (f"SELECT id FROM ({VISIBLE_SESSIONS}) ORDER BY id DESC LIMIT ?", (seen_by, seen_by, limit_sessions))
+        )
         with self._db.connect() as conn:
             rows = conn.execute(
-                "SELECT v.word FROM vocabulary v JOIN (SELECT id FROM sessions ORDER BY id DESC LIMIT ?) s ON s.id = v.session_id"
-                " ORDER BY s.id DESC, v.position",
-                (limit_sessions,),
+                f"SELECT v.word FROM vocabulary v JOIN ({recent}) s ON s.id = v.session_id ORDER BY s.id DESC, v.position",
+                params,
             ).fetchall()
         return tuple(dict.fromkeys(row["word"] for row in rows))
 

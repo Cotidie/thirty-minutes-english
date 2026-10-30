@@ -171,7 +171,7 @@ class JobRunner:
         """The session is saved, with expressions from the corpus, and `job.session_id` set, as soon as
         its text is written; the pictures land on it one by one after that, so it can be opened while they are drawn."""
         try:
-            used = Exclusions(self._sessions.used_words())
+            used = Exclusions(self._sessions.used_words(seen_by=job.created_by))
             exclude = used.thin(1 - self.REPEAT_ALLOWANCE, random.Random())
             log.info("job %s: banning %d/%d words", job.id, len(exclude.words), len(used.words))
             draft = generator.generate(job.topic, on_progress=job.apply, exclude=exclude)
@@ -180,7 +180,7 @@ class JobRunner:
                 log.warning("job %s: %d banned words came back anyway: %s", job.id, len(leaked), leaked)
             if job.status == "cancelled":
                 return
-            picked = self._expressions.pick(EXPRESSION_COUNT, random.Random())
+            picked = self._expressions.pick(EXPRESSION_COUNT, random.Random(), seen_by=job.created_by)
             session = self._sessions.create(draft, [e.id for e in picked], job.created_by)
             job.session_id = session.id
             landed = self._keep_figures(session, draft.article.figures)

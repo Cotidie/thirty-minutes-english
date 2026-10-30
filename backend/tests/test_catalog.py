@@ -1,7 +1,6 @@
 
 import pytest
 
-from tests.conftest import admin_client
 
 from app.config import catalog as catalog_module
 from app.config.catalog import Catalog, ModelOption, claude_models, gemini_live, newest_first, openrouter_images
@@ -11,6 +10,7 @@ from app.db.pictures import PictureRepo, PictureStat
 from app.main import create_app
 from app.wiring import Services, effort
 from tests.test_api import FakeGenerator, InlineExecutor
+from tests.conftest import admin_client
 
 
 class Clock:

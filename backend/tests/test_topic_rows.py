@@ -1,12 +1,11 @@
 import pytest
-from tests.conftest import admin_client
 
 from app.db import Database
 from app.db.topics import TopicInUse
 from app.main import create_app
 from app.models import Category
 from app.wiring import Services
-from tests.conftest import CURATED_TOPICS, sample_draft
+from tests.conftest import CURATED_TOPICS, admin_client, sample_draft
 from tests.test_api import FakeGenerator, InlineExecutor
 
 
