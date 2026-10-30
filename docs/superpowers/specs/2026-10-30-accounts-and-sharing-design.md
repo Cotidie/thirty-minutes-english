@@ -131,9 +131,12 @@ ALTER TABLE sessions ADD COLUMN created_by INTEGER REFERENCES users(id);
 app/accounts/passwords.py        해시와 검증
 app/accounts/limits.py           로그인 실패와 가입 횟수 제한
 app/accounts/reset_password.py   재설정 명령
-app/db/accounts.py               users, logins, session_shares 저장소
+app/db/accounts.py               users, logins 저장소
+app/db/shares.py                 session_shares 저장소와 접근 판단
+app/live/changes.py              세션 변경 알림의 구독자 목록
 app/api/auth.py                  signup, login, logout, me
 app/api/accounts.py              운영자의 계정 목록과 can_create 변경
+app/api/events.py                이벤트 스트림 라우트
 app/api/deps.py                  Me, 역할 검사, 세션 접근 검사
 ```
 
@@ -158,24 +161,76 @@ app/api/deps.py                  Me, 역할 검사, 세션 접근 검사
 - **대상:** 별표, 노트, 표현 교체와 추가, 그림 다시 그리기, 말하기 연습 기록(`examples`, `summaries`, `readings`).
 - **세션을 못 보게 될 때:** 세션이 삭제되거나 내 공유가 풀리면 화면을 "This session is no longer available."와 홈 링크로 바꾼다.
 
-### 방식
+### 통신의 경계
 
-Server-Sent Events(서버가 브라우저로 한 방향으로 알림을 보내는 표준 HTTP 스트림)를 쓴다. 쓰기는 지금의 REST API로 충분하므로 양방향인 WebSocket이 필요 없고, 폴링은 지연과 요청 수 사이에서 손해를 본다. 새 의존성은 없다.
+앱의 통신은 네 가지이고, 각각 맡는 일이 겹치지 않는다.
 
-- **이벤트:** `GET /api/sessions/{id}/events`가 무엇이 바뀌었는지 이름만 보낸다. 이름은 `session`(표현, 단어, 그림), `stars`, `note`, `records`, `gone`이다. 데이터는 보내지 않고, 브라우저가 기존 GET API로 다시 읽는다. 그래서 응답 형식과 권한 검사가 한 곳에 남는다.
-- **서버:** 세션별 구독자 목록을 메모리에 둔다(`app/generation` 밖의 새 모듈). 동기 라우트는 스레드풀에서 돌므로 발행은 `loop.call_soon_threadsafe`로 각 구독자의 `asyncio.Queue`에 넣는다. 스트림은 비동기 제너레이터로 만들어 스레드풀을 점유하지 않는다.
-- **발행 위치:** DB 쓰기가 끝난 뒤 라우트에서 발행한다. job의 그림이 도착할 때와 그림 다시 그리기는 `session`을 발행한다.
-- **접근권 재확인:** 25초마다 하트비트 주석을 보내면서 접근권을 다시 확인한다. 공유 해제와 세션 삭제는 `gone`을 바로 보낸다. 접근권이 없어지면 스트림을 닫는다.
+| 통신 | 방향 | 맡는 일 | 쓰는 곳 |
+|---|---|---|---|
+| REST | 요청과 응답 | **모든 상태의 읽기와 쓰기** | 앱 전체 |
+| 이벤트 스트림 `GET /api/sessions/{id}/events` | 서버에서 브라우저로 | 공유되는 세션 상태 중 무엇을 다시 읽어야 하는지 알림. 데이터는 없다 | 세션 화면 |
+| 폴링 `GET /api/jobs` | 브라우저에서 서버로 | 세션 생성 진행률. 시작한 사람만 보는 임시 상태다 | 홈, 세션 화면의 그림 진행 표시 |
+| WebSocket (브라우저와 Gemini, Azure 사이) | 양방향 | 말하기 연습의 음성. 우리 서버를 거치지 않는다 | 연습 화면 |
+
+규칙:
+
+- **상태는 REST로만 읽고 쓴다.** 이벤트에는 자원 이름만 있고 데이터가 없다. 응답 형식과 권한 검사는 GET 라우트 한 곳에만 있다. 브라우저에서 서버로 쓰는 일도 REST로만 한다.
+- **이벤트는 "이 자원을 다시 읽어라"만 뜻한다.** 이벤트 이름 하나는 아래 표의 GET과 일대일로 대응한다. 이벤트 처리는 화면을 직접 고치지 않고 다시 읽기만 한다.
+- **스트림은 하나다.** 세션 화면 전용이고, 다른 화면과 다른 자원은 쓰지 않는다.
+- **발행은 저장소에서만 한다.** 라우트, job, 그림 콜백, 컴포넌트는 발행하지 않는다. 쓰기 경로가 여러 곳이어도 모두 `SessionRepo`, `RecordRepo`, `ShareRepo`, `ExpressionRepo`를 지나므로, 경로를 새로 만들어도 알림을 빠뜨리지 않는다. 커밋이 끝난 뒤에 발행한다.
+- **구독은 훅 하나로만 한다.** `useSessionResource`만 스트림에 연결한다. 컴포넌트나 다른 훅이 `EventSource`를 직접 만들지 않는다.
+- **새 기능의 판단 기준:** 여러 사람이 보는 세션 상태면 GET을 만들고 이벤트 이름을 더한다. 한 사람의 임시 진행 상황이면 폴링한다. 스트림에 데이터를 실으면 안 된다.
+
+이 규칙은 `AGENTS.md`에도 적어 앞으로의 작업에 적용한다.
+
+### 이벤트
+
+| 이벤트 | 브라우저가 다시 읽는 것 | 발행하는 저장소 메서드 |
+|---|---|---|
+| `session` | `GET /api/sessions/{id}` | `swap_expression`, `add_expression`, `add_figure`, `replace_picture`, `ExpressionRepo.delete`(그 표현을 쓴 세션마다) |
+| `stars` | `GET /api/sessions/{id}/stars` | `set_star`, `swap_expression`(빠진 표현의 별표도 사라진다) |
+| `note` | `GET /api/sessions/{id}/note` | `set_note` |
+| `records` | `examples`, `summaries`, `readings`의 GET | `add_example`, `add_summary`, `add_reading` |
+| `gone` | 없음. 화면을 "This session is no longer available."로 바꾼다 | 저장소가 아니라 스트림이 판단한다 (아래) |
+
+내부 신호 `access`는 `SessionRepo.delete`와 `ShareRepo.unshare`가 발행하며 브라우저로 나가지 않는다. 스트림은 이 신호를 받으면 접근권을 다시 확인해, 없어졌으면 `gone`을 보내고 닫는다. 그래서 "누가 못 보게 됐는가"의 판단은 접근 검사 한 곳에만 있다.
+
+```
+브라우저 A ── PUT /stars/words/12 ──▶ 라우트 ──▶ SessionRepo.set_star ──▶ 커밋
+                                                      │ publish(세션, stars)
+                                                      ▼
+브라우저 B ◀── event: stars ──── 스트림 ◀──── SessionChanges
+브라우저 B ── GET /stars ──▶ 라우트 (권한 검사) ──▶ 최신 상태
+```
+
+### 서버
+
+Server-Sent Events(서버가 브라우저로 한 방향으로 알림을 보내는 표준 HTTP 스트림)를 쓴다. 쓰기는 REST로 충분하므로 양방향인 WebSocket이 필요 없고, 폴링은 지연과 요청 수 사이에서 손해를 본다. 새 의존성은 없다.
+
+- **구독자 목록:** `app/live/changes.py`의 `SessionChanges`. 웹 프레임워크를 모른다. `Database`가 하나 가지고 저장소는 `publish`만 안다.
+- **밀림 방지:** 구독자마다 큐 대신 "아직 안 보낸 이벤트 이름의 집합"을 둔다. 느린 브라우저가 있어도 메모리가 늘지 않고, 그림 20장이 연달아 도착해도 `session` 한 번으로 합쳐진다.
+- **스레드:** 저장소는 스레드풀과 job 스레드에서 돌므로 `publish`는 스레드 안전해야 하고, 스트림의 이벤트 루프는 `loop.call_soon_threadsafe`로 깨운다. 스트림은 비동기 제너레이터로 만들어 스레드풀을 점유하지 않는다.
+- **재확인:** 25초마다 하트비트 주석을 보내면서 로그인과 접근권을 다시 확인한다. 없어졌으면 `gone`을 보내고 닫는다.
 - **프록시:** 응답 헤더는 `Content-Type: text/event-stream`, `Cache-Control: no-cache`, `X-Accel-Buffering: no`다. `frontend/nginx.conf`에 이 경로 전용 `location`을 더해 `proxy_buffering off`, `proxy_http_version 1.1`, `proxy_set_header Connection ""`, 긴 `proxy_read_timeout`을 준다. 공개 주소는 Cloudflare를 거치며 유휴 연결 제한이 있으므로 하트비트로 연결을 유지한다.
 - **종료:** 열린 스트림이 재시작을 막지 않도록 `Dockerfile`과 `compose.dev.yaml`의 uvicorn에 `--timeout-graceful-shutdown 5`를 더한다.
 - **프로세스 수:** 구독자 목록이 메모리에 있어 uvicorn 프로세스가 하나여야 한다. 지금 구성이 그렇다. 워커를 늘리려면 이 부분을 바꿔야 한다.
 
 ### 브라우저
 
-- `useSessionEvents`가 `EventSource`를 열고, 이벤트 이름에 맞는 훅을 다시 읽게 한다. `useStars`, `useNote`, `useExamples`, `useSummaries`, 세션 본문, `SummaryTab`의 기록이 대상이다.
-- 끊기면 `EventSource`가 스스로 다시 연결한다. 끊긴 동안의 이벤트는 재전송하지 않으므로, 다시 연결될 때마다 전부 다시 읽는다.
-- 내 변경도 나에게 돌아오지만 같은 내용을 다시 읽을 뿐이다.
+세션 데이터를 읽는 코드는 모두 같은 형태가 된다.
+
+```ts
+useSessionResource(sessionId, 'records', read)   // read: () => Promise<unknown>
+```
+
+- `useSessionResource`는 처음 한 번 읽고, 그 이벤트가 오면 다시 읽고, 다시 연결되면 또 읽는다. 끊긴 동안의 이벤트는 재전송하지 않기 때문이다.
+- `lib/sessionChanges.ts`가 세션당 `EventSource` 하나를 참조 수로 관리한다. 첫 사용자가 열고 마지막 사용자가 닫는다.
+- 읽기는 한 번에 하나만 돈다. 도중에 이벤트가 오면 끝난 뒤 한 번 더 읽는다. 응답 순서가 뒤바뀌어 옛 내용이 새 내용을 덮는 일이 없다.
+- 내 변경도 나에게 돌아오지만 같은 내용을 다시 읽을 뿐이다. 쓰기 응답으로 화면을 바로 고치는 지금의 동작은 그대로 둔다.
+- **별표:** 내 저장이 진행 중이면 다시 읽은 결과를 버린다. 마지막 저장의 응답이 최신 상태다.
 - **노트:** 저장하지 않은 입력이 있으면 들어온 내용으로 덮어쓰지 않는다. 저장되면 나중에 저장한 내용이 남는다. 동시 입력을 글자 단위로 합치지는 않는다.
+- **그림 도착:** `useArrivingPictures`의 세션 폴링을 없앤다. 그림은 `session` 이벤트로 받는다. 남는 폴링은 "지금 그리는 중인가"(job 상태)만 묻는다. 이름도 `useDrawingPictures`로 바꾼다.
+- **세션 삭제와 공유 해제:** 스트림의 `gone`과, 다시 읽다가 받은 404를 같은 화면으로 처리한다.
 - 스트림이 실패해도 앱은 그대로 동작한다. 다만 다시 연결될 때까지 상대의 변경이 보이지 않는다.
 
 ## 화면
@@ -238,7 +293,7 @@ UI 문구는 지금 앱과 같이 영어다.
 
 - **권한 표 전체:** 모든 경로를 비로그인, 미승인, 공유받은 계정, 승인 계정, 운영자로 호출해 기대한 상태 코드를 확인한다. `app.routes`를 순회해, 공개 경로를 뺀 경로가 익명 요청에 모두 401인지도 확인한다. 새 경로가 생기면 자동으로 검사된다.
 - **세션 격리:** 다른 사람의 세션, 그림, 기록을 번호로 직접 요청하면 404다.
-- **실시간:** 상태를 바꾸는 모든 세션 라우트가 맞는 이벤트를 발행하는지 표로 확인한다. Playwright로 브라우저 두 개를 다른 계정으로 띄워, 별표, 노트, 표현 교체, 연습 기록이 새로고침 없이 2초 안에 보이는지 확인한다. 저장하지 않은 노트 입력이 덮어쓰이지 않는지, 공유 해제와 삭제가 상대 화면에 바로 나타나는지, 재연결 뒤 놓친 변경이 보이는지도 확인한다. 배포 후에는 Cloudflare를 거치는 공개 주소에서 다시 확인한다.
+- **실시간:** 이벤트 표의 모든 저장소 메서드가 맞는 이벤트를 커밋 후에 발행하는지 표로 확인한다. Playwright로 브라우저 두 개를 다른 계정으로 띄워, 별표, 노트, 표현 교체, 연습 기록이 새로고침 없이 2초 안에 보이는지 확인한다. 저장하지 않은 노트 입력이 덮어쓰이지 않는지, 공유 해제와 삭제가 상대 화면에 바로 나타나는지, 재연결 뒤 놓친 변경이 보이는지도 확인한다. 배포 후에는 Cloudflare를 거치는 공개 주소에서 다시 확인한다.
 - **중복 체크:** 다른 사람이 쓴 표현과 단어는 내 새 세션에서 피하지 않는다. 공유받은 세션에 나온 것은 피한다. 안 쓴 표현이 다 떨어지면 내 기준으로 가장 오래전에 쓴 표현이 먼저 나온다.
 - **이전:** v9 파일을 v10으로 올리면 데이터가 유지되고, 운영자 생성 시 기존 세션이 넘어가는지 확인한다.
 - **인증:** 로그인 실패 문구 동일, 횟수 제한, 만료된 토큰 거부, 로그아웃 후 쿠키 무효, DB에 토큰과 비밀번호 원문 없음.
