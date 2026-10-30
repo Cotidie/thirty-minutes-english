@@ -27,14 +27,16 @@ function drawCursors(store: PresenceStore, layer: HTMLElement): () => void {
   }
   const place = (id: string) => {
     const at = store.cursorOf(id)
-    const point = at && at.tab === store.myTab() ? pointFor(at.anchor, at.x, at.y) : null
-    if (!point) {
+    const person = store.people().find((other) => other.id === id)
+    // The person's tab as well as the cursor's: they can change tabs while the mouse stands still.
+    const here = at && person && at.tab === store.myTab() && person.tab === store.myTab()
+    const point = here ? pointFor(at.anchor, at.x, at.y) : null
+    if (!person || !point) {
       remove(id)
       return
     }
-    const color = store.people().find((person) => person.id === id)?.color ?? 0
     const cursor = cursorOf(id)
-    cursor.style.setProperty('--person', personColor(color))
+    cursor.style.setProperty('--person', personColor(person.color))
     cursor.classList.toggle('is-above', point.top < 0)
     cursor.classList.toggle('is-below', point.top > window.innerHeight)
     const left = Math.min(Math.max(point.left, EDGE_PX), window.innerWidth - EDGE_PX)

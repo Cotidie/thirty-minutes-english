@@ -55,6 +55,15 @@ describe('Cursors, what is drawn', () => {
     expect(cursors()).toHaveLength(0)
   })
 
+  it('takes their cursor away the moment they go to another tab, though the mouse has not moved', () => {
+    const { socket } = inRoom()
+    theyPoint(socket)
+    act(() => socket.receive({ type: 'tab', id: 'b', tab: 1 }))
+    expect(cursors()).toHaveLength(0)
+    act(() => socket.receive({ type: 'tab', id: 'b', tab: 0 }))
+    expect(cursors()).toHaveLength(1)
+  })
+
   it('takes the cursor away when I go to another tab, and brings it back when I return', () => {
     const { socket, rerender } = inRoom()
     theyPoint(socket)
@@ -248,6 +257,29 @@ describe('Cursors, what is sent', () => {
       vi.advanceTimersByTime(60)
     })
     expect(cursorsSent(socket).at(-1)).toMatchObject({ y: 1 })
+  })
+
+  it('says where the mouse is on a new tab without waiting for it to move', () => {
+    const { socket, rerender } = sending()
+    move('mouse')
+    act(() => vi.advanceTimersByTime(60))
+    rerender(
+      <PresenceProvider sessionId={3}>
+        <Page tab={2} />
+      </PresenceProvider>,
+    )
+    expect(cursorsSent(socket).at(-1)).toMatchObject({ type: 'cursor', tab: 2, anchor: 'word:2' })
+  })
+
+  it('sends nothing on a new tab when the mouse has not been on the page', () => {
+    const { socket, rerender } = sending()
+    rerender(
+      <PresenceProvider sessionId={3}>
+        <Page tab={2} />
+      </PresenceProvider>,
+    )
+    act(() => vi.advanceTimersByTime(60))
+    expect(cursorsSent(socket)).toEqual([])
   })
 
   it('sends nothing on a scroll when the mouse has not been on the page', () => {

@@ -1,13 +1,17 @@
-import { useEffect } from 'react'
+import { useEffect, useRef, type RefObject } from 'react'
 import { anchorAt } from './anchors'
 import { usePresenceStore } from './PresenceProvider'
 import type { PresenceStore } from './store'
 
 const SEND_EVERY_MS = 50
 
+interface Mouse {
+  x: number
+  y: number
+}
+
 /** Watches a mouse, not a finger: a tap on a phone is no cursor. Returns how to stop. */
-function watchMouse(store: PresenceStore, tab: number): () => void {
-  let mouse: { x: number; y: number } | null = null
+function watchMouse(store: PresenceStore, tab: number, mouse: RefObject<Mouse | null>): () => void {
   let pending: ReturnType<typeof setTimeout> | undefined
   let lastSentAt = -Infinity
   let saidNone = false
@@ -15,7 +19,7 @@ function watchMouse(store: PresenceStore, tab: number): () => void {
   const sendPlace = () => {
     pending = undefined
     lastSentAt = Date.now()
-    const place = mouse && anchorAt(mouse.x, mouse.y)
+    const place = mouse.current && anchorAt(mouse.current.x, mouse.current.y)
     if (!place && saidNone) return
     saidNone = !place
     store.sendCursor(tab, place)
@@ -28,15 +32,15 @@ function watchMouse(store: PresenceStore, tab: number): () => void {
   }
   const onMove = (event: PointerEvent) => {
     if (event.pointerType !== 'mouse') return
-    mouse = { x: event.clientX, y: event.clientY }
+    mouse.current = { x: event.clientX, y: event.clientY }
     sendSoon()
   }
   const onScroll = () => {
-    if (mouse) sendSoon()
+    if (mouse.current) sendSoon()
   }
   const onMouseGone = () => {
     clearTimeout(pending)
-    mouse = null
+    mouse.current = null
     sendPlace()
   }
   const onVisibility = () => {
@@ -47,6 +51,7 @@ function watchMouse(store: PresenceStore, tab: number): () => void {
   window.addEventListener('scroll', onScroll, { capture: true, passive: true })
   document.documentElement.addEventListener('pointerleave', onMouseGone)
   document.addEventListener('visibilitychange', onVisibility)
+  if (mouse.current) sendSoon() // a new tab, under a mouse standing still
   return () => {
     clearTimeout(pending)
     window.removeEventListener('pointermove', onMove)
@@ -59,5 +64,6 @@ function watchMouse(store: PresenceStore, tab: number): () => void {
 /** Tells the others where my mouse is, about 20 times a second at most. */
 export function useCursorSender(tab: number): void {
   const store = usePresenceStore()
-  useEffect(() => (store ? watchMouse(store, tab) : undefined), [store, tab])
+  const mouse = useRef<Mouse | null>(null)
+  useEffect(() => (store ? watchMouse(store, tab, mouse) : undefined), [store, tab])
 }
