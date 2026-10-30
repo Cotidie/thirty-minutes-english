@@ -1,4 +1,4 @@
-import { act, render, screen, within } from '@testing-library/react'
+import { act, fireEvent, render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom'
 import { describe, expect, it, vi } from 'vitest'
@@ -66,6 +66,21 @@ describe('SessionPage', () => {
     expect(await screen.findByText('a moving target')).toBeInTheDocument()
     await userEvent.click(screen.getByRole('button', { name: /Article/ }))
     expect(screen.getByLabelText('hash')).toHaveTextContent('#article')
+  })
+
+  it('stays on the tab it is on while the timer runs, past the end of a phase', async () => {
+    renderAt('/s/3#vocabulary')
+    await screen.findByText('mitigate')
+    vi.useFakeTimers()
+    try {
+      fireEvent.click(screen.getByRole('button', { name: 'Start 30 min' }))
+      act(() => vi.advanceTimersByTime(11 * 60 * 1000))
+      expect(screen.getByText('19:00')).toBeInTheDocument()
+      expect(screen.getByLabelText('hash')).toHaveTextContent('#vocabulary')
+      expect(screen.getByText('mitigate')).toBeInTheDocument()
+    } finally {
+      vi.useRealTimers()
+    }
   })
 
   it('keeps one note on every tab and saves it; Summary leaves it to the Notes box', async () => {

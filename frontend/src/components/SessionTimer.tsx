@@ -1,12 +1,8 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { PHASES, SESSION_SECONDS, formatClock, phaseIndexAt } from '../lib/phases'
 import './SessionTimer.css'
 
-interface Props {
-  onPhaseChange: (index: number) => void
-}
-
-export function SessionTimer({ onPhaseChange }: Props) {
+export function SessionTimer() {
   const [elapsed, setElapsed] = useState(0)
   const [running, setRunning] = useState(false)
 
@@ -17,18 +13,6 @@ export function SessionTimer({ onPhaseChange }: Props) {
   }, [running])
 
   const phase = phaseIndexAt(elapsed)
-  const notifiedPhase = useRef<number | null>(null)
-  useEffect(() => {
-    if (elapsed === 0) {
-      notifiedPhase.current = null
-      return
-    }
-    if (notifiedPhase.current !== phase) {
-      notifiedPhase.current = phase
-      onPhaseChange(phase)
-    }
-  }, [phase, elapsed, onPhaseChange])
-
   const finished = elapsed >= SESSION_SECONDS
   const progress = elapsed / SESSION_SECONDS
 

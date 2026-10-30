@@ -1,4 +1,4 @@
-import { useCallback, useState } from 'react'
+import { useState } from 'react'
 import { Link, useLocation, useNavigate, useParams } from 'react-router-dom'
 import { api, type ApiError } from '../api'
 import { SharePanel } from '../components/SharePanel'
@@ -18,7 +18,7 @@ import { useStars } from '../lib/useStars'
 import type { Session, SessionContent } from '../types'
 import './SessionPage.css'
 
-/** Sits after the timed phases; the timer never sends you here. */
+/** Sits after the timed phases. */
 const SUMMARY_TAB = PHASES.length
 /** Each tab's name in the address (/s/19#vocabulary), so a reload stays on it. */
 const TAB_KEYS = [...PHASES.map((p) => p.key), 'summary']
@@ -61,13 +61,10 @@ function OpenSession({ id, onGone }: { id: number; onGone: () => void }) {
   const setContent = (update: (content: SessionContent) => Partial<SessionContent>) =>
     setSession((s) => s && { ...s, content: { ...s.content, ...update(s.content) } })
 
-  const showTab = useCallback(
-    (index: number) => {
-      navigate({ search, hash: TAB_KEYS[index] }, { replace: true })
-      window.scrollTo({ top: 0 })
-    },
-    [navigate, search],
-  )
+  const showTab = (index: number) => {
+    navigate({ search, hash: TAB_KEYS[index] }, { replace: true })
+    window.scrollTo({ top: 0 })
+  }
 
   if (error && !session) {
     return (
@@ -86,7 +83,7 @@ function OpenSession({ id, onGone }: { id: number; onGone: () => void }) {
       <aside className="rail">
         <Link to="/" className="rail-back">All sessions</Link>
         <p className="rail-topic">{content.topic}</p>
-        <SessionTimer onPhaseChange={showTab} />
+        <SessionTimer />
         <nav className="tabs" aria-label="Session parts">
           {PHASES.map((p, i) => (
             <button
