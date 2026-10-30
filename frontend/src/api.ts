@@ -1,3 +1,4 @@
+import { goToLogin } from './lib/safeNext'
 import type { JobStatus } from './lib/progress'
 import type {
   AssessorSession,
@@ -8,6 +9,7 @@ import type {
   Expression,
   KeyTestResult,
   LiveSession,
+  Me,
   Note,
   PictureFace,
   Summary,
@@ -24,18 +26,37 @@ import type {
   VocabularyItem,
 } from './types'
 
+/** A request the server refused: `status` is its HTTP status, the message the reason it gave. */
+export class ApiError extends Error {
+  readonly status: number
+
+  constructor(status: number, message: string) {
+    super(message)
+    this.status = status
+  }
+}
+
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const res = await fetch(path, { headers: { 'Content-Type': 'application/json' }, ...init })
   if (res.status === 204) return undefined as T
   const body = await res.json().catch(() => null)
   if (!res.ok) {
     const detail = body && typeof body.detail === 'string' ? body.detail : `${res.status} ${res.statusText}`
-    throw new Error(detail)
+    if (res.status === 401 && !path.startsWith('/api/auth/')) goToLogin()
+    throw new ApiError(res.status, detail)
   }
   return body as T
 }
 
+function credentials(email: string, password: string): RequestInit {
+  return { method: 'POST', body: JSON.stringify({ email, password }) }
+}
+
 export const api = {
+  me: () => request<Me>('/api/auth/me'),
+  login: (email: string, password: string) => request<Me>('/api/auth/login', credentials(email, password)),
+  signup: (email: string, password: string) => request<Me>('/api/auth/signup', credentials(email, password)),
+  logout: () => request<void>('/api/auth/logout', { method: 'POST' }),
   topics: () => request<TopicListing>('/api/topics'),
   refreshTopics: () => request<TopicListing>('/api/topics/refresh', { method: 'POST' }),
   /** Every topic with the days it led the news and the sessions written on it. */

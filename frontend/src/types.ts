@@ -152,6 +152,14 @@ export interface TopicListing {
   labels: Record<string, string>
 }
 
+/** The logged-in account. */
+export interface Me {
+  id: number
+  email: string
+  is_admin: boolean
+  can_create: boolean
+}
+
 export interface SessionSummary {
   id: number
   created_at: string
