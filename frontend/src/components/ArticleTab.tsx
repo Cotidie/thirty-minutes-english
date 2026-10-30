@@ -1,5 +1,6 @@
 import { Fragment, useEffect, useRef, useState } from "react";
 import { markedSpans } from "../lib/highlight";
+import { useSharedView } from "../lib/presence/useSharedView";
 import { pairSentences } from "../lib/sentences";
 import { useReadingMarks } from "../lib/useReadingMarks";
 import { useSummaries } from "../lib/useSummaries";
@@ -16,7 +17,9 @@ export function ArticleTab({
   article: Article;
   sessionId: number;
 }) {
-  const [active, setActive] = useState<number | null>(null);
+  const [active, setActive] = useSharedView<number | null>("question", null);
+  /** Scrolling is each person's own: only a click of mine takes me to the passage. */
+  const scrollToPassage = useRef(false);
   /** The paragraph holding the microphone. */
   const [reading, setReading] = useState<number | null>(null);
   const bodyRef = useRef<HTMLElement>(null);
@@ -28,9 +31,11 @@ export function ArticleTab({
     paragraphs.map((p) => p.text),
     article.translation ?? [],
   );
-  const evidence = active === null ? [] : article.questions[active].evidence;
+  const evidence = active === null ? [] : (article.questions[active]?.evidence ?? []);
 
   useEffect(() => {
+    if (!scrollToPassage.current) return;
+    scrollToPassage.current = false;
     bodyRef.current
       ?.querySelector("mark")
       ?.scrollIntoView?.({ behavior: "smooth", block: "center" });
@@ -74,7 +79,10 @@ export function ArticleTab({
               <QuestionItem
                 question={q}
                 active={active === i}
-                onToggle={() => setActive(active === i ? null : i)}
+                onToggle={() => {
+                  scrollToPassage.current = true;
+                  setActive(active === i ? null : i);
+                }}
               />
             </li>
           ))}

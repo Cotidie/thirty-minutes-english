@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react'
 import { api } from '../api'
+import { useSharedView } from '../lib/presence/useSharedView'
 import { practiceWord, type Example, type PictureFace, type VocabularyItem } from '../types'
 import { Practice } from './Practice'
 import { StarButton } from './StarButton'
@@ -38,8 +39,7 @@ function Drawing({ seconds }: { seconds: number }) {
 }
 
 /** Why the picture is the word: the picture blurs and the caption rises over it; a click on it closes. */
-function SceneCaption({ caption, word }: { caption: string; word: string }) {
-  const [shown, setShown] = useState(false)
+function SceneCaption({ caption, word, shown, onShownChange }: { caption: string; word: string; shown: boolean; onShownChange: (shown: boolean) => void }) {
   return (
     <>
       <span
@@ -48,7 +48,7 @@ function SceneCaption({ caption, word }: { caption: string; word: string }) {
         aria-hidden={!shown}
         onClick={(e) => {
           e.stopPropagation()
-          setShown(false)
+          onShownChange(false)
         }}
       >
         <span className="vocab-caption-label">The scene</span>
@@ -63,7 +63,7 @@ function SceneCaption({ caption, word }: { caption: string; word: string }) {
         aria-label={shown ? `Hide the scene for ${word}` : `What the picture for ${word} shows`}
         onClick={(e) => {
           e.stopPropagation()
-          setShown((s) => !s)
+          onShownChange(!shown)
         }}
       >
         <svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.6" aria-hidden="true">
@@ -85,9 +85,11 @@ interface PictureProps {
   drawing: boolean
   /** The session's first pictures are still landing; a face without one is waiting for its own. */
   arriving: boolean
+  captionShown: boolean
+  onCaptionShownChange: (shown: boolean) => void
 }
 
-function VocabPicture({ item, face, onFlip, drawing, arriving }: PictureProps) {
+function VocabPicture({ item, face, onFlip, drawing, arriving, captionShown, onCaptionShownChange }: PictureProps) {
   const seconds = useElapsed(drawing)
   const practice = face === 'practice'
   const image = practice ? item.image : item.example_image
@@ -105,7 +107,7 @@ function VocabPicture({ item, face, onFlip, drawing, arriving }: PictureProps) {
       {drawing ? (
         <Drawing seconds={seconds} />
       ) : (
-        practice && image && item.caption && <SceneCaption key={image} caption={item.caption} word={item.word} />
+        practice && image && item.caption && <SceneCaption caption={item.caption} word={item.word} shown={captionShown} onShownChange={onCaptionShownChange} />
       )}
       <button
         type="button"
@@ -126,14 +128,14 @@ function VocabPicture({ item, face, onFlip, drawing, arriving }: PictureProps) {
 }
 
 function VocabCard({ item, picture }: { item: VocabularyItem; picture: React.ReactNode }) {
-  const [revealed, setRevealed] = useState(false)
+  const [revealed, setRevealed] = useSharedView<boolean>(`reveal:${item.id}`, false)
   return (
-    <div className={`vocab-card${revealed ? ' is-revealed' : ''}`} onClick={() => setRevealed((r) => !r)}>
+    <div className={`vocab-card${revealed ? ' is-revealed' : ''}`} onClick={() => setRevealed(!revealed)}>
       {picture}
       <span className="vocab-word">
         <span className="vocab-word-text">{item.word}</span> <em className="vocab-pos">{item.pos}</em>
         <SpeakButton text={item.word} what={item.word} />
-        {item.korean && <KoreanChip korean={item.korean} of={item.word} />}
+        {item.korean && <KoreanChip korean={item.korean} of={item.word} viewKey={`chip:word:${item.id}`} />}
       </span>
       <span className="vocab-example">
         <Marked text={item.example} word={item.word} />
@@ -145,7 +147,7 @@ function VocabCard({ item, picture }: { item: VocabularyItem; picture: React.Rea
         aria-expanded={revealed}
         onClick={(e) => {
           e.stopPropagation()
-          setRevealed((r) => !r)
+          setRevealed(!revealed)
         }}
       >
         {revealed ? (
@@ -176,15 +178,24 @@ interface CellProps {
 /** One word: its card, with the picture face it shows, and the redraw button for that face. */
 function VocabCell({ item, drawing, arriving, failed, canRedraw, onRedraw, children }: CellProps) {
   /** The face the learner flipped to; until then the example, wherever one is drawn or on its way. */
-  const [flipped, setFlipped] = useState<PictureFace | null>(null)
+  const [flipped, setFlipped] = useSharedView<PictureFace | null>(`face:${item.id}`, null)
+  const [captionShown, setCaptionShown] = useSharedView<boolean>(`caption:${item.id}`, false)
   const face = flipped ?? (item.example_image || arriving ? 'example' : 'practice')
   const pictured = Boolean(item.image || item.example_image || arriving)
   const hint = face === 'example' ? 'The example sentence, drawn again' : 'New scene, new picture'
+  /** A caption belongs to the picture it was opened on. */
+  const closeCaption = () => {
+    if (captionShown) setCaptionShown(false)
+  }
+  const flip = () => {
+    setFlipped(face === 'example' ? 'practice' : 'example')
+    closeCaption()
+  }
   return (
     <div className={`vocab-cell${pictured ? '' : ' is-bare'}`}>
       <VocabCard
         item={item}
-        picture={pictured && <VocabPicture item={item} face={face} onFlip={() => setFlipped(face === 'example' ? 'practice' : 'example')} drawing={drawing} arriving={arriving} />}
+        picture={pictured && <VocabPicture item={item} face={face} onFlip={flip} drawing={drawing} arriving={arriving} captionShown={captionShown} onCaptionShownChange={setCaptionShown} />}
       />
       {canRedraw && (item.scene || face === 'example') && (
         <button
@@ -193,7 +204,10 @@ function VocabCell({ item, drawing, arriving, failed, canRedraw, onRedraw, child
           aria-label={`New picture for ${item.word}`}
           title={drawing ? 'Drawing…' : hint}
           disabled={drawing}
-          onClick={() => onRedraw(face)}
+          onClick={() => {
+            onRedraw(face)
+            closeCaption()
+          }}
         >
           {drawing ? '…' : '↻'}
         </button>

@@ -1,6 +1,7 @@
 import { act, render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, expect, it, vi } from 'vitest'
+import { renderInRoom, someoneSets, viewsSent } from '../test/presenceRoom'
 import type { Example, VocabularyItem } from '../types'
 import { VocabularyTab } from './VocabularyTab'
 import { api } from '../api'
@@ -221,4 +222,61 @@ it('offers new pictures only to who may draw them', () => {
   expect(screen.getByRole('button', { name: /New picture for/ })).toBeInTheDocument()
   rerender(<VocabularyTab {...props} canRedraw={false} />)
   expect(screen.queryByRole('button', { name: /New picture for/ })).not.toBeInTheDocument()
+})
+
+describe('VocabularyTab with someone else in the session', () => {
+  const drawn = [{ ...items[0], scene: 'phones on a train', caption: 'Phones are ubiquitous here.', image: 'p.png', example_image: 'e.png', korean: '어디에나 있는' }]
+  const tab = () => <VocabularyTab items={drawn} sessionId={3} onPicture={vi.fn()} starred={[]} onToggleStar={vi.fn()} examples={none} onExample={vi.fn()} />
+
+  it('turns over the chip with them', async () => {
+    const { socket } = renderInRoom(tab())
+    someoneSets(socket, 'chip:word:31', true)
+    const chip = screen.getByRole('button', { name: 'Hide the Korean for ubiquitous' })
+    await userEvent.click(chip)
+    expect(viewsSent(socket)).toEqual([{ key: 'chip:word:31', value: false }])
+  })
+
+  it('reveals the definition with them', async () => {
+    const { socket } = renderInRoom(tab())
+    someoneSets(socket, 'reveal:31', true)
+    expect(screen.getByText('present everywhere')).toBeInTheDocument()
+    await userEvent.click(screen.getByRole('button', { expanded: true, name: /present everywhere/ }))
+    expect(viewsSent(socket)).toEqual([{ key: 'reveal:31', value: false }])
+  })
+
+  it('shows the picture face they flipped to', () => {
+    const { socket } = renderInRoom(tab())
+    expect(screen.getByRole('img', { name: 'Phones are ubiquitous.' })).toHaveAttribute('src', '/api/images/e.png')
+    someoneSets(socket, 'face:31', 'practice')
+    expect(screen.getByRole('img', { name: 'phones on a train' })).toHaveAttribute('src', '/api/images/p.png')
+  })
+
+  it('opens the scene caption with them, and flipping the picture closes it for both', async () => {
+    const { socket } = renderInRoom(tab())
+    someoneSets(socket, 'face:31', 'practice')
+    someoneSets(socket, 'caption:31', true)
+    expect(screen.getByRole('note')).toHaveClass('is-shown')
+    await userEvent.click(screen.getByRole('button', { name: 'Show the example picture for ubiquitous' }))
+    expect(viewsSent(socket)).toEqual([
+      { key: 'face:31', value: 'example' },
+      { key: 'caption:31', value: false },
+    ])
+  })
+
+  it('a redraw closes the scene caption for both', async () => {
+    vi.mocked(api.redrawPicture).mockResolvedValue(drawn[0])
+    const { socket } = renderInRoom(tab())
+    someoneSets(socket, 'face:31', 'practice')
+    someoneSets(socket, 'caption:31', true)
+    await userEvent.click(screen.getByRole('button', { name: 'New picture for ubiquitous' }))
+    expect(viewsSent(socket)).toEqual([{ key: 'caption:31', value: false }])
+  })
+
+  it('a tap on the open caption closes it for both', async () => {
+    const { socket } = renderInRoom(tab())
+    someoneSets(socket, 'face:31', 'practice')
+    someoneSets(socket, 'caption:31', true)
+    await userEvent.click(screen.getByRole('note'))
+    expect(viewsSent(socket)).toEqual([{ key: 'caption:31', value: false }])
+  })
 })

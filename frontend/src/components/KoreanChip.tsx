@@ -1,10 +1,10 @@
-import { useState } from 'react'
+import { useSharedView } from '../lib/presence/useSharedView'
 import './KoreanChip.css'
 
 /** A dashed blank pill; a tap turns it over to the Korean, another hides it again.
  * A button of its own, so it works inside a row whose parent has a click of its own. */
-export function KoreanChip({ korean, of }: { korean: string; of: string }) {
-  const [shown, setShown] = useState(false)
+export function KoreanChip({ korean, of, viewKey }: { korean: string; of: string; viewKey: string }) {
+  const [shown, setShown] = useSharedView<boolean>(viewKey, false)
   return (
     <button
       type="button"
@@ -14,7 +14,7 @@ export function KoreanChip({ korean, of }: { korean: string; of: string }) {
       title={shown ? 'Hide' : 'Korean'}
       onClick={(e) => {
         e.stopPropagation()
-        setShown((s) => !s)
+        setShown(!shown)
       }}
     >
       {shown ? korean : '한'}

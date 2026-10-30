@@ -3,6 +3,7 @@ import { Link, useLocation, useNavigate, useParams } from 'react-router-dom'
 import { api, type ApiError } from '../api'
 import { SharePanel } from '../components/SharePanel'
 import { useAuth } from '../lib/auth'
+import { PresenceProvider } from '../lib/presence/PresenceProvider'
 import { useDrawingPictures } from '../lib/useDrawingPictures'
 import { useSessionGone, useSessionResource } from '../lib/sessionChanges'
 import { ArticleTab } from '../components/ArticleTab'
@@ -35,7 +36,11 @@ export function SessionPage() {
       </main>
     )
   }
-  return <OpenSession key={id} id={Number(id)} onGone={() => setGoneId(id ?? null)} />
+  return (
+    <PresenceProvider key={id} sessionId={Number(id)}>
+      <OpenSession id={Number(id)} onGone={() => setGoneId(id ?? null)} />
+    </PresenceProvider>
+  )
 }
 
 function OpenSession({ id, onGone }: { id: number; onGone: () => void }) {

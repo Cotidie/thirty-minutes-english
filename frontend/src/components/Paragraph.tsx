@@ -43,7 +43,7 @@ export function Paragraph({ paragraph, pieces, spans, summaries, saved, onSummar
       <p>
         {pieces.map((piece, j) => {
           const run = { text: piece.text, start: piece.start, spans, starts, marks }
-          return piece.ko === null ? <Run key={j} {...run} /> : <Sentence key={j} {...run} ko={piece.ko} />
+          return piece.ko === null ? <Run key={j} {...run} /> : <Sentence key={j} {...run} ko={piece.ko} viewKey={`sentence:${paragraph.id}:${piece.start}`} />
         })}
       </p>
       <div className="paragraph-actions">

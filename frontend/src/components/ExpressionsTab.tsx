@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { useSharedView } from '../lib/presence/useSharedView'
 import type { Expression, KoreanExample as KoreanExampleData } from '../types'
 import { StarButton } from './StarButton'
 import { KoreanChip } from './KoreanChip'
@@ -74,7 +75,7 @@ export function ExpressionsTab({ items, starred, onToggleStar, onSwap, onAdd }: 
           <li key={item.id} className="expression">
             <div className="expression-head">
               <h3 className="expression-phrase">{item.phrase}</h3>
-              {item.korean && <KoreanChip korean={item.korean} of={item.phrase} />}
+              {item.korean && <KoreanChip korean={item.korean} of={item.phrase} viewKey={`chip:expression:${item.id}`} />}
               <button
                 type="button"
                 className="expression-swap"
@@ -107,7 +108,7 @@ export function ExpressionsTab({ items, starred, onToggleStar, onSwap, onAdd }: 
                 </li>
               ))}
             </ul>
-            {item.korean_example && <KoreanExample example={item.korean_example} phrase={item.phrase} />}
+            {item.korean_example && <KoreanExample expressionId={item.id} example={item.korean_example} phrase={item.phrase} />}
           </li>
         ))}
       </ol>
@@ -117,12 +118,12 @@ export function ExpressionsTab({ items, starred, onToggleStar, onSwap, onAdd }: 
 }
 
 /** The Korean sentence until tapped, then the English model answer with the expression marked. */
-function KoreanExample({ example, phrase }: { example: KoreanExampleData; phrase: string }) {
-  const [english, setEnglish] = useState(false)
+function KoreanExample({ expressionId, example, phrase }: { expressionId: number; example: KoreanExampleData; phrase: string }) {
+  const [english, setEnglish] = useSharedView<boolean>(`example:${expressionId}`, false)
   return (
     <div className="korean-example">
       <p className="korean-example-label">한국어로 해 보기</p>
-      <button type="button" className="korean-example-card" aria-pressed={english} onClick={() => setEnglish((e) => !e)}>
+      <button type="button" className="korean-example-card" aria-pressed={english} onClick={() => setEnglish(!english)}>
         {english ? (
           <span className="korean-example-english">
             <Marked text={example.english} word={phrase} />

@@ -1,7 +1,9 @@
 import { fireEvent, render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { api } from '../api'
+import { PresenceProvider } from '../lib/presence/PresenceProvider'
+import { renderInRoom, someoneSets, viewsSent, WELCOME } from '../test/presenceRoom'
 import { ArticleTab } from './ArticleTab'
 
 vi.mock('../api', () => ({
@@ -183,5 +185,87 @@ describe('ArticleTab open question', () => {
     render(<ArticleTab article={translated} sessionId={3} />)
     await userEvent.click(screen.getByRole('button', { name: 'Both?' }))
     expect(markedText()).toBe('cheap. Upkeep is what')
+  })
+})
+
+describe('ArticleTab with someone else in the session', () => {
+  const translated = {
+    ...article,
+    translation: [
+      { en: 'Ambition is cheap.', ko: '야심은 싸다.' },
+      { en: 'Upkeep is what actually pays.', ko: '유지가 진짜 돈이 든다.' },
+    ],
+  }
+  const scrolled = vi.fn()
+
+  beforeEach(() => {
+    scrolled.mockClear()
+    Element.prototype.scrollIntoView = scrolled
+  })
+  afterEach(() => {
+    delete (Element.prototype as Partial<Element>).scrollIntoView
+  })
+
+  it('flips a sentence the same way a click does', () => {
+    const { socket } = renderInRoom(<ArticleTab article={translated} sessionId={3} />)
+    const sentence = screen.getByRole('button', { name: 'Ambition is cheap.' })
+    someoneSets(socket, 'sentence:1:0', 'ko')
+    expect(sentence).toHaveClass('is-sinking')
+    fireEvent.animationEnd(sentence)
+    expect(sentence).toHaveTextContent('야심은 싸다.')
+    expect(sentence).toHaveClass('is-ko', 'is-rising')
+    fireEvent.animationEnd(sentence)
+    expect(sentence).toHaveClass('is-still')
+    someoneSets(socket, 'sentence:1:0', 'en')
+    expect(sentence).toHaveClass('is-sinking')
+  })
+
+  it('catches up once the animation ends with a value that came during it', () => {
+    const { socket } = renderInRoom(<ArticleTab article={translated} sessionId={3} />)
+    const sentence = screen.getByRole('button', { name: 'Ambition is cheap.' })
+    someoneSets(socket, 'sentence:1:0', 'ko')
+    fireEvent.animationEnd(sentence)
+    someoneSets(socket, 'sentence:1:0', 'en')
+    expect(sentence).toHaveClass('is-rising')
+    fireEvent.animationEnd(sentence)
+    expect(sentence).toHaveClass('is-sinking')
+    fireEvent.animationEnd(sentence)
+    expect(sentence).toHaveTextContent('Ambition is cheap.')
+  })
+
+  it('tells them when I flip a sentence', async () => {
+    const { socket } = renderInRoom(<ArticleTab article={translated} sessionId={3} />)
+    await userEvent.click(screen.getByRole('button', { name: 'Ambition is cheap.' }))
+    expect(viewsSent(socket)).toEqual([{ key: 'sentence:1:0', value: 'ko' }])
+  })
+
+  it('shows a sentence already flipped when I come to the tab, with no animation', () => {
+    const { rerender } = renderInRoom(<p />, { ...WELCOME, view: { 'sentence:1:0': 'ko' } })
+    rerender(
+      <PresenceProvider sessionId={3}>
+        <ArticleTab article={translated} sessionId={3} />
+      </PresenceProvider>,
+    )
+    expect(screen.getByText('야심은 싸다.')).toHaveClass('is-ko', 'is-still')
+  })
+
+  it('marks the passage of the question they picked, without scrolling me', () => {
+    const { socket } = renderInRoom(<ArticleTab article={article} sessionId={3} />)
+    someoneSets(socket, 'question', 0)
+    expect(markedText()).toBe('Upkeep is what actually pays.')
+    expect(scrolled).not.toHaveBeenCalled()
+  })
+
+  it('scrolls only the person who clicked the question', async () => {
+    const { socket } = renderInRoom(<ArticleTab article={article} sessionId={3} />)
+    await userEvent.click(screen.getByRole('button', { name: 'What pays?' }))
+    expect(scrolled).toHaveBeenCalledOnce()
+    expect(viewsSent(socket)).toEqual([{ key: 'question', value: 0 }])
+  })
+
+  it('a question number that is not here marks nothing', () => {
+    const { socket } = renderInRoom(<ArticleTab article={article} sessionId={3} />)
+    someoneSets(socket, 'question', 99)
+    expect(document.querySelector('mark')).toBeNull()
   })
 })

@@ -1,6 +1,8 @@
 import { render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, expect, it, vi } from 'vitest'
+import { renderInRoom, someoneSets, viewsSent } from '../test/presenceRoom'
+import type { Expression } from '../types'
 import { ExpressionsTab } from './ExpressionsTab'
 
 const items = [
@@ -137,5 +139,27 @@ describe('ExpressionsTab', () => {
   it('gives an expression no Your turn', () => {
     render(<ExpressionsTab items={items} starred={[]} onToggleStar={vi.fn()} onSwap={vi.fn()} onAdd={vi.fn()} />)
     expect(screen.queryByRole('button', { name: /Your turn/ })).toBeNull()
+  })
+})
+
+describe('ExpressionsTab with someone else in the session', () => {
+  const tab = (list: Expression[]) => <ExpressionsTab items={list} starred={[]} onToggleStar={vi.fn()} onSwap={vi.fn()} onAdd={vi.fn()} />
+
+  it('turns over the chip someone else turned over, and tells them when I do', async () => {
+    const { socket } = renderInRoom(tab([{ ...items[0], korean: '움직이는 과녁' }]))
+    someoneSets(socket, 'chip:expression:21', true)
+    const chip = screen.getByRole('button', { name: 'Hide the Korean for a moving target' })
+    expect(chip).toHaveTextContent('움직이는 과녁')
+    await userEvent.click(chip)
+    expect(viewsSent(socket)).toEqual([{ key: 'chip:expression:21', value: false }])
+  })
+
+  it('flips the Korean card with them', async () => {
+    const { socket } = renderInRoom(tab([{ ...items[0], korean_example: { korean: '목표가 자꾸 바뀌어.', english: 'It is a moving target.' } }]))
+    expect(screen.getByText('목표가 자꾸 바뀌어.')).toBeInTheDocument()
+    someoneSets(socket, 'example:21', true)
+    expect(screen.queryByText('목표가 자꾸 바뀌어.')).not.toBeInTheDocument()
+    await userEvent.click(screen.getByRole('button', { pressed: true }))
+    expect(viewsSent(socket)).toEqual([{ key: 'example:21', value: false }])
   })
 })

@@ -1,9 +1,10 @@
 import { Fragment, useState, type KeyboardEvent } from 'react'
 import { segmentsIn, type Span } from '../lib/highlight'
+import { useSharedView } from '../lib/presence/useSharedView'
 import { atoms, type Atom, type Marks } from '../lib/words'
 import './Sentence.css'
 
-type Phase = 'still' | 'sinking' | 'rising'
+type Lang = 'en' | 'ko'
 
 export interface RunProps {
   text: string
@@ -18,21 +19,25 @@ export interface RunProps {
 
 /**
  * One sentence of the article. A click sinks the English and floats the
- * Korean up in its place; another click brings the English back.
+ * Korean up in its place; another click brings the English back. Everyone in
+ * the session wants the same language, and whatever is showing sinks whenever
+ * it is not that one, once any rise under way has ended.
  */
-export function Sentence({ ko, ...run }: RunProps & { ko: string }) {
-  const [lang, setLang] = useState<'en' | 'ko'>('en')
-  const [phase, setPhase] = useState<Phase>('still')
+export function Sentence({ ko, viewKey, ...run }: RunProps & { ko: string; viewKey: string }) {
+  const [wanted, setWanted] = useSharedView<Lang>(viewKey, 'en')
+  const [lang, setLang] = useState<Lang>(wanted)
+  const [rising, setRising] = useState(false)
+  const phase = rising ? 'rising' : wanted !== lang ? 'sinking' : 'still'
 
   const flip = () => {
-    if (phase === 'still') setPhase('sinking')
+    if (phase === 'still') setWanted(lang === 'en' ? 'ko' : 'en')
   }
   const onAnimationEnd = () => {
     if (phase === 'sinking') {
-      setLang((l) => (l === 'en' ? 'ko' : 'en'))
-      setPhase('rising')
+      setLang(wanted)
+      setRising(true)
     } else if (phase === 'rising') {
-      setPhase('still')
+      setRising(false)
     }
   }
   const onKeyDown = (e: KeyboardEvent) => {
