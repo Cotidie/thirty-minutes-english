@@ -27,6 +27,9 @@ log = logging.getLogger(__name__)
 # How many corpus expressions a session teaches.
 EXPRESSION_COUNT = 5
 
+# How many images an article shows: its cover and one under a paragraph.
+ARTICLE_IMAGES = 2
+
 # Seconds per stage before any run has finished; a stage a run skips counts as 0.
 DEFAULT_STAGE_SECONDS: dict[Stage, float] = {
     Stage.STARTING: 10,
@@ -210,17 +213,26 @@ class JobRunner:
         paragraphs = session.content.article.paragraphs
         return paragraphs[min(max(after, 1), len(paragraphs)) - 1].id
 
+    def _place(self, session: Session, after: int, landed: list[int | None]) -> int | None:
+        """Where the next image goes: the place it asks for (after 0 is the cover), or the other when that one is taken."""
+        cover_taken = None in landed
+        paragraph_taken = any(paragraph is not None for paragraph in landed)
+        takes_cover = not cover_taken if after == 0 else paragraph_taken
+        return None if takes_cover else self._under(session, after)
+
     def _keep_figures(self, session: Session, figures: list[FigureDraft]) -> list[int | None]:
-        """Downloads the images the generator found: the first with after 0 goes under the title as the cover,
-        the rest under their paragraphs. Where each kept one landed: its paragraph's id, None for the cover."""
+        """Downloads the images the generator found until the article has its two, one under the title as the cover
+        and one under its paragraph. Where each kept one landed: its paragraph's id, None for the cover."""
         if self._sources is None or not session.content.article.paragraphs:
             return []
         landed: list[int | None] = []
         for figure in figures:
+            if len(landed) == ARTICLE_IMAGES:
+                break
             picture_id = self._sources.keep(figure.image_url)
             if picture_id is None:
                 continue
-            paragraph = None if figure.after == 0 and None not in landed else self._under(session, figure.after)
+            paragraph = self._place(session, figure.after, landed)
             try:
                 self._sessions.add_figure(session.id, paragraph, picture_id, figure.caption, figure.page_url or None, figure.credit or None)
             except KeyError:
@@ -230,7 +242,7 @@ class JobRunner:
         return landed
 
     def _scenes_to_draw(self, session: Session, article: ArticleDraft, landed: list[int | None]) -> list[ArticleScene]:
-        """What the kept images leave the article short of, so that it shows at least two: a cover, one under a paragraph."""
+        """What the kept images leave the article short of, so that it shows its two: a cover, one under a paragraph."""
         if not session.content.article.paragraphs:
             return []
         scenes: list[ArticleScene] = []

@@ -189,6 +189,25 @@ def test_with_no_image_at_all_both_scenes_are_drawn_so_the_article_still_shows_t
     assert job.progress.pictures_total == 2 * len(sample_draft().vocabulary) + 2
 
 
+def test_two_images_that_both_ask_for_a_paragraph_also_fill_the_cover_so_nothing_is_drawn(tmp_path):
+    from tests.test_illustrator import FakePainter
+
+    db = Database(tmp_path / "s.db")
+    painter = FakePainter()
+    illustrator = Illustrator(painter, db.pictures, PictureFiles(db.images_dir))
+    job = runner_over(db).start("A", Recording([figure(1), figure(2)]), illustrator)
+    article = db.sessions.get(job.session_id).content.article
+    assert [(f.paragraph_id, f.caption) for f in article.figures] == [(article.paragraphs[0].id, "Under 1."), (None, "Under 2.")]
+    assert len(painter.prompts) == 2 * len(sample_draft().vocabulary)  # the words' pictures only
+
+
+def test_an_article_stops_at_two_images_however_many_the_generator_names(tmp_path):
+    db = Database(tmp_path / "s.db")
+    job = runner_over(db).start("A", Recording([figure(0), figure(3), figure(1)]))
+    article = db.sessions.get(job.session_id).content.article
+    assert [f.caption for f in article.figures] == ["Under 0.", "Under 3."]
+
+
 def test_an_article_keeps_one_cover_and_a_second_goes_under_the_first_paragraph(tmp_path):
     db = Database(tmp_path / "s.db")
     job = runner_over(db).start("A", Recording([figure(0), figure(0, "https://news.example/b.jpg")]))

@@ -170,7 +170,7 @@ or three concrete sentences (the place, who is there, what they are doing, detai
 text or signs), and a one-sentence caption. It is drawn as the cover when no cover image can be used. \
 Always give paragraph_picture as well: a different moment, from one paragraph, written the same way, with after \
 (the paragraph it belongs under, counted from 1) and a one-sentence caption. It is drawn under that paragraph when \
-no image lands under a paragraph, so that the article always shows at least 2 images.
+no image lands under a paragraph, so that the article always shows exactly 2 images.
 
 2. vocabulary: {vocabulary_count} words at B2 to C1+ level connected to the topic. Draw from the \
 article body where it offers strong candidates, and fill the rest with words a well-read speaker would \
