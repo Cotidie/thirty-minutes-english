@@ -65,7 +65,9 @@ describe('useStars', () => {
 
     act(() => result.current.toggle('words', 42))
     act(() => result.current.toggle('words', 43))
-    vi.mocked(api.getStars).mockResolvedValueOnce({ expressions: [11], words: [] }) // from before either save
+    vi.mocked(api.getStars)
+      .mockResolvedValue({ expressions: [11], words: [42, 43] })
+      .mockResolvedValueOnce({ expressions: [11], words: [] }) // from before either save
     act(() => FakeEventSource.open[0].send('stars'))
     await act(async () => {})
     expect(result.current.stars.words).toEqual([42, 43])
@@ -96,5 +98,35 @@ describe('useStars', () => {
     vi.mocked(api.getStars).mockResolvedValueOnce({ expressions: [11, 12], words: [] })
     act(() => FakeEventSource.open[0].send('stars'))
     await waitFor(() => expect(result.current.stars.expressions).toEqual([11, 12]))
+  })
+
+  it('shows the answer to the newest save, whichever answer lands last', async () => {
+    const { result } = renderHook(() => useStars(3))
+    await waitFor(() => expect(result.current.stars.expressions).toEqual([11]))
+    const first = deferred<Stars>()
+    const second = deferred<Stars>()
+    vi.mocked(api.setStar).mockReturnValueOnce(first.promise).mockReturnValueOnce(second.promise)
+
+    act(() => result.current.toggle('words', 42))
+    act(() => result.current.toggle('words', 43))
+    await act(async () => second.resolve({ expressions: [11], words: [42, 43] }))
+    await act(async () => first.resolve({ expressions: [11], words: [42] }))
+    expect(result.current.stars.words).toEqual([42, 43])
+  })
+
+  it('reads once more after the saves when an announced change had to be set aside', async () => {
+    const { result } = renderHook(() => useStars(3))
+    await waitFor(() => expect(result.current.stars.expressions).toEqual([11]))
+    const save = deferred<Stars>()
+    vi.mocked(api.setStar).mockReturnValueOnce(save.promise)
+    act(() => result.current.toggle('words', 42))
+
+    vi.mocked(api.getStars).mockResolvedValueOnce({ expressions: [11], words: [] }) // set aside: a save is in flight
+    act(() => FakeEventSource.open[0].send('stars'))
+    await act(async () => {})
+
+    vi.mocked(api.getStars).mockResolvedValueOnce({ expressions: [11, 12], words: [42] })
+    await act(async () => save.resolve({ expressions: [11], words: [42] }))
+    await waitFor(() => expect(result.current.stars).toEqual({ expressions: [11, 12], words: [42] }))
   })
 })

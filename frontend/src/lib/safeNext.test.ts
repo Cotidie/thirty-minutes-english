@@ -1,7 +1,7 @@
 import { expect, test } from 'vitest'
 import { safeNext } from './safeNext'
 
-test.each(['//evil.example', 'https://evil.example', '/\\evil.example', '/\t/evil.example', 'evil', '', null])(
+test.each(['//evil.example', 'https://evil.example', '/\\evil.example', '/\t/evil.example', 'evil', '', null, '//%5B', '/login', '/login?next=/x', '/signup#top'])(
   'next %j goes home',
   (raw) => {
     expect(safeNext(raw)).toBe('/')

@@ -153,3 +153,31 @@ test('logging out goes back to the login page', async () => {
   await waitFor(() => expect(api.logout).toHaveBeenCalled())
   expect(await screen.findByLabelText('Email')).toBeInTheDocument()
 })
+
+test('logging out with a login already over still goes to the login page', async () => {
+  vi.mocked(api.me).mockResolvedValue(MINA)
+  vi.mocked(api.logout).mockRejectedValue(new ApiError(401, 'Log in first.'))
+  open('/s/26')
+  await userEvent.click(await screen.findByRole('button', { name: /inside as/ }))
+  expect(await screen.findByLabelText('Email')).toBeInTheDocument()
+})
+
+test('a logout that does not reach the server leaves you logged in', async () => {
+  vi.mocked(api.me).mockResolvedValue(MINA)
+  vi.mocked(api.logout).mockRejectedValue(new ApiError(502, 'offline'))
+  open('/s/26')
+  await userEvent.click(await screen.findByRole('button', { name: /inside as/ }))
+  await waitFor(() => expect(api.logout).toHaveBeenCalled())
+  expect(screen.getByRole('button', { name: /inside as/ })).toBeInTheDocument()
+})
+
+test('a broken next does not break the login page', async () => {
+  open('/login?next=%2F%2F%255B')
+  expect(await screen.findByLabelText('Email')).toBeInTheDocument()
+})
+
+test('a next that points at the login page does not loop', async () => {
+  vi.mocked(api.me).mockResolvedValue(MINA)
+  open('/login?next=%2Flogin')
+  expect(await screen.findByText('home')).toBeInTheDocument()
+})

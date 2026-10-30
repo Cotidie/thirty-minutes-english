@@ -1,6 +1,6 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react'
 import { Navigate, useLocation } from 'react-router-dom'
-import { api } from '../api'
+import { api, type ApiError } from '../api'
 import type { Me } from '../types'
 
 interface Auth {
@@ -33,7 +33,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const logIn = useCallback(async (email: string, password: string) => setMe(await api.login(email, password)), [])
   const signUp = useCallback(async (email: string, password: string) => setMe(await api.signup(email, password)), [])
   const logOut = useCallback(async () => {
-    await api.logout()
+    try {
+      await api.logout()
+    } catch (e) {
+      if ((e as ApiError).status !== 401) return // the login still stands, so nobody should think it ended
+    }
     setMe(null)
   }, [])
 

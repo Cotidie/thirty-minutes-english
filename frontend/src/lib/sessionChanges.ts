@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react'
+import { useCallback, useEffect, useRef } from 'react'
 
 /**
  * What the server's event stream says: which resource of an open session to read again over REST.
@@ -125,7 +125,7 @@ function useLatest<T>(value: T) {
  * The one way to read a session's data: `read` over REST at first, again when `change` is announced, and
  * again whenever the stream comes up, each result going to `show`. One read runs at a time, and changes
  * during it make one more after it, so an old answer never lands on a newer one. What lands after the
- * session is left is dropped.
+ * session is left is dropped. Returns a way to ask for another read, in the same line.
  */
 export function useSessionResource<T>(
   sessionId: number,
@@ -133,8 +133,9 @@ export function useSessionResource<T>(
   read: () => Promise<T>,
   show: (value: T) => void,
   onError?: (error: Error) => void,
-): void {
+): () => void {
   const latest = useLatest({ read, show, onError })
+  const readNow = useRef<() => void>(() => undefined)
 
   useEffect(() => {
     let live = true
@@ -164,6 +165,7 @@ export function useSessionResource<T>(
         })
     }
 
+    readNow.current = run
     const stop = listen(sessionId, change, run)
     run()
     return () => {
@@ -171,6 +173,8 @@ export function useSessionResource<T>(
       stop()
     }
   }, [sessionId, change, latest])
+
+  return useCallback(() => readNow.current(), [])
 }
 
 /** Tells when the session was deleted, or this account can no longer open it. */
