@@ -216,6 +216,16 @@ class SessionContent(BaseModel):
     vocabulary: list[VocabularyItem]
 
 
+class User(BaseModel):
+    """An account. `is_admin` is the one who approves the others; `can_create` lets an account make sessions."""
+
+    id: int
+    created_at: datetime
+    email: str
+    is_admin: bool
+    can_create: bool
+
+
 class SessionSummary(BaseModel):
     id: int
     created_at: datetime

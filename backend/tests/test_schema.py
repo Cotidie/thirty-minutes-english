@@ -9,8 +9,28 @@ from app.models import Category
 from tests.conftest import CURATED_TOPICS, sample_draft, seed_expressions
 
 
+def as_v9(path) -> None:
+    """Rewrites a current file the way v9 kept it: no accounts, and no creator on a session."""
+    conn = sqlite3.connect(path)
+    conn.execute("PRAGMA foreign_keys = OFF")
+    with conn:
+        for table in ("session_shares", "logins", "users"):
+            conn.execute(f"DROP TABLE {table}")
+        conn.execute(schema.SESSIONS.split(";")[0].replace("CREATE TABLE sessions", "CREATE TABLE sessions_v9"))
+        conn.execute("INSERT INTO sessions_v9 SELECT id, created_at, topic_id, title, note, questions, sources, translation FROM sessions")
+        counter = conn.execute("SELECT seq FROM sqlite_sequence WHERE name = 'sessions'").fetchone()
+        conn.execute("DROP TABLE sessions")
+        conn.execute("ALTER TABLE sessions_v9 RENAME TO sessions")
+        if counter:
+            conn.execute("UPDATE sqlite_sequence SET seq = ? WHERE name = 'sessions'", counter)
+        conn.execute(schema.SESSIONS.split(";")[1])
+        conn.execute("PRAGMA user_version = 9")
+    conn.close()
+
+
 def as_v3(path) -> None:
     """Rewrites a current file the way v3 kept topics: the text on each session, a JSON list per day, no topics table."""
+    as_v9(path)
     conn = sqlite3.connect(path)
     conn.execute("PRAGMA foreign_keys = OFF")
     with conn:
@@ -47,7 +67,7 @@ def test_a_fresh_file_is_at_the_current_version_with_strict_tables_and_live_fore
         assert conn.execute("PRAGMA user_version").fetchone()[0] == schema.VERSION
         sqls = [r[0] for r in conn.execute("SELECT sql FROM sqlite_master WHERE type = 'table' AND name NOT LIKE 'sqlite_%'")]
         assert sqls and all(s.rstrip().endswith("STRICT") for s in sqls)
-        assert {r[1] for r in conn.execute("PRAGMA table_info(sessions)")} == {"id", "created_at", "topic_id", "title", "note", "questions", "sources", "translation"}
+        assert {r[1] for r in conn.execute("PRAGMA table_info(sessions)")} == {"id", "created_at", "created_by", "topic_id", "title", "note", "questions", "sources", "translation"}
         with pytest.raises(sqlite3.IntegrityError):
             conn.execute("INSERT INTO paragraphs (session_id, position, text) VALUES (999, 0, 'x')")
 
@@ -112,6 +132,7 @@ def test_a_v3_file_moves_its_topics_into_rows_and_keeps_everything_else(tmp_path
 def test_a_v4_file_gains_the_swapped_expressions_table_and_keeps_its_sessions(tmp_path):
     path = tmp_path / "s.db"
     session = Database(path).sessions.create(sample_draft(), [])
+    as_v9(path)
     with sqlite3.connect(path) as conn:
         conn.execute("DROP TABLE swapped_expressions")
         conn.execute("ALTER TABLE expressions DROP COLUMN korean_example")
@@ -127,6 +148,7 @@ def test_a_v4_file_gains_the_swapped_expressions_table_and_keeps_its_sessions(tm
 def test_a_v5_file_gains_an_empty_korean_example_on_each_expression(tmp_path):
     path = tmp_path / "s.db"
     [expression] = seed_expressions(Database(path), 1)
+    as_v9(path)
     with sqlite3.connect(path) as conn:
         conn.execute("ALTER TABLE expressions DROP COLUMN korean_example")
         conn.execute("PRAGMA user_version = 5")
@@ -143,6 +165,7 @@ def test_a_v6_file_keeps_its_word_sentences_and_drops_the_expression_ones(tmp_pa
     session = db.sessions.create(sample_draft(), seed_expressions(db, 1))
     word = session.content.vocabulary[0].id
     kept = db.records.add_example(session.id, word, "word use", "echo", 2)
+    as_v9(path)
     with sqlite3.connect(path) as conn:
         conn.execute("ALTER TABLE examples RENAME TO examples_v7")
         conn.execute(
@@ -169,6 +192,7 @@ def test_a_v7_file_forgets_openai_and_comfy(tmp_path):
     path = tmp_path / "s.db"
     db = Database(path)
     db.settings.save({"VOICE_NAME": "Puck", "IMAGE_STYLE": "comic", "OPENROUTER_API_KEY": "sk-or"})
+    as_v9(path)
     with sqlite3.connect(path) as conn:
         conn.executemany(
             "INSERT INTO settings VALUES (?, ?)",
@@ -193,6 +217,7 @@ def test_a_v7_file_forgets_openai_and_comfy(tmp_path):
 def test_a_v7_file_on_gemini_keeps_its_voice_model(tmp_path):
     path = tmp_path / "s.db"
     Database(path)  # a fresh file, set back to v7 below
+    as_v9(path)
     with sqlite3.connect(path) as conn:
         conn.executemany("INSERT INTO settings VALUES (?, ?)", [("VOICE_PROVIDER", "gemini"), ("VOICE_MODEL", "gemini-3.8-live")])
         conn.execute("PRAGMA user_version = 7")
@@ -206,6 +231,7 @@ def test_a_v8_file_ties_its_figures_to_their_sessions(tmp_path):
     second = session.content.article.paragraphs[1].id
     photo = db.pictures.add(None, None, None)
     db.sessions.add_figure(session.id, second, photo, "Trams.", "https://news.example/trams", "Yonhap")
+    as_v9(path)
     with sqlite3.connect(path) as conn:  # back to how v8 kept figures: under a paragraph only
         conn.execute("ALTER TABLE figures RENAME TO figures_v9")
         conn.execute("DROP INDEX figures_session")
@@ -225,3 +251,17 @@ def test_a_v8_file_ties_its_figures_to_their_sessions(tmp_path):
     [figure] = db.sessions.get(session.id).content.article.figures
     assert (figure.paragraph_id, figure.image, figure.credit) == (second, f"{photo}.png", "Yonhap")
     assert db.sessions.delete(session.id) == [photo]
+
+
+def test_a_v9_file_gains_accounts_and_keeps_its_sessions_with_no_creator(tmp_path):
+    path = tmp_path / "s.db"
+    session = Database(path).sessions.create(sample_draft(), [])
+    as_v9(path)
+    db = Database(path)
+    with db.connect() as conn:
+        assert conn.execute("PRAGMA user_version").fetchone()[0] == 10
+        for table in ("users", "logins", "session_shares"):
+            assert conn.execute(f"SELECT sql FROM sqlite_master WHERE name = '{table}'").fetchone()[0].rstrip().endswith("STRICT")
+    assert db.sessions.get(session.id) == session
+    assert db.shares.created_by(session.id) is None
+    assert any(".bak-v9-" in p.name for p in tmp_path.iterdir())

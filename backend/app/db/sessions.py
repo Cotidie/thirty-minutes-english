@@ -50,15 +50,15 @@ class SessionRepo:
     def __init__(self, db: "Database") -> None:
         self._db = db
 
-    def create(self, draft: Draft, expression_ids: Sequence[int]) -> Session:
+    def create(self, draft: Draft, expression_ids: Sequence[int], created_by: int | None = None) -> Session:
         """Stores the draft with the corpus expressions it teaches, in that order."""
         article = draft.article
         with self._db.connect() as conn:
             now = datetime.now(UTC).isoformat()
             cur = conn.execute(
-                "INSERT INTO sessions (created_at, topic_id, title, questions, sources, translation) VALUES (?, ?, ?, ?, ?, ?)",
+                "INSERT INTO sessions (created_at, topic_id, title, questions, sources, translation, created_by) VALUES (?, ?, ?, ?, ?, ?, ?)",
                 (now, topics.ensure(conn, draft.topic, Category.TYPED, now), article.title, _json(article.questions), _json(article.sources),
-                 _json(article.translation)),
+                 _json(article.translation), created_by),
             )
             session_id = cur.lastrowid
             conn.executemany(

@@ -5,7 +5,7 @@ import pytest
 
 from app.db import Database
 from app.generation.generator import VOCABULARY_COUNT
-from app.models import ArticleDraft, Draft, ParagraphPictureDraft, PictureDraft, Question, SentencePair, Source, Topic, VocabularyDraft
+from app.models import ArticleDraft, Draft, ParagraphPictureDraft, PictureDraft, Question, SentencePair, Source, Topic, User, VocabularyDraft
 from app.topics.curated import CURATED
 
 
@@ -46,6 +46,16 @@ def seed_expressions(db: Database, n: int = 5, setting: str | None = None) -> li
         db.expressions.add(f"{name} phrase", f"meaning {i}", [f"syn {i}"], [f"ex {i}a", f"ex {i}b"], f"note {i}", f"표현 {i}", setting, "test")
         for i, name in enumerate(NAMES[:n])
     ]
+
+
+def add_user(db: Database, email: str = "a@example.com", *, admin: bool = False, can_create: bool = False) -> User:
+    """An account whose password nothing can check, for tests that log in through a token."""
+    user = db.accounts.create(email, "no password")
+    with db.connect() as conn:
+        conn.execute("UPDATE users SET is_admin = ?, can_create = ? WHERE id = ?", (int(admin), int(can_create), user.id))
+    result = db.accounts.get(user.id)
+    assert result is not None
+    return result
 
 
 @pytest.fixture

@@ -5,6 +5,7 @@ import sqlite3
 from pathlib import Path
 
 from app.db import migrate, schema
+from app.db.accounts import AccountRepo
 from app.db.caches import CacheRepo
 from app.db.expressions import ExpressionRepo
 from app.db.pictures import PictureRepo
@@ -12,6 +13,7 @@ from app.db.pins import PinRepo
 from app.db.records import RecordRepo
 from app.db.sessions import SessionRepo
 from app.db.settings import SettingsRepo
+from app.db.shares import ShareRepo
 from app.db.stages import StageRepo
 from app.db.topics import TopicRepo
 
@@ -45,6 +47,8 @@ class Database:
         self.pins = PinRepo(self)
         self.settings = SettingsRepo(self)
         self.topics = TopicRepo(self)
+        self.accounts = AccountRepo(self)
+        self.shares = ShareRepo(self)
 
     def connect(self) -> sqlite3.Connection:
         """A connection whose `with` block is one transaction, with foreign keys enforced."""

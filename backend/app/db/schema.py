@@ -8,7 +8,7 @@ from datetime import UTC, datetime
 from app.db import topics
 from app.models import Category
 
-VERSION = 9
+VERSION = 10
 
 # Added in v3, by session since v9: images under the article's paragraphs, and its cover (no paragraph) under the title.
 FIGURES = """
@@ -88,6 +88,39 @@ DELETE FROM settings WHERE key IN ('IMAGE_PROVIDER', 'IMAGE_MODEL')
 DELETE FROM settings WHERE key IN ('OPENAI_API_KEY', 'COMFY_API_KEY', 'VOICE_PROVIDER');
 DELETE FROM model_pins WHERE source IN ('comfy_images', 'openai_voice', 'openai_text');
 DELETE FROM model_lists WHERE source IN ('comfy_images', 'openai_voice', 'openai_text');
+"""
+
+# Added in v10: accounts, their logins, whom a session is shared with, and who made each session.
+ACCOUNTS = """
+CREATE TABLE users (
+    id            INTEGER PRIMARY KEY AUTOINCREMENT,
+    created_at    TEXT    NOT NULL,
+    email         TEXT    NOT NULL UNIQUE,
+    password_hash TEXT    NOT NULL,
+    is_admin      INTEGER NOT NULL DEFAULT 0,
+    can_create    INTEGER NOT NULL DEFAULT 0
+) STRICT;
+
+CREATE UNIQUE INDEX users_one_admin ON users (is_admin) WHERE is_admin = 1;
+
+CREATE TABLE logins (
+    token_hash TEXT PRIMARY KEY,
+    user_id    INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    expires_at TEXT    NOT NULL
+) STRICT;
+
+CREATE INDEX logins_user ON logins (user_id);
+
+CREATE TABLE session_shares (
+    session_id INTEGER NOT NULL REFERENCES sessions(id) ON DELETE CASCADE,
+    user_id    INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    created_at TEXT    NOT NULL,
+    PRIMARY KEY (session_id, user_id)
+) STRICT;
+
+CREATE INDEX session_shares_user ON session_shares (user_id);
+
+ALTER TABLE sessions ADD COLUMN created_by INTEGER REFERENCES users(id);
 """
 
 SESSIONS = """
@@ -195,7 +228,7 @@ CREATE INDEX session_expressions_expression ON session_expressions (expression_i
 CREATE INDEX readings_paragraph ON readings (paragraph_id);
 CREATE INDEX summaries_paragraph ON summaries (paragraph_id);
 CREATE INDEX stage_times_stage ON stage_times (stage, id);
-""" + FIGURES + SWAPS + KOREAN_EXAMPLES + EXAMPLES
+""" + FIGURES + SWAPS + KOREAN_EXAMPLES + EXAMPLES + ACCOUNTS
 
 
 def _run(conn: sqlite3.Connection, script: str) -> None:
@@ -232,6 +265,9 @@ def upgrade(conn: sqlite3.Connection, version: int) -> None:
         conn.execute("PRAGMA user_version = 8")
     if version < 9:
         _figures_by_session(conn)
+    if version < 10:
+        _run(conn, ACCOUNTS)
+        conn.execute("PRAGMA user_version = 10")
 
 
 def _figures_by_session(conn: sqlite3.Connection) -> None:
