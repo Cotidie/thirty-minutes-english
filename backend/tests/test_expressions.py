@@ -72,7 +72,8 @@ def test_the_corpus_is_served_whole(tmp_path):
 def test_delete_takes_an_expression_out_of_the_corpus_and_every_session_that_taught_it(store):
     kept, gone = seed_expressions(store, 2)
     session = store.sessions.create(sample_draft(), [kept, gone]).id
-    store.sessions.set_stars(session, store.sessions.get_stars(session).model_copy(update={"expressions": [kept, gone]}))
+    store.sessions.set_star(session, "expressions", kept, True)
+    store.sessions.set_star(session, "expressions", gone, True)
     assert store.expressions.delete(gone) is True
     assert store.expressions.get(gone) is None and store.expressions.count() == 1
     assert [e.id for e in store.sessions.get(session).content.expressions] == [kept]

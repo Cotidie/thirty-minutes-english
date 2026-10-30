@@ -93,10 +93,15 @@ def test_stars_are_ids_and_ignore_ids_from_other_sessions(store):
     assert store.sessions.get_stars(session.id) == Stars()
 
     foreign = other.content.vocabulary[0].id
-    saved = store.sessions.set_stars(session.id, Stars(expressions=[ids[1], ids[1], ids[2]], words=[words[3], foreign]))
+    store.sessions.set_star(session.id, "expressions", ids[1], True)
+    store.sessions.set_star(session.id, "expressions", ids[2], True)
+    store.sessions.set_star(session.id, "words", foreign, True)
+    saved = store.sessions.set_star(session.id, "words", words[3], True)
     assert saved == Stars(expressions=[ids[1]], words=[words[3]])
 
-    store.sessions.set_stars(session.id, Stars(words=[words[5]]))
+    store.sessions.set_star(session.id, "expressions", ids[1], False)
+    store.sessions.set_star(session.id, "words", words[3], False)
+    store.sessions.set_star(session.id, "words", words[5], True)
     assert store.sessions.get_stars(session.id) == Stars(expressions=[], words=[words[5]])
     assert store.sessions.get_stars(other.id) == Stars()
 
@@ -212,3 +217,27 @@ def test_figures_hang_under_their_paragraph_or_the_title_and_go_with_the_session
     assert store.sessions.delete(session.id) == [photo, drawn]
     with pytest.raises(KeyError):
         store.sessions.add_figure(session.id, None, photo, "too late", None, None)  # the session went while it was fetched
+
+
+def test_two_people_starring_different_words_keep_both(store):
+    session = store.sessions.create(sample_draft(), [])
+    a, b = [v.id for v in session.content.vocabulary[:2]]
+    store.sessions.set_star(session.id, "words", a, True)
+    assert store.sessions.set_star(session.id, "words", b, True).words == [a, b]
+    assert store.sessions.set_star(session.id, "words", a, False).words == [b]
+
+
+def test_starring_an_expression_touches_only_that_one(store):
+    ids = seed_expressions(store, 2)
+    session = store.sessions.create(sample_draft(), ids)
+    assert store.sessions.set_star(session.id, "expressions", ids[1], True).expressions == [ids[1]]
+
+
+def test_a_star_on_an_item_of_another_session_is_ignored(store):
+    ids = seed_expressions(store, 1)
+    mine = store.sessions.create(sample_draft(), [])
+    other = store.sessions.create(sample_draft(), ids)
+    word = other.content.vocabulary[0].id
+    assert store.sessions.set_star(mine.id, "words", word, True).words == []
+    assert store.sessions.set_star(mine.id, "expressions", ids[0], True).expressions == []
+    assert store.sessions.get_stars(other.id).words == []

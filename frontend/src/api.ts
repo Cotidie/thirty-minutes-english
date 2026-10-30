@@ -75,8 +75,9 @@ export const api = {
     return res.blob()
   },
   getStars: (id: number) => request<Stars>(`/api/sessions/${id}/stars`),
-  setStars: (id: number, stars: Stars) =>
-    request<Stars>(`/api/sessions/${id}/stars`, { method: 'PUT', body: JSON.stringify(stars) }),
+  /** One item's star; the session's stars as they then are, others' included. */
+  setStar: (id: number, kind: keyof Stars, item: number, starred: boolean) =>
+    request<Stars>(`/api/sessions/${id}/stars/${kind}/${item}`, { method: 'PUT', body: JSON.stringify({ starred }) }),
   getNote: (id: number) => request<Note>(`/api/sessions/${id}/note`),
   /** `keepalive` lets the save finish after the page closes. */
   setNote: (id: number, text: string, keepalive = false) =>

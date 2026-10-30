@@ -310,12 +310,16 @@ def test_stars_endpoint_round_trips_and_404s_on_unknown_session(client):
     assert client.get(f"/api/sessions/{sid}/stars").json() == {"expressions": [], "words": []}
 
     content = content_of(client, sid)
-    body = {"expressions": [content["expressions"][1]["id"]], "words": [content["vocabulary"][3]["id"]]}
-    assert client.put(f"/api/sessions/{sid}/stars", json=body).json() == body
+    expression, word = content["expressions"][1]["id"], content["vocabulary"][3]["id"]
+    body = {"expressions": [expression], "words": [word]}
+    assert client.put(f"/api/sessions/{sid}/stars/expressions/{expression}", json={"starred": True}).status_code == 200
+    assert client.put(f"/api/sessions/{sid}/stars/words/{word}", json={"starred": True}).json() == body
     assert client.get(f"/api/sessions/{sid}/stars").json() == body
+    assert client.put(f"/api/sessions/{sid}/stars/words/{word}", json={"starred": False}).json() == {"expressions": [expression], "words": []}
 
+    assert client.put(f"/api/sessions/{sid}/stars/nothing/{word}", json={"starred": True}).status_code == 422
     assert client.get("/api/sessions/999/stars").status_code == 404
-    assert client.put("/api/sessions/999/stars", json=body).status_code == 404
+    assert client.put(f"/api/sessions/999/stars/words/{word}", json={"starred": True}).status_code == 404
 
 
 def test_note_endpoint_round_trips_and_404s_on_unknown_session(client):

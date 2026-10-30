@@ -14,6 +14,10 @@ class Credentials(BaseModel):
     password: str
 
 
+class StarRequest(BaseModel):
+    starred: bool
+
+
 class AccountUpdate(BaseModel):
     can_create: bool
 

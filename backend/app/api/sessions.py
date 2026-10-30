@@ -3,8 +3,9 @@ from dataclasses import asdict
 from fastapi import APIRouter, HTTPException, Response
 
 from app.api.deps import Creator, Db, Files, Jobs, Me, Svc, failed, off, require_access, require_creator
-from app.api.schemas import CreateSessionRequest, JobStatus, RedrawRequest, ShareEntry, ShareRequest
+from app.api.schemas import CreateSessionRequest, JobStatus, RedrawRequest, ShareEntry, ShareRequest, StarRequest
 from app.db import Database
+from app.db.sessions import StarKind
 from app.generation.jobs import Job, JobRunner
 from app.llm import GenerationError
 from app.models import Expression, Note, Session, SessionSummary, Stars, User, VocabularyItem
@@ -190,10 +191,10 @@ def get_stars(session_id: int, db: Db, me: Me) -> Stars:
     return db.sessions.get_stars(session_id)
 
 
-@router.put("/sessions/{session_id}/stars", response_model=Stars)
-def set_stars(session_id: int, body: Stars, db: Db, me: Me) -> Stars:
+@router.put("/sessions/{session_id}/stars/{kind}/{item}", response_model=Stars)
+def set_star(session_id: int, kind: StarKind, item: int, body: StarRequest, db: Db, me: Me) -> Stars:
     require_access(db, me, session_id)
-    return db.sessions.set_stars(session_id, body)
+    return db.sessions.set_star(session_id, kind, item, body.starred)
 
 
 @router.get("/sessions/{session_id}/note", response_model=Note)

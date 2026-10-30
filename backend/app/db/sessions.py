@@ -7,7 +7,7 @@ import re
 import sqlite3
 from collections.abc import Sequence
 from datetime import UTC, datetime
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Literal
 
 from app.db.expressions import COLUMNS as EXPRESSION_COLUMNS
 from app.db import topics
@@ -22,6 +22,9 @@ if TYPE_CHECKING:
 
 # The vocabulary column each picture of a word lives in.
 PICTURE_COLUMNS = {"image": "picture_id", "example_image": "example_picture_id"}
+StarKind = Literal["expressions", "words"]
+# The table and id column of each kind of starred item.
+STAR_COLUMNS: dict[StarKind, tuple[str, str]] = {"expressions": ("session_expressions", "expression_id"), "words": ("vocabulary", "id")}
 # A session read with its topic's text.
 WITH_TOPIC = "sessions s JOIN topics t ON t.id = s.topic_id"
 
@@ -279,17 +282,12 @@ class SessionRepo:
             words = conn.execute("SELECT id FROM vocabulary WHERE session_id = ? AND starred ORDER BY position", (session_id,)).fetchall()
         return Stars(expressions=[r[0] for r in expressions], words=[r[0] for r in words])
 
-    def set_stars(self, session_id: int, stars: Stars) -> Stars:
-        """The session's stars become exactly `stars`; ids that are not the session's are ignored."""
+    def set_star(self, session_id: int, kind: StarKind, item: int, starred: bool) -> Stars:
+        """One item's star, so two people starring at once do not undo each other; an item that is not
+        the session's is ignored. The session's stars as they then are."""
+        table, column = STAR_COLUMNS[kind]
         with self._db.connect() as conn:
-            conn.execute(
-                "UPDATE session_expressions SET starred = expression_id IN (SELECT value FROM json_each(?)) WHERE session_id = ?",
-                (json.dumps(stars.expressions), session_id),
-            )
-            conn.execute(
-                "UPDATE vocabulary SET starred = id IN (SELECT value FROM json_each(?)) WHERE session_id = ?",
-                (json.dumps(stars.words), session_id),
-            )
+            conn.execute(f"UPDATE {table} SET starred = ? WHERE session_id = ? AND {column} = ?", (int(starred), session_id, item))
         return self.get_stars(session_id)
 
     def get_note(self, session_id: int) -> Note:

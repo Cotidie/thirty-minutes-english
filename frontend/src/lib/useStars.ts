@@ -7,13 +7,15 @@ export type StarKind = keyof Stars
 const NONE: Stars = { expressions: [], words: [] }
 
 /**
- * A session's stars, flipped on the spot and saved as a whole set. A failed
- * save puts the set back the way the server last had it.
+ * A session's stars, flipped on the spot and saved one item at a time, so two people
+ * starring at once keep each other's. The answer to the last save in flight is what
+ * shows; a failed save puts the set back the way the server last had it.
  */
 export function useStars(sessionId: number) {
   const [stars, setStars] = useState<Stars>(NONE)
   const current = useRef<Stars>(NONE)
   const saved = useRef<Stars>(NONE)
+  const saving = useRef(0)
 
   const show = (s: Stars) => {
     current.current = s
@@ -38,14 +40,21 @@ export function useStars(sessionId: number) {
   const toggle = useCallback(
     (kind: StarKind, item: number) => {
       const list = current.current[kind]
-      const next = { ...current.current, [kind]: list.includes(item) ? list.filter((x) => x !== item) : [...list, item] }
-      show(next)
+      const starred = !list.includes(item)
+      show({ ...current.current, [kind]: starred ? [...list, item] : list.filter((x) => x !== item) })
+      saving.current += 1
       api
-        .setStars(sessionId, next)
+        .setStar(sessionId, kind, item, starred)
         .then((s) => {
           saved.current = s
+          if (saving.current === 1) show(s)
         })
-        .catch(() => show(saved.current))
+        .catch(() => {
+          if (saving.current === 1) show(saved.current)
+        })
+        .finally(() => {
+          saving.current -= 1
+        })
     },
     [sessionId],
   )
