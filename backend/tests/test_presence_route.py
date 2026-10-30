@@ -57,13 +57,11 @@ def test_no_access_and_no_session_look_the_same(tmp_path):
             assert closed_with(ws) == 4404
 
 
-def test_another_origin_is_refused_before_anything_else(tmp_path):
+def test_another_origin_is_closed_with_a_code_a_browser_can_read_and_hears_nothing(tmp_path):
     db, client, maker, session = world(tmp_path)
     sign_in(client, db, maker)
-    with pytest.raises(WebSocketDisconnect) as e:
-        with client.websocket_connect(url_of(session), headers={"origin": "https://evil.example"}):
-            pass
-    assert e.value.code == 4403
+    with client.websocket_connect(url_of(session), headers={"origin": "https://evil.example"}) as ws:
+        assert closed_with(ws) == 4403
 
 
 def test_no_origin_only_needs_the_login(tmp_path):

@@ -96,11 +96,12 @@ async def _take_part(websocket: WebSocket, db: Database, token: str, session_id:
 
 @router.websocket("/sessions/{session_id}/presence")
 async def presence(websocket: WebSocket, session_id: int) -> None:
-    """Accepted before the login check so the browser can read why it was closed, and stop trying. Nothing is sent first."""
+    """Accepted before any check, with nothing sent, so a browser can read why it was closed and stop trying: all a refused
+    handshake tells it is 1006, which it would retry for as long as the page stays open."""
+    await websocket.accept()
     if not _same_origin(websocket.headers):
         await websocket.close(code=CLOSE_OTHER_ORIGIN)
         return
-    await websocket.accept()
     db = websocket.app.state.db
     token = websocket.cookies.get(LOGIN_COOKIE, "")
     user = await run_in_threadpool(db.accounts.user_of_login, token)
