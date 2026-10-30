@@ -1,5 +1,8 @@
 import '@testing-library/jest-dom/vitest'
+import { vi } from 'vitest'
 import { FakeEventSource } from './test/fakeEventSource'
+
+vi.mock('partysocket', async () => ({ WebSocket: (await import('./test/fakeWebSocket')).FakeWebSocket }))
 
 // jsdom has no AnimationEvent. Without one, React DOM listens for the
 // webkit-prefixed name only and a fired `animationend` never lands.
