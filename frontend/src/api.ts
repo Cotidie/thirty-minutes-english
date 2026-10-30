@@ -1,6 +1,7 @@
 import { goToLogin } from './lib/safeNext'
 import type { JobStatus } from './lib/progress'
 import type {
+  Account,
   AssessorSession,
   Correction,
   CorpusEntry,
@@ -18,6 +19,7 @@ import type {
   Reading,
   Session,
   SessionSummary,
+  ShareEntry,
   SettingsUpdate,
   SettingsView,
   Stars,
@@ -77,6 +79,16 @@ export const api = {
   /** Stops a running generation; nothing from it is saved. */
   cancelJob: (id: string) => request<JobStatus>(`/api/jobs/${id}`, { method: 'DELETE' }),
   deleteSession: (id: number) => request<void>(`/api/sessions/${id}`, { method: 'DELETE' }),
+  /** Whom the session is shared with; for the one who made it. */
+  listShares: (sessionId: number) => request<ShareEntry[]>(`/api/sessions/${sessionId}/shares`),
+  addShare: (sessionId: number, email: string) =>
+    request<ShareEntry[]>(`/api/sessions/${sessionId}/shares`, { method: 'POST', body: JSON.stringify({ email }) }),
+  removeShare: (sessionId: number, userId: number) => request<void>(`/api/sessions/${sessionId}/shares/${userId}`, { method: 'DELETE' }),
+  /** A session shared with me, off my list; it stays for everyone else. */
+  leaveSession: (sessionId: number) => request<void>(`/api/sessions/${sessionId}/shares/me`, { method: 'DELETE' }),
+  listAccounts: () => request<Account[]>('/api/accounts'),
+  setCanCreate: (id: number, canCreate: boolean) =>
+    request<Account>(`/api/accounts/${id}`, { method: 'PUT', body: JSON.stringify({ can_create: canCreate }) }),
   /** Another corpus expression in this one's place; the one swapped out counts as used. */
   swapExpression: (sessionId: number, expressionId: number) =>
     request<Expression>(`/api/sessions/${sessionId}/expressions/${expressionId}/swap`, { method: 'POST' }),

@@ -165,6 +165,8 @@ interface CellProps {
   item: VocabularyItem
   drawing: boolean
   arriving: boolean
+  /** Whether this account may draw new pictures, which cost money. */
+  canRedraw: boolean
   /** Why the last redraw failed. */
   failed?: string
   onRedraw: (face: PictureFace) => void
@@ -172,7 +174,7 @@ interface CellProps {
 }
 
 /** One word: its card, with the picture face it shows, and the redraw button for that face. */
-function VocabCell({ item, drawing, arriving, failed, onRedraw, children }: CellProps) {
+function VocabCell({ item, drawing, arriving, failed, canRedraw, onRedraw, children }: CellProps) {
   /** The face the learner flipped to; until then the example, wherever one is drawn or on its way. */
   const [flipped, setFlipped] = useState<PictureFace | null>(null)
   const face = flipped ?? (item.example_image || arriving ? 'example' : 'practice')
@@ -184,7 +186,7 @@ function VocabCell({ item, drawing, arriving, failed, onRedraw, children }: Cell
         item={item}
         picture={pictured && <VocabPicture item={item} face={face} onFlip={() => setFlipped(face === 'example' ? 'practice' : 'example')} drawing={drawing} arriving={arriving} />}
       />
-      {(item.scene || face === 'example') && (
+      {canRedraw && (item.scene || face === 'example') && (
         <button
           type="button"
           className="vocab-redraw"
@@ -207,6 +209,8 @@ interface Props {
   sessionId: number
   /** The session's first pictures are still being drawn. */
   arriving?: boolean
+  /** Whether this account may draw new pictures. */
+  canRedraw?: boolean
   /** A word's picture was redrawn; the session holds the new item. */
   onPicture: (index: number, item: VocabularyItem) => void
   /** Ids of the starred words. */
@@ -217,7 +221,7 @@ interface Props {
   onExample: (example: Example) => void
 }
 
-export function VocabularyTab({ items, sessionId, arriving = false, onPicture, starred, onToggleStar, examples, onExample }: Props) {
+export function VocabularyTab({ items, sessionId, arriving = false, canRedraw = true, onPicture, starred, onToggleStar, examples, onExample }: Props) {
   const [drawing, setDrawing] = useState<Set<number>>(new Set())
   const [failed, setFailed] = useState<Record<number, string>>({})
   /** One of a word's pictures again, in place, in the style Settings holds. */
@@ -250,6 +254,7 @@ export function VocabularyTab({ items, sessionId, arriving = false, onPicture, s
             item={item}
             drawing={drawing.has(index)}
             arriving={arriving}
+            canRedraw={canRedraw}
             failed={failed[index]}
             onRedraw={(face) => void redraw(index, face)}
           >

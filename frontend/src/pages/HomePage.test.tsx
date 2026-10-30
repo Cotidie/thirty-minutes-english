@@ -1,40 +1,26 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { render, screen, waitFor } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import { MemoryRouter } from 'react-router-dom'
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { beforeEach, expect, test, vi } from 'vitest'
 import { api } from '../api'
-import type { JobStatus } from '../lib/progress'
+import { useAuth } from '../lib/auth'
+import type { Me, SessionSummary } from '../types'
 import { HomePage } from './HomePage'
 
 vi.mock('../api', () => ({
-  api: { topics: vi.fn(), refreshTopics: vi.fn(), listSessions: vi.fn(), listJobs: vi.fn(), getJob: vi.fn(), cancelJob: vi.fn() },
+  api: { listSessions: vi.fn(), topics: vi.fn(), listJobs: vi.fn(), deleteSession: vi.fn(), leaveSession: vi.fn() },
 }))
+vi.mock('../lib/auth', () => ({ useAuth: vi.fn() }))
 
-const running: JobStatus = {
-  id: 'abc123',
-  topic: 'Science fiction that predicted real technology',
-  status: 'running',
-  stage: 'starting',
-  searches: 0,
-  activity: '',
-  input_tokens: 0,
-  output_tokens: 0,
-  pictures_done: 0,
-  pictures_total: 0,
-  elapsed_seconds: 10,
-  stage_elapsed_seconds: 10,
-  stage_expected_seconds: 10,
-  expected_seconds: 150,
-  session_id: null,
-  error: null,
+const NEWCOMER: Me = { id: 1, email: 'a@example.com', is_admin: false, can_create: false }
+const MINE: SessionSummary = { id: 7, created_at: '2026-10-30T10:00:00Z', topic: 'Trams', title: 'My trams', mine: true, shared_by: null }
+const SHARED: SessionSummary = { id: 8, created_at: '2026-10-30T10:00:00Z', topic: 'Boats', title: 'Their boats', mine: false, shared_by: 'mina@example.com' }
+
+function logIn(me: Me) {
+  vi.mocked(useAuth).mockReturnValue({ me, loading: false, logIn: vi.fn(), signUp: vi.fn(), logOut: vi.fn() })
 }
 
-beforeEach(() => {
-  vi.mocked(api.topics).mockResolvedValue({ topics: [], pending: false, error: null, labels: {} })
-  vi.mocked(api.listSessions).mockResolvedValue([])
-  vi.mocked(api.getJob).mockResolvedValue(running)
-})
-
-function renderHome() {
+function open() {
   render(
     <MemoryRouter>
       <HomePage />
@@ -42,34 +28,48 @@ function renderHome() {
   )
 }
 
-describe('HomePage', () => {
-  it('picks up a generation still running on the server', async () => {
-    vi.mocked(api.listJobs).mockResolvedValue([running])
-    renderHome()
+beforeEach(() => {
+  vi.mocked(api.listSessions).mockReset().mockResolvedValue([])
+  vi.mocked(api.topics).mockReset().mockResolvedValue({ topics: [], pending: false, error: null, labels: {} })
+  vi.mocked(api.listJobs).mockReset().mockResolvedValue([])
+  vi.mocked(api.deleteSession).mockReset().mockResolvedValue(undefined)
+  vi.mocked(api.leaveSession).mockReset().mockResolvedValue(undefined)
+})
 
-    expect(await screen.findByRole('progressbar', { name: 'Generation progress' })).toBeInTheDocument()
-    expect(screen.getByText('Reading the brief')).toBeInTheDocument()
-    expect(screen.getByText(running.topic)).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'Writing…' })).toBeDisabled()
-  })
+test('an account that may not create sees why, and asks for no topics', async () => {
+  logIn(NEWCOMER)
+  open()
+  expect(await screen.findByText("Session creation isn't on for this account yet. Ask the admin to turn it on.")).toBeInTheDocument()
+  expect(screen.getByText('Nothing here yet. Sessions shared with you appear here.')).toBeInTheDocument()
+  expect(screen.queryByRole('button', { name: 'Generate session' })).not.toBeInTheDocument()
+  expect(api.topics).not.toHaveBeenCalled()
+  expect(api.listJobs).not.toHaveBeenCalled()
+})
 
-  it('shows a failed generation with its error until it is closed', async () => {
-    vi.mocked(api.listJobs).mockResolvedValue([{ ...running, status: 'failed', error: 'claude timed out after 600s' }])
-    vi.mocked(api.cancelJob).mockResolvedValue({ ...running, status: 'failed' })
-    renderHome()
+test.each([
+  ['approved', { ...NEWCOMER, can_create: true }],
+  ['the admin', { ...NEWCOMER, is_admin: true }],
+])('%s can create', async (_who, me) => {
+  logIn(me)
+  open()
+  expect(await screen.findByRole('button', { name: 'Generate session' })).toBeInTheDocument()
+  await waitFor(() => expect(api.topics).toHaveBeenCalled())
+  expect(screen.queryByText(/Session creation isn't on/)).not.toBeInTheDocument()
+})
 
-    expect(await screen.findByRole('alert')).toHaveTextContent('claude timed out after 600s')
-    expect(screen.getByRole('button', { name: 'Generate session' })).toBeEnabled()
-    fireEvent.click(screen.getByRole('button', { name: 'Close' }))
-    await waitFor(() => expect(screen.queryByRole('alert')).not.toBeInTheDocument())
-    expect(api.cancelJob).toHaveBeenCalledWith(running.id)
-  })
+test('my session can be deleted, and a shared one only taken off my list', async () => {
+  logIn(NEWCOMER)
+  vi.mocked(api.listSessions).mockResolvedValue([SHARED, MINE])
+  open()
+  expect(await screen.findByText('Shared by mina@example.com')).toBeInTheDocument()
 
-  it('shows no progress when nothing is running', async () => {
-    vi.mocked(api.listJobs).mockResolvedValue([])
-    renderHome()
+  expect(screen.queryByRole('button', { name: 'Delete Their boats' })).not.toBeInTheDocument()
+  await userEvent.click(screen.getByRole('button', { name: 'Remove Their boats from your list' }))
+  expect(api.leaveSession).toHaveBeenCalledWith(8)
+  expect(api.deleteSession).not.toHaveBeenCalled()
+  await waitFor(() => expect(screen.queryByText('Their boats')).not.toBeInTheDocument())
 
-    expect(await screen.findByRole('button', { name: 'Generate session' })).toBeEnabled()
-    expect(screen.queryByRole('progressbar')).not.toBeInTheDocument()
-  })
+  await userEvent.click(screen.getByRole('button', { name: 'Delete My trams' }))
+  expect(api.deleteSession).toHaveBeenCalledWith(7)
+  await waitFor(() => expect(screen.queryByText('My trams')).not.toBeInTheDocument())
 })

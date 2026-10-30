@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useState } from 'react'
 import { Link, useLocation, useNavigate, useParams } from 'react-router-dom'
 import { api } from '../api'
+import { SharePanel } from '../components/SharePanel'
+import { useAuth } from '../lib/auth'
 import { useArrivingPictures } from '../lib/useArrivingPictures'
 import { ArticleTab } from '../components/ArticleTab'
 import { ExpressionsTab } from '../components/ExpressionsTab'
@@ -22,6 +24,7 @@ const TAB_KEYS = [...PHASES.map((p) => p.key), 'summary']
 
 export function SessionPage() {
   const { id } = useParams()
+  const { me } = useAuth()
   const { stars, toggle } = useStars(Number(id))
   const { examples, add: addExample } = useExamples(Number(id))
   const note = useNote(Number(id))
@@ -57,6 +60,7 @@ export function SessionPage() {
   if (!session) return <main className="session"><p className="empty">Loading…</p></main>
 
   const { content } = session
+  const mayCreate = Boolean(me && (me.is_admin || me.can_create))
   return (
     <main className="session">
       <aside className="rail">
@@ -88,6 +92,7 @@ export function SessionPage() {
             <span className="tab-minutes">after</span>
           </button>
         </nav>
+        {session.mine && <SharePanel sessionId={session.id} canAdd={mayCreate} />}
       </aside>
       <NoteBox note={note} />
       <div className="content">
@@ -112,6 +117,7 @@ export function SessionPage() {
             items={content.vocabulary}
             sessionId={session.id}
             arriving={arriving}
+            canRedraw={session.mine && mayCreate}
             onPicture={(index, item) => setContent((c) => ({ vocabulary: c.vocabulary.map((v, i) => (i === index ? item : v)) }))}
             starred={stars.words}
             onToggleStar={(id) => toggle('words', id)}

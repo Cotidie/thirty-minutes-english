@@ -34,6 +34,11 @@
   max-width: 34rem;
 }
 
+.home-locked {
+  margin: 0 0 3rem;
+  color: var(--muted);
+}
+
 .history-title {
   font-family: var(--serif);
   font-weight: 500;

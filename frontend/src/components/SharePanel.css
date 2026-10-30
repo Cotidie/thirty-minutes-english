@@ -1,0 +1,66 @@
+.share {
+  display: grid;
+  gap: 0.5rem;
+  font-size: 0.9rem;
+}
+
+.share-label {
+  display: block;
+  margin-bottom: 0.2rem;
+  font-weight: 600;
+}
+
+.share-row {
+  display: flex;
+  gap: 0.4rem;
+}
+
+.share-row .btn {
+  padding: 0.3rem 0.8rem;
+}
+
+.share-input {
+  flex: 1 1 auto;
+  min-width: 0;
+  border: 0;
+  border-bottom: 1px solid var(--ink);
+  background: transparent;
+  padding: 0.2rem 0.1rem;
+}
+
+.share-input:focus {
+  outline: 0;
+  background: var(--marker-soft);
+  box-shadow: 0 1px 0 var(--ink);
+}
+
+.share-error {
+  margin: 0;
+  color: var(--error);
+  font-weight: 500;
+}
+
+.share-list {
+  display: grid;
+  gap: 0.2rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.share-item {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+
+.share-email {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.share-stop {
+  flex: none;
+  padding: 0;
+}

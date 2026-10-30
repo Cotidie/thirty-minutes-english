@@ -5,7 +5,7 @@ import { api } from '../api'
 import type { SettingField, SettingGroup } from '../types'
 import { SettingsModal } from './SettingsModal'
 
-vi.mock('../api', () => ({ api: { getSettings: vi.fn(), putSettings: vi.fn(), testKey: vi.fn(), refreshModels: vi.fn(), pinModel: vi.fn() } }))
+vi.mock('../api', () => ({ api: { listAccounts: vi.fn(async () => []), getSettings: vi.fn(), putSettings: vi.fn(), testKey: vi.fn(), refreshModels: vi.fn(), pinModel: vi.fn() } }))
 
 const opt = (id: string, description = '', label = '', efforts: string[] | null = null) => ({ id, label, description, efforts })
 
@@ -116,9 +116,17 @@ describe('SettingsModal', () => {
     expect(screen.getByRole('heading', { name: /Settings/ })).toHaveTextContent(`Settings v${__APP_VERSION__}`)
   })
 
+  it('keeps accounts on their own tab, with nothing to save', async () => {
+    render(<SettingsModal open onClose={vi.fn()} />)
+    await userEvent.click(await screen.findByRole('tab', { name: 'Accounts' }))
+    expect(api.listAccounts).toHaveBeenCalled()
+    expect(screen.getByRole('heading', { name: 'Accounts' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Save' })).toBeDisabled()
+  })
+
   it('shows one group at a time, secrets masked, the saved value as the placeholder', async () => {
     await open()
-    expect(screen.getAllByRole('tab').map((t) => t.textContent)).toEqual(GROUPS.map((g) => g.title))
+    expect(screen.getAllByRole('tab').map((t) => t.textContent)).toEqual([...GROUPS.map((g) => g.title), 'Accounts'])
     const key = screen.getByLabelText('GEMINI_API_KEY') as HTMLInputElement
     expect(key.type).toBe('password')
     expect(key.value).toBe('')

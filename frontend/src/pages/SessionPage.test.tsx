@@ -10,6 +10,8 @@ const session = {
   created_at: '',
   topic: 'X',
   title: 'T',
+  mine: false,
+  shared_by: 'mina@example.com',
   content: {
     topic: 'X',
     expressions: [{ id: 1, phrase: 'a moving target', meaning: 'keeps changing', usage_note: 'n', examples: ['e1', 'e2'] }],
@@ -31,6 +33,9 @@ vi.mock('../api', () => ({
     swapExpression: vi.fn(async () => ({ id: 5, phrase: 'touch base', meaning: 'contact briefly', usage_note: 'n', examples: ['e3', 'e4'] })),
     addExpression: vi.fn(async () => ({ id: 6, phrase: 'circle back', meaning: 'return to it later', usage_note: 'n', examples: ['e5', 'e6'] })),
   },
+}))
+vi.mock('../lib/auth', () => ({
+  useAuth: () => ({ me: { id: 1, email: 'a@example.com', is_admin: false, can_create: true } }),
 }))
 vi.mock('../lib/liveClient', () => ({ connectExample: vi.fn(), connectSummary: vi.fn() }))
 

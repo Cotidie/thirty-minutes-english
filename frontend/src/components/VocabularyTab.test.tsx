@@ -213,3 +213,12 @@ describe('VocabularyTab', () => {
     expect(screen.queryByText('A word of another session.')).not.toBeInTheDocument()
   })
 })
+
+it('offers new pictures only to who may draw them', () => {
+  const drawn = [{ ...items[0], scene: 'a phone in every hand on a train', image: 'job-0.png' }]
+  const props = { items: drawn, sessionId: 1, onPicture: vi.fn(), starred: [], onToggleStar: vi.fn(), examples: none, onExample: vi.fn() }
+  const { rerender } = render(<VocabularyTab {...props} />)
+  expect(screen.getByRole('button', { name: /New picture for/ })).toBeInTheDocument()
+  rerender(<VocabularyTab {...props} canRedraw={false} />)
+  expect(screen.queryByRole('button', { name: /New picture for/ })).not.toBeInTheDocument()
+})

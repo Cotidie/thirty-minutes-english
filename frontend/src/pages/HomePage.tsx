@@ -1,18 +1,14 @@
-import { useCallback, useEffect, useState } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
+import { useEffect, useState } from 'react'
+import { Link } from 'react-router-dom'
 import { api } from '../api'
-import { GenerationProgress } from '../components/GenerationProgress'
-import { TopicPicker } from '../components/TopicPicker'
-import { useGenerationJob } from '../lib/useGenerationJob'
-import { useTopics } from '../lib/useTopics'
+import { SessionCreator } from '../components/SessionCreator'
+import { useAuth } from '../lib/auth'
 import type { SessionSummary } from '../types'
 import './HomePage.css'
 
 export function HomePage() {
-  const navigate = useNavigate()
-  const { topics, labels: topicLabels, pending, error: topicError, refresh } = useTopics()
-  const open = useCallback((sessionId: number) => navigate(`/s/${sessionId}`), [navigate])
-  const { job, running: busy, error, start: generate, close } = useGenerationJob(open)
+  const { me } = useAuth()
+  const canCreate = Boolean(me && (me.is_admin || me.can_create))
   const [sessions, setSessions] = useState<SessionSummary[]>([])
   const [loadError, setLoadError] = useState<string | null>(null)
 
@@ -20,9 +16,10 @@ export function HomePage() {
     api.listSessions().then(setSessions).catch((e: Error) => setLoadError(e.message))
   }, [])
 
-  async function remove(id: number) {
-    await api.deleteSession(id)
-    setSessions((s) => s.filter((x) => x.id !== id))
+  /** My own session is deleted; a shared one only leaves my list. */
+  async function remove(session: SessionSummary) {
+    await (session.mine ? api.deleteSession(session.id) : api.leaveSession(session.id))
+    setSessions((s) => s.filter((x) => x.id !== session.id))
   }
 
   return (
@@ -34,23 +31,17 @@ export function HomePage() {
         </p>
       </header>
 
-      <TopicPicker
-        suggestions={topics}
-        labels={topicLabels}
-        pending={pending}
-        error={topicError}
-        busy={busy}
-        onGenerate={generate}
-        onRefresh={refresh}
-      />
-      {job && <GenerationProgress job={job} onClose={close} onOpen={open} />}
-      {error && <p className="error">Could not create the session: {error}</p>}
+      {canCreate ? (
+        <SessionCreator />
+      ) : (
+        <p className="home-locked">Session creation isn't on for this account yet. Ask the admin to turn it on.</p>
+      )}
       {loadError && <p className="error">Could not load past sessions: {loadError}</p>}
 
       <section className="history">
         <h2 className="history-title">Past sessions</h2>
         {sessions.length === 0 ? (
-          <p className="empty">Nothing yet. Generate the first session above.</p>
+          <p className="empty">{canCreate ? 'Nothing yet. Generate the first session above.' : 'Nothing here yet. Sessions shared with you appear here.'}</p>
         ) : (
           <ul className="history-list">
             {sessions.map((s) => (
@@ -59,9 +50,15 @@ export function HomePage() {
                 <Link to={`/s/${s.id}`} className="history-link">
                   {s.title}
                   <span className="history-topic">{s.topic}</span>
+                  {s.shared_by && <span className="history-topic">Shared by {s.shared_by}</span>}
                 </Link>
-                <button type="button" className="btn btn-link" onClick={() => remove(s.id)} aria-label={`Delete ${s.title}`}>
-                  Delete
+                <button
+                  type="button"
+                  className="btn btn-link"
+                  onClick={() => void remove(s)}
+                  aria-label={s.mine ? `Delete ${s.title}` : `Remove ${s.title} from your list`}
+                >
+                  {s.mine ? 'Delete' : 'Remove'}
                 </button>
               </li>
             ))}

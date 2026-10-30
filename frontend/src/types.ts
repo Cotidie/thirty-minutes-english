@@ -160,11 +160,25 @@ export interface Me {
   can_create: boolean
 }
 
+/** An account as the admin sees it. */
+export interface Account extends Me {
+  created_at: string
+}
+
+/** Someone a session is shared with. */
+export interface ShareEntry {
+  user_id: number
+  email: string
+}
+
 export interface SessionSummary {
   id: number
   created_at: string
   topic: string
   title: string
+  /** Whether this account made it; if not, `shared_by` is who did. */
+  mine: boolean
+  shared_by: string | null
 }
 
 export interface Session {
@@ -172,6 +186,9 @@ export interface Session {
   created_at: string
   topic: string
   content: SessionContent
+  /** Whether this account made it; if not, `shared_by` is who did. */
+  mine: boolean
+  shared_by: string | null
 }
 
 /** A Gemini Live round: a one-use token in the socket URL and the setup message to send first. */
