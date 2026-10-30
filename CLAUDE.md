@@ -56,3 +56,5 @@ The app version (`X.Y.Z`) lives in `frontend/package.json` and `backend/pyprojec
 - Only repositories in `backend/app/db` publish events, after they commit. Routes, jobs, and callbacks do not.
 - In the browser, only `useSessionResource` and `useAccountResource` subscribe. Nothing else opens an `EventSource`.
 - New shared state gets a GET route and an event name: on the session's stream if it belongs to a session, on the account's if it belongs to an account. One person's temporary progress is polled.
+- Presence is the one exception to REST: `WS /api/sessions/{id}/presence` carries who is here, cursors, tabs, what they have turned over, and the shared timer. None of it is saved; losing it costs no more than a reload. Whatever must survive stays REST plus an event.
+- In the browser, only `frontend/src/lib/presence/connection.ts` opens that socket.

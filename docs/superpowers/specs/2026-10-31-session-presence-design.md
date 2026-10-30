@@ -68,7 +68,7 @@
 
 - 지금 라우터는 `dependencies=[Depends(signed_in)]`로 묶인다. `signed_in`은 `Request`를 받는데 FastAPI는 웹소켓 라우트에 `Request`를 주입하지 않아 그대로 넣으면 실패한다. `public_router`처럼 그 의존성 없이 따로 등록하고 라우트 안에서 직접 검사한다.
 - 연결할 때 로그인 쿠키(`LOGIN_COOKIE`)와 `db.shares.can_access`를 확인한다. 통과하기 전에는 어떤 데이터도 보내지 않는다.
-- **Origin 검사가 필수다.** 웹소켓에는 동일 출처 정책이 적용되지 않는다. `Origin` 헤더가 있으면 그 호스트가 `Host` 헤더와 같아야 한다. `Origin`이 없는 요청(브라우저가 아닌 클라이언트)은 로그인 검사만 받는다. 안쪽 nginx의 `/api/`는 `Host`를 넘기지 않으므로 이 경로의 `location`에서 `proxy_set_header Host $host`를 준다.
+- **Origin 검사가 필수다.** 웹소켓에는 동일 출처 정책이 적용되지 않는다. `Origin` 헤더가 있으면 그 호스트가 `Host` 헤더와 같아야 한다. `Origin`이 없는 요청(브라우저가 아닌 클라이언트)은 로그인 검사만 받는다. 안쪽 nginx의 `/api/`는 `Host`를 넘기지 않으므로 이 경로의 `location`에서 `proxy_set_header Host $http_host`를 준다. `$host`는 포트를 떼어 `127.0.0.1:5173` 같은 직접 접속의 `Origin`과 어긋난다.
 - 접속 중에도 권한을 다시 본다. `db.changes.subscribe(session_id)`로 `ACCESS`를 듣고, 25초마다도 로그인과 접근권을 확인한다. 없어졌으면 연결을 닫는다. 세션 스트림의 `events_of`와 같은 판단을 재사용한다.
 - 거절은 클라이언트가 구별할 수 있어야 한다. 자동 재연결이 끝없이 돌지 않도록, 권한 없음으로 닫힌 뒤에는 다시 연결하지 않는다. (닫는 코드와 시점은 구현자 재량)
 
@@ -115,7 +115,7 @@ JSON 텍스트 프레임이다. 필드 이름은 구현자 재량이고 담기�
 
 ## 프록시
 
-- 안쪽 `frontend/nginx.conf`에 `location ~ ^/api/sessions/[0-9]+/presence$`를 더한다: `proxy_http_version 1.1`, `Upgrade`, `Connection "upgrade"`, `Host $host`, 긴 `proxy_read_timeout`.
+- 안쪽 `frontend/nginx.conf`에 `location ~ ^/api/sessions/[0-9]+/presence$`를 더한다: `proxy_http_version 1.1`, `Upgrade`, `Connection "upgrade"`, `Host $http_host`, 긴 `proxy_read_timeout`.
 - 바깥 nginx(`lab-server`)는 `snippets/proxy.conf`에서 이미 `Upgrade`를 통과시키므로 고치지 않는다. `proxy_read_timeout 600s`는 uvicorn의 기본 웹소켓 핑(20초)이 넘지 않게 한다.
 - `frontend/vite.config.ts`의 프록시를 `{ target, ws: true }` 형태로 바꾼다.
 - Cloudflare 통과는 배포 전에는 확인할 수 없다. 공개 주소는 이 저장소의 스택으로만 이어지고, 지금 스택에는 웹소켓 라우트가 없다. 그래서 먼저 안쪽 nginx를 포함한 별도 스택에서 검증하고, **배포 직후 공개 주소로 확인한다.** 막혀 있어도 세션은 지금처럼 혼자서 동작하며, 그때는 Cloudflare 대시보드의 WebSockets 설정을 사용자에게 알린다. (설계자의 판단이다.)
