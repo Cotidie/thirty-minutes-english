@@ -43,12 +43,12 @@ export function ArticleTab({
 
   return (
     <section className="tab-panel">
-      <p className="tab-brief">
+      <p className="tab-brief" data-presence-anchor="brief">
         Read it, then each of you sums it up in your own words before the
         questions. Click a sentence for the Korean, a question for its passage.
       </p>
       <article className="article" ref={bodyRef}>
-        <h2 className="article-title">{article.title}</h2>
+        <h2 className="article-title" data-presence-anchor="title">{article.title}</h2>
         {cover && <ArticleFigure figure={cover} />}
         {paragraphs.map((p, i) => (
           <Fragment key={p.id}>
@@ -75,7 +75,7 @@ export function ArticleTab({
         <h3>Discussion questions</h3>
         <ol>
           {article.questions.map((q, i) => (
-            <li key={q.text}>
+            <li key={q.text} data-presence-anchor={`question:${i}`}>
               <QuestionItem
                 question={q}
                 active={active === i}
@@ -143,7 +143,7 @@ function ArticleFigure({ figure }: { figure: Figure }) {
     ? [figure.credit, hostOf(figure.source_url)].filter(Boolean).join(" · ")
     : null;
   return (
-    <figure className="article-figure">
+    <figure className="article-figure" data-presence-anchor={`figure:${figure.id}`}>
       <img
         src={`/api/images/${figure.image}`}
         alt={figure.caption}

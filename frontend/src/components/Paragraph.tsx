@@ -39,7 +39,7 @@ export function Paragraph({ paragraph, pieces, spans, summaries, saved, onSummar
   const marks: Marks = { findings: round.findings, open: round.open, onOpen: round.ask }
 
   return (
-    <div className="paragraph">
+    <div className="paragraph" data-presence-anchor={`paragraph:${paragraph.id}`}>
       <p>
         {pieces.map((piece, j) => {
           const run = { text: piece.text, start: piece.start, spans, starts, marks }

@@ -1,0 +1,48 @@
+/* Over the page and under the corner buttons, and clicks pass straight through. */
+.cursors {
+  position: fixed;
+  inset: 0;
+  z-index: 19;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.cursor {
+  position: absolute;
+  top: 0;
+  left: 0;
+  transition: transform 90ms linear;
+  filter: drop-shadow(0 1px 1px rgb(27 36 49 / 35%));
+}
+
+/* The tip of the arrow sits on the point. */
+.cursor-arrow {
+  display: block;
+  width: 14px;
+  height: 20px;
+  background: var(--person);
+  clip-path: polygon(0 0, 100% 72%, 55% 72%, 78% 100%, 58% 100%, 36% 76%, 0 100%);
+}
+
+/* Off the top or bottom of this screen: a triangle at the edge pointing the way. */
+.cursor.is-above .cursor-arrow,
+.cursor.is-below .cursor-arrow {
+  width: 16px;
+  height: 12px;
+  transform: translateX(-50%);
+}
+
+.cursor.is-above .cursor-arrow {
+  clip-path: polygon(50% 0, 100% 100%, 0 100%);
+}
+
+.cursor.is-below .cursor-arrow {
+  clip-path: polygon(0 0, 100% 0, 50% 100%);
+  transform: translate(-50%, -100%);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .cursor {
+    transition: none;
+  }
+}

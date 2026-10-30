@@ -5,10 +5,12 @@ import { SharePanel } from '../components/SharePanel'
 import { TabPeople } from '../components/TabPeople'
 import { useAuth } from '../lib/auth'
 import { PresenceProvider } from '../lib/presence/PresenceProvider'
+import { useCursorSender } from '../lib/presence/useCursorSender'
 import { useTellMyTab } from '../lib/presence/useOthersOnTab'
 import { useDrawingPictures } from '../lib/useDrawingPictures'
 import { useSessionGone, useSessionResource } from '../lib/sessionChanges'
 import { ArticleTab } from '../components/ArticleTab'
+import { Cursors } from '../components/Cursors'
 import { ExpressionsTab } from '../components/ExpressionsTab'
 import { NoteBox } from '../components/NoteBox'
 import { SessionTimer } from '../components/SessionTimer'
@@ -56,6 +58,7 @@ function OpenSession({ id, onGone }: { id: number; onGone: () => void }) {
   const navigate = useNavigate()
   const tab = Math.max(0, TAB_KEYS.indexOf(hash.slice(1)))
   useTellMyTab(tab)
+  useCursorSender(tab)
 
   useSessionResource(
     id,
@@ -88,11 +91,11 @@ function OpenSession({ id, onGone }: { id: number; onGone: () => void }) {
   const mayCreate = Boolean(me && (me.is_admin || me.can_create))
   return (
     <main className="session">
-      <aside className="rail">
+      <aside className="rail" data-presence-anchor="rail">
         <Link to="/" className="rail-back">All sessions</Link>
         <p className="rail-topic">{content.topic}</p>
         <SessionTimer />
-        <nav className="tabs" aria-label="Session parts">
+        <nav className="tabs" aria-label="Session parts" data-presence-anchor="tabs">
           {PHASES.map((p, i) => (
             <button
               key={p.key}
@@ -122,7 +125,8 @@ function OpenSession({ id, onGone }: { id: number; onGone: () => void }) {
         {session.mine && <SharePanel sessionId={session.id} canAdd={mayCreate} />}
       </aside>
       <NoteBox note={note} />
-      <div className="content">
+      <Cursors />
+      <div className="content" data-presence-anchor="content">
         {tab === 0 && (
           <ExpressionsTab
             items={content.expressions}

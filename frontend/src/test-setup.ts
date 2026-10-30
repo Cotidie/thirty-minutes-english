@@ -17,5 +17,8 @@ if (!('IntersectionObserver' in w)) {
   }
 }
 
+// Nor elementFromPoint, which a pointer event in any test reaches on the session page.
+document.elementFromPoint = () => null
+
 // jsdom has no EventSource either.
 w.EventSource = FakeEventSource

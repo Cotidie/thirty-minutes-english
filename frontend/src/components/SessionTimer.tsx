@@ -9,7 +9,7 @@ export function SessionTimer() {
   const progress = elapsed / SESSION_SECONDS
 
   return (
-    <div className="timer">
+    <div className="timer" data-presence-anchor="timer">
       <div className="timer-clock" aria-live="off">
         {formatClock(SESSION_SECONDS - elapsed)}
       </div>

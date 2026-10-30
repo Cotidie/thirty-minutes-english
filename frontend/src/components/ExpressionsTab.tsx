@@ -66,13 +66,13 @@ export function ExpressionsTab({ items, starred, onToggleStar, onSwap, onAdd }: 
   }
   return (
     <section className="tab-panel">
-      <p className="tab-brief">
+      <p className="tab-brief" data-presence-anchor="brief">
         Read the examples aloud, then each of you says the Korean sentence in English before you tap it for the model
         answer.
       </p>
       <ol className="expression-list">
         {items.map((item) => (
-          <li key={item.id} className="expression">
+          <li key={item.id} className="expression" data-presence-anchor={`expression:${item.id}`}>
             <div className="expression-head">
               <h3 className="expression-phrase">{item.phrase}</h3>
               {item.korean && <KoreanChip korean={item.korean} of={item.phrase} viewKey={`chip:expression:${item.id}`} />}

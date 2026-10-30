@@ -196,16 +196,17 @@ describe('SessionPage with someone else in the session', () => {
 
   it('tells the others which tab I am on, and again after reconnecting', async () => {
     const socket = await open([], '/s/3#article')
-    expect(socket.sent).toEqual([{ type: 'tab', tab: 1 }])
+    const tabsSent = () => socket.sent.filter((message) => message.type === 'tab')
+    expect(tabsSent()).toEqual([{ type: 'tab', tab: 1 }])
     await userEvent.click(tabNamed(/Vocabulary/))
-    expect(socket.sent).toEqual([{ type: 'tab', tab: 1 }, { type: 'tab', tab: 2 }])
+    expect(tabsSent()).toEqual([{ type: 'tab', tab: 1 }, { type: 'tab', tab: 2 }])
     socket.sent = []
     act(() => {
       socket.drop()
       socket.connect()
       socket.receive(WELCOME)
     })
-    expect(socket.sent).toEqual([{ type: 'tab', tab: 2 }])
+    expect(tabsSent()).toEqual([{ type: 'tab', tab: 2 }])
   })
 
   it('shows one mark for one person on two connections, and one each for two people', async () => {

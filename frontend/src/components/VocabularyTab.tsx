@@ -192,7 +192,7 @@ function VocabCell({ item, drawing, arriving, failed, canRedraw, onRedraw, child
     closeCaption()
   }
   return (
-    <div className={`vocab-cell${pictured ? '' : ' is-bare'}`}>
+    <div className={`vocab-cell${pictured ? '' : ' is-bare'}`} data-presence-anchor={`word:${item.id}`}>
       <VocabCard
         item={item}
         picture={pictured && <VocabPicture item={item} face={face} onFlip={flip} drawing={drawing} arriving={arriving} captionShown={captionShown} onCaptionShownChange={setCaptionShown} />}
@@ -257,7 +257,7 @@ export function VocabularyTab({ items, sessionId, arriving = false, canRedraw = 
 
   return (
     <section className="tab-panel is-wide">
-      <p className="tab-brief">
+      <p className="tab-brief" data-presence-anchor="brief">
         Take turns. Read the word and its sentence aloud, then explain in English what you think it means. Check only
         after both of you have tried.
       </p>

@@ -57,7 +57,7 @@ export function SharePanel({ sessionId, canAdd }: Props) {
   if (!canAdd && shares.length === 0) return null
 
   return (
-    <section className="share" aria-label="Sharing">
+    <section className="share" aria-label="Sharing" data-presence-anchor="shares">
       {canAdd && (
         <form className="share-form" onSubmit={(e) => void add(e)}>
           <label htmlFor="share-email" className="share-label">
