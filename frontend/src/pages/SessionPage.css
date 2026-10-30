@@ -99,7 +99,7 @@
 
 @media (max-width: 720px) {
   .session {
-    grid-template-columns: 1fr;
+    grid-template-columns: minmax(0, 1fr);
   }
 
   .rail {

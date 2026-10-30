@@ -22,16 +22,19 @@
   margin-bottom: 0;
 }
 
-/* Phrase, chip and star share one centre line; the row carries the gap below. */
+/* Phrase, chip and star share one centre line, until a narrow card sends the buttons to a line of their own; the row carries the gap below. */
 .expression-head {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
-  gap: 1rem;
+  gap: 0.4rem 1rem;
   margin-bottom: 0.4rem;
 }
 
 .expression-head .expression-phrase {
-  flex: 1;
+  flex: 1 1 12rem;
+  min-width: 0;
+  overflow-wrap: anywhere;
   margin: 0;
 }
 

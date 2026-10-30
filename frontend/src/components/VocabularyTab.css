@@ -294,12 +294,18 @@
 
 .vocab-word {
   display: flex;
+  flex-wrap: wrap;
   align-items: baseline;
   gap: 0.3rem;
   font-family: var(--serif);
   font-weight: 500;
   font-size: 1.7rem;
   line-height: 1.1;
+}
+
+.vocab-word-text {
+  min-width: 0;
+  overflow-wrap: anywhere;
 }
 
 /* The word's speaker sits on the row's centre line, not its baseline. */
