@@ -32,13 +32,52 @@ def test_without_usable_values_the_app_warns_and_old_sessions_stay_hidden_until_
     assert store.shares.created_by(old.id) == store.accounts.by_email("boss@example.com").id
 
 
-def test_once_there_is_an_admin_the_env_is_ignored_without_a_warning(store, caplog):
+def test_once_there_is_an_admin_a_new_email_in_the_env_is_ignored(store, caplog):
     ensure_admin_from(store, GOOD)
-    ensure_admin_from(store, {"ADMIN_EMAIL": "other@example.com", "ADMIN_PASSWORD": "87654321"})
+    ensure_admin_from(store, {"ADMIN_EMAIL": "other@example.com"})
     ensure_admin_from(store, {})
     assert store.accounts.by_email("other@example.com") is None
     assert verify_password("12345678", store.accounts.with_hash("boss@example.com")[1])
     assert "ADMIN_EMAIL" not in caplog.text
+
+
+def test_a_new_password_in_the_env_becomes_the_admins_and_ends_its_logins(store):
+    ensure_admin_from(store, GOOD)
+    admin = store.accounts.by_email("boss@example.com")
+    token = store.accounts.start_login(admin.id)
+    ensure_admin_from(store, {"ADMIN_PASSWORD": "a-new-password"})
+    stored = store.accounts.with_hash("boss@example.com")[1]
+    assert verify_password("a-new-password", stored) and not verify_password("12345678", stored)
+    assert store.accounts.user_of_login(token) is None
+
+
+def test_the_same_password_in_the_env_keeps_the_admin_logged_in(store):
+    ensure_admin_from(store, GOOD)
+    admin = store.accounts.by_email("boss@example.com")
+    token = store.accounts.start_login(admin.id)
+    ensure_admin_from(store, GOOD)
+    assert store.accounts.user_of_login(token).id == admin.id
+
+
+def test_a_blank_password_in_the_env_leaves_the_admin_alone(store, caplog):
+    ensure_admin_from(store, GOOD)
+    ensure_admin_from(store, {"ADMIN_EMAIL": "boss@example.com", "ADMIN_PASSWORD": ""})
+    assert verify_password("12345678", store.accounts.with_hash("boss@example.com")[1])
+    assert "ADMIN_PASSWORD" not in caplog.text
+
+
+def test_a_short_password_in_the_env_is_refused_with_a_warning(store, caplog):
+    ensure_admin_from(store, GOOD)
+    ensure_admin_from(store, {"ADMIN_PASSWORD": "short"})
+    assert verify_password("12345678", store.accounts.with_hash("boss@example.com")[1])
+    assert "ADMIN_PASSWORD" in caplog.text
+
+
+def test_the_env_password_never_touches_anyone_but_the_admin(store):
+    ensure_admin_from(store, GOOD)
+    other = store.accounts.create("a@example.com", hash_password("their-password"))
+    ensure_admin_from(store, {"ADMIN_PASSWORD": "a-new-password"})
+    assert verify_password("their-password", store.accounts.with_hash(other.email)[1])
 
 
 def test_reset_prints_a_new_password_once_and_ends_the_logins(tmp_path, capsys, monkeypatch):

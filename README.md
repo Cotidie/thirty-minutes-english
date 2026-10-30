@@ -77,7 +77,9 @@ Anyone can sign up, with an email and a password. Emails are never checked, so a
 - The admin turns on session creation for an account in Settings, under Accounts.
 - Whoever made a session shares it with an account by its email. The people it is shared with can use it fully, but only its maker can delete it.
 
-To replace a forgotten password, run this on the server. It prints a new password once and logs that account out everywhere:
+To change the admin's password, put the new one in `ADMIN_PASSWORD` and run `docker compose up -d`. That logs the admin out everywhere. A blank value keeps the current password.
+
+To replace anyone else's forgotten password, run this on the server. It prints a new password once and logs that account out everywhere:
 
 ```sh
 docker compose exec backend uv run --no-dev python -m app.accounts.reset_password EMAIL
