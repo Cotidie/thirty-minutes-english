@@ -784,7 +784,9 @@ git commit -m "feat: an open session re-reads what others change, through one ho
 
 - [ ] **Step 1: 임시 데이터 폴더로 개발 스택을 띄운다**
 
-Run: `DB_PATH` 없이 `backend/data`를 건드리지 않도록 별도 복제 디렉터리에서 `ADMIN_EMAIL=boss@example.com ADMIN_PASSWORD=12345678 COOKIE_SECURE=false docker compose -f compose.yaml -f compose.dev.yaml -p tme-test up -d --build`를 실행하고 `FRONTEND_PORT`를 비어 있는 포트로 준다.
+운영 데이터(`backend/data`)를 건드리지 않도록 스크래치패드에 브랜치를 `git clone`하고, 그 복제본의 `.env`에 `ADMIN_EMAIL=boss@example.com`, `ADMIN_PASSWORD=12345678`, `COOKIE_SECURE=false`, 비어 있는 `FRONTEND_PORT`를 적는다.
+
+Run: 복제본에서 `docker compose -f compose.yaml -f compose.dev.yaml -p tme-test up -d --build`
 Expected: 시작 로그에 운영자 생성, `/login`이 200.
 
 - [ ] **Step 2: 흐름을 PC(1280×800)와 폰(390×844) 폭에서 실행해 스크린샷을 확인한다**
@@ -792,7 +794,7 @@ Expected: 시작 로그에 운영자 생성, `/login`이 200.
 브라우저 컨텍스트 세 개(운영자, A, B)로 다음을 확인한다.
 
 1. A, B 가입. A의 홈에 생성 불가 문구가 보인다.
-2. 운영자가 A를 승인. A가 세션을 만든다(`generator`는 실제 호출하지 않도록 기존 세션을 복제한 데이터 사용).
+2. 운영자가 A를 승인하면 A의 홈에 주제 선택이 나타난다. 복제본에는 Claude 토큰이 없으므로 실제 생성은 하지 않고, 컨테이너 안에서 Python으로 `db.sessions.create(..., created_by=<A의 id>)`를 호출해 표현이 든 세션을 넣는다.
 3. A가 B에게 공유. B의 홈에 나타나고 Remove가 보인다.
 4. 두 화면을 열어 둔 채 A의 별표, 노트, 표현 교체, 연습 기록이 B 화면에 새로고침 없이 2초 안에 보인다. 반대 방향도 확인한다.
 5. B가 노트 입력 중(저장 전)에 A가 노트를 저장해도 B의 입력이 남는다.
@@ -804,7 +806,7 @@ Expected: 전부 기대대로. 어긋나면 해당 Task로 돌아가 테스트�
 
 - [ ] **Step 3: 전체 테스트와 정리**
 
-Run: `cd backend && uv run pytest -q && cd ../frontend && npx vitest run && npx tsc -b && cd .. && docker compose -p tme-test down -v`
+Run: `cd backend && uv run pytest -q && cd ../frontend && npx vitest run && npx tsc -b`, 이어서 복제본에서 `docker compose -p tme-test down -v`
 Expected: 전부 PASS, 임시 스택 제거.
 
 - [ ] **Step 4: 인덱스 갱신과 그래프 확인**
