@@ -72,9 +72,9 @@ scripts/backup user@host
 
 Everything but signing up and logging in needs an account. Set `ADMIN_EMAIL` and `ADMIN_PASSWORD` in `.env` before the first start: that account becomes the admin, and every session from before accounts becomes theirs. Without them the app runs with no admin, and those sessions stay hidden until the values are set and the app restarts.
 
-Anyone can sign up, with an email and a password. Emails are never checked, so a new account can do nothing until something is given to it:
+Anyone can sign up, with an email and a password. Emails are never checked, so a new account can do nothing that costs money until something is given to it:
 
-- The admin turns on session creation for an account in Settings, under Accounts.
+- The admin gives an account credits in Settings, under Accounts. Whatever costs money takes a fixed price from the balance of whoever uses it: making a session, drawing a picture again, Practice, Summarize, Read aloud, and hearing a sentence not read before. The admin is not charged. The prices are in `backend/app/credits.py`.
 - Whoever made a session shares it with an account by its email. The people it is shared with can use it fully, but only its maker can delete it.
 
 To change the admin's password, put the new one in `ADMIN_PASSWORD` and run `docker compose up -d`. That logs the admin out everywhere. A blank value keeps the current password.
