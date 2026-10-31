@@ -6,7 +6,17 @@ from app.db import Database, schema
 from app.db.pictures import PictureStat
 from app.generation.progress import Stage
 from app.models import Category
+from app.topics.curated import CURATED
 from tests.conftest import CURATED_TOPICS, sample_draft, seed_expressions
+
+
+def as_v10(path) -> None:
+    """Rewrites a current file the way v10 kept it: no economics topics."""
+    conn = sqlite3.connect(path)
+    with conn:
+        conn.execute("DELETE FROM topics WHERE category = 'economics'")
+        conn.execute("PRAGMA user_version = 10")
+    conn.close()
 
 
 def as_v9(path) -> None:
@@ -259,9 +269,46 @@ def test_a_v9_file_gains_accounts_and_keeps_its_sessions_with_no_creator(tmp_pat
     as_v9(path)
     db = Database(path)
     with db.connect() as conn:
-        assert conn.execute("PRAGMA user_version").fetchone()[0] == 10
+        assert conn.execute("PRAGMA user_version").fetchone()[0] == schema.VERSION
         for table in ("users", "logins", "session_shares"):
             assert conn.execute(f"SELECT sql FROM sqlite_master WHERE name = '{table}'").fetchone()[0].rstrip().endswith("STRICT")
     assert db.sessions.get(session.id) == session
     assert db.shares.created_by(session.id) is None
     assert any(".bak-v9-" in p.name for p in tmp_path.iterdir())
+
+
+def test_upgrading_v10_adds_the_economics_topics_and_keeps_every_other(tmp_path):
+    path = tmp_path / "s.db"
+    store = Database(path)
+    store.topics.set_news("2026-10-31", ["Something in the news"])
+    before = [(t.text, t.category) for t in store.topics.list_all() if t.category != Category.ECONOMICS]
+    as_v10(path)
+    upgraded = Database(path)
+    after = [(t.text, t.category) for t in upgraded.topics.list_all()]
+    economics = [(text, Category.ECONOMICS) for text in CURATED[Category.ECONOMICS]]
+    assert after == before + economics
+    with upgraded.connect() as conn:
+        assert conn.execute("PRAGMA user_version").fetchone()[0] == schema.VERSION
+
+
+def test_upgrading_v10_brings_no_deleted_topic_back(tmp_path):
+    path = tmp_path / "s.db"
+    store = Database(path)
+    gone = CURATED_TOPICS[0].text
+    store.topics.delete(next(t.id for t in store.topics.list_all() if t.text == gone))
+    as_v10(path)
+    assert gone not in [t.text for t in Database(path).topics.list_all()]
+
+
+def test_upgrading_v10_leaves_a_topic_someone_already_typed_under_its_category(tmp_path):
+    path = tmp_path / "s.db"
+    Database(path)
+    as_v10(path)
+    typed = CURATED[Category.ECONOMICS][0]
+    conn = sqlite3.connect(path)
+    with conn:
+        conn.execute("INSERT INTO topics (text, category, added_at) VALUES (?, 'typed', '2026-01-01')", (typed,))
+    conn.close()
+    entries = {t.text: t.category for t in Database(path).topics.list_all()}
+    assert entries[typed] == Category.TYPED
+    assert sum(category == Category.ECONOMICS for category in entries.values()) == len(CURATED[Category.ECONOMICS]) - 1

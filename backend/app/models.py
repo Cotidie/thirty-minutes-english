@@ -16,6 +16,7 @@ class Category(StrEnum):
     WORLD = "world"
     KOREA = "korea"
     RESEARCH = "research"
+    ECONOMICS = "economics"
     NEWS = "news"
     TYPED = "typed"
 
@@ -32,6 +33,7 @@ CATEGORY_LABELS: dict[Category, str] = {
     Category.CS: "Computer science",
     Category.IE: "Industrial engineering",
     Category.AI: "AI",
+    Category.ECONOMICS: "Economics",
     Category.LITERATURE: "Literature",
     Category.HISTORY: "History",
     Category.WORLD: "World",

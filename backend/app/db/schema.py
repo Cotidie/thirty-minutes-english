@@ -8,7 +8,7 @@ from datetime import UTC, datetime
 from app.db import topics
 from app.models import Category
 
-VERSION = 10
+VERSION = 11
 
 # Added in v3, by session since v9: images under the article's paragraphs, and its cover (no paragraph) under the title.
 FIGURES = """
@@ -268,6 +268,14 @@ def upgrade(conn: sqlite3.Connection, version: int) -> None:
     if version < 10:
         _run(conn, ACCOUNTS)
         conn.execute("PRAGMA user_version = 10")
+    if version < 11:
+        _economics_topics(conn)
+
+
+def _economics_topics(conn: sqlite3.Connection) -> None:
+    """v10 to v11: the new pool and nothing else, so a curated topic someone deleted stays deleted."""
+    topics.seed_pool(conn, Category.ECONOMICS, _now())
+    conn.execute("PRAGMA user_version = 11")
 
 
 def _figures_by_session(conn: sqlite3.Connection) -> None:

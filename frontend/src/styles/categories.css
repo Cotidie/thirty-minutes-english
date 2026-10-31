@@ -53,6 +53,12 @@
   --cat-ink: #86335f;
 }
 
+[data-category="economics"] {
+  --cat-line: #bccb86;
+  --cat-fill: #f2f6df;
+  --cat-ink: #56690f;
+}
+
 [data-category="typed"] {
   --cat-line: var(--line);
   --cat-fill: var(--paper);

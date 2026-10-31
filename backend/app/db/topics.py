@@ -34,9 +34,13 @@ def set_day(conn: sqlite3.Connection, day: str, texts: list[str], added_at: str)
 
 def seed(conn: sqlite3.Connection, added_at: str) -> None:
     """The curated topics a new (or newly upgraded) file starts with."""
-    for category, texts in CURATED.items():
-        for text in texts:
-            ensure(conn, text, category, added_at)
+    for category in CURATED:
+        seed_pool(conn, category, added_at)
+
+
+def seed_pool(conn: sqlite3.Connection, category: Category, added_at: str) -> None:
+    for text in CURATED[category]:
+        ensure(conn, text, category, added_at)
 
 
 class TopicRepo:

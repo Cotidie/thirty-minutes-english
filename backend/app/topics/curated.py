@@ -1,10 +1,9 @@
-"""The curated topics a fresh database starts with (and the v4 upgrade adds); after that they live
-in the topics table."""
+"""The curated topics a fresh database starts with; after that they live in the topics table, so a pool added later
+needs an upgrade step in app/db/schema.py to reach a file that already exists."""
 
 from app.models import Category
 
-# Three pools for the two fields the learners work in, and the one that sits
-# between them. Each is an argument a smart outsider can join, not a lecture.
+# One pool per field the topics rotate across. Each is an argument a smart outsider can join, not a lecture.
 CURATED: dict[Category, tuple[str, ...]] = {
     Category.CS: (
         "Why software estimates are always wrong",
@@ -378,5 +377,56 @@ CURATED: dict[Category, tuple[str, ...]] = {
         "Simulation studies and the parameters nobody reports",
         "A top journal or a fast one",
     ),
-
+    Category.ECONOMICS: (
+        "Is economics a science, or physics envy with graphs?",
+        "The credibility revolution and the natural experiment",
+        "Too much math, too little world: the economics major",
+        "Why economists disagree, and why the public stops listening",
+        "Finance, consulting, or a PhD: where economics majors end up",
+        "Can economics explain dating, crime, and everything else?",
+        "Is the rational agent dead, or just misunderstood?",
+        "Nudges: a helpful push or polite manipulation",
+        "Loss aversion and the replication fights around it",
+        "Game theory in real life: does anyone actually play Nash?",
+        "Signaling: does a degree teach, or only prove?",
+        "Lemons, insurance, and markets that fall apart",
+        "The tragedy of the commons and Elinor Ostrom's answer",
+        "Auctions, spectrum sales, and the winner's curse",
+        "Matching markets: medical residents, school seats, and kidneys",
+        "Repugnant markets and what money should not buy",
+        "Surge pricing: fair market or price gouging",
+        "Why two seats on one plane have different prices",
+        "Concert tickets, scalpers, and why the price stays too low",
+        "The minimum wage after Card and Krueger",
+        "Rent control and the rare thing economists agree on",
+        "Who actually pays a tariff?",
+        "Carbon taxes: economists love them, voters do not",
+        "Network effects and why the second-best app dies",
+        "Antitrust and the platforms it was not built for",
+        "Free apps and the price of your data",
+        "Greedflation: did companies cause the inflation?",
+        "Why the inflation target is 2 percent, and who chose it",
+        "The Phillips curve: dead, sleeping, or just flat",
+        "Did quantitative easing make the rich richer?",
+        "Modern Monetary Theory and the deficit debate",
+        "GDP and everything it leaves out",
+        "Degrowth versus green growth",
+        "The productivity paradox: computers everywhere but the data",
+        "Dollar dominance and the rivals that keep failing",
+        "Efficient markets and the investors who seem to beat them",
+        "Index funds: what happens when nobody picks stocks",
+        "Bubbles from tulips to tech: can anyone spot one in time?",
+        "2008 and the models that said it could not happen",
+        "Bank runs in the age of the smartphone",
+        "Bitcoin: money, asset, or neither",
+        "Institutions, geography, culture: why some nations get rich",
+        "Free trade and the towns it left behind",
+        "Randomized trials and the fight over how to end poverty",
+        "Just give poor people cash: what the experiments found",
+        "Immigration and wages: what the Mariel boatlift showed",
+        "The child penalty and what the gender pay gap really measures",
+        "Piketty and the argument over inequality",
+        "Industrial policy returns: chips, subsidies, picking winners",
+        "Moneyball and what sports teach economists",
+    ),
 }
