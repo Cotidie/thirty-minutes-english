@@ -41,26 +41,33 @@ export function SpeakButton({ text, what = 'the sentence' }: { text: string; wha
 
   const label = state === 'playing' ? 'Stop reading' : state === 'loading' ? 'Getting the voice…' : `Read ${what} aloud`
   return (
-    <button
-      type="button"
-      className={`speak is-${state}`}
-      aria-label={label}
-      title={state === 'failed' ? `Could not read it: ${error}` : label}
-      onClick={(e) => {
-        e.stopPropagation()
-        void press()
-      }}
-    >
-      {state === 'playing' ? (
-        <svg width="12" height="12" viewBox="0 0 16 16" aria-hidden="true">
-          <rect x="4" y="4" width="8" height="8" rx="1" fill="currentColor" />
-        </svg>
-      ) : (
-        <svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden="true">
-          <path d="M2.5 6h2.5l3.5-3v10l-3.5-3H2.5z" fill="currentColor" stroke="none" />
-          <path d="M11 5.5a3.5 3.5 0 0 1 0 5M12.8 3.8a6 6 0 0 1 0 8.4" strokeLinecap="round" />
-        </svg>
+    <>
+      <button
+        type="button"
+        className={`speak is-${state}`}
+        aria-label={label}
+        title={state === 'failed' ? `Could not read it: ${error}` : label}
+        onClick={(e) => {
+          e.stopPropagation()
+          void press()
+        }}
+      >
+        {state === 'playing' ? (
+          <svg width="12" height="12" viewBox="0 0 16 16" aria-hidden="true">
+            <rect x="4" y="4" width="8" height="8" rx="1" fill="currentColor" />
+          </svg>
+        ) : (
+          <svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden="true">
+            <path d="M2.5 6h2.5l3.5-3v10l-3.5-3H2.5z" fill="currentColor" stroke="none" />
+            <path d="M11 5.5a3.5 3.5 0 0 1 0 5M12.8 3.8a6 6 0 0 1 0 8.4" strokeLinecap="round" />
+          </svg>
+        )}
+      </button>
+      {state === 'failed' && (
+        <span role="alert" className="speak-error">
+          Could not read it: {error}
+        </span>
       )}
-    </button>
+    </>
   )
 }

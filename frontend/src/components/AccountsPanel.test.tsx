@@ -35,6 +35,13 @@ test('each account shows what it last spent', async () => {
   expect(within(history).getByRole('listitem')).toHaveTextContent('−200')
 })
 
+test('credits taken back read as taken back by you', async () => {
+  vi.mocked(api.accountCredits).mockResolvedValue([{ at: '2026-11-01T09:00:00Z', amount: -34, kind: 'grant', detail: null }])
+  render(<AccountsPanel />)
+  const history = await screen.findByRole('list', { name: 'mina@example.com recent charges' })
+  expect(within(history).getByRole('listitem')).toHaveTextContent('Taken back by you')
+})
+
 test('adding credits saves at once and shows the new balance and the row it made', async () => {
   vi.mocked(api.grantCredits).mockResolvedValue({ ...MINA, credits: 540 })
   vi.mocked(api.accountCredits).mockResolvedValueOnce([]).mockResolvedValueOnce([{ at: '2026-11-01T09:00:00Z', amount: 200, kind: 'grant', detail: null }])

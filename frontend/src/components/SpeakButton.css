@@ -33,6 +33,13 @@
   color: var(--wrong);
 }
 
+.speak-error {
+  margin-left: 0.35rem;
+  color: var(--wrong);
+  font-family: var(--sans);
+  font-size: 0.85rem;
+}
+
 .speak:focus-visible {
   outline: 2px solid var(--phrase);
   outline-offset: 2px;

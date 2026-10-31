@@ -31,7 +31,7 @@ class GrantRequest(BaseModel):
 
     @field_validator("amount")
     @classmethod
-    def something(cls, value: int) -> int:
+    def not_zero(cls, value: int) -> int:
         if value == 0:
             raise ValueError("amount must not be 0")
         return value

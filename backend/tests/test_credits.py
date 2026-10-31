@@ -281,3 +281,18 @@ def test_the_admins_failed_generation_writes_no_refund(tmp_path):
     app = create_app(db, Services(FailingGenerator()), InlineExecutor())
     assert admin_client(app).post("/api/sessions", json={"topic": "Trams"}).json()["status"] == "failed"
     assert db.credits.recent(db.accounts.by_email("admin@example.com").id) == []
+
+
+class ShutDownExecutor:
+    def submit(self, fn, /, *args):
+        raise RuntimeError("cannot schedule new futures after shutdown")
+
+
+def test_a_session_the_server_could_not_start_gives_the_200_back(tmp_path):
+    db = Database(tmp_path / "s.db")
+    app = create_app(db, Services(FakeGenerator()), ShutDownExecutor())
+    mina = add_user(db, "mina@example.com")
+    db.credits.grant(mina.id, 200, by=mina.id)
+    res = client_of(app, db, mina).post("/api/sessions", json={"topic": "Trams"})
+    assert res.status_code == 202 and res.json()["status"] == "failed"
+    assert db.credits.balance(mina.id) == 200

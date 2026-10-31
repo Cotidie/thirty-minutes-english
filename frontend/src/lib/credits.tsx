@@ -1,29 +1,18 @@
 import { createContext, useContext, useMemo, useState, type ReactNode } from 'react'
 import { api } from '../api'
 import type { CreditsView } from '../types'
+import { creditsFrom, type Credits } from './creditView'
 import { useAccountResource } from './sessionChanges'
-
-interface Credits extends CreditsView {
-  /** What the features named cost together. Whoever has no balance, the admin, is charged nothing. */
-  cost: (...kinds: string[]) => number
-  canAfford: (...kinds: string[]) => boolean
-}
-
-function creditsOf(view: CreditsView): Credits {
-  const { balance, prices } = view
-  const cost = (...kinds: string[]) => (balance === null ? 0 : kinds.reduce((sum, kind) => sum + (prices[kind] ?? 0), 0))
-  return { ...view, cost, canAfford: (...kinds) => balance === null || balance >= cost(...kinds) }
-}
 
 const NOTHING_KNOWN: CreditsView = { balance: null, prices: {}, recent: [] }
 
-const CreditsContext = createContext<Credits>(creditsOf(NOTHING_KNOWN))
+const CreditsContext = createContext<Credits>(creditsFrom(NOTHING_KNOWN))
 
 /** What the account has to spend, kept fresh for every button under it. */
 export function CreditsProvider({ children }: { children: ReactNode }) {
   const [view, setView] = useState(NOTHING_KNOWN)
   useAccountResource('credits', api.myCredits, setView)
-  const credits = useMemo(() => creditsOf(view), [view])
+  const credits = useMemo(() => creditsFrom(view), [view])
   return <CreditsContext.Provider value={credits}>{children}</CreditsContext.Provider>
 }
 

@@ -33,6 +33,15 @@ test('shows the balance and opens the last charges', async () => {
   expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
 })
 
+test('credits the admin took back read as taken back', async () => {
+  has(40, [{ at: '2026-11-01T09:00:00Z', amount: -34, kind: 'grant', detail: null }])
+  render(<CreditsPill />)
+  await userEvent.click(screen.getByRole('button', { name: 'Credits' }))
+  const row = within(screen.getByRole('dialog', { name: 'Credits' })).getByRole('listitem')
+  expect(row).toHaveTextContent('Taken back by the admin')
+  expect(row).toHaveTextContent('−34')
+})
+
 test('a click outside closes it, and one inside does not', async () => {
   has(340)
   render(

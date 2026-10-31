@@ -365,3 +365,18 @@ def test_a_refund_that_fails_does_not_take_the_job_down(tmp_path):
 
     job = runner_over(db).start("Trams", Exploding(), on_lost=refuses)
     assert job.status == "failed"
+
+
+class ShutDown:
+    """An executor as it is once the server has begun to stop."""
+
+    def submit(self, fn, /, *args):
+        raise RuntimeError("cannot schedule new futures after shutdown")
+
+
+def test_a_job_the_executor_refuses_is_failed_and_reported_lost(tmp_path):
+    db = Database(tmp_path / "s.db")
+    lost = []
+    job = JobRunner(db.sessions, db.expressions, db.stages, ShutDown()).start("Trams", Recording(), on_lost=lost.append)
+    assert job.status == "failed" and "shutdown" in job.error
+    assert lost == [job]

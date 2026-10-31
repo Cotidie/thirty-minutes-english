@@ -137,12 +137,17 @@ class JobRunner:
         """Generates in the background; the pictures follow when an illustrator is given.
         `on_lost` is told once if the job fails or is cancelled before its session is saved: there is nothing to show."""
         job = Job(id=uuid.uuid4().hex[:12], topic=topic, created_by=created_by)
-        self._foresee_pictures(job, illustrator, 2 * VOCABULARY_COUNT)  # the example and the scene
         with self._lock:
             # A new try answers the same person's old failure.
             self._jobs = {id: j for id, j in self._jobs.items() if j.status != "failed" or j.created_by != created_by}
             self._jobs[job.id] = job
-        self.executor.submit(self._run, job, generator, illustrator, on_lost)
+        try:
+            self._foresee_pictures(job, illustrator, 2 * VOCABULARY_COUNT)  # the example and the scene
+            self.executor.submit(self._run, job, generator, illustrator, on_lost)
+        except Exception as e:  # the executor is refused new work once the server has begun to stop
+            job.fail(str(e))
+            log.exception("job %s: could not start", job.id)
+            self._tell_if_lost(job, on_lost)
         return job
 
     def get(self, job_id: str) -> Job | None:
@@ -183,6 +188,10 @@ class JobRunner:
 
     def _run(self, job: Job, generator: Generator, illustrator: Illustrator | None, on_lost: Callable[[Job], None] | None) -> None:
         self._generate(job, generator, illustrator)
+        self._tell_if_lost(job, on_lost)
+
+    @staticmethod
+    def _tell_if_lost(job: Job, on_lost: Callable[[Job], None] | None) -> None:
         if on_lost and job.session_id is None and job.status in ("failed", "cancelled"):
             try:
                 on_lost(job)

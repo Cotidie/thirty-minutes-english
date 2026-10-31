@@ -353,6 +353,32 @@ def test_upgrading_v12_adds_credits_and_drops_can_create_keeping_the_accounts(tm
     assert any(".bak-v12-" in p.name for p in tmp_path.iterdir())
 
 
+def test_an_upgrade_to_v13_that_fails_leaves_the_v12_file_as_it_was(tmp_path):
+    path = tmp_path / "s.db"
+    Database(path)
+    as_v12(path)
+    conn = sqlite3.connect(path)
+    with conn:
+        conn.execute("CREATE INDEX stops_the_drop ON users (can_create)")  # a column with an index cannot be dropped
+    conn.close()
+    with pytest.raises(sqlite3.OperationalError):
+        Database(path)
+    conn = sqlite3.connect(path)
+    assert conn.execute("PRAGMA user_version").fetchone()[0] == 12
+    assert conn.execute("SELECT count(*) FROM sqlite_master WHERE name = 'credits'").fetchone()[0] == 0
+    conn.close()
+
+
+def test_a_v10_file_upgrades_through_steps_that_each_hold_a_transaction(tmp_path):
+    path = tmp_path / "s.db"
+    Database(path)
+    as_v10(path)
+    db = Database(path)
+    with db.connect() as conn:
+        assert conn.execute("PRAGMA user_version").fetchone()[0] == 13
+        assert "can_create" not in [c[1] for c in conn.execute("PRAGMA table_info(users)")]
+
+
 def test_a_v9_file_goes_straight_to_v13_though_its_accounts_never_had_the_flag(tmp_path):
     path = tmp_path / "s.db"
     Database(path)

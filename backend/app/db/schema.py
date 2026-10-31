@@ -297,7 +297,10 @@ def _add_pool(conn: sqlite3.Connection, category: Category, version: int) -> Non
 
 
 def _credits(conn: sqlite3.Connection) -> None:
-    """The ledger comes and the flag it replaces goes. A file older than v10 just got accounts without the flag."""
+    """The ledger comes and the flag it replaces goes, both or neither: outside a transaction each of these
+    statements would commit alone. A file older than v10 just got accounts without the flag."""
+    conn.commit()
+    conn.execute("BEGIN")
     _run(conn, CREDITS)
     if any(column[1] == "can_create" for column in conn.execute("PRAGMA table_info(users)")):
         conn.execute("ALTER TABLE users DROP COLUMN can_create")

@@ -3,8 +3,7 @@ import { useCredits } from '../lib/credits'
 import type { CreditEntry } from '../types'
 import './CreditsPill.css'
 
-export const KIND_LABELS: Record<string, string> = {
-  grant: 'Added by the admin',
+const KIND_LABELS: Record<string, string> = {
   refund: 'Refund',
   session: 'Session',
   redraw: 'New picture',
@@ -76,9 +75,9 @@ export function CreditsPill() {
   )
 }
 
-/** One line of an account's history. */
-export function CreditLine({ entry, grantLabel }: { entry: CreditEntry; grantLabel?: string }) {
-  const label = entry.kind === 'grant' && grantLabel ? grantLabel : (KIND_LABELS[entry.kind] ?? entry.kind)
+/** One line of an account's history. `grantedBy` names who adds credits or takes them back, as the reader knows them. */
+export function CreditLine({ entry, grantedBy = 'the admin' }: { entry: CreditEntry; grantedBy?: string }) {
+  const label = entry.kind === 'grant' ? `${entry.amount < 0 ? 'Taken back' : 'Added'} by ${grantedBy}` : (KIND_LABELS[entry.kind] ?? entry.kind)
   return (
     <li className="credit-line">
       <time dateTime={entry.at}>{new Date(entry.at).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}</time>

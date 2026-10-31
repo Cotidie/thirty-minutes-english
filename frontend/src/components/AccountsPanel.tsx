@@ -123,7 +123,7 @@ function Charged({ account, credits, onSaved, onError }: ChargedProps) {
       {history.length > 0 && (
         <ul className="credit-lines accounts-history" aria-label={`${account.email} recent charges`}>
           {history.map((entry, i) => (
-            <CreditLine key={i} entry={entry} grantLabel="Added by you" />
+            <CreditLine key={i} entry={entry} grantedBy="you" />
           ))}
         </ul>
       )}

@@ -1,3 +1,5 @@
+"""What an account has to spend, as the account itself reads it."""
+
 from fastapi import APIRouter
 
 from app.api.deps import Db, Me
