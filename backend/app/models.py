@@ -221,13 +221,12 @@ class SessionContent(BaseModel):
 
 
 class User(BaseModel):
-    """An account. `is_admin` is the one who approves the others; `can_create` lets an account make sessions."""
+    """An account. `is_admin` is the one who runs the place; everyone else spends credits."""
 
     id: int
     created_at: datetime
     email: str
     is_admin: bool
-    can_create: bool
 
 
 class SessionSummary(BaseModel):

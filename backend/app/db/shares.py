@@ -50,7 +50,7 @@ class ShareRepo:
     def shared_with(self, session_id: int) -> list[User]:
         with self._db.connect() as conn:
             rows = conn.execute(
-                "SELECT u.id, u.created_at, u.email, u.is_admin, u.can_create FROM session_shares s"
+                "SELECT u.id, u.created_at, u.email, u.is_admin FROM session_shares s"
                 " JOIN users u ON u.id = s.user_id WHERE s.session_id = ? ORDER BY u.email",
                 (session_id,),
             ).fetchall()
@@ -70,17 +70,6 @@ class ShareRepo:
                 return True
             return (
                 conn.execute("SELECT 1 FROM session_shares WHERE session_id = ? AND user_id = ?", (session_id, user.id)).fetchone()
-                is not None
-            )
-
-    def has_sessions(self, user_id: int) -> bool:
-        """Whether the account made a session or had one shared with it."""
-        with self._db.connect() as conn:
-            return (
-                conn.execute(
-                    "SELECT 1 FROM sessions WHERE created_by = ? UNION ALL SELECT 1 FROM session_shares WHERE user_id = ? LIMIT 1",
-                    (user_id, user_id),
-                ).fetchone()
                 is not None
             )
 

@@ -28,7 +28,7 @@ def log_in(client, email="a@example.com", password="12345678"):
 def test_signing_up_logs_you_in_without_rights(client):
     res = sign_up(client, " Mina@Example.COM ")
     assert res.status_code == 201 and res.json()["email"] == "mina@example.com"
-    assert res.json()["can_create"] is False and res.json()["is_admin"] is False
+    assert res.json()["is_admin"] is False and "can_create" not in res.json()
     cookie = res.headers["set-cookie"].lower()
     for part in ("login=", "httponly", "samesite=lax", "secure", "max-age=2592000", "path=/"):
         assert part in cookie

@@ -26,10 +26,10 @@ def world(tmp_path):
     seed_expressions(db, EXPRESSION_COUNT + 3)
     app = create_app(db, Services(FakeGenerator()), InlineExecutor())
     accounts = {
-        "creator": add_user(db, "creator@example.com", can_create=True),
+        "creator": add_user(db, "creator@example.com"),
         "sharee": add_user(db, "sharee@example.com"),
         "newcomer": add_user(db, "newcomer@example.com"),
-        "stranger": add_user(db, "stranger@example.com", can_create=True),
+        "stranger": add_user(db, "stranger@example.com"),
         "admin": add_user(db, "boss@example.com", admin=True),
     }
     clients = {name: client_of(app, db, user) for name, user in accounts.items()}
@@ -113,8 +113,8 @@ def test_an_approval_taken_away_stops_new_spending_but_keeps_my_sessions(world):
 def test_jobs_are_seen_and_closed_only_by_who_started_them(tmp_path):
     db = Database(tmp_path / "s.db")
     app = create_app(db, Services(FailingGenerator()), InlineExecutor())
-    mine = client_of(app, db, add_user(db, "me@example.com", can_create=True))
-    other = client_of(app, db, add_user(db, "other@example.com", can_create=True))
+    mine = client_of(app, db, add_user(db, "me@example.com"))
+    other = client_of(app, db, add_user(db, "other@example.com"))
     job = mine.post("/api/sessions", json={"topic": "X"}).json()
     assert [j["id"] for j in mine.get("/api/jobs").json()] == [job["id"]]
     assert other.get("/api/jobs").json() == []

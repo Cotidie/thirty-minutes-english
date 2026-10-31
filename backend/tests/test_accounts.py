@@ -25,16 +25,9 @@ def test_an_email_differing_only_in_case_or_spaces_is_the_same_account(store):
 
 def test_a_new_account_has_no_rights(store):
     user = store.accounts.create("a@example.com", "h")
-    assert (user.is_admin, user.can_create) == (False, False)
+    assert user.is_admin is False
     assert store.accounts.with_hash("a@example.com") == (user, "h")
     assert store.accounts.with_hash("b@example.com") is None
-
-
-def test_creation_rights_can_be_turned_on_and_off(store):
-    user = store.accounts.create("a@example.com", "h")
-    assert store.accounts.set_can_create(user.id, True).can_create
-    assert not store.accounts.set_can_create(user.id, False).can_create
-    assert store.accounts.set_can_create(999, True) is None
 
 
 def test_a_login_token_is_stored_hashed_and_ends(store):
@@ -97,8 +90,6 @@ def test_access_goes_to_the_creator_the_shared_and_the_admin_only(store):
     store.shares.share(session.id, friend.id)
     assert [store.shares.can_access(u, session.id) for u in (me, friend, stranger, admin)] == [True, True, False, True]
     assert not store.shares.can_access(me, 999) and not store.shares.can_access(admin, 999)
-    assert store.shares.has_sessions(me.id) and store.shares.has_sessions(friend.id)
-    assert not store.shares.has_sessions(stranger.id)
 
 
 def test_nobody_but_the_admin_can_open_a_session_with_no_creator(store):

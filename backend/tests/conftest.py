@@ -51,11 +51,11 @@ def seed_expressions(db: Database, n: int = 5, setting: str | None = None) -> li
     ]
 
 
-def add_user(db: Database, email: str = "a@example.com", *, admin: bool = False, can_create: bool = False) -> User:
+def add_user(db: Database, email: str = "a@example.com", *, admin: bool = False) -> User:
     """An account whose password nothing can check, for tests that log in through a token."""
     user = db.accounts.create(email, "no password")
     with db.connect() as conn:
-        conn.execute("UPDATE users SET is_admin = ?, can_create = ? WHERE id = ?", (int(admin), int(can_create), user.id))
+        conn.execute("UPDATE users SET is_admin = ? WHERE id = ?", (int(admin), user.id))
     result = db.accounts.get(user.id)
     assert result is not None
     return result

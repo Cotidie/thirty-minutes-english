@@ -240,7 +240,7 @@ def test_a_source_image_comes_through_with_pictures_off_and_a_late_paragraph_num
 def test_a_job_picks_by_what_its_starter_has_seen(tmp_path):
     db = Database(tmp_path / "s.db")
     ids = seed_expressions(db, EXPRESSION_COUNT + 1)
-    me, other = add_user(db, "me@example.com", can_create=True), add_user(db, "other@example.com", can_create=True)
+    me, other = add_user(db, "me@example.com"), add_user(db, "other@example.com")
     theirs = sample_draft()
     theirs.vocabulary[0] = theirs.vocabulary[0].model_copy(update={"word": "theirs"})
     db.sessions.create(theirs, [ids[1]], created_by=other.id)

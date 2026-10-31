@@ -13,7 +13,7 @@ if TYPE_CHECKING:
     from app.db import Database
 
 LOGIN_LIFETIME = timedelta(days=30)
-USER_COLUMNS = "id, created_at, email, is_admin, can_create"
+USER_COLUMNS = "id, created_at, email, is_admin"
 EMAIL = re.compile(r"[^\s@]+@[^\s@]+\.[^\s@]+")
 
 
@@ -79,11 +79,6 @@ class AccountRepo:
             rows = conn.execute(f"SELECT {USER_COLUMNS} FROM users ORDER BY id").fetchall()
         return [user_from(row) for row in rows]
 
-    def set_can_create(self, user_id: int, value: bool) -> User | None:
-        with self._db.connect() as conn:
-            conn.execute("UPDATE users SET can_create = ? WHERE id = ?", (int(value), user_id))
-        return self.get(user_id)
-
     def set_password(self, user_id: int, password_hash: str) -> None:
         """Every login of the account ends with its old password."""
         with self._db.connect() as conn:
@@ -106,7 +101,7 @@ class AccountRepo:
         """Who the token logs in, while it lasts."""
         with self._db.connect() as conn:
             row = conn.execute(
-                "SELECT u.id, u.created_at, u.email, u.is_admin, u.can_create FROM logins l JOIN users u ON u.id = l.user_id"
+                "SELECT u.id, u.created_at, u.email, u.is_admin FROM logins l JOIN users u ON u.id = l.user_id"
                 " WHERE l.token_hash = ? AND l.expires_at > ?",
                 (_digest(token), datetime.now(UTC).isoformat()),
             ).fetchone()

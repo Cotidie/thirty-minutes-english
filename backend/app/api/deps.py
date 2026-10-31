@@ -75,7 +75,7 @@ def admin_only(me: Me) -> User:
 
 def can_create(me: Me) -> User:
     """An account allowed to spend on new sessions."""
-    if not (me.is_admin or me.can_create):
+    if not me.is_admin:
         raise HTTPException(status_code=403, detail="Session creation isn't on for this account yet.")
     return me
 
@@ -85,7 +85,7 @@ Creator = Annotated[User, Depends(can_create)]
 
 def can_practice(me: Me, db: Db) -> User:
     """The coaches cost money and name no session, so an account needs a session of its own or shared with it."""
-    if not (me.is_admin or me.can_create or db.shares.has_sessions(me.id)):
+    if not me.is_admin:
         raise HTTPException(status_code=403, detail="Practice opens once a session is shared with this account.")
     return me
 

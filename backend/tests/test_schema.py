@@ -10,8 +10,19 @@ from app.topics.curated import CURATED
 from tests.conftest import CURATED_TOPICS, sample_draft, seed_expressions
 
 
+def as_v12(path) -> None:
+    """Rewrites a current file the way v12 kept it: no credits, and a creation flag on each account."""
+    conn = sqlite3.connect(path)
+    with conn:
+        conn.execute("DROP TABLE credits")
+        conn.execute("ALTER TABLE users ADD COLUMN can_create INTEGER NOT NULL DEFAULT 0")
+        conn.execute("PRAGMA user_version = 12")
+    conn.close()
+
+
 def as_v11(path) -> None:
-    """Rewrites a current file the way v11 kept it: no travel topics."""
+    """Rewrites a current file the way v11 kept it: no travel topics either."""
+    as_v12(path)
     conn = sqlite3.connect(path)
     with conn:
         conn.execute("DELETE FROM topics WHERE category = 'travel'")
@@ -34,7 +45,7 @@ def as_v9(path) -> None:
     conn = sqlite3.connect(path)
     conn.execute("PRAGMA foreign_keys = OFF")
     with conn:
-        for table in ("session_shares", "logins", "users"):
+        for table in ("credits", "session_shares", "logins", "users"):
             conn.execute(f"DROP TABLE {table}")
         conn.execute(schema.SESSIONS.split(";")[0].replace("CREATE TABLE sessions", "CREATE TABLE sessions_v9"))
         conn.execute("INSERT INTO sessions_v9 SELECT id, created_at, topic_id, title, note, questions, sources, translation FROM sessions")
@@ -322,6 +333,35 @@ def test_upgrading_v10_leaves_a_topic_someone_already_typed_under_its_category(t
     entries = {t.text: t.category for t in Database(path).topics.list_all()}
     assert entries[typed] == Category.TYPED
     assert sum(category == Category.ECONOMICS for category in entries.values()) == len(CURATED[Category.ECONOMICS]) - 1
+
+
+def test_upgrading_v12_adds_credits_and_drops_can_create_keeping_the_accounts(tmp_path):
+    path = tmp_path / "s.db"
+    Database(path)
+    as_v12(path)
+    conn = sqlite3.connect(path)
+    with conn:
+        conn.execute("INSERT INTO users (created_at, email, password_hash, is_admin, can_create) VALUES ('2026-01-01', 'boss@example.com', 'h', 1, 0)")
+        conn.execute("INSERT INTO users (created_at, email, password_hash, is_admin, can_create) VALUES ('2026-01-02', 'mina@example.com', 'h', 0, 1)")
+    conn.close()
+    db = Database(path)
+    with db.connect() as conn:
+        assert conn.execute("PRAGMA user_version").fetchone()[0] == 13
+        assert [c[1] for c in conn.execute("PRAGMA table_info(users)")] == ["id", "created_at", "email", "password_hash", "is_admin"]
+        assert conn.execute("SELECT count(*) FROM credits").fetchone()[0] == 0
+    assert [(u.email, u.is_admin) for u in db.accounts.list_all()] == [("boss@example.com", True), ("mina@example.com", False)]
+    assert any(".bak-v12-" in p.name for p in tmp_path.iterdir())
+
+
+def test_a_v9_file_goes_straight_to_v13_though_its_accounts_never_had_the_flag(tmp_path):
+    path = tmp_path / "s.db"
+    Database(path)
+    as_v9(path)
+    db = Database(path)
+    with db.connect() as conn:
+        assert conn.execute("PRAGMA user_version").fetchone()[0] == 13
+        assert "can_create" not in [c[1] for c in conn.execute("PRAGMA table_info(users)")]
+        assert conn.execute("SELECT count(*) FROM credits").fetchone()[0] == 0
 
 
 def test_upgrading_v11_adds_the_travel_topics_and_brings_no_deleted_topic_back(tmp_path):

@@ -8,7 +8,7 @@ from datetime import UTC, datetime
 from app.db import topics
 from app.models import Category
 
-VERSION = 12
+VERSION = 13
 
 # Added in v3, by session since v9: images under the article's paragraphs, and its cover (no paragraph) under the title.
 FIGURES = """
@@ -97,8 +97,7 @@ CREATE TABLE users (
     created_at    TEXT    NOT NULL,
     email         TEXT    NOT NULL UNIQUE,
     password_hash TEXT    NOT NULL,
-    is_admin      INTEGER NOT NULL DEFAULT 0,
-    can_create    INTEGER NOT NULL DEFAULT 0
+    is_admin      INTEGER NOT NULL DEFAULT 0
 ) STRICT;
 
 CREATE UNIQUE INDEX users_one_admin ON users (is_admin) WHERE is_admin = 1;
@@ -136,6 +135,21 @@ CREATE TABLE sessions (
 ) STRICT;
 
 CREATE INDEX sessions_topic ON sessions (topic_id);
+"""
+
+# Added in v13: what each account gained and spent. The balance is the sum, kept nowhere else.
+CREDITS = """
+CREATE TABLE credits (
+    id         INTEGER PRIMARY KEY,
+    user_id    INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    at         TEXT    NOT NULL,
+    amount     INTEGER NOT NULL,
+    kind       TEXT    NOT NULL,
+    detail     TEXT,
+    granted_by INTEGER REFERENCES users(id) ON DELETE SET NULL
+) STRICT;
+
+CREATE INDEX credits_by_user ON credits (user_id, id);
 """
 
 SCHEMA = TOPICS + SESSIONS + """
@@ -228,7 +242,7 @@ CREATE INDEX session_expressions_expression ON session_expressions (expression_i
 CREATE INDEX readings_paragraph ON readings (paragraph_id);
 CREATE INDEX summaries_paragraph ON summaries (paragraph_id);
 CREATE INDEX stage_times_stage ON stage_times (stage, id);
-""" + FIGURES + SWAPS + KOREAN_EXAMPLES + EXAMPLES + ACCOUNTS
+""" + FIGURES + SWAPS + KOREAN_EXAMPLES + EXAMPLES + ACCOUNTS + CREDITS
 
 
 def _run(conn: sqlite3.Connection, script: str) -> None:
@@ -272,12 +286,22 @@ def upgrade(conn: sqlite3.Connection, version: int) -> None:
         _add_pool(conn, Category.ECONOMICS, 11)
     if version < 12:
         _add_pool(conn, Category.TRAVEL, 12)
+    if version < 13:
+        _credits(conn)
 
 
 def _add_pool(conn: sqlite3.Connection, category: Category, version: int) -> None:
     """A new pool and nothing else, so a curated topic someone deleted stays deleted."""
     topics.seed_pool(conn, category, _now())
     conn.execute(f"PRAGMA user_version = {version}")
+
+
+def _credits(conn: sqlite3.Connection) -> None:
+    """The ledger comes and the flag it replaces goes. A file older than v10 just got accounts without the flag."""
+    _run(conn, CREDITS)
+    if any(column[1] == "can_create" for column in conn.execute("PRAGMA table_info(users)")):
+        conn.execute("ALTER TABLE users DROP COLUMN can_create")
+    conn.execute("PRAGMA user_version = 13")
 
 
 def _figures_by_session(conn: sqlite3.Connection) -> None:
