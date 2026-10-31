@@ -7,7 +7,7 @@ from app.main import create_app
 from app.voice.speech import GeminiTts, Speaker, speaker_for
 from app.wiring import Services
 from tests.test_api import FakeGenerator, InlineExecutor
-from tests.conftest import admin_client
+from tests.conftest import add_user, admin_client, client_of
 
 
 class CountingVoice:
@@ -64,3 +64,18 @@ def test_the_speech_route_returns_audio_and_says_why_when_it_cannot(tmp_path):
         assert c.post("/api/speech", json={"text": "Read me."}).status_code == 502
     with admin_client(app_with(None)) as c:
         assert c.post("/api/speech", json={"text": "Read me."}).status_code == 503
+
+
+def test_a_sentence_already_read_is_free_and_a_new_one_costs_1(tmp_path):
+    db = Database(tmp_path / "s.db")
+    speaker = Speaker(CountingVoice(), tmp_path / "speech")
+    app = create_app(db, Services(FakeGenerator(), speaker=speaker), InlineExecutor())
+    mina = add_user(db, "mina@example.com")
+    db.credits.grant(mina.id, 1, by=mina.id)
+    me = client_of(app, db, mina)
+    assert me.post("/api/speech", json={"text": "It was flawed."}).status_code == 200
+    assert db.credits.balance(mina.id) == 0
+    assert db.credits.recent(mina.id)[0].detail == "It was flawed."
+    assert me.post("/api/speech", json={"text": "It was  flawed."}).status_code == 200  # cached: the spaces are folded
+    assert me.post("/api/speech", json={"text": "Another one."}).status_code == 402
+    assert speaker.cached("It was flawed.") and not speaker.cached("Another one.")

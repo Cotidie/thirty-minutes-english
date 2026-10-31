@@ -2,7 +2,7 @@ from dataclasses import asdict
 
 from fastapi import APIRouter, HTTPException, Response
 
-from app.api.deps import Creator, Db, Files, Jobs, Me, Svc, failed, off, require_access, require_creator
+from app.api.deps import Db, Files, Jobs, Me, Svc, charge, failed, off, require_access, require_creator
 from app.api.schemas import CreateSessionRequest, JobStatus, RedrawRequest, ShareEntry, ShareRequest, StarRequest
 from app.db import Database
 from app.db.sessions import StarKind
@@ -45,11 +45,12 @@ def list_sessions(db: Db, me: Me) -> list[SessionSummary]:
 
 
 @router.post("/sessions", response_model=JobStatus, status_code=202)
-def create_session(body: CreateSessionRequest, db: Db, jobs: Jobs, services: Svc, me: Creator) -> JobStatus:
+def create_session(body: CreateSessionRequest, db: Db, jobs: Jobs, services: Svc, me: Me) -> JobStatus:
     """A blank topic takes one from the pool that the last few sessions did not use."""
     topic = (body.topic or "").strip() or pick_topic(
         db.sessions.recent_topics(RECENT_TOPIC_WINDOW), [t.text for t in db.topics.curated()]
     )
+    charge(db, me, "session", topic)
     return status_of(jobs.start(topic, services.generator, services.illustrator, created_by=me.id), jobs)
 
 
@@ -107,7 +108,7 @@ def list_shares(session_id: int, db: Db, me: Me) -> list[ShareEntry]:
 
 
 @router.post("/sessions/{session_id}/shares", response_model=list[ShareEntry], status_code=201)
-def add_share(session_id: int, body: ShareRequest, db: Db, me: Creator) -> list[ShareEntry]:
+def add_share(session_id: int, body: ShareRequest, db: Db, me: Me) -> list[ShareEntry]:
     """Only an account that exists; sharing with oneself or sharing again changes nothing."""
     require_creator(db, me, session_id)
     user = db.accounts.by_email(body.email)
@@ -155,7 +156,7 @@ def add_expression(session_id: int, db: Db, me: Me) -> Expression:
 
 
 @router.post("/sessions/{session_id}/pictures/{index}", response_model=VocabularyItem)
-def redraw_picture(session_id: int, index: int, body: RedrawRequest, db: Db, services: Svc, files: Files, me: Creator) -> VocabularyItem:
+def redraw_picture(session_id: int, index: int, body: RedrawRequest, db: Db, services: Svc, files: Files, me: Me) -> VocabularyItem:
     """One of a word's pictures drawn again and shown in place of the old one, whose file goes:
     the example sentence as it is, or a fresh scene for Practice."""
     require_creator(db, me, session_id)
@@ -166,6 +167,7 @@ def redraw_picture(session_id: int, index: int, body: RedrawRequest, db: Db, ser
     if illustrator is None or writer is None:
         raise off("pictures are off: set IMAGE_PROVIDER and its key in Settings")
     item = session.content.vocabulary[index]
+    charge(db, me, "redraw", item.word)
     try:
         if body.face == "example":
             field, scene = "example_image", None

@@ -14,7 +14,7 @@ from tests.test_api import FailingGenerator, FakeGenerator, InlineExecutor
 
 @pytest.fixture
 def world(tmp_path):
-    """One session made by `creator` and shared with `sharee`; `stranger` may create but has no part in it."""
+    """One session made by `creator` and shared with `sharee`; `stranger` has credits too but no part in it."""
     db = Database(tmp_path / "s.db")
     seed_expressions(db, EXPRESSION_COUNT + 3)
     app = create_app(db, Services(FakeGenerator()), InlineExecutor())
@@ -25,10 +25,17 @@ def world(tmp_path):
         "stranger": add_user(db, "stranger@example.com"),
         "admin": add_user(db, "boss@example.com", admin=True),
     }
+    for name in ("creator", "stranger"):
+        db.credits.grant(accounts[name].id, 1000, by=accounts["admin"].id)
     clients = {name: client_of(app, db, user) for name, user in accounts.items()}
     job = clients["creator"].post("/api/sessions", json={"topic": "Trams"}).json()
     db.shares.share(job["session_id"], accounts["sharee"].id)
     return SimpleNamespace(db=db, app=app, sid=job["session_id"], job_id=job["id"], anon=client_of(app, db), accounts=accounts, **clients)
+
+
+def spend_everything(world, name: str) -> None:
+    user = world.accounts[name]
+    world.db.credits.grant(user.id, -world.db.credits.balance(user.id), by=world.accounts["admin"].id)
 
 
 @pytest.mark.parametrize(
@@ -45,8 +52,8 @@ def world(tmp_path):
         ("GET", "/api/settings", 401, 403, 403, 403, 200),
         ("GET", "/api/expressions", 401, 403, 403, 403, 200),
         ("GET", "/api/topics/all", 401, 403, 403, 403, 200),
-        ("GET", "/api/topics", 401, 403, 403, 200, 200),
-        ("GET", "/api/assessor/token", 401, 403, 503, 503, 503),
+        ("GET", "/api/topics", 401, 200, 200, 200, 200),
+        ("GET", "/api/assessor/token", 401, 503, 503, 503, 503),
     ],
 )
 def test_who_gets_what(world, method, path, anon, newcomer, sharee, creator, admin):
@@ -56,7 +63,7 @@ def test_who_gets_what(world, method, path, anon, newcomer, sharee, creator, adm
         assert getattr(world, who).request(method, target).status_code == status, who
 
 
-def test_a_stranger_who_may_create_still_gets_a_404_on_someone_elses_session(world):
+def test_a_stranger_with_credits_still_gets_a_404_on_someone_elses_session(world):
     assert world.stranger.get(f"/api/sessions/{world.sid}").status_code == 404
     assert world.stranger.delete(f"/api/sessions/{world.sid}").status_code == 404
     assert world.stranger.post(f"/api/sessions/{world.sid}/pictures/0", json={}).status_code == 404
@@ -79,9 +86,9 @@ def test_a_session_says_whose_it_is(world):
     assert world.admin.get(f"/api/sessions/{world.sid}").json()["mine"] is False
 
 
-def test_only_an_approved_account_can_start_a_session(world):
-    assert world.newcomer.post("/api/sessions", json={"topic": "X"}).status_code == 403
-    assert world.sharee.post("/api/sessions", json={"topic": "X"}).status_code == 403
+def test_starting_a_session_takes_credits_except_from_the_admin(world):
+    assert world.newcomer.post("/api/sessions", json={"topic": "X"}).status_code == 402
+    assert world.sharee.post("/api/sessions", json={"topic": "X"}).status_code == 402
     assert world.stranger.post("/api/sessions", json={"topic": "X"}).status_code == 202
     assert world.admin.post("/api/sessions", json={"topic": "X"}).status_code == 202
 
@@ -94,19 +101,22 @@ def test_sharee_may_change_expressions_and_keep_notes_but_not_draw_or_delete(wor
     assert world.sharee.post(f"/api/sessions/{world.sid}/pictures/0", json={}).status_code == 403
 
 
-def test_an_approval_taken_away_stops_new_spending_but_keeps_my_sessions(world):
-    world.db.accounts.set_can_create(world.accounts["creator"].id, False)
-    assert world.creator.post("/api/sessions", json={"topic": "X"}).status_code == 403
-    assert world.creator.post(f"/api/sessions/{world.sid}/pictures/0", json={}).status_code == 403
+def test_an_empty_balance_stops_new_spending_but_keeps_my_sessions(world):
+    world.app.state.services.illustrator = world.app.state.services.scene_writer = object()  # only the charge gets to run
+    spend_everything(world, "creator")
+    assert world.creator.post("/api/sessions", json={"topic": "X"}).status_code == 402
+    assert world.creator.post(f"/api/sessions/{world.sid}/pictures/0", json={}).status_code == 402
     assert world.creator.get(f"/api/sessions/{world.sid}").status_code == 200
-    assert world.creator.get("/api/assessor/token").status_code == 503  # past the check: pictures are just off here
+    assert world.creator.get("/api/assessor/token").status_code == 503  # off here, which is said before any charge
     assert world.sharee.get(f"/api/sessions/{world.sid}").status_code == 200
 
 
 def test_jobs_are_seen_and_closed_only_by_who_started_them(tmp_path):
     db = Database(tmp_path / "s.db")
     app = create_app(db, Services(FailingGenerator()), InlineExecutor())
-    mine = client_of(app, db, add_user(db, "me@example.com"))
+    me = add_user(db, "me@example.com")
+    db.credits.grant(me.id, 200, by=me.id)
+    mine = client_of(app, db, me)
     other = client_of(app, db, add_user(db, "other@example.com"))
     job = mine.post("/api/sessions", json={"topic": "X"}).json()
     assert [j["id"] for j in mine.get("/api/jobs").json()] == [job["id"]]
@@ -186,9 +196,9 @@ def test_only_the_creator_manages_shares(world):
     assert world.stranger.get(f"/api/sessions/{world.sid}/shares").status_code == 404
 
 
-def test_an_approval_taken_away_stops_new_shares_but_not_ending_them(world):
-    world.db.accounts.set_can_create(world.accounts["creator"].id, False)
-    assert world.creator.post(f"/api/sessions/{world.sid}/shares", json={"email": "stranger@example.com"}).status_code == 403
+def test_sharing_costs_nothing_even_on_an_empty_balance(world):
+    spend_everything(world, "creator")
+    assert world.creator.post(f"/api/sessions/{world.sid}/shares", json={"email": "stranger@example.com"}).status_code == 201
     assert world.creator.get(f"/api/sessions/{world.sid}/shares").status_code == 200
     assert world.creator.delete(f"/api/sessions/{world.sid}/shares/{world.accounts['sharee'].id}").status_code == 204
     assert world.sharee.get(f"/api/sessions/{world.sid}").status_code == 404

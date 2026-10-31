@@ -62,10 +62,17 @@ class Speaker:
     def media_type(self) -> str:
         return self._voice.media_type
 
+    def cached(self, text: str) -> bool:
+        """Whether this sentence comes from the folder, so reading it costs nothing."""
+        return self._path(" ".join(text.split())).is_file()
+
+    def _path(self, text: str) -> Path:
+        return self._folder / hashlib.sha256(f"{self._voice.name}\n{text}".encode()).hexdigest()[:32]
+
     def read(self, text: str) -> bytes:
         """Raises GenerationError when the provider does not read it."""
         text = " ".join(text.split())
-        path = self._folder / hashlib.sha256(f"{self._voice.name}\n{text}".encode()).hexdigest()[:32]
+        path = self._path(text)
         if path.is_file():
             return path.read_bytes()
         try:

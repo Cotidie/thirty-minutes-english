@@ -124,17 +124,21 @@ def test_every_route_but_signup_and_login_refuses_an_anonymous_call(client):
     assert checked > 30
 
 
-def test_a_newcomer_cannot_reach_what_only_the_admin_or_a_creator_may(client):
+def test_a_newcomer_cannot_reach_what_only_the_admin_may(client):
     sign_up(client)
     assert client.get("/api/settings").status_code == 403
     assert client.put("/api/settings", json={"values": {}}).status_code == 403
     assert client.post("/api/settings/test-key", json={"key": "GEMINI_API_KEY", "value": ""}).status_code == 403
     assert client.get("/api/expressions").status_code == 403
     assert client.get("/api/topics/all").status_code == 403
-    assert client.get("/api/topics").status_code == 403
-    assert client.post("/api/topics/refresh").status_code == 403
-    assert client.get("/api/assessor/token").status_code == 403
-    assert client.post("/api/speech", json={"text": "hi"}).status_code == 403
+
+
+def test_a_newcomer_gets_the_free_topics_and_is_only_told_the_rest_is_off(client):
+    sign_up(client)
+    assert client.get("/api/topics").status_code == 200
+    assert client.post("/api/topics/refresh").status_code == 200
+    assert client.get("/api/assessor/token").status_code == 503
+    assert client.post("/api/speech", json={"text": "hi"}).status_code == 503
 
 
 class Clock:
