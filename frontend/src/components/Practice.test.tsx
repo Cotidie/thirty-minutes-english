@@ -99,6 +99,23 @@ describe('Practice', () => {
     expect(notes.querySelectorAll('li')).toHaveLength(2)
   })
 
+  it("shows the server's sentence when the feedback comes back with a 402", async () => {
+    vi.mocked(api.exampleFeedback).mockRejectedValue(new Error('Not enough credits: this needs 10 and you have 0.'))
+    renderPractice()
+    await userEvent.click(screen.getByRole('button', { name: /^Practice/ }))
+    act(() => emit({ type: 'session.started', session: { id: 'live_1' } }))
+    act(() => emit({ type: 'session.input_transcript.delta', delta: 'The dam mitigate the flood.' }))
+    act(() => emit({ type: 'session.output_transcript.delta', delta: 'Got it.' }))
+    expect(await screen.findByText('Not enough credits: this needs 10 and you have 0.')).toBeInTheDocument()
+  })
+
+  it("shows the server's sentence when the round itself comes back with a 402", async () => {
+    connect.mockRejectedValueOnce(new Error('Not enough credits: this needs 10 and you have 3.'))
+    renderPractice()
+    await userEvent.click(screen.getByRole('button', { name: /^Practice/ }))
+    expect(await screen.findByText('Not enough credits: this needs 10 and you have 3.')).toBeInTheDocument()
+  })
+
   it('holds the round open while the answer is being written', async () => {
     vi.useFakeTimers({ shouldAdvanceTime: true })
     let answer: (f: typeof feedback) => void = () => undefined
