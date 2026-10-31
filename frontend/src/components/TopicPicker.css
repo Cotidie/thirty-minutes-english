@@ -89,6 +89,7 @@
 }
 
 .chip {
+  position: relative;
   border: 1px solid var(--cat-line, var(--line));
   border-radius: 999px;
   background: var(--cat-fill, var(--paper));
@@ -100,6 +101,54 @@
 
 .chip:not(:disabled):hover {
   border-color: var(--cat-ink, var(--ink));
+}
+
+/* The chip's own colours turned over. Not a title attribute, which a browser makes wait a second or two. Out of the
+   layout until it shows, so that a chip at the edge of a narrow screen adds no sideways scroll. */
+.chip[data-tip]::before,
+.chip[data-tip]::after {
+  position: absolute;
+  z-index: 5;
+  display: none;
+  pointer-events: none;
+}
+
+.chip[data-tip]::after {
+  content: attr(data-tip);
+  left: 0.6rem;
+  bottom: calc(100% + 0.42rem);
+  padding: 0.22rem 0.55rem;
+  border-radius: 0.4rem;
+  background: var(--cat-ink);
+  color: var(--cat-fill);
+  font-size: 0.78rem;
+  font-weight: 500;
+  line-height: 1.35;
+  white-space: nowrap;
+  box-shadow: 0 2px 8px rgb(27 36 49 / 22%);
+}
+
+/* The little arrow, pointing down at the chip. */
+.chip[data-tip]::before {
+  content: "";
+  left: 1.1rem;
+  bottom: calc(100% + 0.14rem);
+  border: solid transparent;
+  border-width: 0.3rem 0.3rem 0;
+  border-top-color: var(--cat-ink);
+}
+
+.chip[data-tip]:focus-visible::before,
+.chip[data-tip]:focus-visible::after {
+  display: block;
+}
+
+/* Only where there is a mouse: a tap would leave it standing on a phone. */
+@media (hover: hover) {
+  .chip[data-tip]:hover::before,
+  .chip[data-tip]:hover::after {
+    display: block;
+  }
 }
 
 .chip-key {

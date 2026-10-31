@@ -72,7 +72,8 @@ export function TopicPicker({ suggestions, labels, pending, error, busy, onGener
                   type="button"
                   className="chip"
                   data-category={s.category}
-                  title={labels[s.category]}
+                  data-tip={labels[s.category]}
+                  aria-description={labels[s.category]}
                   disabled={busy}
                   onClick={() => setTopic(s.text)}
                 >
