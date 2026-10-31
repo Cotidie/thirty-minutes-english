@@ -13,7 +13,7 @@ vi.mock('../api', async (original) => ({
   api: { me: vi.fn(), login: vi.fn(), signup: vi.fn(), logout: vi.fn() },
 }))
 
-const MINA: Me = { id: 1, email: 'mina@example.com', is_admin: false, can_create: false }
+const MINA: Me = { id: 1, email: 'mina@example.com', is_admin: false }
 
 function Inside() {
   const { me, logOut } = useAuth()

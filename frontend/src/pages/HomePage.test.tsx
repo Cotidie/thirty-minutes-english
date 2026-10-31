@@ -13,7 +13,7 @@ vi.mock('../api', () => ({
 }))
 vi.mock('../lib/auth', () => ({ useAuth: vi.fn() }))
 
-const NEWCOMER: Me = { id: 1, email: 'a@example.com', is_admin: false, can_create: false }
+const NEWCOMER: Me = { id: 1, email: 'a@example.com', is_admin: false }
 const MINE: SessionSummary = { id: 7, created_at: '2026-10-30T10:00:00Z', topic: 'Trams', title: 'My trams', mine: true, shared_by: null }
 const SHARED: SessionSummary = { id: 8, created_at: '2026-10-30T10:00:00Z', topic: 'Boats', title: 'Their boats', mine: false, shared_by: 'mina@example.com' }
 

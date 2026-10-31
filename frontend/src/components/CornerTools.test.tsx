@@ -8,7 +8,7 @@ import { CornerTools } from './CornerTools'
 
 vi.mock('../lib/auth', () => ({ useAuth: vi.fn() }))
 
-const USER: Me = { id: 1, email: 'a@example.com', is_admin: false, can_create: true }
+const USER: Me = { id: 1, email: 'a@example.com', is_admin: false }
 
 function open(me: Me) {
   const logOut = vi.fn().mockResolvedValue(undefined)

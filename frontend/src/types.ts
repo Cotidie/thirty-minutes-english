@@ -157,12 +157,28 @@ export interface Me {
   id: number
   email: string
   is_admin: boolean
-  can_create: boolean
 }
 
 /** An account as the admin sees it. */
 export interface Account extends Me {
   created_at: string
+  /** What is left to spend; the admin, who is not charged, has none. */
+  credits: number | null
+}
+
+/** One line of an account's history: credits gained when `amount` is positive, spent when negative. */
+export interface CreditEntry {
+  at: string
+  amount: number
+  kind: string
+  detail: string | null
+}
+
+/** What the account has to spend, what each kind of charge costs, and its last charges. */
+export interface CreditsView {
+  balance: number | null
+  prices: Record<string, number>
+  recent: CreditEntry[]
 }
 
 /** Someone a session is shared with. */

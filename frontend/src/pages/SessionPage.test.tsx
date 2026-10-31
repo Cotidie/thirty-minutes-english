@@ -38,7 +38,7 @@ vi.mock('../api', () => ({
   },
 }))
 vi.mock('../lib/auth', () => ({
-  useAuth: () => ({ me: { id: 1, email: 'a@example.com', is_admin: false, can_create: true } }),
+  useAuth: () => ({ me: { id: 1, email: 'a@example.com', is_admin: false } }),
 }))
 vi.mock('../lib/liveClient', () => ({ connectExample: vi.fn(), connectSummary: vi.fn() }))
 

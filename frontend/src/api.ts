@@ -2,6 +2,8 @@ import { goToLogin } from './lib/safeNext'
 import type { JobStatus } from './lib/progress'
 import type {
   Account,
+  CreditEntry,
+  CreditsView,
   AssessorSession,
   Correction,
   CorpusEntry,
@@ -87,8 +89,11 @@ export const api = {
   /** A session shared with me, off my list; it stays for everyone else. */
   leaveSession: (sessionId: number) => request<void>(`/api/sessions/${sessionId}/shares/me`, { method: 'DELETE' }),
   listAccounts: () => request<Account[]>('/api/accounts'),
-  setCanCreate: (id: number, canCreate: boolean) =>
-    request<Account>(`/api/accounts/${id}`, { method: 'PUT', body: JSON.stringify({ can_create: canCreate }) }),
+  accountCredits: (id: number) => request<CreditEntry[]>(`/api/accounts/${id}/credits`),
+  /** Adds to an account's balance, or takes back when negative. */
+  grantCredits: (id: number, amount: number) =>
+    request<Account>(`/api/accounts/${id}/credits`, { method: 'POST', body: JSON.stringify({ amount }) }),
+  myCredits: () => request<CreditsView>('/api/me/credits'),
   /** Another corpus expression in this one's place; the one swapped out counts as used. */
   swapExpression: (sessionId: number, expressionId: number) =>
     request<Expression>(`/api/sessions/${sessionId}/expressions/${expressionId}/swap`, { method: 'POST' }),
