@@ -1,3 +1,4 @@
+import itertools
 import json
 
 import pytest
@@ -11,6 +12,11 @@ def cursor(x=0.5):
 
 def view(key="chip:word:2", value=True, seq=1):
     return json.dumps({"type": "view", "key": key, "value": value, "seq": seq})
+
+
+def rooms_with_a_second_between_writes():
+    """The clock moves on each time it is read, so no limit on writes comes into a test about something else."""
+    return Rooms(clock=itertools.count().__next__)
 
 
 def two_people(rooms=None):
@@ -137,7 +143,7 @@ def test_a_bad_frame_is_dropped_and_changes_nothing(raw):
 
 
 def test_a_room_stops_taking_new_keys_at_2000_but_keeps_updating_old_ones():
-    rooms = Rooms()
+    rooms = rooms_with_a_second_between_writes()
     room, mina = rooms.join(1, 10, 0)
     for i in range(2000):
         room.handle(mina, view(key=f"k:{i}"))
@@ -168,8 +174,81 @@ def test_saying_there_is_no_cursor_is_never_dropped():
     assert jo.outbox.take()[-1]["anchor"] is None
 
 
+WRITES = {
+    "view": lambda i: view(key=f"k:{i}", seq=i),
+    "tab": lambda i: json.dumps({"type": "tab", "tab": i % 10}),
+    "timer": lambda i: json.dumps({"type": "timer", "running": True, "elapsed": i, "seq": i}),
+}
+
+
+@pytest.mark.parametrize("write", WRITES.values(), ids=WRITES.keys())
+def test_writes_past_40_a_second_close_the_writer_and_leave_the_others_alone(write):
+    room, mina, jo = two_people(Rooms(clock=lambda: 0.0))
+    for i in range(1000):
+        room.handle(jo, write(i))
+    assert len(mina.outbox.take()) == 40
+    assert mina.outbox.overflowed is False
+    assert jo.outbox.overflowed is True
+
+
+def test_a_write_past_the_limit_changes_nothing():
+    room, mina, jo = two_people(Rooms(clock=lambda: 0.0))
+    for i in range(41):
+        room.handle(mina, view(key=f"k:{i}"))
+    room.handle(mina, json.dumps({"type": "tab", "tab": 2}))
+    room.handle(mina, json.dumps({"type": "timer", "running": True, "elapsed": 5, "seq": 1}))
+    welcome = room.welcome(jo)
+    assert "k:39" in welcome["view"] and "k:40" not in welcome["view"]
+    assert welcome["people"][0]["tab"] is None
+    assert welcome["timer"] is None
+
+
+def test_a_second_connection_buys_no_more_writes():
+    rooms = Rooms(clock=lambda: 0.0)
+    room, mina, jo = two_people(rooms)
+    _, jo_again = rooms.join(1, 20, 1)
+    mina.outbox.take()
+    for i in range(1000):
+        room.handle(jo if i % 2 else jo_again, view(key=f"k:{i}"))
+    assert len(mina.outbox.take()) == 40
+
+
+def test_coming_back_does_not_start_the_limit_again():
+    rooms = Rooms(clock=lambda: 0.0)
+    room, mina, jo = two_people(rooms)
+    for i in range(40):
+        room.handle(jo, view(key=f"k:{i}"))
+    rooms.leave(1, jo)
+    _, back = rooms.join(1, 20, 1)
+    mina.outbox.take()
+    room.handle(back, view(key="k:40"))
+    assert mina.outbox.take() == []
+
+
+def test_writing_at_40_a_second_goes_on_as_long_as_it_likes():
+    now = [0.0]
+    room, mina, jo = two_people(Rooms(clock=lambda: now[0]))
+    for second in range(3):
+        now[0] = float(second)
+        for i in range(40):
+            room.handle(mina, view(key=f"k:{i}"))
+        assert len(jo.outbox.take()) == 40
+    assert mina.outbox.overflowed is False
+
+
+def test_bad_frames_and_cursors_use_up_none_of_the_limit():
+    room, mina, jo = two_people(Rooms(clock=lambda: 0.0))
+    for _ in range(100):
+        room.handle(mina, view(key="Bad Key"))
+        room.handle(mina, cursor())
+    jo.outbox.take()
+    room.handle(mina, view())
+    assert [m["type"] for m in jo.outbox.take()] == ["view"]
+    assert mina.outbox.overflowed is False
+
+
 def test_a_full_outbox_says_so():
-    room, mina, jo = two_people()
+    room, mina, jo = two_people(rooms_with_a_second_between_writes())
     for i in range(256):
         room.handle(mina, view(key=f"k:{i}"))
     assert jo.outbox.overflowed is False

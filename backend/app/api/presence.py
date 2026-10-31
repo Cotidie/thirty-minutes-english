@@ -26,7 +26,7 @@ RECHECK_S = 25.0
 CLOSE_NO_LOGIN = 4401
 CLOSE_OTHER_ORIGIN = 4403
 CLOSE_NO_ACCESS = 4404
-CLOSE_TOO_SLOW = 1013  # the browser reconnects and starts from a fresh welcome
+CLOSE_START_OVER = 1013  # reading too slowly or writing too fast: the browser reconnects from a fresh welcome
 
 
 def _same_origin(headers: Headers) -> bool:
@@ -44,7 +44,7 @@ async def _send_what_waits(websocket: WebSocket, member: Member) -> None:
     while True:
         await member.outbox.wait()
         if member.outbox.overflowed:
-            await websocket.close(code=CLOSE_TOO_SLOW)
+            await websocket.close(code=CLOSE_START_OVER)
             return
         for message in member.outbox.take():
             await websocket.send_json(message)

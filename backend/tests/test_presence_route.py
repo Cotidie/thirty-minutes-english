@@ -135,6 +135,19 @@ def test_someone_too_slow_to_keep_up_is_closed_to_start_over(tmp_path, monkeypat
             assert closed_with(me) == 1013
 
 
+def test_someone_writing_too_fast_is_closed_to_start_over_and_the_others_stay(tmp_path, monkeypatch):
+    monkeypatch.setattr(live_presence, "MAX_WRITES_PER_SECOND", 0)
+    _, mine, theirs, _, session = with_a_friend(tmp_path)
+    with mine.websocket_connect(url_of(session), headers=HOME) as me:
+        me.receive_json()
+        with theirs.websocket_connect(url_of(session), headers=HOME) as them:
+            them.receive_json()
+            assert me.receive_json()["type"] == "joined"
+            them.send_json({"type": "tab", "tab": 1})
+            assert closed_with(them) == 1013
+        assert me.receive_json()["type"] == "left"
+
+
 def test_a_binary_frame_is_ignored(tmp_path):
     db, client, maker, session = world(tmp_path)
     sign_in(client, db, maker)

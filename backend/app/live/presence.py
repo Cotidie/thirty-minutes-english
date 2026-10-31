@@ -10,7 +10,7 @@ import math
 import re
 import secrets
 import time
-from collections import deque
+from collections import defaultdict, deque
 from collections.abc import Callable, Iterable
 from dataclasses import dataclass, field
 
@@ -18,6 +18,7 @@ MAX_FRAME_BYTES = 1024
 MAX_VIEW_KEYS = 2000
 MAX_VALUE_CHARS = 32
 MAX_CURSORS_PER_SECOND = 40
+MAX_WRITES_PER_SECOND = 40  # view, tab and timer together, by account: more than holding a key down makes
 MAX_QUEUED = 256
 MAX_ELAPSED_SECONDS = 86400
 LAST_TAB = 9
@@ -51,6 +52,11 @@ class Outbox:
     def forget_cursor(self, sender_id: str) -> None:
         self._cursors.pop(sender_id, None)
 
+    def overflow(self) -> None:
+        """Whatever else waits, this connection is to be closed, to come back from a fresh welcome."""
+        self.overflowed = True
+        self._ready.set()
+
     def take(self) -> list[dict]:
         messages = []
         while self._queue:
@@ -67,6 +73,20 @@ class Outbox:
 
 
 @dataclass
+class _Rate:
+    """How many have come in the current second."""
+
+    window_start: float = -1.0
+    count: int = 0
+
+    def allows(self, limit: int, now: float) -> bool:
+        if now - self.window_start >= 1:
+            self.window_start, self.count = now, 0
+        self.count += 1
+        return self.count <= limit
+
+
+@dataclass
 class Member:
     id: str
     user_id: int
@@ -74,8 +94,7 @@ class Member:
     tab: int | None = None
     cursor: dict | None = None  # the last place they pointed at, for whoever comes in while the mouse stands still
     outbox: Outbox = field(default_factory=Outbox)
-    cursor_window_start: float = -1.0
-    cursors_in_window: int = 0
+    cursor_rate: _Rate = field(default_factory=_Rate)
 
 
 @dataclass
@@ -124,13 +143,15 @@ def _is_elapsed(value: object) -> bool:
 
 
 class Room:
-    """One session's people and what they share. What arrives malformed or too fast is dropped without a word."""
+    """One session's people and what they share. What arrives malformed is dropped without a word, and so is a cursor
+    that comes too fast. A write that comes too fast also closes the connection that sent it."""
 
     def __init__(self, clock: Callable[[], float]) -> None:
         self._clock = clock
         self._members: list[Member] = []
         self._view: dict[str, object] = {}
         self._timer: _Timer | None = None
+        self._write_rates: defaultdict[int, _Rate] = defaultdict(_Rate)
         self.empty_since: float | None = None
         self._readers: dict[str, Callable[[Member, dict], None]] = {
             "cursor": self._read_cursor,
@@ -200,15 +221,20 @@ class Room:
             other.outbox.put_cursor(member.id, message)
 
     def _within_cursor_rate(self, member: Member) -> bool:
-        now = self._clock()
-        if now - member.cursor_window_start >= 1:
-            member.cursor_window_start, member.cursors_in_window = now, 0
-        member.cursors_in_window += 1
-        return member.cursors_in_window <= MAX_CURSORS_PER_SECOND
+        return member.cursor_rate.allows(MAX_CURSORS_PER_SECOND, self._clock())
+
+    def _within_write_rate(self, member: Member) -> bool:
+        """Counted by account, so another connection buys no more. Writes pile up in everyone's outbox, so this is what
+        keeps one person from closing the others. Whoever goes past it is closed rather than ignored: their screen would
+        go on waiting for a write that was dropped to come back."""
+        if self._write_rates[member.user_id].allows(MAX_WRITES_PER_SECOND, self._clock()):
+            return True
+        member.outbox.overflow()
+        return False
 
     def _read_tab(self, member: Member, message: dict) -> None:
         tab = message.get("tab")
-        if not _is_tab(tab):
+        if not _is_tab(tab) or not self._within_write_rate(member):
             return
         member.tab = tab
         for other in self._other_accounts(member):
@@ -220,12 +246,16 @@ class Room:
             return
         if key not in self._view and len(self._view) >= MAX_VIEW_KEYS:
             return
+        if not self._within_write_rate(member):
+            return
         self._view[key] = value
         self._send_to_everyone({"type": "view", "key": key, "value": value, "by": member.id, "seq": seq})
 
     def _read_timer(self, member: Member, message: dict) -> None:
         running, elapsed, seq = message.get("running"), message.get("elapsed"), message.get("seq")
         if not (type(running) is bool and _is_elapsed(elapsed) and type(seq) is int):
+            return
+        if not self._within_write_rate(member):
             return
         self._timer = _Timer(running, elapsed, self._clock())
         self._send_to_everyone({"type": "timer", "running": running, "elapsed": elapsed, "by": member.id, "seq": seq})
