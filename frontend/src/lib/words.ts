@@ -6,6 +6,10 @@ export interface Marks {
   /** Index into `findings` of the one whose card is open. */
   open: number | null
   onOpen: (index: number) => void
+  /** Why opening a finding cannot be paid for, when it cannot: it has the coach say the word. */
+  locked: string | null
+  /** What opening a finding costs. */
+  price: number
 }
 
 /** Word index by the character offset of each word's first letter. Words are whitespace-separated, as the judge counts them. */

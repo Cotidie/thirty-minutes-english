@@ -88,8 +88,9 @@ function Word({ atom, spans, marks }: { atom: Atom; spans: Span[]; marks: Marks 
     <button
       type="button"
       className={`reading-hit${finding.repeated_ok ? ' is-ok' : ''}${marks.open === index ? ' is-open' : ''}`}
-      title={title}
+      title={marks.locked ?? (marks.price ? `${title} · Hear the coach · ${marks.price}` : title)}
       aria-label={title}
+      disabled={marks.locked !== null}
       onClick={(e) => {
         e.stopPropagation()
         marks.onOpen(index)

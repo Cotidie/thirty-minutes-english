@@ -1,6 +1,8 @@
 import { act, render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { describe, expect, it, vi } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { useCredits } from '../lib/credits'
+import { creditsOf } from '../test/credits'
 import { renderInRoom, someoneSets, viewsSent } from '../test/presenceRoom'
 import type { Example, VocabularyItem } from '../types'
 import { VocabularyTab } from './VocabularyTab'
@@ -14,6 +16,11 @@ vi.mock('../api', () => ({
   },
 }))
 vi.mock('../lib/liveClient', () => ({ connectExample: vi.fn() }))
+vi.mock('../lib/credits', async (original) => ({ ...(await original<typeof import('../lib/credits')>()), useCredits: vi.fn() }))
+
+beforeEach(() => {
+  vi.mocked(useCredits).mockReturnValue(creditsOf(null))
+})
 
 const none: Example[] = []
 
@@ -23,6 +30,33 @@ const items = [
 ]
 
 describe('VocabularyTab', () => {
+  const pictured = [{ ...items[0], scene: 'phones on a train', image: 'a.png' }, items[1]]
+
+  it('practice shows the price of a round and locks under it', () => {
+    vi.mocked(useCredits).mockReturnValue(creditsOf(15, { practice_voice: 10, practice_feedback: 10 }))
+    const { container } = render(<VocabularyTab items={pictured} sessionId={3} onPicture={vi.fn()} starred={[]} onToggleStar={vi.fn()} examples={none} onExample={vi.fn()} />)
+    const practice = container.querySelector('.practice-start') as HTMLButtonElement
+    expect(practice).toHaveTextContent('20')
+    expect(practice).toBeDisabled()
+    expect(practice).toHaveAttribute('title', 'Not enough credits: this needs 20 and you have 15.')
+  })
+
+  it('with a round paid for, practice and the redraw stay on and say what they cost', () => {
+    vi.mocked(useCredits).mockReturnValue(creditsOf(20, { redraw: 10, practice_voice: 10, practice_feedback: 10 }))
+    const { container } = render(<VocabularyTab items={pictured} sessionId={3} onPicture={vi.fn()} starred={[]} onToggleStar={vi.fn()} examples={none} onExample={vi.fn()} />)
+    expect(container.querySelector('.practice-start')).toBeEnabled()
+    const redraw = screen.getByRole('button', { name: 'New picture for ubiquitous' })
+    expect(redraw).toBeEnabled()
+    expect(redraw).toHaveAttribute('title', 'New scene, new picture · 10')
+  })
+
+  it('the admin, who is charged nothing, sees no price', () => {
+    vi.mocked(useCredits).mockReturnValue(creditsOf(null, { redraw: 10, practice_voice: 10, practice_feedback: 10 }))
+    const { container } = render(<VocabularyTab items={pictured} sessionId={3} onPicture={vi.fn()} starred={[]} onToggleStar={vi.fn()} examples={none} onExample={vi.fn()} />)
+    expect(container.querySelector('.practice-start')).toHaveTextContent(/^Practice$/)
+    expect(screen.getByRole('button', { name: 'New picture for ubiquitous' })).toHaveAttribute('title', 'New scene, new picture')
+  })
+
   it('redraws one word at once in the configured style and hands the new item up', async () => {
     const drawn = [{ ...items[0], scene: 'phones on a train', image: 'a.png' }, items[1]]
     const fresh = { ...drawn[0], scene: 'phones at a dinner table', image: 'b.png' }

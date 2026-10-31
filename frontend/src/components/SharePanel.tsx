@@ -7,11 +7,10 @@ import './SharePanel.css'
 interface Props {
   sessionId: number
   /** Whether this account may add people; anyone who made the session may end a share. */
-  canAdd: boolean
 }
 
 /** Whom the maker of a session has shared it with. */
-export function SharePanel({ sessionId, canAdd }: Props) {
+export function SharePanel({ sessionId }: Props) {
   const [shares, setShares] = useState<ShareEntry[]>([])
   const [email, setEmail] = useState('')
   const [readError, setReadError] = useState<string | null>(null)
@@ -54,32 +53,28 @@ export function SharePanel({ sessionId, canAdd }: Props) {
     }
   }
 
-  if (!canAdd && shares.length === 0) return null
-
   return (
     <section className="share" aria-label="Sharing" data-presence-anchor="shares">
-      {canAdd && (
-        <form className="share-form" onSubmit={(e) => void add(e)}>
-          <label htmlFor="share-email" className="share-label">
-            Share with
-          </label>
-          <div className="share-row">
-            <input
-              id="share-email"
-              type="email"
-              autoCapitalize="none"
-              spellCheck={false}
-              placeholder="their email"
-              className="share-input"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-            />
-            <button type="submit" className="btn" disabled={busy || !email.trim()}>
-              Share
-            </button>
-          </div>
-        </form>
-      )}
+      <form className="share-form" onSubmit={(e) => void add(e)}>
+        <label htmlFor="share-email" className="share-label">
+          Share with
+        </label>
+        <div className="share-row">
+          <input
+            id="share-email"
+            type="email"
+            autoCapitalize="none"
+            spellCheck={false}
+            placeholder="their email"
+            className="share-input"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+          />
+          <button type="submit" className="btn" disabled={busy || !email.trim()}>
+            Share
+          </button>
+        </div>
+      </form>
       {error && (
         <p role="alert" className="share-error">
           {error}

@@ -1,8 +1,10 @@
 import { act, fireEvent, render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom'
-import { describe, expect, it, vi } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { api } from '../api'
+import { useCredits } from '../lib/credits'
+import { creditsOf } from '../test/credits'
 import { FakeEventSource } from '../test/fakeEventSource'
 import { FakeWebSocket } from '../test/fakeWebSocket'
 import { WELCOME } from '../test/presenceRoom'
@@ -27,6 +29,7 @@ vi.mock('../api', () => ({
   api: {
     getSession: vi.fn(async () => session),
     listJobs: vi.fn(async () => []),
+    listShares: vi.fn(async () => []),
     getStars: vi.fn(async () => ({ expressions: [], words: [] })),
     listExamples: vi.fn(async () => []),
     getNote: vi.fn(async () => ({ text: '' })),
@@ -37,9 +40,7 @@ vi.mock('../api', () => ({
     addExpression: vi.fn(async () => ({ id: 6, phrase: 'circle back', meaning: 'return to it later', usage_note: 'n', examples: ['e5', 'e6'] })),
   },
 }))
-vi.mock('../lib/auth', () => ({
-  useAuth: () => ({ me: { id: 1, email: 'a@example.com', is_admin: false } }),
-}))
+vi.mock('../lib/credits', async (original) => ({ ...(await original<typeof import('../lib/credits')>()), useCredits: vi.fn() }))
 vi.mock('../lib/liveClient', () => ({ connectExample: vi.fn(), connectSummary: vi.fn() }))
 
 function Hash() {
@@ -56,7 +57,44 @@ function renderAt(path: string) {
   )
 }
 
+beforeEach(() => {
+  vi.mocked(useCredits).mockReturnValue(creditsOf(null))
+})
+
+/** The session as its maker gets it, with its word already drawn, so there is a picture to draw again. */
+const mine = {
+  ...session,
+  mine: true,
+  shared_by: null,
+  content: { ...session.content, vocabulary: [{ ...session.content.vocabulary[0], scene: 'A dam in rain', image: 'a.png' }] },
+}
+
 describe('SessionPage', () => {
+  it('locks the redraw for its maker when the balance cannot cover it', async () => {
+    vi.mocked(useCredits).mockReturnValue(creditsOf(3, { redraw: 10 }))
+    vi.mocked(api.getSession).mockResolvedValueOnce(mine)
+    renderAt('/s/3#vocabulary')
+    const redraw = await screen.findByRole('button', { name: 'New picture for mitigate' })
+    expect(redraw).toBeDisabled()
+    expect(redraw).toHaveAttribute('title', 'Not enough credits: this needs 10 and you have 3.')
+  })
+
+  it('gives no redraw to whoever only had the session shared', async () => {
+    vi.mocked(useCredits).mockReturnValue(creditsOf(50, { redraw: 10 }))
+    vi.mocked(api.getSession).mockResolvedValueOnce({ ...mine, mine: false, shared_by: 'mina@example.com' })
+    renderAt('/s/3#vocabulary')
+    await screen.findByText('mitigate')
+    expect(screen.queryByRole('button', { name: 'New picture for mitigate' })).not.toBeInTheDocument()
+  })
+
+  it('lets the maker share whatever the balance is', async () => {
+    vi.mocked(useCredits).mockReturnValue(creditsOf(0, { session: 200 }))
+    vi.mocked(api.getSession).mockResolvedValueOnce(mine)
+    vi.mocked(api.listShares).mockResolvedValueOnce([])
+    renderAt('/s/3')
+    expect(await screen.findByPlaceholderText('their email')).toBeInTheDocument()
+  })
+
   it('opens on the tab named in the address, so a reload stays there', async () => {
     renderAt('/s/3#vocabulary')
     expect(await screen.findByText('mitigate')).toBeInTheDocument()

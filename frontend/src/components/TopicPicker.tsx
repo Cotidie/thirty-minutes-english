@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import type { Topic } from '../types'
+import { Price } from './Price'
 import './TopicPicker.css'
 
 interface Props {
@@ -65,11 +66,7 @@ export function TopicPicker({ suggestions, labels, pending, error, busy, price, 
         />
         <button type="submit" className="btn btn-primary" disabled={busy || short !== null} title={short ?? undefined}>
           {busy ? 'Writing…' : 'Generate session'}
-          {!busy && price > 0 && (
-            <span className="btn-price" aria-hidden="true">
-              {price}
-            </span>
-          )}
+          {!busy && <Price amount={price} />}
         </button>
       </div>
       {short && (

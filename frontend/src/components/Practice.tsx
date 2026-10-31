@@ -4,7 +4,9 @@ import { connectExample } from '../lib/liveClient'
 import type { LiveState } from '../lib/liveSession'
 import { useMicLevel } from '../lib/micLevel'
 import { useLiveRound } from '../lib/useLiveRound'
+import { usePrice } from '../lib/usePrice'
 import type { Example, ExampleFeedback, PracticeTarget } from '../types'
+import { Price } from './Price'
 import { Slip } from './Slip'
 import './Practice.css'
 
@@ -72,6 +74,7 @@ export function Practice({ target, label, sessionId, examples, onKept }: Props) 
     if (await save()) dismiss()
   }
   const complete = answer !== null && state !== null && state.user.trim() !== ''
+  const { price, short } = usePrice('practice_voice', 'practice_feedback')
 
   return (
     <div className="practice">
@@ -87,8 +90,9 @@ export function Practice({ target, label, sessionId, examples, onKept }: Props) 
         </ol>
       )}
       {state === null ? (
-        <button type="button" className="practice-start" onClick={() => void start()}>
+        <button type="button" className="practice-start" onClick={() => void start()} disabled={short !== null} title={short ?? undefined}>
           {label}
+          <Price amount={price} />
         </button>
       ) : (
         <Slip

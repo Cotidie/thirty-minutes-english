@@ -3,8 +3,10 @@ import { api } from '../api'
 import { startAzureAssessor, type Assessor } from '../lib/assessor/azure'
 import { Judge, type AzureWord, type Shown } from '../lib/assessor/judge'
 import { connectReadAloud, type LiveConnection } from '../lib/liveClient'
+import { usePrice } from '../lib/usePrice'
 import type { Paragraph } from '../types'
 import { FindingCard } from './FindingCard'
+import { Price } from './Price'
 import './ReadAloud.css'
 
 interface Options {
@@ -228,9 +230,11 @@ export function useReadAloud({ paragraph: { id: paragraphId, text: paragraph }, 
 
 /** Starts a round. It stays in its place under the paragraph; the round itself shows below. */
 export function ReadAloudButton({ round, disabled }: { round: ReadAloudRound; disabled: boolean }) {
+  const { price, short } = usePrice('read_aloud_token')
   return (
-    <button type="button" className="paragraph-action" onClick={round.start} disabled={disabled || round.phase !== null}>
+    <button type="button" className="paragraph-action" onClick={round.start} disabled={disabled || round.phase !== null || short !== null} title={short ?? undefined}>
       {round.phase !== null || round.findings.length > 0 ? 'Read again' : 'Read aloud'}
+      <Price amount={price} />
     </button>
   )
 }

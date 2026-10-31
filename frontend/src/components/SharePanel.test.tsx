@@ -22,7 +22,7 @@ beforeEach(() => {
 
 test('shows who has it, and sharing adds someone and clears the box', async () => {
   vi.mocked(api.addShare).mockResolvedValue([JO, MINA])
-  render(<SharePanel sessionId={7} canAdd />)
+  render(<SharePanel sessionId={7} />)
   expect(await screen.findByText('mina@example.com')).toBeInTheDocument()
   const box = screen.getByLabelText('Share with')
   await userEvent.type(box, 'jo@example.com')
@@ -33,13 +33,13 @@ test('shows who has it, and sharing adds someone and clears the box', async () =
 })
 
 test('an address cut short on its line still shows in full on hover', async () => {
-  render(<SharePanel sessionId={7} canAdd />)
+  render(<SharePanel sessionId={7} />)
   expect(await screen.findByText('mina@example.com')).toHaveAttribute('title', 'mina@example.com')
 })
 
 test('an email nobody uses says so and stays in the box', async () => {
   vi.mocked(api.addShare).mockRejectedValue(new ApiError(404, 'No account uses that email.'))
-  render(<SharePanel sessionId={7} canAdd />)
+  render(<SharePanel sessionId={7} />)
   const box = await screen.findByLabelText('Share with')
   await userEvent.type(box, 'nobody@example.com')
   await userEvent.click(screen.getByRole('button', { name: 'Share' }))
@@ -48,14 +48,14 @@ test('an email nobody uses says so and stays in the box', async () => {
 })
 
 test('a share can be ended', async () => {
-  render(<SharePanel sessionId={7} canAdd />)
+  render(<SharePanel sessionId={7} />)
   await userEvent.click(await screen.findByRole('button', { name: 'Stop sharing with mina@example.com' }))
   expect(api.removeShare).toHaveBeenCalledWith(7, 2)
   await waitFor(() => expect(screen.queryByText('mina@example.com')).not.toBeInTheDocument())
 })
 
 test('whoever leaves or is added from another tab shows without a reload', async () => {
-  render(<SharePanel sessionId={7} canAdd />)
+  render(<SharePanel sessionId={7} />)
   expect(await screen.findByText('mina@example.com')).toBeInTheDocument()
   expect(FakeEventSource.open[0].url).toBe('/api/sessions/7/events')
 
@@ -67,7 +67,7 @@ test('whoever leaves or is added from another tab shows without a reload', async
 
 test('a failed read says so and the next good one clears it', async () => {
   vi.mocked(api.listShares).mockRejectedValue(new Error('offline'))
-  render(<SharePanel sessionId={7} canAdd />)
+  render(<SharePanel sessionId={7} />)
   expect(await screen.findByRole('alert')).toHaveTextContent('offline')
 
   vi.mocked(api.listShares).mockResolvedValue([MINA])
@@ -78,7 +78,7 @@ test('a failed read says so and the next good one clears it', async () => {
 
 test('a refused share stays on screen through a read that goes well', async () => {
   vi.mocked(api.addShare).mockRejectedValue(new ApiError(404, 'No account uses that email.'))
-  render(<SharePanel sessionId={7} canAdd />)
+  render(<SharePanel sessionId={7} />)
   await userEvent.type(await screen.findByLabelText('Share with'), 'nobody@example.com')
   await userEvent.click(screen.getByRole('button', { name: 'Share' }))
   expect(await screen.findByRole('alert')).toHaveTextContent('No account uses that email.')
@@ -86,11 +86,4 @@ test('a refused share stays on screen through a read that goes well', async () =
   act(() => FakeEventSource.open[0].send('shares'))
   await waitFor(() => expect(api.listShares).toHaveBeenCalledTimes(2))
   expect(screen.getByRole('alert')).toHaveTextContent('No account uses that email.')
-})
-
-test('without creation rights the list stays but nobody can be added', async () => {
-  render(<SharePanel sessionId={7} canAdd={false} />)
-  expect(await screen.findByText('mina@example.com')).toBeInTheDocument()
-  expect(screen.queryByLabelText('Share with')).not.toBeInTheDocument()
-  expect(screen.getByRole('button', { name: 'Stop sharing with mina@example.com' })).toBeInTheDocument()
 })

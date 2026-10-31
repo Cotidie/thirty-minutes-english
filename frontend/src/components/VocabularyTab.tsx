@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react'
 import { api } from '../api'
 import { useSharedView } from '../lib/presence/useSharedView'
+import { usePrice } from '../lib/usePrice'
 import { practiceWord, type Example, type PictureFace, type VocabularyItem } from '../types'
 import { Practice } from './Practice'
 import { StarButton } from './StarButton'
@@ -167,7 +168,7 @@ interface CellProps {
   item: VocabularyItem
   drawing: boolean
   arriving: boolean
-  /** Whether this account may draw new pictures, which cost money. */
+  /** Whether this account made the session, and so may draw new pictures. */
   canRedraw: boolean
   /** Why the last redraw failed. */
   failed?: string
@@ -183,6 +184,7 @@ function VocabCell({ item, drawing, arriving, failed, canRedraw, onRedraw, child
   const face = flipped ?? (item.example_image || arriving ? 'example' : 'practice')
   const pictured = Boolean(item.image || item.example_image || arriving)
   const hint = face === 'example' ? 'The example sentence, drawn again' : 'New scene, new picture'
+  const { price, short } = usePrice('redraw')
   /** A caption belongs to the picture it was opened on. */
   const closeCaption = () => {
     if (captionShown) setCaptionShown(false)
@@ -202,8 +204,8 @@ function VocabCell({ item, drawing, arriving, failed, canRedraw, onRedraw, child
           type="button"
           className="vocab-redraw"
           aria-label={`New picture for ${item.word}`}
-          title={drawing ? 'Drawing…' : hint}
-          disabled={drawing}
+          title={drawing ? 'Drawing…' : (short ?? (price ? `${hint} · ${price}` : hint))}
+          disabled={drawing || short !== null}
           onClick={() => {
             onRedraw(face)
             closeCaption()

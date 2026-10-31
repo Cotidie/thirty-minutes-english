@@ -3,6 +3,7 @@ import type { Shown } from '../lib/assessor/judge'
 import type { Span } from '../lib/highlight'
 import type { Piece } from '../lib/sentences'
 import type { Paragraph as ArticleParagraph, Summary } from '../types'
+import { usePrice } from '../lib/usePrice'
 import { wordStarts, type Marks } from '../lib/words'
 import { ReadAloudButton, ReadAloudPanel, useReadAloud } from './ReadAloud'
 import { Run, Sentence } from './Sentence'
@@ -36,7 +37,8 @@ export function Paragraph({ paragraph, pieces, spans, summaries, saved, onSummar
   const starts = useMemo(() => wordStarts(paragraph.text), [paragraph.text])
   const round = useReadAloud({ paragraph, saved, onStart, onEnd })
   const summary = useSummary({ paragraph, onKept: onSummary, onStart, onEnd })
-  const marks: Marks = { findings: round.findings, open: round.open, onOpen: round.ask }
+  const coach = usePrice('read_aloud_voice')
+  const marks: Marks = { findings: round.findings, open: round.open, onOpen: round.ask, locked: coach.short, price: coach.price }
 
   return (
     <div className="paragraph" data-presence-anchor={`paragraph:${paragraph.id}`}>

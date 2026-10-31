@@ -4,7 +4,9 @@ import { connectSummary } from '../lib/liveClient'
 import type { LiveState } from '../lib/liveSession'
 import { useMicLevel } from '../lib/micLevel'
 import { useLiveRound } from '../lib/useLiveRound'
+import { usePrice } from '../lib/usePrice'
 import type { Paragraph, Summary, SummaryFeedback } from '../types'
+import { Price } from './Price'
 import { Slip } from './Slip'
 import { SpeakButton } from './SpeakButton'
 import './Summarize.css'
@@ -100,9 +102,11 @@ export function useSummary({ paragraph: { id: paragraphId, text: paragraph }, on
 
 /** Starts a round. It stays in its place under the paragraph; the round itself shows below. */
 export function SummarizeButton({ summary, kept, disabled }: { summary: SummaryRound; kept: boolean; disabled: boolean }) {
+  const { price, short } = usePrice('summary_voice', 'summary_feedback')
   return (
-    <button type="button" className="paragraph-action" onClick={summary.start} disabled={disabled || summary.state !== null}>
+    <button type="button" className="paragraph-action" onClick={summary.start} disabled={disabled || summary.state !== null || short !== null} title={short ?? undefined}>
       {kept ? 'Summarize again' : 'Summarize'}
+      <Price amount={price} />
     </button>
   )
 }

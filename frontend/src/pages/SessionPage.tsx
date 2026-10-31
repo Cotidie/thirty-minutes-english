@@ -3,7 +3,6 @@ import { Link, useLocation, useNavigate, useParams } from 'react-router-dom'
 import { api, type ApiError } from '../api'
 import { SharePanel } from '../components/SharePanel'
 import { TabPeople } from '../components/TabPeople'
-import { useAuth } from '../lib/auth'
 import { PresenceProvider } from '../lib/presence/PresenceProvider'
 import { useCursorSender } from '../lib/presence/useCursorSender'
 import { useTellMyTab } from '../lib/presence/useOthersOnTab'
@@ -48,7 +47,6 @@ export function SessionPage() {
 }
 
 function OpenSession({ id, onGone }: { id: number; onGone: () => void }) {
-  const { me } = useAuth()
   const { stars, toggle } = useStars(id)
   const { examples, add: addExample } = useExamples(id)
   const note = useNote(id)
@@ -88,7 +86,6 @@ function OpenSession({ id, onGone }: { id: number; onGone: () => void }) {
   if (!session) return <main className="session"><p className="empty">Loading…</p></main>
 
   const { content } = session
-  const mayCreate = Boolean(me && (me.is_admin || me.can_create))
   return (
     <main className="session">
       <aside className="rail" data-presence-anchor="rail">
@@ -122,7 +119,7 @@ function OpenSession({ id, onGone }: { id: number; onGone: () => void }) {
             <TabPeople tab={SUMMARY_TAB} />
           </button>
         </nav>
-        {session.mine && <SharePanel sessionId={session.id} canAdd={mayCreate} />}
+        {session.mine && <SharePanel sessionId={session.id} />}
       </aside>
       <NoteBox note={note} />
       <Cursors />
@@ -148,7 +145,7 @@ function OpenSession({ id, onGone }: { id: number; onGone: () => void }) {
             items={content.vocabulary}
             sessionId={session.id}
             arriving={arriving}
-            canRedraw={session.mine && mayCreate}
+            canRedraw={session.mine}
             onPicture={(index, item) => setContent((c) => ({ vocabulary: c.vocabulary.map((v, i) => (i === index ? item : v)) }))}
             starred={stars.words}
             onToggleStar={(id) => toggle('words', id)}
