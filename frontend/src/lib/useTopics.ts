@@ -2,14 +2,14 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { api } from '../api'
 import type { Topic, TopicListing } from '../types'
 
-/** How often to look back for the day's news topics while they are still coming. */
-export const TOPIC_POLL_MS = 15_000
-export const TOPIC_POLL_LIMIT = 12
+/** How often to look back for the day's first news topics while they are still coming. */
+export const TOPIC_POLL_MS = 5_000
+export const TOPIC_POLL_LIMIT = 48
 
 /**
  * Today's suggestions. The news half is fetched on the server the first time
  * anyone asks; until it lands the pool fills the list, so we keep looking for
- * a while. `refresh` deals a new list and starts that fetch again.
+ * a while. `refresh` deals a new list from what the server has in stock.
  */
 export function useTopics() {
   const [topics, setTopics] = useState<Topic[]>([])

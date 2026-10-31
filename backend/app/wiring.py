@@ -82,9 +82,7 @@ def build_services(
             effort=effort(settings, "CLAUDE_EFFORT", efforts_of),
             firecrawl_key=settings.get("FIRECRAWL_API_KEY"),
         ),
-        topic_source=ClaudeTopicSource(
-            settings.get("TOPICS_MODEL"), effort(settings, "TOPICS_EFFORT", efforts_of), settings.get("FIRECRAWL_API_KEY")
-        ),
+        topic_source=ClaudeTopicSource(settings.get("TOPICS_MODEL"), effort(settings, "TOPICS_EFFORT", efforts_of)),
         agents=_live_agents(settings, agent_dirs),
         example_coach=_example_coach(settings, agent_dirs["example"], effort(settings, "EXAMPLE_EFFORT", efforts_of)),
         summary_coach=_summary_coach(settings, agent_dirs["summary"], effort(settings, "SUMMARY_EFFORT", efforts_of)),

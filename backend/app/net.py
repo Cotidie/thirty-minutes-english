@@ -17,10 +17,12 @@ class HttpError(Exception):
         self.message = message
 
 
-def request(method: str, url: str, headers: dict[str, str] | None = None, body: dict | None = None, timeout: float = 30) -> httpx2.Response:
+def request(
+    method: str, url: str, headers: dict[str, str] | None = None, body: dict | None = None, timeout: float = 30, follow_redirects: bool = False
+) -> httpx2.Response:
     """The response, once it came back 2xx. Raises HttpError."""
     try:
-        with httpx2.Client(timeout=timeout, transport=TRANSPORT) as client:
+        with httpx2.Client(timeout=timeout, transport=TRANSPORT, follow_redirects=follow_redirects) as client:
             response = client.request(method, url, headers=headers, json=body)
     except httpx2.HTTPError as e:
         raise HttpError(502, str(e) or type(e).__name__) from e
