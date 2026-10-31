@@ -251,3 +251,96 @@ def test_a_job_picks_by_what_its_starter_has_seen(tmp_path):
     assert {e.id for e in session.content.expressions} == set(ids) - {ids[0]}
     assert "theirs" not in generator.excluded[0].words
     assert db.shares.created_by(session.id) == me.id
+
+
+class Exploding:
+    def generate(self, topic, on_progress=None, exclude=None):
+        raise RuntimeError("no network")
+
+
+def test_a_job_that_dies_of_anything_is_failed_and_reported_lost(tmp_path):
+    db = Database(tmp_path / "s.db")
+    lost = []
+    job = runner_over(db).start("Trams", Exploding(), on_lost=lost.append)
+    assert job.status == "failed" and "no network" in job.error
+    assert lost == [job]
+
+
+def test_a_failure_the_generator_reports_is_lost_too(tmp_path):
+    db = Database(tmp_path / "s.db")
+    lost = []
+
+    class Failing:
+        def generate(self, topic, on_progress=None, exclude=None):
+            raise GenerationError("claude exited 1")
+
+    job = runner_over(db).start("Trams", Failing(), on_lost=lost.append)
+    assert job.status == "failed" and lost == [job]
+
+
+def test_a_cancel_before_the_session_is_saved_is_lost_but_one_after_is_not(tmp_path):
+    db = Database(tmp_path / "s.db")
+    seed_expressions(db, EXPRESSION_COUNT)
+    runner = runner_over(db)
+    lost = []
+
+    class CancelsItself:
+        """With InlineExecutor the job runs inside start(), so the one open job is this one."""
+
+        def generate(self, topic, on_progress=None, exclude=None):
+            runner.close(runner.open()[0].id)
+            on_progress(Progress(Stage.SEARCHING, 1))  # raises Cancelled
+            return sample_draft()
+
+    job = runner.start("Trams", CancelsItself(), on_lost=lost.append)
+    assert job.status == "cancelled" and job.session_id is None
+    assert lost == [job]
+
+    done = runner.start("Boats", Recording(), on_lost=lost.append)
+    runner.close(done.id)  # too late to be lost: the session is saved
+    assert done.session_id is not None and lost == [job]
+
+
+def test_a_cancel_the_generator_never_hears_of_is_still_lost(tmp_path):
+    db = Database(tmp_path / "s.db")
+    runner = runner_over(db)
+    lost = []
+
+    class FinishesAnyway:
+        def generate(self, topic, on_progress=None, exclude=None):
+            runner.close(runner.open()[0].id)
+            return sample_draft()
+
+    job = runner.start("Trams", FinishesAnyway(), on_lost=lost.append)
+    assert job.status == "cancelled" and job.session_id is None and lost == [job]
+
+
+def test_a_cancel_while_the_pictures_are_drawn_keeps_the_session_and_is_not_lost(tmp_path):
+    db = Database(tmp_path / "s.db")
+    seed_expressions(db, EXPRESSION_COUNT)
+    runner = runner_over(db)
+    lost = []
+
+    class CancelsWhileDrawing:
+        def expected_seconds(self, count):
+            return None
+
+        def count(self, words, scenes):
+            return 1
+
+        def illustrate(self, job_id, words, on_done, on_picture, scenes, on_figure):
+            runner.close(job_id)
+            on_done(1)  # raises Cancelled
+
+    job = runner.start("Trams", Recording(), CancelsWhileDrawing(), on_lost=lost.append)
+    assert job.status == "cancelled" and job.session_id is not None and lost == []
+
+
+def test_a_refund_that_fails_does_not_take_the_job_down(tmp_path):
+    db = Database(tmp_path / "s.db")
+
+    def refuses(job):
+        raise RuntimeError("database is locked")
+
+    job = runner_over(db).start("Trams", Exploding(), on_lost=refuses)
+    assert job.status == "failed"

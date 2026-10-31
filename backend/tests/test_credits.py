@@ -11,7 +11,7 @@ from app.main import create_app
 from app.models import ExampleFeedback, SummaryFeedback
 from app.wiring import Services
 from tests.conftest import add_user, admin_client, client_of, seed_expressions
-from tests.test_api import FakeGenerator, InlineExecutor
+from tests.test_api import FailingGenerator, FakeGenerator, InlineExecutor
 
 
 def test_a_new_account_has_nothing_and_a_grant_shows_up_first(store):
@@ -263,3 +263,21 @@ def test_the_admin_pays_nothing_at_a_paid_route(tmp_path):
     assert admin.post("/api/example/feedback", json=FEEDBACK_BODY).status_code == 200
     boss = db.accounts.by_email("admin@example.com")
     assert db.credits.recent(boss.id) == []
+
+
+def test_a_failed_generation_gives_the_200_back_as_a_refund(tmp_path):
+    db = Database(tmp_path / "s.db")
+    app = create_app(db, Services(FailingGenerator()), InlineExecutor())
+    mina = add_user(db, "mina@example.com")
+    db.credits.grant(mina.id, 200, by=mina.id)
+    me = client_of(app, db, mina)
+    assert me.post("/api/sessions", json={"topic": "Trams"}).json()["status"] == "failed"
+    assert db.credits.balance(mina.id) == 200
+    assert [(e.amount, e.kind, e.detail) for e in db.credits.recent(mina.id)[:2]] == [(200, "refund", "Trams"), (-200, "session", "Trams")]
+
+
+def test_the_admins_failed_generation_writes_no_refund(tmp_path):
+    db = Database(tmp_path / "s.db")
+    app = create_app(db, Services(FailingGenerator()), InlineExecutor())
+    assert admin_client(app).post("/api/sessions", json={"topic": "Trams"}).json()["status"] == "failed"
+    assert db.credits.recent(db.accounts.by_email("admin@example.com").id) == []

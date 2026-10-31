@@ -4,6 +4,7 @@ import logging
 import random
 import time
 import uuid
+from collections.abc import Callable
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass, field
 from statistics import median
@@ -83,6 +84,11 @@ class Job:
         if self.status == "running":
             self.status = "cancelled"
 
+    def fail(self, error: str) -> None:
+        self.error = error
+        self.failed_at = time.monotonic()
+        self.status = "failed"
+
     def finish(self) -> None:
         """Books the current visit's time to its stage; the model can go back, e.g. think between searches."""
         self.stage_seconds[self.stage] = self.stage_seconds.get(self.stage, 0.0) + self.stage_elapsed_seconds
@@ -120,15 +126,23 @@ class JobRunner:
         self._jobs: dict[str, Job] = {}
         self._lock = Lock()
 
-    def start(self, topic: str, generator: Generator, illustrator: Illustrator | None = None, created_by: int | None = None) -> Job:
-        """Generates in the background; the pictures follow when an illustrator is given."""
+    def start(
+        self,
+        topic: str,
+        generator: Generator,
+        illustrator: Illustrator | None = None,
+        created_by: int | None = None,
+        on_lost: Callable[[Job], None] | None = None,
+    ) -> Job:
+        """Generates in the background; the pictures follow when an illustrator is given.
+        `on_lost` is told once if the job ends with nothing to show: failed, or cancelled before its session was saved."""
         job = Job(id=uuid.uuid4().hex[:12], topic=topic, created_by=created_by)
         self._foresee_pictures(job, illustrator, 2 * VOCABULARY_COUNT)  # the example and the scene
         with self._lock:
             # A new try answers the same person's old failure.
             self._jobs = {id: j for id, j in self._jobs.items() if j.status != "failed" or j.created_by != created_by}
             self._jobs[job.id] = job
-        self.executor.submit(self._run, job, generator, illustrator)
+        self.executor.submit(self._run, job, generator, illustrator, on_lost)
         return job
 
     def get(self, job_id: str) -> Job | None:
@@ -167,7 +181,15 @@ class JobRunner:
             total += max(spent, self.stage_expected_seconds(stage, job)) if ahead else spent
         return total
 
-    def _run(self, job: Job, generator: Generator, illustrator: Illustrator | None) -> None:
+    def _run(self, job: Job, generator: Generator, illustrator: Illustrator | None, on_lost: Callable[[Job], None] | None) -> None:
+        self._generate(job, generator, illustrator)
+        if on_lost and (job.status == "failed" or (job.status == "cancelled" and job.session_id is None)):
+            try:
+                on_lost(job)
+            except Exception:
+                log.exception("job %s: lost, and telling so failed too", job.id)
+
+    def _generate(self, job: Job, generator: Generator, illustrator: Illustrator | None) -> None:
         """The session is saved, with expressions from the corpus, and `job.session_id` set, as soon as
         its text is written; the pictures land on it one by one after that, so it can be opened while they are drawn."""
         try:
@@ -186,22 +208,21 @@ class JobRunner:
             landed = self._keep_figures(session, draft.article.figures)
             if illustrator:
                 self._illustrate(job, illustrator, session, self._scenes_to_draw(session, draft.article, landed))
+            job.finish()
+            for stage in Stage:
+                self._stages.add(stage, job.stage_seconds.get(stage, 0.0))
+            log.info("job %s: done in %.0fs: %s", job.id, job.elapsed_seconds, {s.value: round(t) for s, t in job.stage_seconds.items()})
+            job.status = "done"
         except Cancelled:
             log.info("job %s: cancelled", job.id)
-            return
         except GenerationError as e:
-            if job.status == "cancelled":
-                return
-            job.error = str(e)
-            job.failed_at = time.monotonic()
-            job.status = "failed"
-            log.warning("job %s: failed after %.0fs in %s: %s", job.id, job.elapsed_seconds, job.stage, e)
-            return
-        job.finish()
-        for stage in Stage:
-            self._stages.add(stage, job.stage_seconds.get(stage, 0.0))
-        log.info("job %s: done in %.0fs: %s", job.id, job.elapsed_seconds, {s.value: round(t) for s, t in job.stage_seconds.items()})
-        job.status = "done"
+            if job.status != "cancelled":
+                job.fail(str(e))
+                log.warning("job %s: failed after %.0fs in %s: %s", job.id, job.elapsed_seconds, job.stage, e)
+        except Exception as e:
+            if job.status != "cancelled":
+                job.fail(str(e))
+                log.exception("job %s: died after %.0fs in %s", job.id, job.elapsed_seconds, job.stage)
 
     @staticmethod
     def _foresee_pictures(job: Job, illustrator: Illustrator | None, count: int) -> None:

@@ -4,6 +4,7 @@ from fastapi import APIRouter, HTTPException, Response
 
 from app.api.deps import Db, Files, Jobs, Me, Svc, charge, failed, off, require_access, require_creator
 from app.api.schemas import CreateSessionRequest, JobStatus, RedrawRequest, ShareEntry, ShareRequest, StarRequest
+from app.credits import PRICES
 from app.db import Database
 from app.db.sessions import StarKind
 from app.generation.jobs import Job, JobRunner
@@ -51,7 +52,8 @@ def create_session(body: CreateSessionRequest, db: Db, jobs: Jobs, services: Svc
         db.sessions.recent_topics(RECENT_TOPIC_WINDOW), [t.text for t in db.topics.curated()]
     )
     charge(db, me, "session", topic)
-    return status_of(jobs.start(topic, services.generator, services.illustrator, created_by=me.id), jobs)
+    on_lost = None if me.is_admin else lambda _: db.credits.refund(me.id, PRICES["session"], topic)
+    return status_of(jobs.start(topic, services.generator, services.illustrator, created_by=me.id, on_lost=on_lost), jobs)
 
 
 @router.get("/jobs", response_model=list[JobStatus])
