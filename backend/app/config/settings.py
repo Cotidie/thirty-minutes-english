@@ -72,7 +72,7 @@ class Spec:
     number: tuple[float, float] | None = None  # strict: must parse as a number inside [lo, hi]
     shown_when: tuple[str, str] | None = None  # (key, value): the field only matters then
     used_when: tuple[str, str] | None = None  # (key, value): a key the app only calls then; shown, marked idle otherwise
-    help: str = ""  # one or two sentences for the modal's info tooltip, or under `use` where a model has an effort
+    help: str = ""  # one or two sentences for the modal's info tooltip; one short line under `use`, where a model has an effort
     use: str = ""  # what a model with an effort is for, in words: its row's title in the modal
 
 
@@ -96,19 +96,19 @@ SPECS: tuple[Spec, ...] = (
     Spec("ASSESS_WORD_SCORE", "assess", "60", number=(0, 100),
          help="Azure gives every word an accuracy score from 0 to 100. Words below this number get a pronunciation note. Higher is stricter."),
     Spec("CLAUDE_MODEL", "claude", "opus", catalog="claude", use="Writing sessions",
-         help="Writes each session: expressions, article, words and picture scenes. Sonnet is faster, Opus writes better."),
+         help="Expressions, article, words and picture scenes."),
     Spec("CLAUDE_EFFORT", "claude", "xhigh", effort_of="CLAUDE_MODEL",
          help="More thinking writes better and takes longer."),
     Spec("TOPICS_MODEL", "claude", "sonnet", catalog="claude", use="News topics",
-         help="Turns the headlines of the news feeds into topics, a stock at a time."),
+         help="Turns news headlines into topics."),
     Spec("TOPICS_EFFORT", "claude", "medium", effort_of="TOPICS_MODEL",
          help="On Sonnet, medium takes about 12 seconds and high a minute or more."),
     Spec("EXAMPLE_MODEL", "claude", "opus", catalog="claude", use="Practice feedback",
-         help="Writes the Practice feedback, and new picture scenes on redraw."),
+         help="Practice feedback and redrawn picture scenes."),
     Spec("EXAMPLE_EFFORT", "claude", "low", effort_of="EXAMPLE_MODEL",
          help="Low keeps feedback quick."),
     Spec("SUMMARY_MODEL", "claude", "opus", catalog="claude", use="Summary judging",
-         help="Judges a spoken summary and writes its model answer. It has to come back fast."),
+         help="Judges spoken summaries, writes model answers."),
     Spec("SUMMARY_EFFORT", "claude", "medium", effort_of="SUMMARY_MODEL",
          help="Medium keeps it quick; low gets shallow."),
     Spec("IMAGE_PROVIDER", "images", "openrouter", choices=IMAGE_PROVIDERS,

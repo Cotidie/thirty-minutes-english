@@ -454,7 +454,7 @@ function ModelRow({ model, effort, draft, menuOf, onChange, onPin }: ModelRowPro
       <h4 id={`${id}-use`} className="settings-use-title" title={`${model.key}, ${effort.key}`}>
         {model.use}
       </h4>
-      <p className="settings-use-what">{`${model.help} ${effort.help}`}</p>
+      <p className="settings-use-what">{model.help}</p>
       <div className="settings-use-controls">
         <div className="settings-use-model">
           <span id={`${id}-label`} className="settings-use-label">
@@ -471,7 +471,7 @@ function ModelRow({ model, effort, draft, menuOf, onChange, onPin }: ModelRowPro
           />
         </div>
         <div className="settings-use-effort">
-          <span id={`${effortId}-label`} className="settings-use-label">
+          <span id={`${effortId}-label`} className="settings-use-label" title={effort.help}>
             Thinking
           </span>
           <Control
