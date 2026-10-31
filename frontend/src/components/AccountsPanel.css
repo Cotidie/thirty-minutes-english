@@ -6,10 +6,9 @@
 }
 
 .accounts-item {
-  display: flex;
-  flex-wrap: wrap;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
   align-items: center;
-  justify-content: space-between;
   gap: 0.4rem 1rem;
   padding: 0.7rem 0;
   border-bottom: 1px solid var(--line);
@@ -29,9 +28,44 @@
   font-size: 0.85rem;
 }
 
-.accounts-toggle {
+.accounts-credits {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 0.35rem;
+  color: var(--muted);
+  font-size: 0.85rem;
+}
+
+.accounts-balance {
+  color: var(--ink);
+  font-size: 1.1rem;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.accounts-credits.is-short .accounts-balance {
+  color: var(--wrong);
+}
+
+.accounts-add {
   display: inline-flex;
   align-items: center;
   gap: 0.4rem;
-  font-size: 0.9rem;
+}
+
+.accounts-add input {
+  width: 5rem;
+}
+
+.accounts-history {
+  grid-column: 1 / -1;
+  padding-left: 0.9rem;
+  border-left: 2px solid var(--marker);
+  color: var(--muted);
+}
+
+@media (max-width: 40rem) {
+  .accounts-item {
+    grid-template-columns: minmax(0, 1fr);
+  }
 }

@@ -1,43 +1,118 @@
-import { render, screen, waitFor } from '@testing-library/react'
+import { render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { beforeEach, expect, test, vi } from 'vitest'
 import { api } from '../api'
+import type { Account } from '../types'
 import { AccountsPanel } from './AccountsPanel'
 
-vi.mock('../api', () => ({ api: { listAccounts: vi.fn(), setCanCreate: vi.fn() } }))
+vi.mock('../api', () => ({ api: { listAccounts: vi.fn(), accountCredits: vi.fn(), grantCredits: vi.fn() } }))
 
-const ADMIN = { id: 1, email: 'boss@example.com', is_admin: true, can_create: false, created_at: '2026-10-30T10:00:00Z' }
-const MINA = { id: 2, email: 'mina@example.com', is_admin: false, can_create: false, created_at: '2026-10-31T10:00:00Z' }
+const ADMIN = { id: 1, email: 'boss@example.com', is_admin: true, created_at: '2026-10-30T10:00:00Z', credits: null }
+const MINA = { id: 2, email: 'mina@example.com', is_admin: false, created_at: '2026-10-31T10:00:00Z', credits: 340 }
 
 beforeEach(() => {
   vi.mocked(api.listAccounts).mockReset().mockResolvedValue([ADMIN, MINA])
-  vi.mocked(api.setCanCreate).mockReset()
+  vi.mocked(api.accountCredits).mockReset().mockResolvedValue([])
+  vi.mocked(api.grantCredits).mockReset()
 })
 
-test('turning creation on saves at once and shows what the server says', async () => {
-  vi.mocked(api.setCanCreate).mockResolvedValue({ ...MINA, can_create: true })
+test('each account shows its balance; the admin is not charged', async () => {
   render(<AccountsPanel />)
-  const toggle = await screen.findByRole('checkbox', { name: 'mina@example.com can create sessions' })
-  expect(toggle).not.toBeChecked()
-  await userEvent.click(toggle)
-  expect(api.setCanCreate).toHaveBeenCalledWith(2, true)
-  await waitFor(() => expect(toggle).toBeChecked())
+  expect(await screen.findByText('340')).toBeInTheDocument()
+  expect(screen.getByText('not charged')).toBeInTheDocument()
+  expect(screen.queryByRole('checkbox')).not.toBeInTheDocument()
+  expect(screen.queryByRole('spinbutton', { name: 'boss@example.com credits to add' })).not.toBeInTheDocument()
+  await waitFor(() => expect(api.accountCredits).toHaveBeenCalledWith(2))
+  expect(api.accountCredits).toHaveBeenCalledTimes(1)
 })
 
-test('the admin can always create, so the toggle is on and fixed', async () => {
+test('each account shows what it last spent', async () => {
+  vi.mocked(api.accountCredits).mockResolvedValue([{ at: '2026-11-01T09:00:00Z', amount: -200, kind: 'session', detail: 'Trams' }])
   render(<AccountsPanel />)
-  const toggle = await screen.findByRole('checkbox', { name: 'boss@example.com can create sessions' })
-  expect(toggle).toBeChecked()
-  expect(toggle).toBeDisabled()
+  const history = await screen.findByRole('list', { name: 'mina@example.com recent charges' })
+  expect(within(history).getByRole('listitem')).toHaveTextContent('Session')
+  expect(within(history).getByRole('listitem')).toHaveTextContent('Trams')
+  expect(within(history).getByRole('listitem')).toHaveTextContent('−200')
 })
 
-test('a failed change goes back and says why', async () => {
-  vi.mocked(api.setCanCreate).mockRejectedValue(new Error('offline'))
+test('adding credits saves at once and shows the new balance and the row it made', async () => {
+  vi.mocked(api.grantCredits).mockResolvedValue({ ...MINA, credits: 540 })
+  vi.mocked(api.accountCredits).mockResolvedValueOnce([]).mockResolvedValueOnce([{ at: '2026-11-01T09:00:00Z', amount: 200, kind: 'grant', detail: null }])
   render(<AccountsPanel />)
-  const toggle = await screen.findByRole('checkbox', { name: 'mina@example.com can create sessions' })
-  await userEvent.click(toggle)
+  const field = await screen.findByRole('spinbutton', { name: 'mina@example.com credits to add' })
+  expect(field).toHaveValue(200)
+  await userEvent.click(screen.getByRole('button', { name: 'Add credits to mina@example.com' }))
+  expect(api.grantCredits).toHaveBeenCalledWith(2, 200)
+  expect(await screen.findByText('540')).toBeInTheDocument()
+  const history = await screen.findByRole('list', { name: 'mina@example.com recent charges' })
+  expect(within(history).getByRole('listitem')).toHaveTextContent('Added by you')
+  expect(within(history).getByRole('listitem')).toHaveTextContent('+200')
+})
+
+test('a negative number takes credits back, and zero is refused before it is sent', async () => {
+  vi.mocked(api.grantCredits).mockResolvedValue({ ...MINA, credits: 240 })
+  render(<AccountsPanel />)
+  const field = await screen.findByRole('spinbutton', { name: 'mina@example.com credits to add' })
+  await userEvent.clear(field)
+  await userEvent.type(field, '0')
+  await userEvent.click(screen.getByRole('button', { name: 'Add credits to mina@example.com' }))
+  expect(api.grantCredits).not.toHaveBeenCalled()
+  expect(screen.getByRole('alert')).toHaveTextContent('Enter a number other than 0.')
+  await userEvent.clear(field)
+  await userEvent.type(field, '-100')
+  await userEvent.click(screen.getByRole('button', { name: 'Add credits to mina@example.com' }))
+  expect(api.grantCredits).toHaveBeenCalledWith(2, -100)
+  expect(await screen.findByText('240')).toBeInTheDocument()
+  expect(screen.queryByRole('alert')).not.toBeInTheDocument()
+})
+
+test('an empty field or a fraction is refused the same way', async () => {
+  render(<AccountsPanel />)
+  const field = await screen.findByRole('spinbutton', { name: 'mina@example.com credits to add' })
+  await userEvent.clear(field)
+  await userEvent.click(screen.getByRole('button', { name: 'Add credits to mina@example.com' }))
+  await userEvent.type(field, '1.5')
+  await userEvent.click(screen.getByRole('button', { name: 'Add credits to mina@example.com' }))
+  expect(api.grantCredits).not.toHaveBeenCalled()
+  expect(screen.getByRole('alert')).toHaveTextContent('Enter a number other than 0.')
+})
+
+test('Enter in the field adds, and does not save the settings the panel sits in', async () => {
+  vi.mocked(api.grantCredits).mockResolvedValue({ ...MINA, credits: 540 })
+  const saveSettings = vi.fn((e: React.FormEvent) => e.preventDefault())
+  render(
+    <form onSubmit={saveSettings}>
+      <AccountsPanel />
+    </form>,
+  )
+  const field = await screen.findByRole('spinbutton', { name: 'mina@example.com credits to add' })
+  await userEvent.type(field, '{Enter}')
+  expect(api.grantCredits).toHaveBeenCalledWith(2, 200)
+  expect(await screen.findByText('540')).toBeInTheDocument()
+  expect(saveSettings).not.toHaveBeenCalled()
+})
+
+test('a second press while the first is on its way adds nothing more', async () => {
+  let saved: (account: Account) => void = () => undefined
+  vi.mocked(api.grantCredits).mockReturnValue(new Promise((resolve) => (saved = resolve)))
+  render(<AccountsPanel />)
+  await screen.findByText('340')
+  const add = screen.getByRole('button', { name: 'Add credits to mina@example.com' })
+  await userEvent.click(add)
+  await userEvent.click(add)
+  expect(api.grantCredits).toHaveBeenCalledTimes(1)
+  saved({ ...MINA, credits: 540 })
+  expect(await screen.findByText('540')).toBeInTheDocument()
+  expect(add).toBeEnabled()
+})
+
+test('a failed grant says why and leaves the balance', async () => {
+  vi.mocked(api.grantCredits).mockRejectedValue(new Error('offline'))
+  render(<AccountsPanel />)
+  await screen.findByText('340')
+  await userEvent.click(screen.getByRole('button', { name: 'Add credits to mina@example.com' }))
   expect(await screen.findByRole('alert')).toHaveTextContent('offline')
-  expect(toggle).not.toBeChecked()
+  expect(screen.getByText('340')).toBeInTheDocument()
 })
 
 test('a list that will not load says why', async () => {
