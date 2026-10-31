@@ -76,6 +76,7 @@ def field_of(spec: Spec, settings: Settings, menus: ModelMenus) -> SettingField:
         shown_when=spec.shown_when,
         used_when=spec.used_when,
         help=spec.help,
+        use=spec.use,
     )
 
 

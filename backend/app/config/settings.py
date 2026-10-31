@@ -72,7 +72,8 @@ class Spec:
     number: tuple[float, float] | None = None  # strict: must parse as a number inside [lo, hi]
     shown_when: tuple[str, str] | None = None  # (key, value): the field only matters then
     used_when: tuple[str, str] | None = None  # (key, value): a key the app only calls then; shown, marked idle otherwise
-    help: str = ""  # one or two sentences for the modal's info tooltip
+    help: str = ""  # one or two sentences for the modal's info tooltip, or under `use` where a model has an effort
+    use: str = ""  # what a model with an effort is for, in words: its row's title in the modal
 
 
 SPECS: tuple[Spec, ...] = (
@@ -94,22 +95,22 @@ SPECS: tuple[Spec, ...] = (
          help="The region of your Azure Speech resource. It must match the key."),
     Spec("ASSESS_WORD_SCORE", "assess", "60", number=(0, 100),
          help="Azure gives every word an accuracy score from 0 to 100. Words below this number get a pronunciation note. Higher is stricter."),
-    Spec("CLAUDE_MODEL", "claude", "opus", catalog="claude",
+    Spec("CLAUDE_MODEL", "claude", "opus", catalog="claude", use="Writing sessions",
          help="Writes each session: expressions, article, words and picture scenes. Sonnet is faster, Opus writes better."),
     Spec("CLAUDE_EFFORT", "claude", "xhigh", effort_of="CLAUDE_MODEL",
-         help="How much the session model thinks before it writes. Higher is better and slower."),
-    Spec("TOPICS_MODEL", "claude", "sonnet", catalog="claude",
+         help="More thinking writes better and takes longer."),
+    Spec("TOPICS_MODEL", "claude", "sonnet", catalog="claude", use="News topics",
          help="Turns the headlines of the news feeds into topics, a stock at a time."),
     Spec("TOPICS_EFFORT", "claude", "medium", effort_of="TOPICS_MODEL",
-         help="How much the topics model thinks."),
-    Spec("EXAMPLE_MODEL", "claude", "opus", catalog="claude",
+         help="On Sonnet, medium takes about 12 seconds and high a minute or more."),
+    Spec("EXAMPLE_MODEL", "claude", "opus", catalog="claude", use="Practice feedback",
          help="Writes the Practice feedback, and new picture scenes on redraw."),
     Spec("EXAMPLE_EFFORT", "claude", "low", effort_of="EXAMPLE_MODEL",
-         help="How much the feedback model thinks. Low keeps feedback quick."),
-    Spec("SUMMARY_MODEL", "claude", "opus", catalog="claude",
+         help="Low keeps feedback quick."),
+    Spec("SUMMARY_MODEL", "claude", "opus", catalog="claude", use="Summary judging",
          help="Judges a spoken summary and writes its model answer. It has to come back fast."),
     Spec("SUMMARY_EFFORT", "claude", "medium", effort_of="SUMMARY_MODEL",
-         help="How much the summary judge thinks. Medium keeps it quick; low gets shallow."),
+         help="Medium keeps it quick; low gets shallow."),
     Spec("IMAGE_PROVIDER", "images", "openrouter", choices=IMAGE_PROVIDERS,
          help="Who draws the vocabulary pictures. OpenRouter draws them all at once; off skips pictures."),
     Spec("IMAGE_MODEL", "images", IMAGE_DEFAULT_MODEL, catalog="openrouter_images", inline=True, shown_when=("IMAGE_PROVIDER", "openrouter"),

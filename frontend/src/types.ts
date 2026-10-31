@@ -234,6 +234,8 @@ export interface SettingField {
   testable: boolean
   /** An effort level: the menu is what the model in that field takes. */
   effort_of: string | null
+  /** What a model with an effort is for, in words: the title of the row they share. */
+  use: string
   /** [key, value]: the field only shows while that setting holds that value. */
   shown_when: [string, string] | null
   /** [key, value]: a key the app only calls while that setting holds that value. */

@@ -23,6 +23,7 @@ function field(partial: Partial<SettingField> & Pick<SettingField, 'key' | 'grou
     shown_when: null,
     used_when: null,
     help: '',
+    use: '',
     ...partial,
   }
 }
@@ -61,9 +62,11 @@ const FIELDS: SettingField[] = [
     default: 'opus',
     free: true,
     catalog: 'claude',
+    use: 'Writing sessions',
+    help: 'Writes each session.',
     options: [opt('opus', 'Most capable', 'Opus 5.5', ['low', 'max']), opt('sonnet', 'Efficient', 'Sonnet 5', ['low', 'high']), opt('haiku', 'Fastest', 'Haiku 4.5', [])],
   }),
-  field({ key: 'CLAUDE_EFFORT', group: 'claude', value: 'high', default: 'xhigh', effort_of: 'CLAUDE_MODEL' }),
+  field({ key: 'CLAUDE_EFFORT', group: 'claude', value: 'high', default: 'xhigh', effort_of: 'CLAUDE_MODEL', help: 'Higher is slower.' }),
   field({ key: 'IMAGE_PROVIDER', group: 'images', value: 'openrouter', default: 'openrouter', options: [opt('openrouter'), opt('off')] }),
   field({
     key: 'IMAGE_MODEL',
@@ -131,10 +134,10 @@ describe('SettingsModal', () => {
     expect(key.type).toBe('password')
     expect(key.value).toBe('')
     expect(key.placeholder).toBe('Saved: …1234. Type to replace.')
-    expect(screen.queryByLabelText('CLAUDE_MODEL')).not.toBeInTheDocument()
+    expect(screen.queryByRole('combobox', { name: 'Writing sessions Model' })).not.toBeInTheDocument()
 
     await showTab('Claude generation')
-    expect(screen.getByRole('combobox', { name: 'CLAUDE_MODEL' })).toHaveValue('sonnet')
+    expect(screen.getByRole('combobox', { name: 'Writing sessions Model' })).toHaveValue('sonnet')
   })
 
   it('offers the Gemini voices, the thinking level, and the live models', async () => {
@@ -237,10 +240,21 @@ describe('SettingsModal help', () => {
 })
 
 describe('SettingsModal models', () => {
+  it('shows a Claude model as one row: what it is for, the model, and how hard it thinks', async () => {
+    await open()
+    await showTab('Claude generation')
+    const row = screen.getByRole('group', { name: 'Writing sessions' })
+    expect(within(row).getByText('Writes each session. Higher is slower.')).toBeInTheDocument()
+    expect(within(row).getByRole('combobox', { name: 'Writing sessions Model' })).toHaveValue('sonnet')
+    expect(within(row).getByRole('button', { name: /Writing sessions Thinking$/ })).toHaveTextContent('high')
+    expect(screen.queryByText('CLAUDE_MODEL')).not.toBeInTheDocument()
+    expect(screen.queryByText('CLAUDE_EFFORT')).not.toBeInTheDocument()
+  })
+
   it('lists every model on open even while one is set, and offers the effort levels that model takes', async () => {
     await open()
     await showTab('Claude generation')
-    const model = screen.getByRole('combobox', { name: 'CLAUDE_MODEL' })
+    const model = screen.getByRole('combobox', { name: 'Writing sessions Model' })
     await userEvent.click(model)
     expect((await screen.findAllByRole('option')).map((o) => o.textContent)).toEqual([
       'Opus 5.5opusMost capable',
@@ -249,15 +263,16 @@ describe('SettingsModal models', () => {
     ])
     await userEvent.click(screen.getByRole('option', { name: /^Haiku/ }))
     expect(model).toHaveValue('haiku')
-    const effort = screen.getByRole('button', { name: /CLAUDE_EFFORT$/ })
+    const effort = screen.getByRole('button', { name: /Writing sessions Thinking$/ })
     expect(effort).toBeDisabled()
-    expect(effort).toHaveTextContent('Haiku 4.5 takes no effort level')
+    expect(effort).toHaveTextContent('None')
+    expect(within(screen.getByRole('group', { name: 'Writing sessions' })).getByText('Haiku 4.5 takes no effort level')).toBeInTheDocument()
   })
 
   it('keeps a typed model id nobody lists', async () => {
     await open()
     await showTab('Claude generation')
-    const model = screen.getByRole('combobox', { name: 'CLAUDE_MODEL' })
+    const model = screen.getByRole('combobox', { name: 'Writing sessions Model' })
     await userEvent.clear(model)
     await userEvent.type(model, 'claude-next')
     expect(await screen.findByText(/No listed model matches/)).toBeInTheDocument()
@@ -276,7 +291,7 @@ describe('SettingsModal models', () => {
     await open()
     await showTab('Claude generation')
     await userEvent.click(screen.getByRole('button', { name: 'Refresh model lists' }))
-    await userEvent.click(screen.getByRole('combobox', { name: 'CLAUDE_MODEL' }))
+    await userEvent.click(screen.getByRole('combobox', { name: 'Writing sessions Model' }))
     expect((await screen.findAllByRole('option')).map((o) => o.textContent)).toEqual(['Fable 5.1claude-fable-5-1'])
   })
 })
@@ -297,7 +312,7 @@ describe('SettingsModal pins', () => {
     expect(api.pinModel).toHaveBeenCalledWith('claude', 'sonnet', true)
     expect(await screen.findByRole('button', { name: 'Unpin sonnet' })).toHaveAttribute('aria-pressed', 'true')
 
-    await userEvent.click(screen.getByRole('combobox', { name: 'CLAUDE_MODEL' }))
+    await userEvent.click(screen.getByRole('combobox', { name: 'Writing sessions Model' }))
     expect(await screen.findByText('Pinned')).toBeInTheDocument()
     const rows = await screen.findAllByRole('option')
     expect(rows.map((o) => within(o).queryByRole('img', { name: 'Pinned' }) !== null)).toEqual([true, false, false])

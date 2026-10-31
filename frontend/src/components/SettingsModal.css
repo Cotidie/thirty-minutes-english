@@ -164,6 +164,59 @@
   border-bottom: 0;
 }
 
+/* A model and how hard it thinks, under what they are for. They wrap only where one line cannot hold them. */
+.settings-use-title {
+  margin: 0;
+  font-size: 1rem;
+  font-weight: 600;
+}
+
+.settings-use-what {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.88rem;
+  line-height: 1.4;
+}
+
+/* Without this the track grows to fit the input's default width and pushes the panel sideways on a phone. */
+.settings-use {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.settings-use-controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem 1.1rem;
+  margin-top: 0.2rem;
+}
+
+.settings-use-model,
+.settings-use-effort {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  min-width: 0;
+}
+
+.settings-use-model {
+  flex: 1 1 13rem;
+}
+
+.settings-use-effort {
+  flex: 0 0 auto;
+}
+
+.settings-use-effort .choice {
+  flex: none;
+  width: 7.5rem;
+}
+
+.settings-use-label {
+  color: var(--muted);
+  font-size: 0.85rem;
+}
+
 .settings-row-head {
   display: flex;
   align-items: baseline;

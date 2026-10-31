@@ -195,6 +195,7 @@ class SettingField(BaseModel):
     shown_when: tuple[str, str] | None = None  # (key, value): hidden otherwise
     used_when: tuple[str, str] | None = None  # (key, value): the key sits idle otherwise
     help: str = ""  # what the setting does, for the info tooltip
+    use: str = ""  # what a model with an effort is for: its row's title
 
 
 class SettingGroup(BaseModel):

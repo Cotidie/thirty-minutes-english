@@ -320,19 +320,33 @@ export function SettingsModal({ open, onClose }: Props) {
                   )}
                 </div>
                 {tab === ACCOUNTS_TAB && <AccountsPanel />}
-                {inGroup(tab).map((f) => (
-                  <Row
-                    key={f.key}
-                    field={f}
-                    value={draft[f.key] ?? ''}
-                    menu={menuFor(f, draft, byKey)}
-                    idle={!!f.used_when && draft[f.used_when[0]] !== f.used_when[1]}
-                    test={keyTests[f.key]}
-                    onChange={(v) => edit(f.key, v)}
-                    onPin={(catalog, model, pinned) => void pin(catalog, model, pinned)}
-                    onTest={() => void testKey(f.key)}
-                  />
-                ))}
+                {inGroup(tab).map((f) => {
+                  if (f.effort_of) return null // on its model's row
+                  const effort = inGroup(tab).find((e) => e.effort_of === f.key)
+                  return effort ? (
+                    <ModelRow
+                      key={f.key}
+                      model={f}
+                      effort={effort}
+                      draft={draft}
+                      menuOf={(field) => menuFor(field, draft, byKey)}
+                      onChange={edit}
+                      onPin={(catalog, model, pinned) => void pin(catalog, model, pinned)}
+                    />
+                  ) : (
+                    <Row
+                      key={f.key}
+                      field={f}
+                      value={draft[f.key] ?? ''}
+                      menu={menuFor(f, draft, byKey)}
+                      idle={!!f.used_when && draft[f.used_when[0]] !== f.used_when[1]}
+                      test={keyTests[f.key]}
+                      onChange={(v) => edit(f.key, v)}
+                      onPin={(catalog, model, pinned) => void pin(catalog, model, pinned)}
+                      onTest={() => void testKey(f.key)}
+                    />
+                  )
+                })}
               </section>
             </div>
           )}
@@ -421,6 +435,61 @@ function Row({ field, value, menu, idle, test, onChange, onTest, onPin }: RowPro
   )
 }
 
+interface ModelRowProps {
+  model: SettingField
+  effort: SettingField
+  draft: Record<string, string>
+  menuOf: (field: SettingField) => Menu
+  onChange: (key: string, value: string) => void
+  onPin: (catalog: string, model: string, pinned: boolean) => void
+}
+
+/** One use of a model, in words, with the model and how hard it thinks on one line. */
+function ModelRow({ model, effort, draft, menuOf, onChange, onPin }: ModelRowProps) {
+  const id = `setting-${model.key}`
+  const effortId = `setting-${effort.key}`
+  const effortMenu = menuOf(effort)
+  return (
+    <div className="settings-row settings-use" role="group" aria-labelledby={`${id}-use`}>
+      <h4 id={`${id}-use`} className="settings-use-title" title={`${model.key}, ${effort.key}`}>
+        {model.use}
+      </h4>
+      <p className="settings-use-what">{`${model.help} ${effort.help}`}</p>
+      <div className="settings-use-controls">
+        <div className="settings-use-model">
+          <span id={`${id}-label`} className="settings-use-label">
+            Model
+          </span>
+          <Control
+            id={id}
+            labelledBy={`${id}-use ${id}-label`}
+            field={model}
+            value={draft[model.key] ?? ''}
+            menu={menuOf(model)}
+            onChange={(v) => onChange(model.key, v)}
+            onPin={onPin}
+          />
+        </div>
+        <div className="settings-use-effort">
+          <span id={`${effortId}-label`} className="settings-use-label">
+            Thinking
+          </span>
+          <Control
+            id={effortId}
+            labelledBy={`${id}-use ${effortId}-label`}
+            field={effort}
+            value={draft[effort.key] ?? ''}
+            menu={effortMenu.off ? { ...effortMenu, off: 'None' } : effortMenu}
+            onChange={(v) => onChange(effort.key, v)}
+            onPin={onPin}
+          />
+        </div>
+      </div>
+      {effortMenu.off && <p className="settings-use-what">{effortMenu.off}</p>}
+    </div>
+  )
+}
+
 /** An ⓘ that shows what the setting does on hover or keyboard focus. */
 function InfoTip({ id, name, text }: { id: string; name: string; text: string }) {
   return (
@@ -462,6 +531,8 @@ function KeyStatus({ test, idle, testable }: { test: KeyTestState | undefined; i
 
 interface ControlProps {
   id: string
+  /** What names the control, when it is more than the field's own label. */
+  labelledBy?: string
   field: SettingField
   value: string
   menu: Menu
@@ -469,8 +540,7 @@ interface ControlProps {
   onPin: (catalog: string, model: string, pinned: boolean) => void
 }
 
-function Control({ id, field, value, menu, onChange, onPin }: ControlProps) {
-  const labelledBy = `${id}-label`
+function Control({ id, labelledBy = `${id}-label`, field, value, menu, onChange, onPin }: ControlProps) {
   if (field.inline && menu.catalog)
     return (
       <ModelList
