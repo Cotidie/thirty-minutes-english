@@ -336,6 +336,27 @@ def test_a_cancel_while_the_pictures_are_drawn_keeps_the_session_and_is_not_lost
     assert job.status == "cancelled" and job.session_id is not None and lost == []
 
 
+def test_a_job_that_dies_after_its_session_is_saved_is_failed_but_not_lost(tmp_path):
+    db = Database(tmp_path / "s.db")
+    seed_expressions(db, EXPRESSION_COUNT)
+    lost = []
+
+    class DiesWhileDrawing:
+        def expected_seconds(self, count):
+            return None
+
+        def count(self, words, scenes):
+            return 1
+
+        def illustrate(self, job_id, words, on_done, on_picture, scenes, on_figure):
+            raise OSError("No space left on device")
+
+    job = runner_over(db).start("Trams", Recording(), DiesWhileDrawing(), on_lost=lost.append)
+    assert job.status == "failed" and "No space left" in job.error
+    assert job.session_id is not None and db.sessions.get(job.session_id) is not None
+    assert lost == []
+
+
 def test_a_refund_that_fails_does_not_take_the_job_down(tmp_path):
     db = Database(tmp_path / "s.db")
 

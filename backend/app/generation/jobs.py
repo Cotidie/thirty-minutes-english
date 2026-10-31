@@ -135,7 +135,7 @@ class JobRunner:
         on_lost: Callable[[Job], None] | None = None,
     ) -> Job:
         """Generates in the background; the pictures follow when an illustrator is given.
-        `on_lost` is told once if the job ends with nothing to show: failed, or cancelled before its session was saved."""
+        `on_lost` is told once if the job fails or is cancelled before its session is saved: there is nothing to show."""
         job = Job(id=uuid.uuid4().hex[:12], topic=topic, created_by=created_by)
         self._foresee_pictures(job, illustrator, 2 * VOCABULARY_COUNT)  # the example and the scene
         with self._lock:
@@ -183,7 +183,7 @@ class JobRunner:
 
     def _run(self, job: Job, generator: Generator, illustrator: Illustrator | None, on_lost: Callable[[Job], None] | None) -> None:
         self._generate(job, generator, illustrator)
-        if on_lost and (job.status == "failed" or (job.status == "cancelled" and job.session_id is None)):
+        if on_lost and job.session_id is None and job.status in ("failed", "cancelled"):
             try:
                 on_lost(job)
             except Exception:
