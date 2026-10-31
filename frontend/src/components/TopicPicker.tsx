@@ -11,11 +11,15 @@ interface Props {
   /** Why the news half is missing, when the last fetch failed. */
   error?: string | null
   busy: boolean
+  /** What a session costs this account; nothing is shown when it costs nothing. */
+  price: number
+  /** Why this account cannot pay for a session, when it cannot. */
+  short: string | null
   onGenerate: (topic: string | null) => void
   onRefresh: () => void
 }
 
-export function TopicPicker({ suggestions, labels, pending, error, busy, onGenerate, onRefresh }: Props) {
+export function TopicPicker({ suggestions, labels, pending, error, busy, price, short, onGenerate, onRefresh }: Props) {
   const [topic, setTopic] = useState('')
   // The server decides how many the day offers, and in what order.
   const shown = suggestions
@@ -59,10 +63,20 @@ export function TopicPicker({ suggestions, labels, pending, error, busy, onGener
           disabled={busy}
           autoComplete="off"
         />
-        <button type="submit" className="btn btn-primary" disabled={busy}>
+        <button type="submit" className="btn btn-primary" disabled={busy || short !== null} title={short ?? undefined}>
           {busy ? 'Writing…' : 'Generate session'}
+          {!busy && price > 0 && (
+            <span className="btn-price" aria-hidden="true">
+              {price}
+            </span>
+          )}
         </button>
       </div>
+      {short && (
+        <p className="topic-short" role="status">
+          {short}
+        </p>
+      )}
       {shown.length > 0 && (
         <>
           <ul className="chips" aria-label="Suggested topics">

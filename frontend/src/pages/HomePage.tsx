@@ -2,14 +2,11 @@ import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { api } from '../api'
 import { SessionCreator } from '../components/SessionCreator'
-import { useAuth } from '../lib/auth'
 import { useAccountResource } from '../lib/sessionChanges'
 import type { SessionSummary } from '../types'
 import './HomePage.css'
 
 export function HomePage() {
-  const { me } = useAuth()
-  const canCreate = Boolean(me && (me.is_admin || me.can_create))
   const [sessions, setSessions] = useState<SessionSummary[]>([])
   const [loadError, setLoadError] = useState<string | null>(null)
 
@@ -38,17 +35,13 @@ export function HomePage() {
         </p>
       </header>
 
-      {canCreate ? (
-        <SessionCreator />
-      ) : (
-        <p className="home-locked">Session creation isn't on for this account yet. Ask the admin to turn it on.</p>
-      )}
+      <SessionCreator />
       {loadError && <p className="error">Could not load past sessions: {loadError}</p>}
 
       <section className="history">
         <h2 className="history-title">Past sessions</h2>
         {sessions.length === 0 ? (
-          <p className="empty">{canCreate ? 'Nothing yet. Generate the first session above.' : 'Nothing here yet. Sessions shared with you appear here.'}</p>
+          <p className="empty">Nothing yet. Sessions you make, and ones shared with you, appear here.</p>
         ) : (
           <ul className="history-list">
             {sessions.map((s) => (

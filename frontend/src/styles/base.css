@@ -74,6 +74,14 @@ a {
   opacity: 0.55;
 }
 
+/* What pressing the button costs in credits. */
+.btn-price {
+  margin-left: 0.5rem;
+  font-weight: 500;
+  opacity: 0.75;
+  font-variant-numeric: tabular-nums;
+}
+
 .btn-primary {
   background: var(--ink);
   color: var(--paper);
