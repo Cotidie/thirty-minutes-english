@@ -10,8 +10,8 @@ function presenceUrl(sessionId: number): string {
 }
 
 /**
- * The only place that opens this socket. Nothing is kept for while it is down: a cursor from then is out of date, and
- * every connection starts from the server's welcome. Returns how to close it.
+ * The only place that opens this socket. Nothing is queued while it is down: a cursor from then is out of date, and at
+ * every welcome the store says again where this screen stands. Returns how to close it.
  */
 export function connectPresence(sessionId: number, store: PresenceStore): () => void {
   const socket = new ReconnectingWebSocket(presenceUrl(sessionId), undefined, { maxEnqueuedMessages: 0 })

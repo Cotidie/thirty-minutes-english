@@ -126,6 +126,27 @@ test('a welcome says the tab again', () => {
   expect(sent).toEqual([{ type: 'tab', tab: 2 }])
 })
 
+test('a welcome says where my mouse stands, after the tab', () => {
+  const { store, sent } = joined('a')
+  store.setTab(2)
+  store.sendCursor(2, { anchor: 'brief', x: 0.2, y: 0.3 })
+  sent.length = 0
+  store.receive({ ...WELCOME, you: { id: 'a2', color: 0 } })
+  expect(sent).toEqual([
+    { type: 'tab', tab: 2 },
+    { type: 'cursor', tab: 2, anchor: 'brief', x: 0.2, y: 0.3 },
+  ])
+})
+
+test('a welcome says nothing of a cursor that has gone', () => {
+  const { store, sent } = joined('a')
+  store.sendCursor(2, { anchor: 'brief', x: 0.2, y: 0.3 })
+  store.sendCursor(2, null)
+  sent.length = 0
+  store.receive({ ...WELCOME, you: { id: 'a2', color: 0 } })
+  expect(sent).toEqual([])
+})
+
 test('a restarted server gets a running timer back, but not an untouched one', () => {
   const { store, sent } = joined('a')
   store.receive({ ...WELCOME, you: { id: 'a2', color: 0 } })

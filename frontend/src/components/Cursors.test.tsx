@@ -271,6 +271,35 @@ describe('Cursors, what is sent', () => {
     expect(cursorsSent(socket).at(-1)).toMatchObject({ type: 'cursor', tab: 2, anchor: 'word:2' })
   })
 
+  it('says where a still mouse is when the connection comes back, as it stood when it last moved', () => {
+    const { socket } = sending()
+    move('mouse')
+    act(() => socket.drop())
+    act(() => vi.advanceTimersByTime(60))
+    move('mouse', 500)
+    socket.sent = []
+    act(() => {
+      socket.connect()
+      socket.receive(WITH_B)
+    })
+    expect(cursorsSent(socket)).toEqual([{ type: 'cursor', tab: 0, anchor: 'word:2', x: 1, y: 0.5 }])
+  })
+
+  it('says nothing when the connection comes back and the mouse has left the page meanwhile', () => {
+    const { socket } = sending()
+    move('mouse')
+    act(() => socket.drop())
+    act(() => {
+      document.documentElement.dispatchEvent(new Event('pointerleave'))
+    })
+    socket.sent = []
+    act(() => {
+      socket.connect()
+      socket.receive(WITH_B)
+    })
+    expect(cursorsSent(socket)).toEqual([])
+  })
+
   it('sends nothing on a new tab when the mouse has not been on the page', () => {
     const { socket, rerender } = sending()
     rerender(

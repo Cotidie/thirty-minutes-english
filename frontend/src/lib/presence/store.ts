@@ -61,6 +61,7 @@ export class PresenceStore {
   private everyone: readonly Person[] = []
   private readonly cursors = new Map<string, CursorAt>()
   private tab: number | null = null
+  private myCursor: CursorAt | null = null
   private timerValue: TimerValue | null = null
   private lastSeq = 0
   /** The write of mine still on its way back, per key. */
@@ -130,6 +131,7 @@ export class PresenceStore {
   }
 
   sendCursor(tab: number, place: CursorPlace | null) {
+    this.myCursor = place && { tab, ...place }
     this.send?.({ type: 'cursor', tab, ...(place ?? { anchor: null }) })
   }
 
@@ -189,6 +191,7 @@ export class PresenceStore {
     this.everyone = welcome.people
     this.cursorIds().forEach((id) => this.placeCursor(id, null))
     if (this.tab !== null) this.send?.({ type: 'tab', tab: this.tab })
+    if (this.myCursor !== null) this.send?.({ type: 'cursor', ...this.myCursor })
     if (welcome.timer !== null) {
       this.timerValue = { ...welcome.timer, at: Date.now() }
     } else if (this.timerValue !== null && timerElapsed(this.timerValue) > 0) {
