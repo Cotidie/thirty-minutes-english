@@ -299,25 +299,30 @@ describe('SettingsModal models', () => {
 })
 
 describe('SettingsModal pins', () => {
-  it('pins the chosen model so it leads the menu', async () => {
+  it('pins the chosen voice model so it leads the menu', async () => {
     vi.mocked(api.pinModel).mockResolvedValueOnce({
       groups: GROUPS,
       fields: FIELDS.map((f) =>
-        f.key === 'CLAUDE_MODEL'
-          ? { ...f, options: [{ ...f.options[1], pinned: true }, f.options[0], f.options[2]] }
-          : f,
+        f.key === 'VOICE_MODEL' ? { ...f, options: [{ ...f.options[0], pinned: true }, f.options[1]] } : f,
       ),
     })
     await open()
-    await showTab('Claude generation')
-    await userEvent.click(screen.getByRole('button', { name: 'Pin sonnet' }))
-    expect(api.pinModel).toHaveBeenCalledWith('claude', 'sonnet', true)
-    expect(await screen.findByRole('button', { name: 'Unpin sonnet' })).toHaveAttribute('aria-pressed', 'true')
+    await showTab('Voice coach')
+    await userEvent.click(screen.getByRole('button', { name: 'Pin gemini-3.8-live-extended-thinking' }))
+    expect(api.pinModel).toHaveBeenCalledWith('gemini_live', 'gemini-3.8-live-extended-thinking', true)
+    expect(await screen.findByRole('button', { name: 'Unpin gemini-3.8-live-extended-thinking' })).toHaveAttribute('aria-pressed', 'true')
 
-    await userEvent.click(screen.getByRole('combobox', { name: 'Writing sessions Model' }))
+    await userEvent.click(screen.getByRole('combobox', { name: 'VOICE_MODEL' }))
     expect(await screen.findByText('Pinned')).toBeInTheDocument()
     const rows = await screen.findAllByRole('option')
-    expect(rows.map((o) => within(o).queryByRole('img', { name: 'Pinned' }) !== null)).toEqual([true, false, false])
+    expect(rows.map((o) => within(o).queryByRole('img', { name: 'Pinned' }) !== null)).toEqual([true, false])
+  })
+
+  it('offers no pin for the Claude models, which are only a few names', async () => {
+    await open()
+    await showTab('Claude generation')
+    expect(screen.getByRole('combobox', { name: 'Writing sessions Model' })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /^(Pin|Unpin) / })).not.toBeInTheDocument()
   })
 })
 

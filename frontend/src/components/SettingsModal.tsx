@@ -331,7 +331,6 @@ export function SettingsModal({ open, onClose }: Props) {
                       draft={draft}
                       menuOf={(field) => menuFor(field, draft, byKey)}
                       onChange={edit}
-                      onPin={(catalog, model, pinned) => void pin(catalog, model, pinned)}
                     />
                   ) : (
                     <Row
@@ -441,11 +440,10 @@ interface ModelRowProps {
   draft: Record<string, string>
   menuOf: (field: SettingField) => Menu
   onChange: (key: string, value: string) => void
-  onPin: (catalog: string, model: string, pinned: boolean) => void
 }
 
-/** One use of a model, in words, with the model and how hard it thinks on one line. */
-function ModelRow({ model, effort, draft, menuOf, onChange, onPin }: ModelRowProps) {
+/** One use of a model, in words, with the model and how hard it thinks on one line. No pin: the list is only a few names. */
+function ModelRow({ model, effort, draft, menuOf, onChange }: ModelRowProps) {
   const id = `setting-${model.key}`
   const effortId = `setting-${effort.key}`
   const effortMenu = menuOf(effort)
@@ -467,7 +465,6 @@ function ModelRow({ model, effort, draft, menuOf, onChange, onPin }: ModelRowPro
             value={draft[model.key] ?? ''}
             menu={menuOf(model)}
             onChange={(v) => onChange(model.key, v)}
-            onPin={onPin}
           />
         </div>
         <div className="settings-use-effort">
@@ -481,7 +478,6 @@ function ModelRow({ model, effort, draft, menuOf, onChange, onPin }: ModelRowPro
             value={draft[effort.key] ?? ''}
             menu={effortMenu.off ? { ...effortMenu, off: 'None' } : effortMenu}
             onChange={(v) => onChange(effort.key, v)}
-            onPin={onPin}
           />
         </div>
       </div>
@@ -537,7 +533,8 @@ interface ControlProps {
   value: string
   menu: Menu
   onChange: (value: string) => void
-  onPin: (catalog: string, model: string, pinned: boolean) => void
+  /** Leave it out for a menu with no pin button. */
+  onPin?: (catalog: string, model: string, pinned: boolean) => void
 }
 
 function Control({ id, labelledBy = `${id}-label`, field, value, menu, onChange, onPin }: ControlProps) {
@@ -550,7 +547,7 @@ function Control({ id, labelledBy = `${id}-label`, field, value, menu, onChange,
         value={value}
         default={menu.placeholder}
         onChange={onChange}
-        onPin={(model, pinned) => onPin(menu.catalog!, model, pinned)}
+        onPin={(model, pinned) => onPin?.(menu.catalog!, model, pinned)}
       />
     )
   if (field.free)
@@ -561,7 +558,7 @@ function Control({ id, labelledBy = `${id}-label`, field, value, menu, onChange,
         value={value}
         placeholder={menu.placeholder}
         onChange={onChange}
-        onPin={menu.catalog ? (model, pinned) => onPin(menu.catalog!, model, pinned) : undefined}
+        onPin={menu.catalog && onPin ? (model, pinned) => onPin(menu.catalog!, model, pinned) : undefined}
       />
     )
   if (menu.off || menu.options.length > 0 || field.effort_of)
