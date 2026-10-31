@@ -1,14 +1,21 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { api } from '../api'
 import { useChunks } from '../lib/useChunks'
+import { useGenerationJob } from '../lib/useGenerationJob'
 import type { TopicEntry, TopicLibrary } from '../types'
 import { ConfirmDelete } from './ConfirmDelete'
+import { GenerationProgress } from './GenerationProgress'
 import { SessionLinks } from './SessionLinks'
 
 type Used = 'all' | 'used' | 'unused'
 
-/** Every topic, newest first: the curated pool, each day's news, and the ones typed in for a session. */
+/** Every topic, newest first: the curated pool, each day's news, and the ones typed in for a session. Any of them can
+ * become a session from here; this page is the admin's, and the admin may always create one. */
 export function TopicsPanel() {
+  const navigate = useNavigate()
+  const open = useCallback((sessionId: number) => navigate(`/s/${sessionId}`), [navigate])
+  const { job, running: busy, error: jobError, start: generate, close } = useGenerationJob(open)
   const [library, setLibrary] = useState<TopicLibrary | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [query, setQuery] = useState('')
@@ -63,27 +70,52 @@ export function TopicsPanel() {
       {library && <p className="db-count">{`${found.length} of ${library.topics.length}`}</p>}
       <ol className="db-list">
         {shown.map((t) => (
-          <TopicItem key={t.id} topic={t} label={library?.labels[t.category] ?? t.category} onDelete={() => remove(t.id)} />
+          <TopicItem
+            key={t.id}
+            topic={t}
+            label={library?.labels[t.category] ?? t.category}
+            busy={busy}
+            onCreate={() => void generate(t.text)}
+            onDelete={() => remove(t.id)}
+          />
         ))}
       </ol>
       {more && <div ref={sentinel} className="db-more" aria-hidden="true" />}
+      {(job || jobError) && (
+        <div className="db-job">
+          {job && <GenerationProgress job={job} onClose={close} onOpen={open} />}
+          {jobError && <p className="error">Could not create the session: {jobError}</p>}
+        </div>
+      )}
     </>
   )
 }
 
+interface TopicItemProps {
+  topic: TopicEntry
+  label: string
+  /** A session is being written, and only one is at a time. */
+  busy: boolean
+  onCreate: () => void
+  onDelete: () => Promise<void>
+}
+
 /** A topic a session was written on has no delete: the session needs it. */
-function TopicItem({ topic, label, onDelete }: { topic: TopicEntry; label: string; onDelete: () => Promise<void> }) {
+function TopicItem({ topic, label, busy, onCreate, onDelete }: TopicItemProps) {
   const news = topic.news_days.length > 0 && `In the news on ${topic.news_days.map(formatDay).join(', ')}`
   return (
     <li className="db-item">
       <div className="db-head">
         <h2 className="topic-text">{topic.text}</h2>
+        {topic.sessions.length === 0 && <ConfirmDelete label={topic.text} onDelete={onDelete} />}
+        <button type="button" className="btn-link db-create" aria-label={`Create a session on ${topic.text}`} disabled={busy} onClick={onCreate}>
+          Create session
+        </button>
+      </div>
+      <p className="db-meta topic-meta">
         <span className="topic-category" data-category={topic.category}>
           {label}
         </span>
-        {topic.sessions.length === 0 && <ConfirmDelete label={topic.text} onDelete={onDelete} />}
-      </div>
-      <p className="db-meta">
         {news}
         {news && topic.sessions.length > 0 && ' · '}
         {topic.sessions.length > 0 && (

@@ -4,11 +4,12 @@ import { beforeEach, expect, it, vi } from 'vitest'
 import { api } from '../api'
 import { DatabasePage } from './DatabasePage'
 
-vi.mock('../api', () => ({ api: { corpus: vi.fn(), topicLibrary: vi.fn() } }))
+vi.mock('../api', () => ({ api: { corpus: vi.fn(), topicLibrary: vi.fn(), listJobs: vi.fn() } }))
 
 beforeEach(() => {
   vi.mocked(api.corpus).mockResolvedValue([])
   vi.mocked(api.topicLibrary).mockResolvedValue({ topics: [], labels: {} })
+  vi.mocked(api.listJobs).mockResolvedValue([])
 })
 
 function renderAt(path: string, tab: 'expressions' | 'topics') {

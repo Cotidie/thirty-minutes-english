@@ -107,7 +107,40 @@
   font-size: 0.85rem;
 }
 
+.db-create {
+  color: var(--ink);
+  font-size: 0.85rem;
+}
+
+.db-create:disabled {
+  cursor: default;
+  opacity: 0.55;
+}
+
+/* Over the list, on the screen wherever in it the session was asked for. At the end of the page and stuck to the bottom
+   of the screen: coming up here moves no row from under the mouse. */
+.db-job {
+  position: sticky;
+  bottom: 0.75rem;
+  z-index: 6;
+  margin-top: 1rem;
+  padding: 0.75rem 1rem;
+  border: 1px solid var(--line);
+  border-radius: 0.6rem;
+  background: var(--paper);
+  box-shadow: 0 4px 16px rgb(27 36 49 / 14%);
+}
+
+.db-job .gen {
+  margin-top: 0;
+}
+
+.db-job .error {
+  margin: 0;
+}
+
 .db-confirm {
+  order: 1;
   flex-basis: 100%;
   display: flex;
   flex-wrap: wrap;
@@ -179,12 +212,24 @@
   margin: 0;
 }
 
+/* Starts from no width, so a long topic wraps on its own line and never pushes the buttons to the next. */
 .topic-text {
+  flex: 1 1 0;
+  min-width: 0;
   font-family: var(--serif);
   font-weight: 500;
   font-size: 1.25rem;
   line-height: 1.25;
   margin: 0;
+}
+
+.topic-meta {
+  margin-top: 0.4rem;
+  line-height: 1.8;
+}
+
+.topic-meta .topic-category {
+  margin-right: 0.5rem;
 }
 
 .topic-category {
@@ -194,4 +239,15 @@
   color: var(--cat-ink, var(--muted));
   padding: 0.05rem 0.55rem;
   font-size: 0.8rem;
+}
+
+/* Too narrow to share a line: the topic takes one of its own, and the buttons sit under it on the right. */
+@media (max-width: 640px) {
+  .db-item:has(.topic-text) .db-head {
+    justify-content: flex-end;
+  }
+
+  .topic-text {
+    flex-basis: 100%;
+  }
 }

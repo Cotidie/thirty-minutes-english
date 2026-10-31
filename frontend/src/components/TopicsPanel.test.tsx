@@ -1,11 +1,15 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/react'
-import { MemoryRouter } from 'react-router-dom'
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
+import { MemoryRouter, Route, Routes } from 'react-router-dom'
 import { beforeEach, expect, it, vi } from 'vitest'
 import { api } from '../api'
+import type { JobStatus } from '../lib/progress'
 import type { TopicEntry, TopicLibrary } from '../types'
 import { TopicsPanel } from './TopicsPanel'
 
-vi.mock('../api', () => ({ api: { topicLibrary: vi.fn(), deleteTopic: vi.fn() } }))
+vi.mock('../api', () => ({
+  api: { topicLibrary: vi.fn(), deleteTopic: vi.fn(), listJobs: vi.fn(), startGeneration: vi.fn(), getJob: vi.fn(), cancelJob: vi.fn() },
+}))
 
 const topic = (over: Partial<TopicEntry>): TopicEntry => ({
   id: 1,
@@ -26,17 +30,45 @@ const library: TopicLibrary = {
   labels: { news: 'In the news', cs: 'Computer science', typed: 'Typed in' },
 }
 
+const RUNNING: JobStatus = {
+  id: 'job-1',
+  topic: 'Why databases still run the world',
+  status: 'running',
+  stage: 'searching',
+  searches: 2,
+  activity: 'Searching "silk road trade"',
+  input_tokens: 12300,
+  output_tokens: 850,
+  pictures_done: 0,
+  pictures_total: 0,
+  elapsed_seconds: 42,
+  stage_elapsed_seconds: 5,
+  stage_expected_seconds: 30,
+  expected_seconds: 150,
+  session_id: null,
+  error: null,
+}
+
 beforeEach(() => {
-  vi.mocked(api.topicLibrary).mockResolvedValue(library)
+  vi.mocked(api.topicLibrary).mockReset().mockResolvedValue(library)
+  vi.mocked(api.listJobs).mockReset().mockResolvedValue([])
+  vi.mocked(api.startGeneration).mockReset().mockResolvedValue(RUNNING)
+  vi.mocked(api.getJob).mockReset().mockResolvedValue(RUNNING)
+  vi.mocked(api.cancelJob).mockReset().mockResolvedValue(RUNNING)
 })
 
 function renderPanel() {
   render(
     <MemoryRouter>
-      <TopicsPanel />
+      <Routes>
+        <Route path="/" element={<TopicsPanel />} />
+        <Route path="/s/:id" element={<p>The new session</p>} />
+      </Routes>
     </MemoryRouter>,
   )
 }
+
+const createOn = (text: string) => screen.findByRole('button', { name: `Create a session on ${text}` })
 
 function shown() {
   return screen.getAllByRole('heading', { level: 2 }).map((h) => h.textContent)
@@ -95,4 +127,50 @@ it('deletes a topic after a confirm', async () => {
   await waitFor(() => expect(shown()).toEqual(['why cities are bringing back trams', 'Mass protests sweeping Europe']))
   expect(api.deleteTopic).toHaveBeenCalledWith(1)
   expect(screen.getByText('2 of 2')).toBeInTheDocument()
+})
+
+it('puts the category on the line under the topic, so the title line only has to fit the buttons', async () => {
+  renderPanel()
+  const heading = await screen.findByRole('heading', { name: 'Why databases still run the world' })
+  const row = heading.closest('li') as HTMLElement
+  expect(within(row).getByText('Computer science').closest('p')).toHaveClass('db-meta')
+})
+
+it('starts a session on a topic from its row, and opens it once it is saved', async () => {
+  vi.mocked(api.getJob).mockResolvedValue({ ...RUNNING, session_id: 42 })
+  renderPanel()
+  await userEvent.click(await createOn('Why databases still run the world'))
+  expect(api.startGeneration).toHaveBeenCalledWith('Why databases still run the world')
+  expect(await screen.findByRole('progressbar', { name: 'Generation progress' })).toBeInTheDocument()
+  expect(await screen.findByText('The new session', {}, { timeout: 2500 })).toBeInTheDocument()
+})
+
+it('offers another session on a topic already used', async () => {
+  renderPanel()
+  await userEvent.click(await createOn('Mass protests sweeping Europe'))
+  expect(api.startGeneration).toHaveBeenCalledWith('Mass protests sweeping Europe')
+})
+
+it('starts one at a time, and cancelling frees the buttons again', async () => {
+  renderPanel()
+  await userEvent.click(await createOn('Why databases still run the world'))
+  expect(await createOn('Mass protests sweeping Europe')).toBeDisabled()
+  await userEvent.click(screen.getByRole('button', { name: 'Cancel' }))
+  expect(api.cancelJob).toHaveBeenCalledWith('job-1')
+  expect(await createOn('Mass protests sweeping Europe')).toBeEnabled()
+})
+
+it('shows a session already being written when the page opens', async () => {
+  vi.mocked(api.listJobs).mockResolvedValue([RUNNING])
+  renderPanel()
+  expect(await screen.findByRole('progressbar', { name: 'Generation progress' })).toBeInTheDocument()
+  expect(await createOn('Why databases still run the world')).toBeDisabled()
+})
+
+it('says so when a session cannot be started, and the buttons stay free', async () => {
+  vi.mocked(api.startGeneration).mockRejectedValue(new Error('503 Service Unavailable'))
+  renderPanel()
+  await userEvent.click(await createOn('Why databases still run the world'))
+  expect(await screen.findByText('Could not create the session: 503 Service Unavailable')).toBeInTheDocument()
+  expect(await createOn('Why databases still run the world')).toBeEnabled()
 })
