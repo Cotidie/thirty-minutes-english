@@ -66,6 +66,13 @@ def sign_in(client: TestClient, db: Database, user: User) -> None:
     client.cookies.set(LOGIN_COOKIE, db.accounts.start_login(user.id))
 
 
+def client_of(app, db, user=None) -> TestClient:
+    client = TestClient(app)
+    if user is not None:
+        sign_in(client, db, user)
+    return client
+
+
 def admin_client(app: FastAPI) -> TestClient:
     """A client logged in as the admin, for tests of what a route does rather than who may call it."""
     db = app.state.db

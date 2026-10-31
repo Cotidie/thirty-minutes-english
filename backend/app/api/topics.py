@@ -1,19 +1,19 @@
 from fastapi import APIRouter, Depends, HTTPException, Response
 
-from app.api.deps import Db, Svc, Topics, admin_only, can_create
+from app.api.deps import Db, Svc, Topics, admin_only, signed_in
 from app.db.topics import TopicInUse
 from app.models import TopicLibrary, TopicListing
 
 router = APIRouter(prefix="/api/topics")
 
 
-@router.get("", response_model=TopicListing, dependencies=[Depends(can_create)])
+@router.get("", response_model=TopicListing, dependencies=[Depends(signed_in)])
 def list_topics(topics: Topics, services: Svc) -> TopicListing:
     topics.ensure_fetched(services.topic_source)
     return topics.listing()
 
 
-@router.post("/refresh", response_model=TopicListing, dependencies=[Depends(can_create)])
+@router.post("/refresh", response_model=TopicListing, dependencies=[Depends(signed_in)])
 def refresh_topics(topics: Topics, services: Svc) -> TopicListing:
     topics.refresh(services.topic_source)
     return topics.listing()

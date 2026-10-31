@@ -7,6 +7,7 @@ from fastapi import Depends, HTTPException, Request
 
 from app.config.catalog import Catalog
 from app.config.settings import Settings
+from app.credits import PRICES
 from app.db import Database
 from app.generation.jobs import JobRunner
 from app.models import User
@@ -108,6 +109,12 @@ def require_paragraph(db: Database, me: User, paragraph_id: int) -> None:
     session_id = db.sessions.session_of_paragraph(paragraph_id)
     if session_id is None or not db.shares.can_access(me, session_id):
         raise HTTPException(status_code=404, detail="paragraph not found")
+
+
+def charge(db: Database, me: User, kind: str, detail: str | None = None) -> None:
+    """The last check of a paid route: the price is taken, or 402 says what it needs and what there is."""
+    if not db.credits.charge(me, kind, detail):
+        raise HTTPException(status_code=402, detail=f"Not enough credits: this needs {PRICES[kind]} and you have {db.credits.balance(me.id)}.")
 
 
 def off(detail: str) -> HTTPException:

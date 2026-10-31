@@ -8,15 +8,8 @@ from app.generation.jobs import EXPRESSION_COUNT
 from app.main import create_app
 from app.pictures.files import PictureFiles
 from app.wiring import Services
-from tests.conftest import add_user, seed_expressions, sign_in
+from tests.conftest import add_user, client_of, seed_expressions, sign_in
 from tests.test_api import FailingGenerator, FakeGenerator, InlineExecutor
-
-
-def client_of(app, db, user=None) -> TestClient:
-    client = TestClient(app)
-    if user is not None:
-        sign_in(client, db, user)
-    return client
 
 
 @pytest.fixture

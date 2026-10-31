@@ -6,7 +6,7 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from app.generation.jobs import Status
 from app.generation.progress import Stage
-from app.models import Correction, SummaryFeedback
+from app.models import Correction, CreditEntry, SummaryFeedback
 
 
 class Credentials(BaseModel):
@@ -20,6 +20,14 @@ class StarRequest(BaseModel):
 
 class AccountUpdate(BaseModel):
     can_create: bool
+
+
+class CreditsView(BaseModel):
+    """What an account has to spend, what things cost, and its last charges. The admin has no balance and no charges."""
+
+    balance: int | None
+    prices: dict[str, int]
+    recent: list[CreditEntry]
 
 
 class ShareRequest(BaseModel):

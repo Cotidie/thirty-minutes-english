@@ -1,8 +1,12 @@
 import threading
 
 from app.credits import PRICES
+from app.db import Database
 from app.live.changes import AccountChange
-from tests.conftest import add_user
+from app.main import create_app
+from app.wiring import Services
+from tests.conftest import add_user, admin_client, client_of
+from tests.test_api import FakeGenerator, InlineExecutor
 
 
 def test_a_new_account_has_nothing_and_a_grant_shows_up_first(store):
@@ -80,3 +84,27 @@ def test_every_row_tells_the_account_to_read_its_credits_again(store, recorder):
     store.credits.refund(mina.id, 1, None)
     store.credits.charge(boss, "speech")
     assert recorder.published == [(mina.id, AccountChange.CREDITS)] * 3
+
+
+def test_my_credits_show_the_balance_the_prices_and_the_last_charges(tmp_path):
+    db = Database(tmp_path / "s.db")
+    app = create_app(db, Services(FakeGenerator()), InlineExecutor())
+    mina = add_user(db, "mina@example.com")
+    db.credits.grant(mina.id, 30, by=mina.id)
+    db.credits.charge(mina, "redraw", "sprawl")
+    body = client_of(app, db, mina).get("/api/me/credits").json()
+    assert body["balance"] == 20 and body["prices"] == PRICES
+    assert [(e["amount"], e["kind"], e["detail"]) for e in body["recent"]] == [(-10, "redraw", "sprawl"), (30, "grant", None)]
+
+
+def test_the_admin_has_no_balance_to_show(tmp_path):
+    db = Database(tmp_path / "s.db")
+    app = create_app(db, Services(FakeGenerator()), InlineExecutor())
+    body = admin_client(app).get("/api/me/credits").json()
+    assert body["balance"] is None and body["recent"] == [] and body["prices"]["session"] == 200
+
+
+def test_topics_are_free_to_any_login(tmp_path):
+    db = Database(tmp_path / "s.db")
+    app = create_app(db, Services(FakeGenerator()), InlineExecutor())
+    assert client_of(app, db, add_user(db, "mina@example.com")).get("/api/topics").status_code == 200
