@@ -6,7 +6,7 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from app.generation.jobs import Status
 from app.generation.progress import Stage
-from app.models import Correction, CreditEntry, SummaryFeedback
+from app.models import Correction, CreditEntry, SummaryFeedback, User
 
 
 class Credentials(BaseModel):
@@ -18,8 +18,23 @@ class StarRequest(BaseModel):
     starred: bool
 
 
-class AccountUpdate(BaseModel):
-    can_create: bool
+class AccountView(User):
+    """An account as the admin sees it. The admin's own row has no balance."""
+
+    credits: int | None
+
+
+class GrantRequest(BaseModel):
+    """Credits to add to an account, or to take back when negative."""
+
+    amount: int
+
+    @field_validator("amount")
+    @classmethod
+    def something(cls, value: int) -> int:
+        if value == 0:
+            raise ValueError("amount must not be 0")
+        return value
 
 
 class CreditsView(BaseModel):

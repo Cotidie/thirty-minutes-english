@@ -110,22 +110,31 @@ def accounts(tmp_path):
     return admin_c, user_c, user
 
 
-def test_the_admin_lists_accounts_and_turns_creation_on_and_off(accounts):
-    admin, user_client, user = accounts
-    assert [a["email"] for a in admin.get("/api/accounts").json()] == ["boss@example.com", "a@example.com"]
-    assert "password_hash" not in admin.get("/api/accounts").json()[0]
-    assert admin.put(f"/api/accounts/{user.id}", json={"can_create": True}).json()["can_create"] is True
-    assert user_client.get("/api/auth/me").json()["can_create"] is True
-    assert user_client.post("/api/sessions", json={"topic": "X"}).status_code == 202
-    assert admin.put(f"/api/accounts/{user.id}", json={"can_create": False}).json()["can_create"] is False
-    assert user_client.post("/api/sessions", json={"topic": "X"}).status_code == 403
+def test_the_admin_lists_balances_and_tops_an_account_up(accounts):
+    admin, _, user = accounts
+    listed = admin.get("/api/accounts").json()
+    assert [(a["email"], a["credits"]) for a in listed] == [("boss@example.com", None), ("a@example.com", 0)]
+    assert "password_hash" not in listed[0] and "can_create" not in listed[0]
+    res = admin.post(f"/api/accounts/{user.id}/credits", json={"amount": 500})
+    assert res.status_code == 201 and res.json()["credits"] == 500 and res.json()["email"] == "a@example.com"
+    assert admin.post(f"/api/accounts/{user.id}/credits", json={"amount": -100}).json()["credits"] == 400
+    history = admin.get(f"/api/accounts/{user.id}/credits").json()
+    assert [(e["amount"], e["kind"]) for e in history] == [(-100, "grant"), (500, "grant")]
 
 
-def test_a_change_to_an_account_that_is_not_there_is_a_404(accounts):
-    assert accounts[0].put("/api/accounts/999", json={"can_create": True}).status_code == 404
+def test_a_grant_of_nothing_to_nobody_or_to_the_admin_is_refused(accounts):
+    admin, _, user = accounts
+    boss = admin.get("/api/accounts").json()[0]
+    assert admin.post(f"/api/accounts/{user.id}/credits", json={"amount": 0}).status_code == 422
+    assert admin.post("/api/accounts/999/credits", json={"amount": 5}).status_code == 404
+    assert admin.get("/api/accounts/999/credits").status_code == 404
+    res = admin.post(f"/api/accounts/{boss['id']}/credits", json={"amount": 5})
+    assert res.status_code == 400 and res.json()["detail"] == "The admin is not charged, so there is nothing to add to."
 
 
-def test_others_cannot_see_or_change_accounts(accounts):
+def test_only_the_admin_sees_or_fills_accounts(accounts):
     _, user_client, user = accounts
     assert user_client.get("/api/accounts").status_code == 403
-    assert user_client.put(f"/api/accounts/{user.id}", json={"can_create": True}).status_code == 403
+    assert user_client.get(f"/api/accounts/{user.id}/credits").status_code == 403
+    assert user_client.post(f"/api/accounts/{user.id}/credits", json={"amount": 5}).status_code == 403
+    assert user_client.put(f"/api/accounts/{user.id}", json={"can_create": True}).status_code in (404, 405)
