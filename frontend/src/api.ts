@@ -2,11 +2,11 @@ import { goToLogin } from './lib/safeNext'
 import type { JobStatus } from './lib/progress'
 import type {
   Account,
-  CreditEntry,
-  CreditsView,
   AssessorSession,
   Correction,
   CorpusEntry,
+  CreditEntry,
+  CreditsView,
   Example,
   ExampleFeedback,
   Expression,

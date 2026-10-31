@@ -1,14 +1,15 @@
 import { Link } from 'react-router-dom'
 import { useAuth } from '../lib/auth'
+import { CreditsPill } from './CreditsPill'
 import { SettingsButton } from './SettingsButton'
 import './CornerTools.css'
 
-/** The round buttons in the corner of every page: the database and the settings for the admin, and the way out. */
+/** The round buttons in the corner of every page: the database and the settings for the admin, credits for everyone else, and the way out. */
 export function CornerTools() {
   const { me, logOut } = useAuth()
   return (
     <nav className="corner-tools">
-      {me?.is_admin && <AdminTools />}
+      {me?.is_admin ? <AdminTools /> : <CreditsPill />}
       <button type="button" className="corner-button" aria-label="Log out" title="Log out" onClick={() => void logOut()}>
         <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true">
           <path
