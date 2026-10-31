@@ -15,14 +15,15 @@
   margin: 0;
   font-family: var(--serif);
   font-weight: 500;
-  font-size: 1.5rem;
+  font-size: clamp(1.7rem, 3.15vw, 2.25rem); /* three quarters of the sentence below it */
   line-height: 1.1;
+  letter-spacing: -0.005em;
 }
 
 .auth-bar {
-  width: 2.6rem;
-  height: 0.3rem;
-  margin-top: 0.4rem;
+  width: 3.6rem;
+  height: 0.4rem;
+  margin-top: 0.55rem;
   background: var(--marker);
 }
 
@@ -181,6 +182,12 @@
 
   .auth-brand {
     font-size: 1.4rem;
+  }
+
+  .auth-bar {
+    width: 2.6rem;
+    height: 0.3rem;
+    margin-top: 0.4rem;
   }
 
   .auth-lede {
