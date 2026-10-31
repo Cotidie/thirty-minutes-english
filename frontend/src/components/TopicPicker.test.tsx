@@ -29,6 +29,18 @@ describe('TopicPicker', () => {
     }
   })
 
+  it('names the category of a chip in its tooltip, and keeps the topic as its name', () => {
+    render(<TopicPicker suggestions={suggestions} labels={labels} pending={false} busy={false} onGenerate={vi.fn()} onRefresh={vi.fn()} />)
+    expect(screen.getByRole('button', { name: 'Digital twins in manufacturing' })).toHaveAttribute('title', 'Industrial engineering')
+    expect(screen.getByRole('button', { name: 'Who pays when the grid runs short' })).toHaveAttribute('title', 'In the news')
+  })
+
+  it('gives no tooltip to a chip whose category has no name', () => {
+    const odd = [{ text: 'A topic of its own', category: 'odd' }] as Topic[]
+    render(<TopicPicker suggestions={odd} labels={labels} pending={false} busy={false} onGenerate={vi.fn()} onRefresh={vi.fn()} />)
+    expect(screen.getByRole('button', { name: 'A topic of its own' })).not.toHaveAttribute('title')
+  })
+
   it('keys only the categories the day actually offers', () => {
     render(<TopicPicker suggestions={suggestions} labels={labels} pending={false} busy={false} onGenerate={vi.fn()} onRefresh={vi.fn()} />)
     const key = screen.getByRole('list', { name: 'Topic categories' })
