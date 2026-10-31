@@ -15,7 +15,7 @@ log = logging.getLogger(__name__)
 
 FRESH_COUNT = 3
 KOREA_COUNT = 1  # of the news three, stories from Korea
-POOL_COUNT = 9
+POOL_COUNT = 10  # one for each curated category, so every one of them shows every day
 
 TOPICS_SCHEMA: dict = {
     "type": "object",

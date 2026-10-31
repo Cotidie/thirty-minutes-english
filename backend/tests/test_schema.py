@@ -10,8 +10,18 @@ from app.topics.curated import CURATED
 from tests.conftest import CURATED_TOPICS, sample_draft, seed_expressions
 
 
+def as_v11(path) -> None:
+    """Rewrites a current file the way v11 kept it: no travel topics."""
+    conn = sqlite3.connect(path)
+    with conn:
+        conn.execute("DELETE FROM topics WHERE category = 'travel'")
+        conn.execute("PRAGMA user_version = 11")
+    conn.close()
+
+
 def as_v10(path) -> None:
-    """Rewrites a current file the way v10 kept it: no economics topics."""
+    """Rewrites a current file the way v10 kept it: no economics topics either."""
+    as_v11(path)
     conn = sqlite3.connect(path)
     with conn:
         conn.execute("DELETE FROM topics WHERE category = 'economics'")
@@ -277,16 +287,16 @@ def test_a_v9_file_gains_accounts_and_keeps_its_sessions_with_no_creator(tmp_pat
     assert any(".bak-v9-" in p.name for p in tmp_path.iterdir())
 
 
-def test_upgrading_v10_adds_the_economics_topics_and_keeps_every_other(tmp_path):
+def test_upgrading_v10_adds_the_later_pools_and_keeps_every_other_topic(tmp_path):
     path = tmp_path / "s.db"
     store = Database(path)
     store.topics.set_news("2026-10-31", ["Something in the news"])
-    before = [(t.text, t.category) for t in store.topics.list_all() if t.category != Category.ECONOMICS]
+    later = (Category.ECONOMICS, Category.TRAVEL)
+    before = [(t.text, t.category) for t in store.topics.list_all() if t.category not in later]
     as_v10(path)
     upgraded = Database(path)
     after = [(t.text, t.category) for t in upgraded.topics.list_all()]
-    economics = [(text, Category.ECONOMICS) for text in CURATED[Category.ECONOMICS]]
-    assert after == before + economics
+    assert after == before + [(text, category) for category in later for text in CURATED[category]]
     with upgraded.connect() as conn:
         assert conn.execute("PRAGMA user_version").fetchone()[0] == schema.VERSION
 
@@ -312,3 +322,17 @@ def test_upgrading_v10_leaves_a_topic_someone_already_typed_under_its_category(t
     entries = {t.text: t.category for t in Database(path).topics.list_all()}
     assert entries[typed] == Category.TYPED
     assert sum(category == Category.ECONOMICS for category in entries.values()) == len(CURATED[Category.ECONOMICS]) - 1
+
+
+def test_upgrading_v11_adds_the_travel_topics_and_brings_no_deleted_topic_back(tmp_path):
+    path = tmp_path / "s.db"
+    store = Database(path)
+    gone = CURATED[Category.ECONOMICS][0]
+    store.topics.delete(next(t.id for t in store.topics.list_all() if t.text == gone))
+    as_v11(path)
+    upgraded = Database(path)
+    texts = [t.text for t in upgraded.topics.list_all()]
+    assert gone not in texts
+    assert set(CURATED[Category.TRAVEL]) <= set(texts)
+    with upgraded.connect() as conn:
+        assert conn.execute("PRAGMA user_version").fetchone()[0] == schema.VERSION

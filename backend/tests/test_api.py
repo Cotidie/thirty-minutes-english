@@ -121,7 +121,7 @@ def test_delete_session(client):
 
 def test_topics_endpoint_offers_a_stable_daily_slice(client):
     body = client.get("/api/topics").json()
-    assert len(body["topics"]) == 12
+    assert len(body["topics"]) == 13
     assert {t["text"] for t in body["topics"]} <= TOPIC_TEXTS
     assert body["pending"] is False  # no news source configured in tests
     assert client.get("/api/topics").json()["topics"] == body["topics"]

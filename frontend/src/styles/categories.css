@@ -59,6 +59,12 @@
   --cat-ink: #56690f;
 }
 
+[data-category="travel"] {
+  --cat-line: #d9a6d9;
+  --cat-fill: #f8e8f8;
+  --cat-ink: #8e1f8e;
+}
+
 [data-category="typed"] {
   --cat-line: var(--line);
   --cat-fill: var(--paper);

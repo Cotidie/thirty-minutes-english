@@ -17,6 +17,7 @@ class Category(StrEnum):
     KOREA = "korea"
     RESEARCH = "research"
     ECONOMICS = "economics"
+    TRAVEL = "travel"
     NEWS = "news"
     TYPED = "typed"
 
@@ -37,6 +38,7 @@ CATEGORY_LABELS: dict[Category, str] = {
     Category.LITERATURE: "Literature",
     Category.HISTORY: "History",
     Category.WORLD: "World",
+    Category.TRAVEL: "Travel",
 }
 
 

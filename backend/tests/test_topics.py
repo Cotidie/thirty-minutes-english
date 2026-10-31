@@ -1,8 +1,11 @@
 import random
 from datetime import date
 
+import pytest
+
 from app.models import CATEGORY_LABELS, Category
 from app.topics.curated import CURATED
+from app.topics.daily import POOL_COUNT
 from app.topics.pool import pick_topic, pool_for_day
 from tests.conftest import CURATED_TOPICS
 
@@ -30,10 +33,17 @@ def test_a_day_shows_every_domain_before_repeating_one():
     assert len(dealt) == len(domains) + 1
 
 
-def test_economics_has_about_fifty_topics_of_its_own_with_a_name_in_the_key():
-    economics = CURATED[Category.ECONOMICS]
-    others = {text for category, texts in CURATED.items() if category != Category.ECONOMICS for text in texts}
-    assert len(economics) == 50 and len(set(economics)) == 50
-    assert not others & set(economics)
-    assert CATEGORY_LABELS[Category.ECONOMICS] == "Economics"
-    assert max(map(len, economics)) <= 62  # no longer than the longest chip in the other pools
+@pytest.mark.parametrize(
+    ("category", "label", "size"), [(Category.ECONOMICS, "Economics", 50), (Category.TRAVEL, "Travel", 70)]
+)
+def test_a_later_pool_has_its_own_topics_with_a_name_in_the_key(category, label, size):
+    pool = CURATED[category]
+    others = {text for other, texts in CURATED.items() if other != category for text in texts}
+    assert len(pool) == size and len(set(pool)) == size
+    assert not others & set(pool)
+    assert CATEGORY_LABELS[category] == label
+    assert max(map(len, pool)) <= 62  # no longer than the longest chip in the other pools
+
+
+def test_a_day_has_room_for_every_curated_category():
+    assert POOL_COUNT >= len(CURATED)
