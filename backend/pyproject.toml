@@ -1,6 +1,6 @@
 [project]
 name = "english-speaking-backend"
-version = "0.5.17"
+version = "0.5.18"
 requires-python = ">=3.13"
 dependencies = [
     "claude-agent-sdk>=0.2.158",
