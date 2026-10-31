@@ -229,6 +229,15 @@ class User(BaseModel):
     is_admin: bool
 
 
+class CreditEntry(BaseModel):
+    """One line of an account's history: credits gained when `amount` is positive, spent when negative."""
+
+    at: datetime
+    amount: int
+    kind: str
+    detail: str | None
+
+
 class SessionSummary(BaseModel):
     id: int
     created_at: datetime

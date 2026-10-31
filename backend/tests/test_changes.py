@@ -10,18 +10,10 @@ from app.live.changes import AccountChange, Changes, SessionChange
 from app.main import create_app
 from app.models import Note, SummaryFeedback
 from app.wiring import Services
-from tests.conftest import add_user, sample_draft, seed_expressions, sign_in
+from tests.conftest import Recorder, add_user, sample_draft, seed_expressions, sign_in
 from tests.test_api import FakeGenerator, InlineExecutor
 
 FEEDBACK = SummaryFeedback(missed=[], fixes=[], summary="x")
-
-
-class Recorder:
-    def __init__(self):
-        self.published: list[tuple[int, SessionChange]] = []
-
-    def publish(self, session_id, change):
-        self.published.append((session_id, change))
 
 
 @pytest.fixture

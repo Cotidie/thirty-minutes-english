@@ -8,6 +8,7 @@ from fastapi.testclient import TestClient
 from app.api.deps import LOGIN_COOKIE
 from app.db import Database
 from app.generation.generator import VOCABULARY_COUNT
+from app.live.changes import Change
 from app.models import ArticleDraft, Draft, ParagraphPictureDraft, PictureDraft, Question, SentencePair, Source, Topic, User, VocabularyDraft
 from app.topics.curated import CURATED
 
@@ -81,6 +82,22 @@ def draft() -> Draft:
 @pytest.fixture
 def store(tmp_path) -> Database:
     return Database(tmp_path / "s.db")
+
+
+class Recorder:
+    """Stands in for a stream's changes, keeping what was published."""
+
+    def __init__(self):
+        self.published: list[tuple[int, Change]] = []
+
+    def publish(self, key, change):
+        self.published.append((key, change))
+
+
+@pytest.fixture
+def recorder(store) -> Recorder:
+    store.account_changes = Recorder()
+    return store.account_changes
 
 
 class FakeHttp:

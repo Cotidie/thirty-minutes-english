@@ -7,6 +7,7 @@ from pathlib import Path
 from app.db import migrate, schema
 from app.db.accounts import AccountRepo
 from app.db.caches import CacheRepo
+from app.db.credits import CreditRepo
 from app.db.expressions import ExpressionRepo
 from app.db.pictures import PictureRepo
 from app.db.pins import PinRepo
@@ -51,6 +52,7 @@ class Database:
         self.settings = SettingsRepo(self)
         self.topics = TopicRepo(self)
         self.accounts = AccountRepo(self)
+        self.credits = CreditRepo(self)
         self.shares = ShareRepo(self)
 
     def connect(self) -> sqlite3.Connection:

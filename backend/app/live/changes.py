@@ -20,6 +20,7 @@ class SessionChange(StrEnum):
 
 class AccountChange(StrEnum):
     SESSIONS = "sessions"  # the list of sessions the account sees
+    CREDITS = "credits"  # the account's balance or its history
 
 
 type Change = SessionChange | AccountChange
