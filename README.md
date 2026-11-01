@@ -51,7 +51,7 @@ Only the Claude token is required. Add the other keys in the app's ⚙ settings 
 
 ## Server
 
-The same stack runs on any Linux server with Docker. It listens on the server's `127.0.0.1:5173` only, so put your own HTTPS proxy or tunnel in front. The microphone needs HTTPS.
+The same stack runs on any Linux server with Docker. It listens on port 5173 on every address of the server, in plain HTTP, and Docker's published ports skip `ufw`. Put your own HTTPS proxy or tunnel in front: the login cookie and the microphone need HTTPS.
 
 ```sh
 git clone https://github.com/Cotidie/thirty-minutes-english && cd thirty-minutes-english

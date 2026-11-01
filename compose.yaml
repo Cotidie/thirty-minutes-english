@@ -23,8 +23,8 @@ services:
   frontend:
     restart: unless-stopped
     build: ./frontend
-    # This machine only: a public address, with HTTPS for the login cookie, is the job of a proxy or tunnel in front.
+    # Every address of this machine. HTTPS, for the login cookie and the microphone, is the job of a proxy or tunnel in front.
     ports:
-      - "127.0.0.1:${FRONTEND_PORT:-5173}:80"
+      - "0.0.0.0:${FRONTEND_PORT:-5173}:80"
     depends_on:
       - backend
