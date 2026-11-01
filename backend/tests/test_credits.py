@@ -164,15 +164,40 @@ def test_a_coach_that_is_off_charges_nothing(tmp_path):
     assert db.credits.balance(mina.id) == 50
 
 
-def test_feedback_costs_10_and_a_failing_coach_keeps_the_charge(tmp_path):
+def test_feedback_costs_10_and_a_failing_coach_takes_nothing(tmp_path):
     db, mina, me = paid_world(tmp_path, 25, example_coach=Coach())
     assert me.post("/api/example/feedback", json=FEEDBACK_BODY).status_code == 200
     assert db.credits.balance(mina.id) == 15
     me.app.state.services.example_coach = Coach(fail=True)
     assert me.post("/api/example/feedback", json=FEEDBACK_BODY).status_code == 502
-    assert db.credits.balance(mina.id) == 5
-    assert me.post("/api/example/feedback", json=FEEDBACK_BODY).status_code == 402
-    assert (db.credits.recent(mina.id)[0].kind, db.credits.recent(mina.id)[0].detail) == ("practice_feedback", "mitigate")
+    assert db.credits.balance(mina.id) == 15
+    assert [(e.kind, e.detail) for e in db.credits.recent(mina.id)] == [("practice_feedback", "mitigate"), ("grant", None)]
+
+
+class CrashingCoach:
+    """Fails the way nothing in the route expects."""
+
+    def feedback(self, *args):
+        raise KeyError("candidates")
+
+
+def test_an_error_no_route_expects_takes_nothing_either(tmp_path):
+    db, mina, me = paid_world(tmp_path, 25, example_coach=CrashingCoach(), summary_coach=CrashingCoach())
+    with pytest.raises(KeyError):
+        me.post("/api/example/feedback", json=FEEDBACK_BODY)
+    with pytest.raises(KeyError):
+        me.post("/api/summary/feedback", json=PARAGRAPH | {"user_text": "It is words."})
+    assert db.credits.balance(mina.id) == 25
+
+
+def test_a_summary_coach_that_fails_takes_nothing(tmp_path):
+    class Down:
+        def feedback(self, paragraph, user_text):
+            raise GenerationError("down")
+
+    db, mina, me = paid_world(tmp_path, 25, summary_coach=Down())
+    assert me.post("/api/summary/feedback", json=PARAGRAPH | {"user_text": "It is words."}).status_code == 502
+    assert db.credits.balance(mina.id) == 25
 
 
 class Assessor:
@@ -242,7 +267,7 @@ class Drawer:
         return self.db.pictures.add(None, None, None)
 
 
-def test_a_new_picture_costs_10_names_the_word_and_a_failed_drawing_keeps_the_charge(tmp_path):
+def test_a_new_picture_costs_10_names_the_word_and_a_failed_drawing_takes_nothing(tmp_path):
     db, mina, me = paid_world(tmp_path, 220)
     sid = me.post("/api/sessions", json={"topic": "Trams"}).json()["session_id"]
     assert me.post(f"/api/sessions/{sid}/pictures/0", json={"face": "example"}).status_code == 503
@@ -253,9 +278,27 @@ def test_a_new_picture_costs_10_names_the_word_and_a_failed_drawing_keeps_the_ch
     assert (db.credits.balance(mina.id), db.credits.recent(mina.id)[0].kind, db.credits.recent(mina.id)[0].detail) == (10, "redraw", word)
     services.illustrator = Drawer(db, fail=True)
     assert me.post(f"/api/sessions/{sid}/pictures/0", json={"face": "example"}).status_code == 502
+    assert db.credits.balance(mina.id) == 10
+    services.illustrator = Drawer(db)
+    assert me.post(f"/api/sessions/{sid}/pictures/0", json={"face": "example"}).status_code == 200
     assert db.credits.balance(mina.id) == 0
     assert me.post(f"/api/sessions/{sid}/pictures/0", json={"face": "example"}).status_code == 402
     assert me.post(f"/api/sessions/{sid}/pictures/99", json={"face": "example"}).status_code == 404
+
+
+def test_a_picture_for_a_session_deleted_while_drawing_takes_nothing(tmp_path):
+    db, mina, me = paid_world(tmp_path, 210)
+    sid = me.post("/api/sessions", json={"topic": "Trams"}).json()["session_id"]
+
+    class DeletesFirst(Drawer):
+        def redraw_example(self, item):
+            db.sessions.delete(sid)
+            return super().redraw_example(item)
+
+    services = me.app.state.services
+    services.illustrator, services.scene_writer = DeletesFirst(db), object()
+    assert me.post(f"/api/sessions/{sid}/pictures/0", json={"face": "example"}).status_code == 404
+    assert db.credits.balance(mina.id) == 10
 
 
 def test_the_admin_pays_nothing_at_a_paid_route(tmp_path):

@@ -2,7 +2,7 @@
 
 from fastapi import APIRouter, Response
 
-from app.api.deps import Db, Me, Svc, charge, failed, off
+from app.api.deps import Db, Me, Svc, charge, failed, off, paid
 from app.api.schemas import (
     AssessorSession,
     ExampleFeedbackRequest,
@@ -16,6 +16,7 @@ from app.llm import GenerationError
 from app.models import ExampleFeedback, SummaryFeedback
 from app.net import HttpError
 from app.voice.live import LiveAgent
+from app.voice.speech import Speaker
 from app.wiring import Services
 
 router = APIRouter(prefix="/api")
@@ -60,11 +61,11 @@ def summary_feedback(body: SummaryFeedbackRequest, db: Db, me: Me, services: Svc
     coach = services.summary_coach
     if coach is None:
         raise off("summary coach is off: the summary-coach folder is missing")
-    charge(db, me, "summary_feedback")
-    try:
-        return coach.feedback(body.paragraph, body.user_text)
-    except GenerationError as e:
-        raise failed("feedback", e) from e
+    with paid(db, me, "summary_feedback"):
+        try:
+            return coach.feedback(body.paragraph, body.user_text)
+        except GenerationError as e:
+            raise failed("feedback", e) from e
 
 
 @router.post("/example/sessions", response_model=LiveSession, status_code=201)
@@ -90,22 +91,28 @@ def example_feedback(body: ExampleFeedbackRequest, db: Db, me: Me, services: Svc
     coach = services.example_coach
     if coach is None:
         raise off("example coach is off: the example-coach folder is missing")
-    charge(db, me, "practice_feedback", body.word)
+    with paid(db, me, "practice_feedback", body.word):
+        try:
+            return coach.feedback(body.word, body.pos, body.meaning, body.user_text, body.scene)
+        except GenerationError as e:
+            raise failed("feedback", e) from e
+
+
+def _read_aloud(speaker: Speaker, text: str) -> Response:
     try:
-        return coach.feedback(body.word, body.pos, body.meaning, body.user_text, body.scene)
+        audio = speaker.read(text)
     except GenerationError as e:
-        raise failed("feedback", e) from e
+        raise failed("reading aloud", e) from e
+    return Response(audio, media_type=speaker.media_type, headers={"Cache-Control": "private, max-age=86400"})
 
 
 @router.post("/speech", response_class=Response)
 def speech(body: SpeechRequest, db: Db, me: Me, services: Svc) -> Response:
     """The sentence read aloud in the coaches' voice; a sentence read before comes from disk, free."""
-    if services.speaker is None:
+    speaker = services.speaker
+    if speaker is None:
         raise off("reading aloud is off: set GEMINI_API_KEY in Settings")
-    if not services.speaker.cached(body.text):
-        charge(db, me, "speech", " ".join(body.text.split())[:40])
-    try:
-        audio = services.speaker.read(body.text)
-    except GenerationError as e:
-        raise failed("reading aloud", e) from e
-    return Response(audio, media_type=services.speaker.media_type, headers={"Cache-Control": "private, max-age=86400"})
+    if speaker.cached(body.text):
+        return _read_aloud(speaker, body.text)
+    with paid(db, me, "speech", " ".join(body.text.split())[:40]):
+        return _read_aloud(speaker, body.text)

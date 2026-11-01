@@ -79,3 +79,13 @@ def test_a_sentence_already_read_is_free_and_a_new_one_costs_1(tmp_path):
     assert me.post("/api/speech", json={"text": "It was  flawed."}).status_code == 200  # cached: the spaces are folded
     assert me.post("/api/speech", json={"text": "Another one."}).status_code == 402
     assert speaker.cached("It was flawed.") and not speaker.cached("Another one.")
+
+
+def test_a_sentence_the_voice_could_not_read_takes_nothing(tmp_path):
+    db = Database(tmp_path / "s.db")
+    speaker = Speaker(CountingVoice(fail=True), tmp_path / "speech")
+    app = create_app(db, Services(FakeGenerator(), speaker=speaker), InlineExecutor())
+    mina = add_user(db, "mina@example.com")
+    db.credits.grant(mina.id, 1, by=mina.id)
+    assert client_of(app, db, mina).post("/api/speech", json={"text": "It was flawed."}).status_code == 502
+    assert db.credits.balance(mina.id) == 1

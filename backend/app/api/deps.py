@@ -1,6 +1,9 @@
 """What the routes read off the app: the database, the current services, the settings, and who is asking."""
 
-from collections.abc import Callable
+import logging
+import sqlite3
+from collections.abc import Callable, Iterator
+from contextlib import contextmanager
 from typing import Annotated
 
 from fastapi import Depends, HTTPException, Request
@@ -9,11 +12,14 @@ from app.config.catalog import Catalog
 from app.config.settings import Settings
 from app.credits import PRICES
 from app.db import Database
+from app.db.credits import NotEnoughCredits
 from app.generation.jobs import JobRunner
 from app.models import User
 from app.pictures.files import PictureFiles
 from app.topics.daily import DailyTopics
 from app.wiring import Services
+
+log = logging.getLogger(__name__)
 
 Rebuild = Callable[[Settings], Services]
 
@@ -98,6 +104,34 @@ def charge(db: Database, me: User, kind: str, detail: str | None = None) -> None
     """The last check of a paid route: the price is taken, or 402 says what it needs and what there is."""
     if not db.credits.charge(me, kind, detail):
         raise HTTPException(status_code=402, detail=f"Not enough credits: this needs {PRICES[kind]} and you have {db.credits.balance(me.id)}.")
+
+
+def held_or_402(db: Database, me: User, kind: str, detail: str | None = None) -> int | None:
+    """The last check of a paid route: the price is held, or 402 says what it needs and what there is."""
+    try:
+        return db.credits.hold(me, kind, detail)
+    except NotEnoughCredits as e:
+        raise HTTPException(status_code=402, detail=f"Not enough credits: this needs {e.need} and you have {e.have}.") from None
+
+
+@contextmanager
+def paid(db: Database, me: User, kind: str, detail: str | None = None) -> Iterator[None]:
+    """The block's work is paid for only if it ends normally; any exception gives the price back.
+    A failure of the ledger itself is logged, not raised: the row goes back when the app next starts."""
+    hold = held_or_402(db, me, kind, detail)
+    try:
+        yield
+    except BaseException:
+        _quietly(db.credits.release, hold)
+        raise
+    _quietly(db.credits.settle, hold)
+
+
+def _quietly(step: Callable[[int | None], None], hold: int | None) -> None:
+    try:
+        step(hold)
+    except sqlite3.Error:
+        log.exception("could not finish credit hold %s", hold)
 
 
 def off(detail: str) -> HTTPException:

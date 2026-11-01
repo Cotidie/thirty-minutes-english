@@ -2,7 +2,7 @@ from dataclasses import asdict
 
 from fastapi import APIRouter, HTTPException, Response
 
-from app.api.deps import Db, Files, Jobs, Me, Svc, charge, failed, off, require_access, require_creator
+from app.api.deps import Db, Files, Jobs, Me, Svc, charge, failed, off, paid, require_access, require_creator
 from app.api.schemas import CreateSessionRequest, JobStatus, RedrawRequest, ShareEntry, ShareRequest, StarRequest
 from app.credits import PRICES
 from app.db import Database
@@ -10,6 +10,9 @@ from app.db.sessions import StarKind
 from app.generation.jobs import Job, JobRunner
 from app.llm import GenerationError
 from app.models import Expression, Note, Session, SessionSummary, Stars, User, VocabularyItem
+from app.pictures.files import PictureFiles
+from app.pictures.illustrator import Illustrator
+from app.pictures.scenes import SceneWriter
 from app.topics.pool import pick_topic
 
 router = APIRouter(prefix="/api")
@@ -169,9 +172,14 @@ def redraw_picture(session_id: int, index: int, body: RedrawRequest, db: Db, ser
     if illustrator is None or writer is None:
         raise off("pictures are off: set IMAGE_PROVIDER and its key in Settings")
     item = session.content.vocabulary[index]
-    charge(db, me, "redraw", item.word)
+    with paid(db, me, "redraw", item.word):
+        return _draw_again(db, illustrator, writer, files, item, body.face)
+
+
+def _draw_again(db: Database, illustrator: Illustrator, writer: SceneWriter, files: PictureFiles, item: VocabularyItem, face: str) -> VocabularyItem:
+    """The word's picture drawn anew and stored in place of the old one, whose file goes; the item as it now is."""
     try:
-        if body.face == "example":
+        if face == "example":
             field, scene = "example_image", None
             picture_id = illustrator.redraw_example(item)
         else:
