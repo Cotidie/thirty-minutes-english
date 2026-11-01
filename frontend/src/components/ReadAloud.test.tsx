@@ -1,4 +1,4 @@
-import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { LiveEvent } from '../lib/liveSession'
@@ -7,20 +7,23 @@ import type { AzureWord, Shown } from '../lib/assessor/judge'
 import type { AssessorOptions } from '../lib/assessor/azure'
 import { api } from '../api'
 import { pairSentences } from '../lib/sentences'
-import { COACH_SILENCE_MS } from './ReadAloud'
+import { COACH_SILENCE_MS, COACH_TIMEOUT_MS } from './ReadAloud'
 import { Paragraph } from './Paragraph'
 
-const session = { token: 'eyJ.t', region: 'koreacentral', word_score: 60 }
+const session = { token: 'eyJ.t', region: 'koreacentral', word_score: 60, hold: 31 }
 vi.mock('../api', () => ({
   api: {
     addReading: vi.fn(async () => ({})),
     assessorToken: vi.fn(async () => session),
+    confirmHold: vi.fn(),
+    giveBackHold: vi.fn(),
   },
 }))
 
 const track = { stop: vi.fn(), enabled: true }
 const microphone = { getTracks: () => [track], getAudioTracks: () => [track] } as unknown as MediaStream
 Object.defineProperty(navigator, 'mediaDevices', { value: { getUserMedia: vi.fn(async () => microphone) }, configurable: true })
+const getUserMedia = vi.mocked(navigator.mediaDevices.getUserMedia)
 
 let segment: (words: AzureWord[], text: string) => void = () => undefined
 const assessor = { stop: vi.fn(async () => undefined) }
@@ -37,6 +40,7 @@ const connection = {
   correct: vi.fn(),
   close: vi.fn(),
   dispose: vi.fn(),
+  giveBack: vi.fn(),
 }
 let emit: (e: LiveEvent) => void = () => undefined
 type RoundOptions = Omit<LiveOptions, 'start'>
@@ -92,7 +96,10 @@ beforeEach(() => {
   assessor.stop.mockClear()
   track.stop.mockClear()
   coachTrack.enabled = true
-  for (const fn of [connection.correct, connection.close, connection.dispose]) fn.mockClear()
+  for (const fn of [connection.correct, connection.close, connection.dispose, connection.giveBack]) fn.mockClear()
+  getUserMedia.mockClear()
+  vi.mocked(api.confirmHold).mockClear()
+  vi.mocked(api.giveBackHold).mockClear()
 })
 
 describe('ReadAloud round', () => {
@@ -193,13 +200,111 @@ describe('ReadAloud round', () => {
     expect(row.compareDocumentPosition(screen.getByRole('note', { name: 'verified' }))).toBe(Node.DOCUMENT_POSITION_FOLLOWING)
   })
 
-  it('fails before touching the microphone when the assessor is off', async () => {
+  it('releases the microphone when the assessor is off', async () => {
     vi.mocked(api.assessorToken).mockRejectedValueOnce(new Error('Read aloud is off: set AZURE_SPEECH_KEY in Settings'))
     renderIdle()
     await userEvent.click(screen.getByRole('button', { name: 'Read aloud' }))
     expect(await screen.findByText('Read aloud is off: set AZURE_SPEECH_KEY in Settings')).toBeInTheDocument()
     expect(screen.getByRole('status')).toHaveTextContent('Could not start')
     expect(startAssessor).not.toHaveBeenCalled()
+    expect(track.stop).toHaveBeenCalled()
+  })
+
+  it('asks for the microphone before it asks for the token', async () => {
+    renderIdle()
+    await startRound()
+    expect(getUserMedia.mock.invocationCallOrder[0]).toBeLessThan(vi.mocked(api.assessorToken).mock.invocationCallOrder[0])
+  })
+
+  it('takes no token when the microphone is refused', async () => {
+    getUserMedia.mockRejectedValueOnce(new Error('Permission denied'))
+    renderIdle()
+    await userEvent.click(screen.getByRole('button', { name: 'Read aloud' }))
+    expect(await screen.findByText('Permission denied')).toBeInTheDocument()
+    expect(api.assessorToken).not.toHaveBeenCalled()
+    expect(api.giveBackHold).not.toHaveBeenCalled()
+  })
+
+  it('confirms once Azure is listening', async () => {
+    renderIdle()
+    await startRound()
+    expect(api.confirmHold).toHaveBeenCalledExactlyOnceWith(31)
+    expect(api.giveBackHold).not.toHaveBeenCalled()
+  })
+
+  it('gives the price back when Azure will not start', async () => {
+    startAssessor.mockRejectedValueOnce(new Error('no route to Azure'))
+    renderIdle()
+    await userEvent.click(screen.getByRole('button', { name: 'Read aloud' }))
+    expect(await screen.findByText('no route to Azure')).toBeInTheDocument()
+    expect(api.giveBackHold).toHaveBeenCalledExactlyOnceWith(31)
+    expect(api.confirmHold).not.toHaveBeenCalled()
+  })
+
+  it('gives the price back when Azure fails during the round', async () => {
+    renderIdle()
+    await startRound()
+    act(() => startAssessor.mock.calls[0][0].onError('Connection closed'))
+    expect(screen.getByText('Assessor: Connection closed')).toBeInTheDocument()
+    expect(api.giveBackHold).toHaveBeenCalledExactlyOnceWith(31)
+  })
+
+  it('takes no token when the page is left at the microphone prompt', async () => {
+    let allow!: (m: MediaStream) => void
+    getUserMedia.mockImplementationOnce(() => new Promise((resolve) => (allow = resolve)))
+    renderIdle()
+    await userEvent.click(screen.getByRole('button', { name: 'Read aloud' }))
+    cleanup()
+    await act(async () => allow(microphone))
+    expect(api.assessorToken).not.toHaveBeenCalled()
+    expect(track.stop).toHaveBeenCalled()
+  })
+
+  /** A finished reading's mark clicked, with fake timers on from then and the coach's call open. */
+  async function callTheCoach() {
+    renderIdle()
+    await startRound()
+    act(() => segment([berified], 'berified'))
+    vi.useFakeTimers({ shouldAdvanceTime: true })
+    await userEvent.click(screen.getByRole('button', { name: 'verified: b for v' }))
+    await vi.waitFor(() => expect(connect).toHaveBeenCalled())
+    await act(() => vi.advanceTimersByTimeAsync(1))
+  }
+
+  it('gives the coach back when it never says a word', async () => {
+    try {
+      await callTheCoach()
+      await act(() => vi.advanceTimersByTimeAsync(COACH_TIMEOUT_MS + 1))
+      expect(connection.giveBack).toHaveBeenCalledOnce()
+      expect(connection.close).toHaveBeenCalled()
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('keeps the coach price once it has spoken', async () => {
+    try {
+      await callTheCoach()
+      act(() => emit({ type: 'session.output_transcript.delta', delta: 'You said /b/.' }))
+      await act(() => vi.advanceTimersByTimeAsync(COACH_TIMEOUT_MS + 1))
+      expect(connection.giveBack).not.toHaveBeenCalled()
+      expect(connection.close).toHaveBeenCalled()
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('a second click abandons a call still connecting', async () => {
+    connect.mockImplementationOnce(() => new Promise(() => undefined))
+    renderIdle()
+    await startRound()
+    act(() => segment([berified], 'berified'))
+    await userEvent.click(screen.getByRole('button', { name: 'verified: b for v' }))
+    await waitFor(() => expect(connect).toHaveBeenCalledOnce())
+    await userEvent.click(screen.getByRole('button', { name: 'verified: b for v' }))
+    await waitFor(() => expect(connect).toHaveBeenCalledTimes(2))
+    expect(connect.mock.calls[0][1].signal!.aborted).toBe(true)
+    expect(connect.mock.calls[1][1].signal!.aborted).toBe(false)
   })
 
   it('is disabled while another paragraph holds the microphone', () => {

@@ -11,7 +11,7 @@ vi.mock('../api', () => ({
     addReading: vi.fn(async () => ({})),
     listSummaries: vi.fn(async () => []),
     listReadings: vi.fn(async () => []),
-    assessorToken: vi.fn(async () => ({ token: 't', region: 'koreacentral', word_score: 60 })),
+    assessorToken: vi.fn(async () => ({ token: 't', region: 'koreacentral', word_score: 60, hold: null })),
   },
 }))
 Object.defineProperty(navigator, 'mediaDevices', {

@@ -48,8 +48,8 @@ const STATUS_LABEL: Record<Phase, string> = {
 
 /** The coach stays on this long after its last word, then hangs up. */
 export const COACH_SILENCE_MS = 2000
-/** No word at all from the coach by then: hang up anyway. */
-const COACH_TIMEOUT_MS = 15_000
+/** No word at all from the coach by then: hang up anyway, and it costs nothing. */
+export const COACH_TIMEOUT_MS = 15_000
 
 /** The reading: the microphone, Azure on it, and the judge's verdicts on the paragraph. */
 interface Round {
@@ -65,6 +65,12 @@ interface Round {
 interface Call {
   coach: LiveConnection
   timer: ReturnType<typeof setTimeout> | null
+  /** Whether it has said a word yet. */
+  spoke: boolean
+}
+
+function giveBack(hold: number | null) {
+  if (hold !== null) void api.giveBackHold(hold)
 }
 
 /**
@@ -84,14 +90,23 @@ export function useReadAloud({ paragraph: { id: paragraphId, text: paragraph }, 
   const audioRef = useRef<HTMLAudioElement>(null)
   const roundRef = useRef<Round | null>(null)
   const callRef = useRef<Call | null>(null)
+  /** Stops a coach call still connecting: nothing else can, until `callRef` has it. */
+  const calling = useRef<AbortController | null>(null)
+  const mounted = useRef(true)
 
-  useEffect(
-    () => () => {
+  useEffect(() => {
+    mounted.current = true
+    return () => {
+      mounted.current = false
+      calling.current?.abort()
       hangUp()
       void endRound()
-    },
-    [],
-  )
+    }
+  }, [])
+
+  const stopIfLeft = () => {
+    if (!mounted.current) throw new Error('The page was left before the round started')
+  }
 
   const start = async () => {
     onStart()
@@ -101,9 +116,15 @@ export function useReadAloud({ paragraph: { id: paragraphId, text: paragraph }, 
     setSeconds(0)
     setFresh([])
     setOpen(null)
+    let microphone: MediaStream | null = null
+    let hold: number | null = null
     try {
+      // The microphone first: a refused one spends nothing.
+      microphone = await navigator.mediaDevices.getUserMedia({ audio: true })
+      stopIfLeft()
       const session = await api.assessorToken()
-      const microphone = await navigator.mediaDevices.getUserMedia({ audio: true })
+      hold = session.hold
+      stopIfLeft()
       const round: Round = {
         microphone,
         assessor: null,
@@ -118,11 +139,18 @@ export function useReadAloud({ paragraph: { id: paragraphId, text: paragraph }, 
         paragraph,
         session,
         onSegment: (words, text) => judged(round, words, text),
-        onError: (message) => setError(`Assessor: ${message}`),
+        onError: (message) => {
+          setError(`Assessor: ${message}`)
+          giveBack(hold)
+        },
       })
+      stopIfLeft()
+      if (hold !== null) void api.confirmHold(hold)
       setPhase('listening')
     } catch (e) {
+      microphone?.getTracks().forEach((t) => t.stop())
       void endRound()
+      giveBack(hold)
       setError(e instanceof Error ? e.message : String(e))
       setPhase('failed')
     }
@@ -160,29 +188,45 @@ export function useReadAloud({ paragraph: { id: paragraphId, text: paragraph }, 
 
   const speak = async (finding: Shown) => {
     hangUp()
+    calling.current?.abort()
+    const call = new AbortController()
+    calling.current = call
+    const { signal } = call
     // Gemini reports session.started while connecting, before `coach` exists.
     let coach: LiveConnection | null = null
     let started = false
     try {
       coach = await connectReadAloud(paragraph, {
         audio: audioRef.current!,
+        signal,
         onEvent: (event) => {
+          if (signal.aborted) return
           if (event.type === 'session.started') {
             started = true
             coach?.correct(finding)
           }
-          if (event.type === 'session.output_transcript.delta') linger(COACH_SILENCE_MS)
+          if (event.type === 'session.output_transcript.delta') {
+            if (callRef.current) callRef.current.spoke = true
+            linger(COACH_SILENCE_MS)
+          }
           if (event.type === 'session.closed') hangUp()
         },
-        onDisconnect: hangUp,
+        onDisconnect: () => {
+          if (!signal.aborted) hangUp()
+        },
       })
+      if (signal.aborted) {
+        coach.giveBack()
+        coach.dispose()
+        return
+      }
       // The coach only speaks here; what the reader says next is Azure's to judge.
       coach.microphone.getAudioTracks().forEach((t) => (t.enabled = false))
-      callRef.current = { coach, timer: null }
+      callRef.current = { coach, timer: null, spoke: false }
       if (started) coach.correct(finding)
       linger(COACH_TIMEOUT_MS)
     } catch (e) {
-      setError(e instanceof Error ? e.message : String(e))
+      if (!signal.aborted) setError(e instanceof Error ? e.message : String(e))
     }
   }
 
@@ -191,7 +235,10 @@ export function useReadAloud({ paragraph: { id: paragraphId, text: paragraph }, 
     const call = callRef.current
     if (!call) return
     if (call.timer) clearTimeout(call.timer)
-    call.timer = setTimeout(() => call.coach.close(), ms)
+    call.timer = setTimeout(() => {
+      if (!call.spoke) call.coach.giveBack()
+      call.coach.close()
+    }, ms)
   }
 
   const hangUp = () => {
