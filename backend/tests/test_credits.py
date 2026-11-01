@@ -14,7 +14,7 @@ from app.models import ExampleFeedback, SummaryFeedback
 from app.net import HttpError
 from app.wiring import Services
 from tests.conftest import add_user, admin_client, client_of, seed_expressions
-from tests.test_api import FailingGenerator, FakeGenerator, InlineExecutor
+from tests.test_api import DeferredExecutor, FailingGenerator, FakeGenerator, InlineExecutor
 
 
 def test_a_new_account_has_nothing_and_a_grant_shows_up_first(store):
@@ -27,36 +27,6 @@ def test_a_new_account_has_nothing_and_a_grant_shows_up_first(store):
     assert (entry.amount, entry.kind, entry.detail) == (500, "grant", None)
 
 
-def test_a_charge_takes_the_price_and_names_what_it_was_for(store):
-    mina = add_user(store, "mina@example.com")
-    store.credits.grant(mina.id, 15, by=mina.id)
-    assert store.credits.charge(mina, "redraw", "sprawl") is True
-    assert store.credits.balance(mina.id) == 5
-    assert [(e.amount, e.kind, e.detail) for e in store.credits.recent(mina.id)] == [(-10, "redraw", "sprawl"), (15, "grant", None)]
-
-
-def test_a_charge_the_balance_cannot_cover_leaves_no_row(store):
-    mina = add_user(store, "mina@example.com")
-    store.credits.grant(mina.id, 3, by=mina.id)
-    assert store.credits.charge(mina, "redraw") is False
-    assert store.credits.balance(mina.id) == 3 and len(store.credits.recent(mina.id)) == 1
-
-
-def test_the_admin_is_never_charged_and_nothing_is_written(store):
-    boss = add_user(store, "boss@example.com", admin=True)
-    assert store.credits.charge(boss, "session", "Trams") is True
-    assert store.credits.recent(boss.id) == []
-
-
-def test_a_refund_is_a_positive_row_of_its_own_kind(store):
-    mina = add_user(store, "mina@example.com")
-    store.credits.grant(mina.id, 200, by=mina.id)
-    store.credits.charge(mina, "session", "Trams")
-    store.credits.refund(mina.id, PRICES["session"], "Trams")
-    assert store.credits.balance(mina.id) == 200
-    assert store.credits.recent(mina.id)[0].kind == "refund"
-
-
 def test_recent_is_newest_first_and_stops_at_the_limit(store):
     mina = add_user(store, "mina@example.com")
     for amount in range(1, 13):
@@ -65,41 +35,12 @@ def test_recent_is_newest_first_and_stops_at_the_limit(store):
     assert len(store.credits.recent(mina.id, limit=3)) == 3
 
 
-def test_two_charges_at_once_on_one_price_worth_of_balance_let_only_one_through(store):
-    mina = add_user(store, "mina@example.com")
-    store.credits.grant(mina.id, 10, by=mina.id)
-    results: list[bool] = []
-    gate = threading.Barrier(2)
-
-    def go():
-        gate.wait()
-        results.append(store.credits.charge(mina, "redraw"))
-
-    threads = [threading.Thread(target=go) for _ in range(2)]
-    for t in threads:
-        t.start()
-    for t in threads:
-        t.join()
-    assert sorted(results) == [False, True]
-    assert store.credits.balance(mina.id) == 0
-
-
-def test_every_row_tells_the_account_to_read_its_credits_again(store, recorder):
-    mina = add_user(store, "mina@example.com")
-    boss = add_user(store, "boss@example.com", admin=True)
-    store.credits.grant(mina.id, 10, by=boss.id)
-    store.credits.charge(mina, "speech", "It was flawed.")
-    store.credits.refund(mina.id, 1, None)
-    store.credits.charge(boss, "speech")
-    assert recorder.published == [(mina.id, AccountChange.CREDITS)] * 3
-
-
 def test_my_credits_show_the_balance_the_prices_and_the_last_charges(tmp_path):
     db = Database(tmp_path / "s.db")
     app = create_app(db, Services(FakeGenerator()), InlineExecutor())
     mina = add_user(db, "mina@example.com")
     db.credits.grant(mina.id, 30, by=mina.id)
-    db.credits.charge(mina, "redraw", "sprawl")
+    db.credits.settle(db.credits.hold(mina, "redraw", "sprawl"))
     body = client_of(app, db, mina).get("/api/me/credits").json()
     assert body["balance"] == 20 and body["prices"] == PRICES
     assert [(e["amount"], e["kind"], e["detail"]) for e in body["recent"]] == [(-10, "redraw", "sprawl"), (30, "grant", None)]
@@ -311,7 +252,7 @@ def test_the_admin_pays_nothing_at_a_paid_route(tmp_path):
     assert db.credits.recent(boss.id) == []
 
 
-def test_a_failed_generation_gives_the_200_back_as_a_refund(tmp_path):
+def test_a_failed_generation_costs_nothing(tmp_path):
     db = Database(tmp_path / "s.db")
     app = create_app(db, Services(FailingGenerator()), InlineExecutor())
     mina = add_user(db, "mina@example.com")
@@ -319,10 +260,10 @@ def test_a_failed_generation_gives_the_200_back_as_a_refund(tmp_path):
     me = client_of(app, db, mina)
     assert me.post("/api/sessions", json={"topic": "Trams"}).json()["status"] == "failed"
     assert db.credits.balance(mina.id) == 200
-    assert [(e.amount, e.kind, e.detail) for e in db.credits.recent(mina.id)[:2]] == [(200, "refund", "Trams"), (-200, "session", "Trams")]
+    assert [e.kind for e in db.credits.recent(mina.id)] == ["grant"]
 
 
-def test_the_admins_failed_generation_writes_no_refund(tmp_path):
+def test_the_admins_failed_generation_writes_nothing(tmp_path):
     db = Database(tmp_path / "s.db")
     app = create_app(db, Services(FailingGenerator()), InlineExecutor())
     assert admin_client(app).post("/api/sessions", json={"topic": "Trams"}).json()["status"] == "failed"
@@ -584,3 +525,156 @@ def test_the_admins_round_has_no_hold(tmp_path):
     db = Database(tmp_path / "s.db")
     app = create_app(db, Services(FakeGenerator(), agents={"example": LiveRound()}), InlineExecutor())
     assert admin_client(app).post("/api/example/sessions", json=WORD).json()["hold"] is None
+
+
+class Pictures:
+    """Stands in for the illustrator: `during` runs while it draws, then it fails or reports what did not come back."""
+
+    def __init__(self, missing=0, error=None, during=None):
+        self.missing, self.error, self.during = missing, error, during
+
+    def expected_seconds(self, count):
+        return None
+
+    def count(self, words, scenes):
+        return 1
+
+    def illustrate(self, job_id, words, on_drawn, on_picture, scenes, on_figure):
+        if self.during:
+            self.during(job_id)
+        on_drawn(1)
+        if self.error:
+            raise self.error
+        return self.missing
+
+
+def make_session(me) -> dict:
+    return me.post("/api/sessions", json={"topic": "Trams"}).json()
+
+
+def queued_world(tmp_path, balance: int, generator=None):
+    db = Database(tmp_path / "s.db")
+    seed_expressions(db, EXPRESSION_COUNT)
+    executor = DeferredExecutor()
+    app = create_app(db, Services(generator or FakeGenerator()), executor)
+    mina = add_user(db, "mina@example.com")
+    db.credits.grant(mina.id, balance, by=mina.id)
+    return db, mina, client_of(app, db, mina), executor
+
+
+def test_a_session_with_every_picture_costs_200_and_stays(tmp_path):
+    db, mina, me = paid_world(tmp_path, 250, illustrator=Pictures())
+    job = make_session(me)
+    assert job["status"] == "done" and db.credits.balance(mina.id) == 50
+    assert me.get(f"/api/sessions/{job['session_id']}").status_code == 200
+
+
+@pytest.mark.parametrize(
+    "pictures,status",
+    [
+        (Pictures(missing=1), "done"),
+        (Pictures(error=GenerationError("openrouter down")), "done"),
+        (Pictures(error=OSError("No space left on device")), "failed"),
+    ],
+)
+def test_a_session_short_of_what_it_promised_stays_and_costs_nothing(tmp_path, pictures, status):
+    db, mina, me = paid_world(tmp_path, 200, illustrator=pictures)
+    job = make_session(me)
+    assert job["status"] == status and job["session_id"] is not None
+    assert db.credits.balance(mina.id) == 200
+    assert [e.kind for e in db.credits.recent(mina.id)] == ["grant"]
+    assert me.get(f"/api/sessions/{job['session_id']}").status_code == 200
+
+
+def test_cancelling_while_the_pictures_are_drawn_deletes_the_session_and_costs_half(tmp_path):
+    db, mina, me = paid_world(tmp_path, 200)
+    me.app.state.services.illustrator = Pictures(during=lambda job_id: me.delete(f"/api/jobs/{job_id}"))
+    job = make_session(me)
+    assert job["status"] == "cancelled" and job["session_id"] is None
+    assert me.get("/api/sessions").json() == []
+    assert db.credits.balance(mina.id) == 100
+    entry = db.credits.recent(mina.id)[0]
+    assert (entry.amount, entry.kind, entry.detail) == (-100, "session_cancelled", "Trams")
+
+
+def test_cancelling_after_claude_was_called_costs_half_even_before_the_session_is_saved(tmp_path):
+    db, mina, me = paid_world(tmp_path, 200)
+
+    class CancelsWhileWriting(FakeGenerator):
+        def generate(self, topic, on_progress=None, exclude=None):
+            me.delete(f"/api/jobs/{me.get('/api/jobs').json()[0]['id']}")
+            return super().generate(topic, on_progress, exclude)  # its progress report raises Cancelled
+
+    me.app.state.services.generator = CancelsWhileWriting()
+    assert make_session(me)["status"] == "cancelled"
+    assert db.credits.balance(mina.id) == 100
+
+
+def test_cancelling_a_job_still_in_the_queue_costs_nothing(tmp_path):
+    db, mina, me, executor = queued_world(tmp_path, 200)
+    job = make_session(me)
+    assert me.get(f"/api/jobs/{job['id']}").json()["spent"] is False
+    me.delete(f"/api/jobs/{job['id']}")
+    executor.run()
+    assert db.credits.balance(mina.id) == 200
+
+
+def test_the_second_session_at_once_is_refused_and_the_firsts_failure_gives_all_back(tmp_path):
+    db, mina, me, executor = queued_world(tmp_path, 300, FailingGenerator())
+    make_session(me)
+    second = me.post("/api/sessions", json={"topic": "Boats"})
+    assert second.status_code == 402
+    assert second.json()["detail"] == "Not enough credits: this needs 200 and you have 100."
+    executor.run()
+    assert db.credits.balance(mina.id) == 300
+
+
+def test_a_cancel_after_the_job_is_done_is_too_late(tmp_path):
+    db, mina, me = paid_world(tmp_path, 200)
+    job = make_session(me)
+    assert me.delete(f"/api/jobs/{job['id']}").json()["status"] == "done"
+    assert db.credits.balance(mina.id) == 0
+    assert me.get(f"/api/sessions/{job['session_id']}").status_code == 200
+
+
+def test_the_admins_cancelled_session_goes_too_and_writes_nothing(tmp_path):
+    db = Database(tmp_path / "s.db")
+    seed_expressions(db, EXPRESSION_COUNT)
+    app = create_app(db, Services(FakeGenerator()), InlineExecutor())
+    admin = admin_client(app)
+    app.state.services.illustrator = Pictures(during=lambda job_id: admin.delete(f"/api/jobs/{job_id}"))
+    assert make_session(admin)["status"] == "cancelled"
+    assert admin.get("/api/sessions").json() == []
+    assert db.credits.recent(db.accounts.by_email("admin@example.com").id) == []
+
+
+def test_a_session_still_being_drawn_cannot_be_deleted(tmp_path):
+    db, mina, me = paid_world(tmp_path, 200)
+    answers = []
+
+    def try_to_delete(job_id):
+        sid = me.get(f"/api/jobs/{job_id}").json()["session_id"]
+        answers.append(me.delete(f"/api/sessions/{sid}"))
+
+    me.app.state.services.illustrator = Pictures(during=try_to_delete)
+    job = make_session(me)
+    assert answers[0].status_code == 409
+    assert answers[0].json()["detail"] == "This session is still being drawn. Cancel it on the progress bar: the session goes and half the price stays charged."
+    assert job["status"] == "done" and db.credits.balance(mina.id) == 0
+    assert me.delete(f"/api/sessions/{job['session_id']}").status_code == 204
+    assert db.credits.balance(mina.id) == 0  # a finished session stays paid for
+
+
+def test_a_session_whose_job_failed_can_be_deleted_and_stays_free(tmp_path):
+    db, mina, me = paid_world(tmp_path, 200, illustrator=Pictures(error=OSError("disk")))
+    job = make_session(me)
+    assert me.delete(f"/api/sessions/{job['session_id']}").status_code == 204
+    assert db.credits.balance(mina.id) == 200
+
+
+def test_a_restart_gives_back_what_the_dead_process_held(tmp_path):
+    db, mina, _ = paid_world(tmp_path, 200)
+    db.credits.hold(mina, "session", "Trams")
+    assert db.credits.balance(mina.id) == 0
+    create_app(db, Services(FakeGenerator()), InlineExecutor())
+    assert db.credits.balance(mina.id) == 200

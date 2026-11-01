@@ -65,7 +65,7 @@ def test_start_returns_upstream_answer(tmp_path, agent_dir):
     with make_client(tmp_path, read_aloud(agent_dir, voice)) as c:
         res = c.post("/api/read-aloud/sessions", json={"paragraph": PARAGRAPH})
     assert res.status_code == 201
-    assert res.json() == {"url": "wss://live?access_token=t", "setup": {"model": "models/m"}}
+    assert res.json() == {"url": "wss://live?access_token=t", "setup": {"model": "models/m"}, "hold": None}
     assert voice.instructions == [f"You are Coach.\n\nRead:\n\n{PARAGRAPH}"]
 
 

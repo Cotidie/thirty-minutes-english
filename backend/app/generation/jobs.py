@@ -67,6 +67,8 @@ class Job:
     created_by: int | None = None
     error: str | None = None
     failed_at: float | None = None  # stops the clock, so the failure keeps its time while it waits to be read
+    spent: bool = False  # Claude has been called, so stopping now still costs
+    pictures_missing: bool = False  # a picture the session calls for did not come back
 
     @property
     def stage(self) -> Stage:
@@ -132,10 +134,10 @@ class JobRunner:
         generator: Generator,
         illustrator: Illustrator | None = None,
         created_by: int | None = None,
-        on_lost: Callable[[Job], None] | None = None,
+        on_finished: Callable[[Job], None] | None = None,
     ) -> Job:
         """Generates in the background; the pictures follow when an illustrator is given.
-        `on_lost` is told once if the job fails or is cancelled before its session is saved: there is nothing to show."""
+        `on_finished` is told once, however the job ends."""
         job = Job(id=uuid.uuid4().hex[:12], topic=topic, created_by=created_by)
         with self._lock:
             # A new try answers the same person's old failure.
@@ -143,11 +145,11 @@ class JobRunner:
             self._jobs[job.id] = job
         try:
             self._foresee_pictures(job, illustrator, 2 * VOCABULARY_COUNT)  # the example and the scene
-            self.executor.submit(self._run, job, generator, illustrator, on_lost)
+            self.executor.submit(self._run, job, generator, illustrator, on_finished)
         except Exception as e:  # the executor is refused new work once the server has begun to stop
             job.fail(str(e))
             log.exception("job %s: could not start", job.id)
-            self._tell_if_lost(job, on_lost)
+            self._tell_finished(job, on_finished)
         return job
 
     def get(self, job_id: str) -> Job | None:
@@ -169,6 +171,11 @@ class JobRunner:
             job.cancel()
         return job
 
+    def drawing(self, session_id: int) -> bool:
+        """Whether a job that saved this session is still running, its pictures on their way."""
+        with self._lock:
+            return any(job.status == "running" and job.session_id == session_id for job in self._jobs.values())
+
     def stage_expected_seconds(self, stage: Stage, job: Job | None = None) -> float:
         """What `job`'s own setup foresees (its picture model's time here), else the latest runs' median."""
         if job and stage in job.foreseen:
@@ -186,25 +193,41 @@ class JobRunner:
             total += max(spent, self.stage_expected_seconds(stage, job)) if ahead else spent
         return total
 
-    def _run(self, job: Job, generator: Generator, illustrator: Illustrator | None, on_lost: Callable[[Job], None] | None) -> None:
+    def _run(self, job: Job, generator: Generator, illustrator: Illustrator | None, on_finished: Callable[[Job], None] | None) -> None:
         self._generate(job, generator, illustrator)
-        self._tell_if_lost(job, on_lost)
+        self._discard_if_cancelled(job)
+        self._tell_finished(job, on_finished)
+
+    def _discard_if_cancelled(self, job: Job) -> None:
+        """A cancelled job leaves nothing behind: the session it saved goes, with the pictures that landed on it."""
+        if job.status != "cancelled" or job.session_id is None:
+            return
+        try:
+            for picture_id in self._sessions.delete(job.session_id) or []:
+                if self._sources:
+                    self._sources.drop(picture_id)
+        except Exception:
+            log.exception("job %s: cancelled, and its session %s would not go", job.id, job.session_id)
+        job.session_id = None
 
     @staticmethod
-    def _tell_if_lost(job: Job, on_lost: Callable[[Job], None] | None) -> None:
-        if on_lost and job.session_id is None and job.status in ("failed", "cancelled"):
+    def _tell_finished(job: Job, on_finished: Callable[[Job], None] | None) -> None:
+        if on_finished:
             try:
-                on_lost(job)
+                on_finished(job)
             except Exception:
-                log.exception("job %s: lost, and telling so failed too", job.id)
+                log.exception("job %s: over, and telling so failed", job.id)
 
     def _generate(self, job: Job, generator: Generator, illustrator: Illustrator | None) -> None:
         """The session is saved, with expressions from the corpus, and `job.session_id` set, as soon as
         its text is written; the pictures land on it one by one after that, so it can be opened while they are drawn."""
         try:
+            if job.status == "cancelled":  # while it waited in the queue: nothing has been called
+                return
             used = Exclusions(self._sessions.used_words(seen_by=job.created_by))
             exclude = used.thin(1 - self.REPEAT_ALLOWANCE, random.Random())
             log.info("job %s: banning %d/%d words", job.id, len(exclude.words), len(used.words))
+            job.spent = True
             draft = generator.generate(job.topic, on_progress=job.apply, exclude=exclude)
             leaked = exclude.taught([v.word for v in draft.vocabulary])
             if leaked:
@@ -217,6 +240,8 @@ class JobRunner:
             landed = self._keep_figures(session, draft.article.figures)
             if illustrator:
                 self._illustrate(job, illustrator, session, self._scenes_to_draw(session, draft.article, landed))
+            if job.status == "cancelled":  # after its last progress report
+                raise Cancelled
             job.finish()
             for stage in Stage:
                 self._stages.add(stage, job.stage_seconds.get(stage, 0.0))
@@ -286,14 +311,14 @@ class JobRunner:
 
     def _illustrate(self, job: Job, illustrator: Illustrator, session: Session, scenes: list[ArticleScene]) -> None:
         """Each picture onto the saved session as it is drawn, the article's `scenes` among them;
-        a painter failure leaves the session without the rest."""
+        a painter failure leaves the session without the rest, and the job knows pictures are missing."""
         words = session.content.vocabulary
         article_scenes = [scene.picture.scene for scene in scenes]
         total = illustrator.count(words, article_scenes)
         self._foresee_pictures(job, illustrator, total)
         job.apply(with_pictures(job.progress, 0, total))
         try:
-            illustrator.illustrate(
+            missing = illustrator.illustrate(
                 job.id,
                 words,
                 lambda done: job.apply(with_pictures(job.progress, done, total)),
@@ -301,5 +326,7 @@ class JobRunner:
                 article_scenes,
                 lambda n, picture_id: self._sessions.add_figure(session.id, scenes[n].paragraph, picture_id, scenes[n].picture.caption, None, None),
             )
+            job.pictures_missing = bool(missing)
         except GenerationError as e:
+            job.pictures_missing = True
             log.warning("job %s: the session stays without the pictures not yet drawn: %s", job.id, e)

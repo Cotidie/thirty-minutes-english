@@ -2,9 +2,8 @@ from dataclasses import asdict
 
 from fastapi import APIRouter, HTTPException, Response
 
-from app.api.deps import Db, Files, Jobs, Me, Svc, charge, failed, off, paid, require_access, require_creator
+from app.api.deps import Db, Files, Jobs, Me, Svc, failed, held_or_402, off, paid, require_access, require_creator
 from app.api.schemas import CreateSessionRequest, JobStatus, RedrawRequest, ShareEntry, ShareRequest, StarRequest
-from app.credits import PRICES
 from app.db import Database
 from app.db.sessions import StarKind
 from app.generation.jobs import Job, JobRunner
@@ -32,6 +31,7 @@ def status_of(job: Job, runner: JobRunner) -> JobStatus:
         expected_seconds=runner.expected_seconds(job),
         session_id=job.session_id,
         error=job.error,
+        spent=job.spent,
     )
 
 
@@ -54,9 +54,19 @@ def create_session(body: CreateSessionRequest, db: Db, jobs: Jobs, services: Svc
     topic = (body.topic or "").strip() or pick_topic(
         db.sessions.recent_topics(RECENT_TOPIC_WINDOW), [t.text for t in db.topics.curated()]
     )
-    charge(db, me, "session", topic)
-    on_lost = None if me.is_admin else lambda _: db.credits.refund(me.id, PRICES["session"], topic)
-    return status_of(jobs.start(topic, services.generator, services.illustrator, created_by=me.id, on_lost=on_lost), jobs)
+    hold = held_or_402(db, me, "session", topic)
+    job = jobs.start(topic, services.generator, services.illustrator, created_by=me.id, on_finished=lambda job: _bill_session(db, hold, job))
+    return status_of(job, jobs)
+
+
+def _bill_session(db: Database, hold: int | None, job: Job) -> None:
+    """Paid in full only with every picture on it; half when its maker stopped it after Claude was called; else nothing."""
+    if job.status == "done" and not job.pictures_missing:
+        db.credits.settle(hold)
+    elif job.status == "cancelled" and job.spent:
+        db.credits.settle(hold, as_kind="session_cancelled")
+    else:
+        db.credits.release(hold)
 
 
 @router.get("/jobs", response_model=list[JobStatus])
@@ -91,9 +101,12 @@ def get_session(session_id: int, db: Db, me: Me) -> Session:
 
 
 @router.delete("/sessions/{session_id}", status_code=204)
-def delete_session(session_id: int, db: Db, files: Files, me: Me) -> Response:
-    """The session, everything kept with it, and the picture files its words showed."""
+def delete_session(session_id: int, db: Db, files: Files, jobs: Jobs, me: Me) -> Response:
+    """The session, everything kept with it, and the picture files its words showed. Not while its pictures are drawn:
+    stopping that has a price, which only the Cancel on the progress bar says."""
     require_creator(db, me, session_id)
+    if jobs.drawing(session_id):
+        raise HTTPException(status_code=409, detail="This session is still being drawn. Cancel it on the progress bar: the session goes and half the price stays charged.")
     pictures = db.sessions.delete(session_id)
     if pictures is None:
         raise HTTPException(status_code=404, detail="session not found")

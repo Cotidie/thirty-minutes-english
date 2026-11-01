@@ -86,11 +86,12 @@ class Illustrator:
         on_picture: OnPicture | None = None,
         article_scenes: Sequence[str] = (),
         on_article: Callable[[int, int], None] | None = None,
-    ) -> None:
+    ) -> int:
         """Draws the example of every word, the scene of every word that has one, and each of `article_scenes`,
         all in one batch. `on_picture` hears of a word's picture and `on_article` of an article scene's (its index,
         its picture id), as soon as its row and file are there; a picture that failed is not heard of. When either
-        raises KeyError (its session went away while drawing), the picture's file goes too."""
+        raises KeyError (its session went away while drawing), the picture's file goes too.
+        How many pictures did not come back."""
         wanted = self._wanted(vocabulary)
         prompts = [prompt for _, _, prompt in wanted] + [self.prompt(scene) for scene in article_scenes]
 
@@ -110,9 +111,12 @@ class Illustrator:
                 self._files.remove(picture_id)
                 log.info("job %s: %s went away while drawing; dropped picture %s", job_id, what(n), picture_id)
 
+        missing = 0
         for n, drawn in enumerate(self._painter.paint(prompts, on_drawn, keep)):
             if drawn is None:
+                missing += 1
                 log.warning("job %s: no picture for %s", job_id, what(n))
+        return missing
 
     def redraw(self, scene: Scene) -> int:
         """`scene` drawn as a new picture. The old one stays until the caller has stored the new id

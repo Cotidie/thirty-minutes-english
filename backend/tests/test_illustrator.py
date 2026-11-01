@@ -58,6 +58,14 @@ def test_every_word_gets_its_example_and_its_scene_drawn(tmp_path):
     assert files.path(picture[2, "image"]).read_bytes() == b"PNG5"
 
 
+def test_illustrate_says_how_many_pictures_did_not_come_back(tmp_path):
+    words = sample_draft().vocabulary
+    short, _, _ = illustrator_for(tmp_path / "short", FakePainter(blank={1, 3}))
+    assert short.illustrate("j", words, None, landing([])) == 2
+    whole, _, _ = illustrator_for(tmp_path / "whole")
+    assert whole.illustrate("j", words, None, landing([])) == 0
+
+
 def test_each_drawn_picture_is_one_row_and_one_file_named_by_the_row(tmp_path):
     illustrator, db, files = illustrator_for(tmp_path)
     landed = []

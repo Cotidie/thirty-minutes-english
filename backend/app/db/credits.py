@@ -45,25 +45,6 @@ class CreditRepo:
             _add_row(conn, user_id, amount, "grant", None, by)
         self._db.account_changes.publish(user_id, AccountChange.CREDITS)
 
-    def charge(self, user: User, kind: str, detail: str | None = None) -> bool:
-        """Takes the price of `kind`, or nothing when the balance cannot cover it. The write lock comes first,
-        so two charges at once cannot both spend the same credits."""
-        if user.is_admin:
-            return True
-        price = PRICES[kind]
-        with self._db.connect() as conn:
-            conn.execute("BEGIN IMMEDIATE")
-            if _balance(conn, user.id) < price:
-                return False
-            _add_row(conn, user.id, -price, kind, detail, None)
-        self._db.account_changes.publish(user.id, AccountChange.CREDITS)
-        return True
-
-    def refund(self, user_id: int, amount: int, detail: str | None) -> None:
-        with self._db.connect() as conn:
-            _add_row(conn, user_id, amount, "refund", detail, None)
-        self._db.account_changes.publish(user_id, AccountChange.CREDITS)
-
     def hold(self, user: User, kind: str, detail: str | None = None) -> int | None:
         """Takes the price of `kind` off the balance while its work runs, or raises NotEnoughCredits; None for the
         admin, who pays nothing. The write lock comes first, so two holds at once cannot spend the same credits."""

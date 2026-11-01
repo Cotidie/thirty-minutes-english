@@ -75,6 +75,7 @@ class JobStatus(BaseModel):
     expected_seconds: float
     session_id: int | None = None
     error: str | None = None
+    spent: bool = False  # Claude has been called, so stopping now costs half
 
 
 def _not_blank(value: str) -> str:

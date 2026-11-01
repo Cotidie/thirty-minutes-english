@@ -1,6 +1,7 @@
 from io import BytesIO
 
 import httpx2
+import pytest
 from PIL import Image as PILImage
 
 from app.db import Database
@@ -258,31 +259,77 @@ class Exploding:
         raise RuntimeError("no network")
 
 
-def test_a_job_that_dies_of_anything_is_failed_and_reported_lost(tmp_path):
+def test_a_job_that_dies_of_anything_is_failed_and_reported(tmp_path):
     db = Database(tmp_path / "s.db")
-    lost = []
-    job = runner_over(db).start("Trams", Exploding(), on_lost=lost.append)
+    finished = []
+    job = runner_over(db).start("Trams", Exploding(), on_finished=finished.append)
     assert job.status == "failed" and "no network" in job.error
-    assert lost == [job]
+    assert finished == [job]
 
 
-def test_a_failure_the_generator_reports_is_lost_too(tmp_path):
+def test_a_failure_the_generator_reports_is_reported_too(tmp_path):
     db = Database(tmp_path / "s.db")
-    lost = []
+    finished = []
 
     class Failing:
         def generate(self, topic, on_progress=None, exclude=None):
             raise GenerationError("claude exited 1")
 
-    job = runner_over(db).start("Trams", Failing(), on_lost=lost.append)
-    assert job.status == "failed" and lost == [job]
+    job = runner_over(db).start("Trams", Failing(), on_finished=finished.append)
+    assert job.status == "failed" and finished == [job]
 
 
-def test_a_cancel_before_the_session_is_saved_is_lost_but_one_after_is_not(tmp_path):
+class Draws:
+    """Stands in for the illustrator: `during` runs while it draws, then it fails or reports what did not come back."""
+
+    def __init__(self, missing=0, error=None, during=None):
+        self.missing, self.error, self.during = missing, error, during
+
+    def expected_seconds(self, count):
+        return None
+
+    def count(self, words, scenes):
+        return 1
+
+    def illustrate(self, job_id, words, on_done, on_picture, scenes, on_figure):
+        if self.during:
+            self.during(job_id, on_picture)
+        on_done(1)
+        if self.error:
+            raise self.error
+        return self.missing
+
+
+def test_every_finished_job_is_reported_once(tmp_path):
+    db = Database(tmp_path / "s.db")
+    finished = []
+    job = runner_over(db).start("Trams", Recording(), on_finished=finished.append)
+    assert job.status == "done" and job.spent is True and finished == [job]
+
+
+def test_a_job_cancelled_in_the_queue_calls_nothing_and_has_spent_nothing(tmp_path):
+    db = Database(tmp_path / "s.db")
+
+    class Queue:
+        def submit(self, fn, /, *args):
+            self.waiting = (fn, args)
+
+    queue = Queue()
+    runner = JobRunner(db.sessions, db.expressions, db.stages, queue)
+    generator, finished = Recording(), []
+    job = runner.start("Trams", generator, on_finished=finished.append)
+    runner.close(job.id)
+    fn, args = queue.waiting
+    fn(*args)
+    assert job.status == "cancelled" and job.spent is False
+    assert generator.excluded == [] and finished == [job]
+
+
+def test_a_cancel_before_the_session_is_saved_has_spent_claude(tmp_path):
     db = Database(tmp_path / "s.db")
     seed_expressions(db, EXPRESSION_COUNT)
     runner = runner_over(db)
-    lost = []
+    finished = []
 
     class CancelsItself:
         """With InlineExecutor the job runs inside start(), so the one open job is this one."""
@@ -292,78 +339,103 @@ def test_a_cancel_before_the_session_is_saved_is_lost_but_one_after_is_not(tmp_p
             on_progress(Progress(Stage.SEARCHING, 1))  # raises Cancelled
             return sample_draft()
 
-    job = runner.start("Trams", CancelsItself(), on_lost=lost.append)
-    assert job.status == "cancelled" and job.session_id is None
-    assert lost == [job]
-
-    done = runner.start("Boats", Recording(), on_lost=lost.append)
-    runner.close(done.id)  # too late to be lost: the session is saved
-    assert done.session_id is not None and lost == [job]
+    job = runner.start("Trams", CancelsItself(), on_finished=finished.append)
+    assert job.status == "cancelled" and job.session_id is None and job.spent is True
+    assert finished == [job]
 
 
-def test_a_cancel_the_generator_never_hears_of_is_still_lost(tmp_path):
+def test_a_cancel_the_generator_never_hears_of_saves_nothing(tmp_path):
     db = Database(tmp_path / "s.db")
     runner = runner_over(db)
-    lost = []
 
     class FinishesAnyway:
         def generate(self, topic, on_progress=None, exclude=None):
             runner.close(runner.open()[0].id)
             return sample_draft()
 
-    job = runner.start("Trams", FinishesAnyway(), on_lost=lost.append)
-    assert job.status == "cancelled" and job.session_id is None and lost == [job]
+    job = runner.start("Trams", FinishesAnyway())
+    assert job.status == "cancelled" and job.session_id is None
 
 
-def test_a_cancel_while_the_pictures_are_drawn_keeps_the_session_and_is_not_lost(tmp_path):
+def test_a_cancel_while_the_pictures_are_drawn_deletes_the_session_and_its_files(tmp_path):
     db = Database(tmp_path / "s.db")
     seed_expressions(db, EXPRESSION_COUNT)
     runner = runner_over(db)
-    lost = []
+    files = PictureFiles(db.images_dir)
+    finished, saved = [], {}
 
-    class CancelsWhileDrawing:
-        def expected_seconds(self, count):
-            return None
+    def landing_then_cancelling(job_id, on_picture):
+        picture_id = db.pictures.add(None, None, None)
+        files.write(picture_id, b"PNG")
+        on_picture(0, "example_image", picture_id)
+        saved["session"] = runner.get(job_id).session_id
+        runner.close(job_id)
 
-        def count(self, words, scenes):
-            return 1
-
-        def illustrate(self, job_id, words, on_done, on_picture, scenes, on_figure):
-            runner.close(job_id)
-            on_done(1)  # raises Cancelled
-
-    job = runner.start("Trams", Recording(), CancelsWhileDrawing(), on_lost=lost.append)
-    assert job.status == "cancelled" and job.session_id is not None and lost == []
+    job = runner.start("Trams", Recording(), Draws(during=landing_then_cancelling), on_finished=finished.append)
+    assert job.status == "cancelled" and job.session_id is None and job.spent is True
+    assert db.sessions.get(saved["session"]) is None
+    assert list(db.images_dir.iterdir()) == []
+    assert finished == [job]
 
 
-def test_a_job_that_dies_after_its_session_is_saved_is_failed_but_not_lost(tmp_path):
+def test_a_cancel_after_the_last_progress_report_still_counts(tmp_path):
     db = Database(tmp_path / "s.db")
     seed_expressions(db, EXPRESSION_COUNT)
-    lost = []
+    runner = runner_over(db)
 
-    class DiesWhileDrawing:
-        def expected_seconds(self, count):
-            return None
-
-        def count(self, words, scenes):
-            return 1
-
+    class CancelsLast(Draws):
         def illustrate(self, job_id, words, on_done, on_picture, scenes, on_figure):
-            raise OSError("No space left on device")
+            on_done(1)
+            runner.close(job_id)
+            return 0
 
-    job = runner_over(db).start("Trams", Recording(), DiesWhileDrawing(), on_lost=lost.append)
+    job = runner.start("Trams", Recording(), CancelsLast())
+    assert job.status == "cancelled" and job.session_id is None
+
+
+def test_a_job_that_dies_after_its_session_is_saved_is_failed_and_keeps_it(tmp_path):
+    db = Database(tmp_path / "s.db")
+    seed_expressions(db, EXPRESSION_COUNT)
+    finished = []
+    job = runner_over(db).start("Trams", Recording(), Draws(error=OSError("No space left on device")), on_finished=finished.append)
     assert job.status == "failed" and "No space left" in job.error
     assert job.session_id is not None and db.sessions.get(job.session_id) is not None
-    assert lost == []
+    assert finished == [job]
 
 
-def test_a_refund_that_fails_does_not_take_the_job_down(tmp_path):
+@pytest.mark.parametrize(
+    "draws,missing",
+    [(Draws(), False), (Draws(missing=2), True), (Draws(error=GenerationError("openrouter down")), True)],
+)
+def test_a_job_knows_whether_every_picture_came_back(tmp_path, draws, missing):
+    db = Database(tmp_path / "s.db")
+    seed_expressions(db, EXPRESSION_COUNT)
+    job = runner_over(db).start("Trams", Recording(), draws)
+    assert job.status == "done" and job.pictures_missing is missing
+
+
+def test_drawing_names_only_a_running_job_that_saved_that_session(tmp_path):
+    db = Database(tmp_path / "s.db")
+    seed_expressions(db, EXPRESSION_COUNT)
+    runner = runner_over(db)
+    seen = {}
+
+    def look(job_id, on_picture):
+        sid = runner.get(job_id).session_id
+        seen.update(sid=sid, during=runner.drawing(sid), other=runner.drawing(sid + 1))
+
+    runner.start("Trams", Recording(), Draws(during=look))
+    assert seen["during"] is True and seen["other"] is False
+    assert runner.drawing(seen["sid"]) is False
+
+
+def test_telling_of_the_end_can_fail_without_taking_the_job_down(tmp_path):
     db = Database(tmp_path / "s.db")
 
     def refuses(job):
         raise RuntimeError("database is locked")
 
-    job = runner_over(db).start("Trams", Exploding(), on_lost=refuses)
+    job = runner_over(db).start("Trams", Exploding(), on_finished=refuses)
     assert job.status == "failed"
 
 
@@ -374,9 +446,9 @@ class ShutDown:
         raise RuntimeError("cannot schedule new futures after shutdown")
 
 
-def test_a_job_the_executor_refuses_is_failed_and_reported_lost(tmp_path):
+def test_a_job_the_executor_refuses_is_failed_and_reported(tmp_path):
     db = Database(tmp_path / "s.db")
-    lost = []
-    job = JobRunner(db.sessions, db.expressions, db.stages, ShutDown()).start("Trams", Recording(), on_lost=lost.append)
+    finished = []
+    job = JobRunner(db.sessions, db.expressions, db.stages, ShutDown()).start("Trams", Recording(), on_finished=finished.append)
     assert job.status == "failed" and "shutdown" in job.error
-    assert lost == [job]
+    assert finished == [job]

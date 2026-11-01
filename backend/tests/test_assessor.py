@@ -44,7 +44,7 @@ def test_token_endpoint_returns_the_azure_session(tmp_path, http):
     http.json = "eyJ.t"
     with token_client(tmp_path) as c:
         body = c.get("/api/assessor/token").json()
-    assert body == {"token": "eyJ.t", "region": "koreacentral", "word_score": 55}
+    assert body == {"token": "eyJ.t", "region": "koreacentral", "word_score": 55, "hold": None}
 
 
 def test_token_endpoint_relays_azure_failures_as_502(tmp_path, http):

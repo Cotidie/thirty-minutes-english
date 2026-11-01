@@ -38,6 +38,7 @@ def create_app(
     `catalog` the model lists are whatever the database holds, never fetched."""
     app = FastAPI(title="english-speaking-claude")
     app.state.db = db
+    db.credits.release_abandoned()  # nothing can still be working on a hold when the app starts; these were left by the process before
     app.state.files = PictureFiles(image_dir or db.images_dir)
     app.state.services = services
     app.state.env = os.environ if env is None else env
