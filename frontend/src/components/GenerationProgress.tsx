@@ -27,6 +27,7 @@ export function GenerationProgress({ job, onClose, onOpen }: Props) {
   useEffect(() => setPercent((prev) => percentFor(job, prev)), [job])
   const failed = job.status === 'failed'
   const price = useCredits().cost('session_cancelled')
+  const note = stopNote(job, price)
 
   return (
     <section className={failed ? 'gen gen-failed' : 'gen'} aria-live="polite">
@@ -66,7 +67,14 @@ export function GenerationProgress({ job, onClose, onOpen }: Props) {
           </button>
         )}
         {job.status === 'running' && (
-          <button type="button" className="btn btn-link" onClick={onClose} title={stopNote(job, price)}>
+          <button
+            type="button"
+            className="btn btn-link"
+            onClick={() => {
+              if (!note || window.confirm(note)) onClose()
+            }}
+            title={note}
+          >
             {job.session_id === null ? 'Cancel' : 'Cancel and delete'}
             {job.spent && <Price amount={price} />}
           </button>

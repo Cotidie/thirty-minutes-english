@@ -1,4 +1,4 @@
-import { act, render, screen } from '@testing-library/react'
+import { act, cleanup, render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { api } from '../api'
@@ -103,6 +103,39 @@ describe('Practice', () => {
   it('keeps the voice when the coach answered', async () => {
     renderPractice()
     await sayAndHear()
+    expect(connection.giveBack).not.toHaveBeenCalled()
+  })
+
+  it.each(['Discard', 'Retry'])('gives the voice back when the reader spoke, nothing came back, and they press %s', async (name) => {
+    renderPractice()
+    await beginRound()
+    act(() => emit({ type: 'session.input_transcript.delta', delta: 'The dam mitigate the flood.' }))
+    await userEvent.click(screen.getByRole('button', { name }))
+    expect(connection.giveBack).toHaveBeenCalledOnce()
+  })
+
+  it('gives the voice back when the reader spoke, nothing came back, and they leave the page', async () => {
+    renderPractice()
+    await beginRound()
+    act(() => emit({ type: 'session.input_transcript.delta', delta: 'The dam mitigate the flood.' }))
+    cleanup()
+    expect(connection.giveBack).toHaveBeenCalledOnce()
+  })
+
+  it('keeps the voice when the reader said nothing and discards', async () => {
+    renderPractice()
+    await beginRound()
+    await userEvent.click(screen.getByRole('button', { name: 'Discard' }))
+    expect(connection.giveBack).not.toHaveBeenCalled()
+  })
+
+  it('keeps the voice when the coach answered and the reader discards', async () => {
+    renderPractice()
+    await beginRound()
+    act(() => emit({ type: 'session.input_transcript.delta', delta: 'The dam mitigate the flood.' }))
+    act(() => emit({ type: 'session.output_transcript.delta', delta: 'Got it.' }))
+    await screen.findByText('Mitigates takes an s here.')
+    await userEvent.click(screen.getByRole('button', { name: 'Discard' }))
     expect(connection.giveBack).not.toHaveBeenCalled()
   })
 

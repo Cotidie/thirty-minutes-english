@@ -294,6 +294,59 @@ describe('ReadAloud round', () => {
     }
   })
 
+  /** The reading done with, and the coach's call open on its mark. */
+  async function callWithRealTimers() {
+    renderIdle()
+    await startRound()
+    act(() => segment([berified], 'berified'))
+    await userEvent.click(screen.getByRole('button', { name: 'verified: b for v' }))
+    await waitFor(() => expect(connect).toHaveBeenCalledOnce())
+    await act(async () => undefined)
+  }
+
+  it('a second click gives back a connected coach that has said nothing', async () => {
+    await callWithRealTimers()
+    await userEvent.click(screen.getByRole('button', { name: 'verified: b for v' }))
+    await waitFor(() => expect(connect).toHaveBeenCalledTimes(2))
+    expect(connection.giveBack).toHaveBeenCalledOnce()
+  })
+
+  it('a second click keeps the price of a coach that has spoken', async () => {
+    await callWithRealTimers()
+    act(() => emit({ type: 'session.output_transcript.delta', delta: 'You said /b/.' }))
+    await userEvent.click(screen.getByRole('button', { name: 'verified: b for v' }))
+    await waitFor(() => expect(connect).toHaveBeenCalledTimes(2))
+    expect(connection.giveBack).not.toHaveBeenCalled()
+  })
+
+  it('leaving the page gives back a connected coach that has said nothing', async () => {
+    await callWithRealTimers()
+    cleanup()
+    expect(connection.giveBack).toHaveBeenCalledOnce()
+  })
+
+  it('gives the price back once though Azure both reports and refuses', async () => {
+    startAssessor.mockImplementationOnce(async (opts: AssessorOptions) => {
+      opts.onError('Connection closed')
+      throw new Error('no route to Azure')
+    })
+    renderIdle()
+    await userEvent.click(screen.getByRole('button', { name: 'Read aloud' }))
+    expect(await screen.findByText('no route to Azure')).toBeInTheDocument()
+    expect(api.giveBackHold).toHaveBeenCalledExactlyOnceWith(31)
+  })
+
+  it('confirms nothing it has already given back', async () => {
+    startAssessor.mockImplementationOnce(async (opts: AssessorOptions) => {
+      opts.onError('Connection closed')
+      return assessor
+    })
+    renderIdle()
+    await startRound()
+    expect(api.giveBackHold).toHaveBeenCalledExactlyOnceWith(31)
+    expect(api.confirmHold).not.toHaveBeenCalled()
+  })
+
   it('a second click abandons a call still connecting', async () => {
     connect.mockImplementationOnce(() => new Promise(() => undefined))
     renderIdle()

@@ -73,10 +73,19 @@ export function useLiveRound(
     leaving.current = null
   }
 
+  /** A round with a coach that closed on what the reader said, with nothing said back. */
+  const wentUnanswered = () => handlers.current.onTurn && turn.current === 'open' && latest.current?.user.trim()
+
+  /** However the reader leaves a round: one that went unanswered did not deliver. */
+  const dropRound = () => {
+    if (wentUnanswered()) connRef.current?.giveBack()
+    connRef.current?.dispose()
+  }
+
   useEffect(() => () => {
     clearSilence()
     abandon()
-    connRef.current?.dispose()
+    dropRound()
   }, [])
 
   const save = useCallback(async () => {
@@ -125,13 +134,10 @@ export function useLiveRound(
     [armSilence],
   )
 
-  /** A round with a coach that closed on what the reader said, with nothing said back. */
-  const wentUnanswered = () => handlers.current.onTurn && turn.current === 'open' && latest.current?.user.trim()
-
   const start = useCallback(async () => {
     clearSilence()
     abandon()
-    connRef.current?.dispose()
+    dropRound()
     connRef.current = null
     setMicrophone(null)
     turn.current = 'open'
@@ -177,7 +183,7 @@ export function useLiveRound(
   const dismiss = useCallback(() => {
     clearSilence()
     abandon()
-    connRef.current?.dispose()
+    dropRound()
     connRef.current = null
     setMicrophone(null)
     turn.current = 'open'

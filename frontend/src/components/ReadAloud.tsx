@@ -69,10 +69,6 @@ interface Call {
   spoke: boolean
 }
 
-function giveBack(hold: number | null) {
-  if (hold !== null) void api.giveBackHold(hold)
-}
-
 /**
  * Read aloud with the assessor as the only listener. Azure marks the paragraph
  * as the reader goes; a clicked mark opens the full account in text, and the
@@ -118,6 +114,10 @@ export function useReadAloud({ paragraph: { id: paragraphId, text: paragraph }, 
     setOpen(null)
     let microphone: MediaStream | null = null
     let hold: number | null = null
+    const giveBack = () => {
+      if (hold !== null) void api.giveBackHold(hold)
+      hold = null
+    }
     try {
       // The microphone first: a refused one spends nothing.
       microphone = await navigator.mediaDevices.getUserMedia({ audio: true })
@@ -141,7 +141,7 @@ export function useReadAloud({ paragraph: { id: paragraphId, text: paragraph }, 
         onSegment: (words, text) => judged(round, words, text),
         onError: (message) => {
           setError(`Assessor: ${message}`)
-          giveBack(hold)
+          giveBack()
         },
       })
       stopIfLeft()
@@ -150,7 +150,7 @@ export function useReadAloud({ paragraph: { id: paragraphId, text: paragraph }, 
     } catch (e) {
       microphone?.getTracks().forEach((t) => t.stop())
       void endRound()
-      giveBack(hold)
+      giveBack()
       setError(e instanceof Error ? e.message : String(e))
       setPhase('failed')
     }
@@ -246,6 +246,7 @@ export function useReadAloud({ paragraph: { id: paragraphId, text: paragraph }, 
     if (!call) return
     callRef.current = null
     if (call.timer) clearTimeout(call.timer)
+    if (!call.spoke) call.coach.giveBack()
     call.coach.dispose()
   }
 

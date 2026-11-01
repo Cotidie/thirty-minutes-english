@@ -63,6 +63,33 @@ describe('GenerationProgress', () => {
     expect(cancel).toHaveAttribute('title', 'Stops now. The session is deleted.')
   })
 
+  it.each([
+    [{ spent: true }, 'Cancel', 'Stops now. 100 credits stay charged.'],
+    [{ spent: true, stage: 'illustrating' as const, session_id: 21 }, 'Cancel and delete', 'Stops now. The session is deleted and 100 credits stay charged.'],
+  ])('asks first when stopping costs or deletes, and stops only on yes', (change, name, question) => {
+    const confirm = vi.spyOn(window, 'confirm').mockReturnValueOnce(false).mockReturnValueOnce(true)
+    const onClose = vi.fn()
+    render(<GenerationProgress job={{ ...base, ...change }} onClose={onClose} onOpen={() => undefined} />)
+    fireEvent.click(screen.getByRole('button', { name }))
+    expect(confirm).toHaveBeenCalledExactlyOnceWith(question)
+    expect(onClose).not.toHaveBeenCalled()
+    fireEvent.click(screen.getByRole('button', { name }))
+    expect(onClose).toHaveBeenCalledOnce()
+    confirm.mockRestore()
+  })
+
+  it('asks nothing when stopping is free, or of a failed job', () => {
+    const confirm = vi.spyOn(window, 'confirm')
+    const onClose = vi.fn()
+    const { rerender } = render(<GenerationProgress job={base} onClose={onClose} onOpen={() => undefined} />)
+    fireEvent.click(screen.getByRole('button', { name: 'Cancel' }))
+    rerender(<GenerationProgress job={{ ...base, spent: true, status: 'failed', session_id: 21 }} onClose={onClose} onOpen={() => undefined} />)
+    fireEvent.click(screen.getByRole('button', { name: 'Close' }))
+    expect(confirm).not.toHaveBeenCalled()
+    expect(onClose).toHaveBeenCalledTimes(2)
+    confirm.mockRestore()
+  })
+
   it('asks nothing of a failed job, whatever it spent', () => {
     render(<GenerationProgress job={{ ...base, spent: true, status: 'failed', session_id: 21 }} onClose={() => undefined} onOpen={() => undefined} />)
     const close = screen.getByRole('button', { name: 'Close' })
