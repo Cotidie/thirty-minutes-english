@@ -2,7 +2,7 @@
 
 from fastapi import APIRouter, Response
 
-from app.api.deps import Db, Me, Svc, charge, failed, off, paid
+from app.api.deps import Db, Me, Svc, browser_round, failed, off, paid
 from app.api.schemas import (
     AssessorSession,
     ExampleFeedbackRequest,
@@ -15,7 +15,8 @@ from app.api.schemas import (
 from app.llm import GenerationError
 from app.models import ExampleFeedback, SummaryFeedback
 from app.net import HttpError
-from app.voice.live import LiveAgent
+from app.voice.assessor import AzureAssessor
+from app.voice.live import GeminiTranscriber, LiveAgent
 from app.voice.speech import Speaker
 from app.wiring import Services
 
@@ -36,11 +37,24 @@ def start_live(agent: LiveAgent, **values: str) -> dict:
         raise failed("voice session", e) from e
 
 
+def _start_transcriber(transcriber: GeminiTranscriber, paragraph: str) -> dict:
+    try:
+        return transcriber.start(paragraph)
+    except HttpError as e:
+        raise failed("transcription session", e) from e
+
+
+def _assessor_session(assessor: AzureAssessor) -> dict:
+    try:
+        return assessor.session()
+    except HttpError as e:
+        raise failed("assessor token", e) from e
+
+
 @router.post("/read-aloud/sessions", response_model=LiveSession, status_code=201)
 def start_read_aloud(body: ParagraphRequest, db: Db, me: Me, services: Svc) -> dict:
     agent = live_agent(services, "read-aloud")
-    charge(db, me, "read_aloud_voice")
-    return start_live(agent, paragraph=body.paragraph)
+    return browser_round(db, me, "read_aloud_voice", None, lambda: start_live(agent, paragraph=body.paragraph))
 
 
 @router.post("/summary/sessions", response_model=LiveSession, status_code=201)
@@ -49,11 +63,7 @@ def start_summary(body: ParagraphRequest, db: Db, me: Me, services: Svc) -> dict
     transcriber = services.transcriber
     if transcriber is None:
         raise off("Summarize is off: set GEMINI_API_KEY in Settings")
-    charge(db, me, "summary_voice")
-    try:
-        return transcriber.start(body.paragraph)
-    except HttpError as e:
-        raise failed("transcription session", e) from e
+    return browser_round(db, me, "summary_voice", None, lambda: _start_transcriber(transcriber, body.paragraph))
 
 
 @router.post("/summary/feedback", response_model=SummaryFeedback)
@@ -71,19 +81,15 @@ def summary_feedback(body: SummaryFeedbackRequest, db: Db, me: Me, services: Svc
 @router.post("/example/sessions", response_model=LiveSession, status_code=201)
 def start_example(body: ExampleSessionRequest, db: Db, me: Me, services: Svc) -> dict:
     agent = live_agent(services, "example")
-    charge(db, me, "practice_voice", body.word)
-    return start_live(agent, word=body.word, meaning=body.meaning, pos=body.pos)
+    return browser_round(db, me, "practice_voice", body.word, lambda: start_live(agent, word=body.word, meaning=body.meaning, pos=body.pos))
 
 
 @router.get("/assessor/token", response_model=AssessorSession)
 def assessor_token(db: Db, me: Me, services: Svc) -> dict:
-    if services.assessor is None:
+    assessor = services.assessor
+    if assessor is None:
         raise off("Read aloud is off: set AZURE_SPEECH_KEY in Settings")
-    charge(db, me, "read_aloud_token")
-    try:
-        return services.assessor.session()
-    except HttpError as e:
-        raise failed("assessor token", e) from e
+    return browser_round(db, me, "read_aloud_token", None, lambda: _assessor_session(assessor))
 
 
 @router.post("/example/feedback", response_model=ExampleFeedback)

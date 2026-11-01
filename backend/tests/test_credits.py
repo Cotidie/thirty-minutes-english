@@ -11,6 +11,7 @@ from app.live.changes import AccountChange
 from app.llm import GenerationError
 from app.main import create_app
 from app.models import ExampleFeedback, SummaryFeedback
+from app.net import HttpError
 from app.wiring import Services
 from tests.conftest import add_user, admin_client, client_of, seed_expressions
 from tests.test_api import FailingGenerator, FakeGenerator, InlineExecutor
@@ -505,3 +506,81 @@ def test_only_what_changes_the_balance_tells_the_account_to_read_it_again(store,
     store.credits.release(store.credits.hold(mina, "speech"))
     store.credits.hold(boss, "speech")
     assert recorder.published == [(mina.id, AccountChange.CREDITS)] * 4
+
+
+class DownRound:
+    def start(self, *args, **values) -> dict:
+        raise HttpError(502, "down")
+
+
+class DownAssessor:
+    def session(self) -> dict:
+        raise HttpError(502, "down")
+
+
+VOICE_ROUTES = [("/api/example/sessions", WORD, 10), ("/api/summary/sessions", PARAGRAPH, 10), ("/api/read-aloud/sessions", PARAGRAPH, 5)]
+
+
+@pytest.mark.parametrize("path,body,price", VOICE_ROUTES)
+def test_a_voice_round_the_provider_refuses_takes_nothing(tmp_path, path, body, price):
+    agents = {"example": DownRound(), "read-aloud": DownRound()}
+    db, mina, me = paid_world(tmp_path, price, agents=agents, transcriber=DownRound())
+    assert me.post(path, json=body).status_code == 502
+    assert db.credits.balance(mina.id) == price
+
+
+def test_an_assessor_token_the_provider_refuses_takes_nothing(tmp_path):
+    db, mina, me = paid_world(tmp_path, 5, assessor=DownAssessor())
+    assert me.get("/api/assessor/token").status_code == 502
+    assert db.credits.balance(mina.id) == 5
+
+
+@pytest.mark.parametrize("path,body,price", VOICE_ROUTES)
+def test_a_voice_round_hands_over_its_hold_which_the_browser_settles_or_gives_back(tmp_path, path, body, price):
+    agents = {"example": LiveRound(), "read-aloud": LiveRound()}
+    db, mina, me = paid_world(tmp_path, price, agents=agents, transcriber=LiveRound())
+    hold = me.post(path, json=body).json()["hold"]
+    assert db.credits.balance(mina.id) == 0
+    assert me.post(f"/api/me/credits/holds/{hold}/confirm").status_code == 204
+    assert db.credits.balance(mina.id) == 0
+    assert me.delete(f"/api/me/credits/holds/{hold}").status_code == 204
+    assert db.credits.balance(mina.id) == price
+    assert me.delete(f"/api/me/credits/holds/{hold}").status_code == 404
+
+
+def test_the_assessor_token_carries_its_hold_too(tmp_path):
+    db, mina, me = paid_world(tmp_path, 5, assessor=Assessor())
+    hold = me.get("/api/assessor/token").json()["hold"]
+    assert me.delete(f"/api/me/credits/holds/{hold}").status_code == 204
+    assert db.credits.balance(mina.id) == 5
+
+
+def test_a_round_never_confirmed_comes_back_and_a_late_confirm_cannot_revive_it(tmp_path, monkeypatch):
+    monkeypatch.setattr("app.api.deps.CONFIRM_WINDOW", timedelta(seconds=-1))
+    db, mina, me = paid_world(tmp_path, 10, agents={"example": LiveRound()})
+    hold = me.post("/api/example/sessions", json=WORD).json()["hold"]
+    assert db.credits.balance(mina.id) == 10
+    assert me.post(f"/api/me/credits/holds/{hold}/confirm").status_code == 404
+    assert db.credits.balance(mina.id) == 10
+
+
+def test_nobody_else_can_report_on_my_hold(tmp_path):
+    db, mina, me = paid_world(tmp_path, 10, agents={"example": LiveRound()})
+    hold = me.post("/api/example/sessions", json=WORD).json()["hold"]
+    other = client_of(me.app, db, add_user(db, "other@example.com"))
+    assert other.post(f"/api/me/credits/holds/{hold}/confirm").status_code == 404
+    assert other.delete(f"/api/me/credits/holds/{hold}").status_code == 404
+    assert db.credits.balance(mina.id) == 0
+
+
+def test_the_browser_cannot_give_back_what_the_server_is_working_on(tmp_path):
+    db, mina, me = paid_world(tmp_path, 10)
+    hold = db.credits.hold(mina, "redraw")
+    assert me.delete(f"/api/me/credits/holds/{hold}").status_code == 404
+    assert db.credits.balance(mina.id) == 0
+
+
+def test_the_admins_round_has_no_hold(tmp_path):
+    db = Database(tmp_path / "s.db")
+    app = create_app(db, Services(FakeGenerator(), agents={"example": LiveRound()}), InlineExecutor())
+    assert admin_client(app).post("/api/example/sessions", json=WORD).json()["hold"] is None

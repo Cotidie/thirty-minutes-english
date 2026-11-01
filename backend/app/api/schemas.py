@@ -177,6 +177,7 @@ class LiveSession(BaseModel):
 
     url: str
     setup: dict[str, Any]
+    hold: int | None = None  # the price held for this round, which the browser reports on; none for the admin
 
 
 class AssessorSession(BaseModel):
@@ -185,6 +186,7 @@ class AssessorSession(BaseModel):
     token: str
     region: str
     word_score: int
+    hold: int | None = None  # the price held for this round, which the browser reports on; none for the admin
 
 
 class Option(BaseModel):

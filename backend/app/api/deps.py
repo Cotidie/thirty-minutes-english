@@ -10,7 +10,7 @@ from fastapi import Depends, HTTPException, Request
 
 from app.config.catalog import Catalog
 from app.config.settings import Settings
-from app.credits import PRICES
+from app.credits import CONFIRM_WINDOW, PRICES
 from app.db import Database
 from app.db.credits import NotEnoughCredits
 from app.generation.jobs import JobRunner
@@ -125,6 +125,18 @@ def paid(db: Database, me: User, kind: str, detail: str | None = None) -> Iterat
         _quietly(db.credits.release, hold)
         raise
     _quietly(db.credits.settle, hold)
+
+
+def browser_round(db: Database, me: User, kind: str, detail: str | None, start: Callable[[], dict]) -> dict:
+    """A round the browser opens by itself: the price stays held until it says the round connected."""
+    hold = held_or_402(db, me, kind, detail)
+    try:
+        session = start()
+        db.credits.await_browser(hold, CONFIRM_WINDOW)
+    except BaseException:
+        _quietly(db.credits.release, hold)
+        raise
+    return {**session, "hold": hold}
 
 
 def _quietly(step: Callable[[int | None], None], hold: int | None) -> None:
