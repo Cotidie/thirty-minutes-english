@@ -1,0 +1,32 @@
+# Reaching the app by IP on a Wi-Fi or hotspot, where no proxy gives HTTPS and browsers refuse the microphone over HTTP.
+# Turn it on with COMPOSE_FILE=compose.yaml:compose.lan.yaml in .env, then open https://<this machine's IP>:5443.
+services:
+  backend:
+    environment:
+      COOKIE_SECURE: "false"
+
+  lan-https:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    ports:
+      - "0.0.0.0:5443:443"
+    configs:
+      - source: caddyfile
+        target: /etc/caddy/Caddyfile
+    volumes:
+      - lan-https:/data # Keeps the self-signed certificate across restarts.
+    depends_on:
+      - frontend
+
+configs:
+  caddyfile:
+    content: |
+      https:// {
+        tls internal {
+          on_demand
+        }
+        reverse_proxy frontend:80
+      }
+
+volumes:
+  lan-https:

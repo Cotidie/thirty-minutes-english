@@ -68,6 +68,16 @@ To copy the server's database and pictures into `backups/` on your own machine:
 scripts/backup user@host
 ```
 
+## Same Wi-Fi
+
+Browsers allow the microphone only over HTTPS or on `localhost`. To use it from other devices on the same Wi-Fi or hotspot, add this line to `.env`:
+
+```sh
+COMPOSE_FILE=compose.yaml:compose.lan.yaml
+```
+
+Run `docker compose up -d` and open `https://<this machine's IP>:5443`. The certificate is self-signed, so the browser shows a warning you have to click through. Traffic is encrypted, but the browser cannot confirm which machine it reached, so use this on a network you trust. A public server does not need it: its own proxy gives HTTPS.
+
 ## Accounts
 
 Everything but signing up and logging in needs an account. Set `ADMIN_EMAIL` and `ADMIN_PASSWORD` in `.env` before the first start: that account becomes the admin, and every session from before accounts becomes theirs. Without them the app runs with no admin, and those sessions stay hidden until the values are set and the app restarts.
