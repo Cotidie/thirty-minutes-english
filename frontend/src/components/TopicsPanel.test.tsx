@@ -138,7 +138,7 @@ it('puts the category on the line under the topic, so the title line only has to
 })
 
 it('starts a session on a topic from its row, and opens it once it is saved', async () => {
-  vi.mocked(api.getJob).mockResolvedValue({ ...RUNNING, session_id: 42 })
+  vi.mocked(api.getJob).mockResolvedValueOnce(RUNNING).mockResolvedValue({ ...RUNNING, session_id: 42 })
   renderPanel()
   await userEvent.click(await createOn('Why databases still run the world'))
   expect(api.startGeneration).toHaveBeenCalledWith('Why databases still run the world')

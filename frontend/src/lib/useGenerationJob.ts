@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { api } from '../api'
 import type { JobStatus } from './progress'
 
@@ -17,6 +17,22 @@ export function useGenerationJob(onSession: (sessionId: number) => void) {
   const [error, setError] = useState<string | null>(null)
   const running = job !== null && job.status === 'running'
 
+  /** Reads the job again: it leaves the page once it is over, and its session opens the moment it is saved. */
+  const readAgain = useCallback(
+    (current: JobStatus) =>
+      api
+        .getJob(current.id)
+        .then((next) => {
+          setJob(next.status === 'cancelled' || next.status === 'done' ? null : next)
+          if (next.session_id !== null && current.session_id === null) onSession(next.session_id)
+        })
+        .catch((e: Error) => {
+          setError(e.message)
+          setJob(null)
+        }),
+    [onSession],
+  )
+
   useEffect(() => {
     let live = true
     api
@@ -32,25 +48,17 @@ export function useGenerationJob(onSession: (sessionId: number) => void) {
 
   useEffect(() => {
     if (!running || !job) return
-    const timer = setInterval(() => {
-      api
-        .getJob(job.id)
-        .then((next) => {
-          setJob(next.status === 'cancelled' || next.status === 'done' ? null : next)
-          if (next.session_id !== null && job.session_id === null) onSession(next.session_id)
-        })
-        .catch((e: Error) => {
-          setError(e.message)
-          setJob(null)
-        })
-    }, JOB_POLL_MS)
+    const timer = setInterval(() => void readAgain(job), JOB_POLL_MS)
     return () => clearInterval(timer)
-  }, [running, job, onSession])
+  }, [running, job, readAgain])
 
   async function start(topic: string | null) {
     setError(null)
     try {
-      setJob(await api.startGeneration(topic))
+      const started = await api.startGeneration(topic)
+      setJob(started)
+      // At once: stopping costs from the moment the worker takes it, and Cancel must say so.
+      await readAgain(started)
     } catch (e) {
       setError((e as Error).message)
       setJob(null)

@@ -69,6 +69,7 @@ class Job:
     failed_at: float | None = None  # stops the clock, so the failure keeps its time while it waits to be read
     spent: bool = False  # Claude has been called, so stopping now still costs
     pictures_missing: bool = False  # a picture the session calls for did not come back
+    deciding: Lock = field(default_factory=Lock, repr=False, compare=False)  # the cancel route and the worker race to end the job
 
     @property
     def stage(self) -> Stage:
@@ -83,8 +84,16 @@ class Job:
         self.progress = progress
 
     def cancel(self) -> None:
-        if self.status == "running":
-            self.status = "cancelled"
+        with self.deciding:
+            if self.status == "running":
+                self.status = "cancelled"
+
+    def complete(self) -> None:
+        """Done, unless a cancel got here first: whoever was told it is cancelled must find it so."""
+        with self.deciding:
+            if self.status == "cancelled":
+                raise Cancelled
+            self.status = "done"
 
     def fail(self, error: str) -> None:
         self.error = error
@@ -224,10 +233,10 @@ class JobRunner:
         try:
             if job.status == "cancelled":  # while it waited in the queue: nothing has been called
                 return
+            job.spent = True  # from here nothing stops it before Claude is called
             used = Exclusions(self._sessions.used_words(seen_by=job.created_by))
             exclude = used.thin(1 - self.REPEAT_ALLOWANCE, random.Random())
             log.info("job %s: banning %d/%d words", job.id, len(exclude.words), len(used.words))
-            job.spent = True
             draft = generator.generate(job.topic, on_progress=job.apply, exclude=exclude)
             leaked = exclude.taught([v.word for v in draft.vocabulary])
             if leaked:
@@ -240,13 +249,11 @@ class JobRunner:
             landed = self._keep_figures(session, draft.article.figures)
             if illustrator:
                 self._illustrate(job, illustrator, session, self._scenes_to_draw(session, draft.article, landed))
-            if job.status == "cancelled":  # after its last progress report
-                raise Cancelled
             job.finish()
             for stage in Stage:
                 self._stages.add(stage, job.stage_seconds.get(stage, 0.0))
+            job.complete()
             log.info("job %s: done in %.0fs: %s", job.id, job.elapsed_seconds, {s.value: round(t) for s, t in job.stage_seconds.items()})
-            job.status = "done"
         except Cancelled:
             log.info("job %s: cancelled", job.id)
         except GenerationError as e:

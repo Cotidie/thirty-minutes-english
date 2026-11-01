@@ -665,6 +665,38 @@ def test_a_session_still_being_drawn_cannot_be_deleted(tmp_path):
     assert db.credits.balance(mina.id) == 0  # a finished session stays paid for
 
 
+def test_a_cancel_acknowledged_at_the_very_end_is_not_overwritten_by_done(tmp_path, monkeypatch):
+    db, mina, me = paid_world(tmp_path, 200)
+    add_stage = db.stages.add
+    answers = []
+
+    def cancelling_first(stage, seconds):
+        if not answers:
+            answers.append(me.delete(f"/api/jobs/{me.get('/api/jobs').json()[0]['id']}").json()["status"])
+        add_stage(stage, seconds)
+
+    monkeypatch.setattr(db.stages, "add", cancelling_first)
+    job = make_session(me)
+    assert answers == ["cancelled"]
+    assert job["status"] == "cancelled" and job["session_id"] is None
+    assert me.get("/api/sessions").json() == []
+    assert db.credits.balance(mina.id) == 100
+
+
+def test_a_job_reads_as_spent_from_the_moment_its_worker_takes_it(tmp_path, monkeypatch):
+    db, _, me = paid_world(tmp_path, 200)
+    used_words = db.sessions.used_words
+    seen = []
+
+    def looking(**kwargs):
+        seen.append(me.get("/api/jobs").json()[0]["spent"])
+        return used_words(**kwargs)
+
+    monkeypatch.setattr(db.sessions, "used_words", looking)
+    make_session(me)
+    assert seen == [True]
+
+
 def test_a_session_whose_job_failed_can_be_deleted_and_stays_free(tmp_path):
     db, mina, me = paid_world(tmp_path, 200, illustrator=Pictures(error=OSError("disk")))
     job = make_session(me)
