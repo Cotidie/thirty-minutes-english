@@ -16,6 +16,8 @@ export interface LiveConnection {
   close(): void
   /** Drops everything without waiting for the final event. */
   dispose(): void
+  /** The round did not deliver: its price comes back. Safe to call twice. */
+  giveBack(): void
 }
 
 export interface LiveOptions {
@@ -24,6 +26,8 @@ export interface LiveOptions {
   audio: HTMLAudioElement
   onEvent: (event: LiveEvent) => void
   onDisconnect: () => void
+  /** Aborted when nobody wants the round any more, while it is still connecting. */
+  signal?: AbortSignal
 }
 
 export const sayInstruction = (text: string) => `Now say exactly this, word for word, then stop: ${text}`

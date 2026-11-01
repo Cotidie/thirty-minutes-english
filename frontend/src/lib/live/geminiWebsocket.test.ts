@@ -1,6 +1,10 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { api } from '../../api'
 import type { LiveEvent } from '../liveSession'
-import { connectGeminiTranscription, FLUSH_TIMEOUT_MS } from './geminiWebsocket'
+import { connectGemini, connectGeminiTranscription, FLUSH_TIMEOUT_MS } from './geminiWebsocket'
+import type { LiveOptions } from './transport'
+
+vi.mock('../../api', () => ({ api: { confirmHold: vi.fn(async () => undefined), giveBackHold: vi.fn(async () => undefined) } }))
 
 /** A socket that opens on its own and answers the setup; the test plays the server after that. */
 class FakeSocket {
@@ -77,7 +81,7 @@ const audioChunks = () => FakeSocket.last.sent.filter((m) => JSON.stringify(m).i
 
 async function openRound(events: LiveEvent[]) {
   const round = await connectGeminiTranscription({
-    start: async () => ({ url: 'wss://live', setup: {} }),
+    start: async () => ({ url: 'wss://live', setup: {}, hold: null }),
     audio: { srcObject: null, play: async () => undefined } as unknown as HTMLAudioElement,
     onEvent: (e) => events.push(e),
     onDisconnect: () => undefined,
@@ -86,6 +90,8 @@ async function openRound(events: LiveEvent[]) {
 }
 
 beforeEach(() => {
+  vi.mocked(api.confirmHold).mockClear()
+  vi.mocked(api.giveBackHold).mockClear()
   vi.stubGlobal('WebSocket', FakeSocket)
   vi.stubGlobal('AudioContext', FakeContext)
   vi.stubGlobal('AudioWorkletNode', FakeNode)
@@ -98,6 +104,118 @@ beforeEach(() => {
 afterEach(() => {
   vi.unstubAllGlobals()
   vi.useRealTimers()
+})
+
+const HOLD = 31
+const options = (over: Partial<LiveOptions> = {}): LiveOptions => ({
+  start: vi.fn(async () => ({ url: 'wss://live', setup: {}, hold: HOLD })),
+  audio: { srcObject: null, play: async () => undefined } as unknown as HTMLAudioElement,
+  onEvent: () => undefined,
+  onDisconnect: () => undefined,
+  ...over,
+})
+
+/** A socket whose server turns the setup down. */
+class RefusingSocket extends FakeSocket {
+  send() {
+    queueMicrotask(() => this.reply({ error: { message: 'no' } }))
+  }
+}
+
+const microphoneAnswers = (getUserMedia: () => Promise<unknown>) =>
+  Object.defineProperty(navigator, 'mediaDevices', { value: { getUserMedia }, configurable: true })
+
+describe('what a round pays', () => {
+  it('asks for the microphone before it asks for a token', async () => {
+    const order: string[] = []
+    microphoneAnswers(async () => {
+      order.push('microphone')
+      return { getTracks: () => [] }
+    })
+    const start = async () => {
+      order.push('token')
+      return { url: 'wss://live', setup: {}, hold: HOLD }
+    }
+    await connectGemini(options({ start }))
+    expect(order).toEqual(['microphone', 'token'])
+  })
+
+  it('takes no token when the microphone is refused', async () => {
+    microphoneAnswers(async () => {
+      throw new Error('Permission denied')
+    })
+    const opts = options()
+    await expect(connectGemini(opts)).rejects.toThrow('Permission denied')
+    expect(opts.start).not.toHaveBeenCalled()
+    expect(api.giveBackHold).not.toHaveBeenCalled()
+  })
+
+  it('confirms once the setup is answered', async () => {
+    await connectGemini(options())
+    expect(api.confirmHold).toHaveBeenCalledExactlyOnceWith(HOLD)
+    expect(api.giveBackHold).not.toHaveBeenCalled()
+  })
+
+  it('gives the price back when the setup is refused', async () => {
+    vi.stubGlobal('WebSocket', RefusingSocket)
+    await expect(connectGemini(options())).rejects.toThrow('no')
+    expect(api.giveBackHold).toHaveBeenCalledExactlyOnceWith(HOLD)
+    expect(api.confirmHold).not.toHaveBeenCalled()
+  })
+
+  it('gives the price back when the connection drops, once however often it is asked', async () => {
+    const onDisconnect = vi.fn()
+    const round = await connectGemini(options({ onDisconnect }))
+    FakeSocket.last.close(1006, '')
+    round.giveBack()
+    expect(onDisconnect).toHaveBeenCalledOnce()
+    expect(api.giveBackHold).toHaveBeenCalledExactlyOnceWith(HOLD)
+  })
+
+  it('keeps the price when the round ends on purpose', async () => {
+    const round = await connectGemini(options())
+    round.close()
+    await settle()
+    expect(api.giveBackHold).not.toHaveBeenCalled()
+  })
+
+  it('reports nothing once the round is disposed, as Retry does', async () => {
+    const round = await connectGemini(options())
+    round.dispose()
+    await settle()
+    expect(api.giveBackHold).not.toHaveBeenCalled()
+  })
+
+  it('takes no token when it is abandoned at the microphone', async () => {
+    const leaving = new AbortController()
+    microphoneAnswers(async () => {
+      leaving.abort()
+      return { getTracks: () => [{ stop: () => undefined }] }
+    })
+    const opts = options({ signal: leaving.signal })
+    await expect(connectGemini(opts)).rejects.toThrow()
+    expect(opts.start).not.toHaveBeenCalled()
+  })
+
+  it('gives the price back when it is abandoned while the token comes', async () => {
+    const leaving = new AbortController()
+    const start = vi.fn(async () => {
+      leaving.abort()
+      return { url: 'wss://live', setup: {}, hold: HOLD }
+    })
+    await expect(connectGemini(options({ start, signal: leaving.signal }))).rejects.toThrow()
+    expect(api.giveBackHold).toHaveBeenCalledExactlyOnceWith(HOLD)
+    expect(api.confirmHold).not.toHaveBeenCalled()
+  })
+
+  it('sends nothing for the admin, whose round has no hold', async () => {
+    const start = async () => ({ url: 'wss://live', setup: {}, hold: null })
+    const round = await connectGemini(options({ start }))
+    FakeSocket.last.close(1006, '')
+    round.giveBack()
+    expect(api.confirmHold).not.toHaveBeenCalled()
+    expect(api.giveBackHold).not.toHaveBeenCalled()
+  })
 })
 
 describe('Gemini transcription round', () => {

@@ -52,6 +52,11 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
   return body as T
 }
 
+/** A word to the server about a round's price; the round goes on whether or not it arrives. */
+function report(path: string, method: string): Promise<unknown> {
+  return fetch(path, { method, keepalive: true }).catch(() => undefined)
+}
+
 function credentials(email: string, password: string): RequestInit {
   return { method: 'POST', body: JSON.stringify({ email, password }) }
 }
@@ -135,6 +140,10 @@ export const api = {
     request<LiveSession>('/api/read-aloud/sessions', { method: 'POST', body: JSON.stringify({ paragraph }) }),
   /** Azure token for the assessor; 503 until AZURE_SPEECH_KEY is set. */
   assessorToken: () => request<AssessorSession>('/api/assessor/token'),
+  /** The round connected, so its price stays. Unheard, the price simply comes back by itself. */
+  confirmHold: (hold: number) => report(`/api/me/credits/holds/${hold}/confirm`, 'POST'),
+  /** The round did not deliver, so its price comes back. */
+  giveBackHold: (hold: number) => report(`/api/me/credits/holds/${hold}`, 'DELETE'),
   startExample: (target: PracticeTarget) =>
     request<LiveSession>('/api/example/sessions', {
       method: 'POST',

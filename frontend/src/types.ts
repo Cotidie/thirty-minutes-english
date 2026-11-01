@@ -211,6 +211,8 @@ export interface Session {
 export interface LiveSession {
   url: string
   setup: Record<string, unknown>
+  /** The price held for this round, which the browser reports on; none for the admin. */
+  hold: number | null
 }
 
 /** One runtime setting, its effective value; secrets come masked. */
@@ -282,6 +284,8 @@ export interface AssessorSession {
   token: string
   region: string
   word_score: number
+  /** The price held for this round, which the browser reports on; none for the admin. */
+  hold: number | null
 }
 
 /** A mark as a reading keeps it, so it can go back on the paragraph. Readings kept before

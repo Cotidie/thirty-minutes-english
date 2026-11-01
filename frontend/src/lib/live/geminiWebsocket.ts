@@ -5,6 +5,7 @@
 // inside the URL and wrote the setup message. The same socket carries Summarize
 // to the transcription model, which only writes down what it hears.
 
+import { api } from '../../api'
 import type { Finding } from '../assessor/judge'
 import type { LiveEvent } from '../liveSession'
 import {
@@ -40,19 +41,33 @@ export function connectGeminiTranscription(opts: LiveOptions): Promise<LiveConne
   return join(new GeminiTranscription(opts), opts)
 }
 
+/** The microphone comes before the token, so a refused one spends nothing; the token's price is reported on from then on. */
 async function join(round: GeminiRound, opts: LiveOptions): Promise<LiveConnection> {
-  const session = await opts.start()
   try {
+    await round.prepare()
+    stopIfLeft(opts.signal)
+    const session = await opts.start()
+    round.hold = session.hold
+    stopIfLeft(opts.signal)
     await round.open(session.url, session.setup)
+    stopIfLeft(opts.signal)
   } catch (e) {
+    round.giveBack()
     round.dispose()
     throw e
   }
+  round.confirm()
   return round
+}
+
+function stopIfLeft(signal: AbortSignal | undefined): void {
+  if (signal?.aborted) throw new Error('The round was left before it connected')
 }
 
 class GeminiRound implements LiveConnection {
   microphone!: MediaStream
+  /** The price held for this round; cleared once it has been given back. */
+  hold: number | null = null
   private socket!: WebSocket
   private capture!: AudioContext
   private playback!: AudioContext
@@ -73,7 +88,7 @@ class GeminiRound implements LiveConnection {
     this.opts = opts
   }
 
-  async open(url: string, setup: Record<string, unknown>): Promise<void> {
+  async prepare(): Promise<void> {
     this.microphone = await navigator.mediaDevices.getUserMedia({
       audio: { channelCount: 1, echoCancellation: true, noiseSuppression: true },
     })
@@ -89,7 +104,9 @@ class GeminiRound implements LiveConnection {
     this.player.connect(speaker)
     this.opts.audio.srcObject = speaker.stream
     this.opts.audio.play().catch(() => undefined)
+  }
 
+  async open(url: string, setup: Record<string, unknown>): Promise<void> {
     this.socket = new WebSocket(url)
     await this.handshake(setup)
 
@@ -156,8 +173,18 @@ class GeminiRound implements LiveConnection {
       return
     }
     if (e.reason) this.emit({ type: 'error', error: { message: e.reason } })
+    this.giveBack()
     this.dispose()
     this.opts.onDisconnect()
+  }
+
+  confirm(): void {
+    if (this.hold !== null) void api.confirmHold(this.hold)
+  }
+
+  giveBack(): void {
+    if (this.hold !== null) void api.giveBackHold(this.hold)
+    this.hold = null
   }
 
   private seconds(): number {

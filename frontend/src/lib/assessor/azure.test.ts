@@ -54,7 +54,7 @@ vi.mock('microsoft-cognitiveservices-speech-sdk', () => ({
 
 import { startAzureAssessor } from './azure'
 
-const session = { token: 'eyJ.t', region: 'koreacentral', word_score: 60 }
+const session = { token: 'eyJ.t', region: 'koreacentral', word_score: 60, hold: null }
 
 beforeEach(() => {
   recognizers.length = 0
