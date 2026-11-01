@@ -1,6 +1,6 @@
 # 크레딧 설계
 
-- 상태: 설계 (2026-11-01). 구현 전.
+- 상태: 구현됨. 실패와 취소에서 얼마가 나가는지는 `2026-11-01-credit-transactions-design.md`가 정한다.
 - 범위: 비용이 드는 기능마다 고정 크레딧을 차감하는 계정별 크레딧, 운영자의 수동 충전, 잔액과 내역 화면, `can_create`와 Practice 잠금의 삭제, 스키마 v13.
 - 대체하는 문서: `2026-10-30-accounts-and-sharing-design.md`의 "권한" 중 `can_create`와 `can_practice`에 관한 부분. 세션 접근권(만든 사람, 공유받은 사람, 운영자)은 그대로다.
 
@@ -16,13 +16,12 @@
 
 | 항목 | 결정 |
 |---|---|
-| 과금 방식 | 기능마다 고정 가격. 서버가 그 기능을 시작하는 순간 차감한다. 실제 토큰 수는 세지 않는다 |
+| 과금 방식 | 기능마다 고정 가격. 시작할 때 잡아 두고, 완수하면 확정한다. 실제 토큰 수는 세지 않는다 |
 | 단위 | 1 크레딧 = 약 1센트. 가격은 실측 비용을 올림한 값 |
 | 충전 | 당장은 운영자가 계정마다 수동으로 넣어 준다. 자동 지급 없음 |
 | 운영자 | 차감하지 않는다 |
 | `can_create` | 크레딧이 "Can create sessions" 토글과 Practice 잠금을 대체한다. 더는 필요 없는 기능과 제한은 과감히 지운다 |
 | 공유받은 세션에서의 사용 | 기능을 쓴 사람의 크레딧에서 나간다 |
-| 세션 생성의 환불 | 시작할 때 차감하고, 실패하거나 취소되면 돌려준다. 나머지 기능은 돌려주지 않는다 |
 | 잔액 표시 | A안: 모든 페이지 구석의 둥근 버튼들 옆에 코인 알약으로 잔액을 보이고, 누르면 최근 내역이 열린다. 유료 버튼마다 가격이 붙는다 |
 | 운영자 화면 | 설정의 Accounts 탭에서 토글 대신 계정마다 잔액, 충전 칸, 최근 내역을 본다 |
 
@@ -31,6 +30,7 @@
 | 기능 | 경로 | 크레딧 |
 |---|---|---|
 | 세션 생성 | `POST /api/sessions` | 200 |
+| 세션 취소 (Claude를 부른 뒤) | `DELETE /api/jobs/{id}` | 100 |
 | 그림 다시 그리기 (장당) | `POST /api/sessions/{id}/pictures/{index}` | 10 |
 | Practice 음성 세션 시작 | `POST /api/example/sessions` | 10 |
 | Practice 글 피드백 | `POST /api/example/feedback` | 10 |
@@ -50,26 +50,26 @@
 ## 규칙
 
 - 잔액은 내역의 합이다. 잔액 열을 따로 두지 않는다.
-- 차감은 한 트랜잭션(`BEGIN IMMEDIATE`) 안에서 잔액을 구하고 모자라지 않으면 음수 행을 넣는다. 동시에 두 요청이 와도 잔액이 음수가 되지 않는다.
+- 잡아 두기는 한 트랜잭션(`BEGIN IMMEDIATE`) 안에서 잔액을 구하고 모자라지 않으면 음수 행을 넣는다. 동시에 두 요청이 와도 잔액이 음수가 되지 않는다.
 - 운영자의 요청은 차감도 기록도 하지 않는다.
-- 검사 순서: 로그인(401), 세션 접근권과 만든 사람 검사(404, 403), 기능이 켜져 있는지(503), 그 다음 차감(402). 비용이 전혀 나가지 않은 요청에서 크레딧이 나가는 일이 없도록 차감이 맨 마지막이다. 차감 뒤 제공자 호출이 실패해도(502) 돌려주지 않는다. 세션 생성만 예외다.
+- 검사 순서: 로그인(401), 세션 접근권과 만든 사람 검사(404, 403), 기능이 켜져 있는지(503), 그 다음 차감(402). 비용이 전혀 나가지 않은 요청에서 크레딧이 나가는 일이 없도록 차감이 맨 마지막이다.
 - 모자라면 `402 Payment Required`, `detail`은 `Not enough credits: this needs 10 and you have 3.` 꼴이다. 화면은 그 문장을 그대로 보인다.
-- 세션 생성: 요청 시점에 200을 차감하고 job을 시작한다. 세션이 저장되기 전에 job이 `failed`로 끝나거나 취소되면 같은 금액을 `refund` 행으로 돌려준다. 세션이 저장된 뒤의 실패나 취소(그림 그리는 중)는 돌려주지 않는다. 그림이 일부 안 그려진 채 끝나도 돌려주지 않는다. 지금 `JobRunner._run`은 `GenerationError`와 `Cancelled`만 잡아서 다른 예외가 나면 job이 영원히 `running`으로 남는데, 어떤 예외든 `failed`로 끝내도록 고쳐 환불이 빠지지 않게 한다. 서버가 재시작되어 job이 사라진 경우는 자동으로 돌려주지 않는다. 운영자가 내역에서 보고 수동으로 돌려준다. 배포는 이미 생성이 돌고 있지 않을 때만 한다.
-- 문장 듣기: 그 문장이 음성 캐시에 있으면 차감 없이 돌려준다. 없을 때만 1을 차감하고 읽는다.
+- 세션 생성: 요청 시점에 200을 잡아 두고 job을 시작한다. 끝난 뒤의 값은 트랜잭션 설계의 결과표를 따른다. 배포는 이미 생성이 돌고 있지 않을 때만 한다.
+- 문장 듣기: 그 문장이 음성 캐시에 있으면 차감 없이 돌려준다. 없을 때만 1을 잡아 두고 읽는다.
 - 뉴스 토픽 조회와 새로고침은 로그인한 누구나 쓸 수 있고 무료다. 재고는 공용이고 보충은 재고가 낮을 때만 일어난다.
 - 공유 추가는 세션을 만든 사람이면 누구나 한다. 비용 없음.
 - 표현 교체와 추가, 별표, 노트, 기록 저장과 조회, 세션 열람은 그대로 무료다.
 
 ## 데이터
 
-스키마 v13.
+스키마 v13. v14에서 `state`와 `open_until` 열이 늘었다 (트랜잭션 설계).
 
 ```sql
 CREATE TABLE credits (
     id         INTEGER PRIMARY KEY,
     user_id    INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     at         TEXT    NOT NULL,          -- ISO 8601, UTC
-    amount     INTEGER NOT NULL,          -- 충전은 양수, 차감은 음수, 환불은 양수
+    amount     INTEGER NOT NULL,          -- 충전은 양수, 차감은 음수
     kind       TEXT    NOT NULL,          -- 아래 목록
     detail     TEXT,                      -- 사람이 읽을 보충: 세션 주제, 단어, 문장 앞부분
     granted_by INTEGER REFERENCES users(id) ON DELETE SET NULL  -- kind = 'grant'일 때 운영자
@@ -77,7 +77,7 @@ CREATE TABLE credits (
 CREATE INDEX credits_by_user ON credits (user_id, id);
 ```
 
-`kind`: `grant`, `session`, `refund`, `redraw`, `practice_voice`, `practice_feedback`, `summary_voice`, `summary_feedback`, `read_aloud_token`, `read_aloud_voice`, `speech`.
+`kind`: `grant`, `session`, `session_cancelled`, `redraw`, `practice_voice`, `practice_feedback`, `summary_voice`, `summary_feedback`, `read_aloud_token`, `read_aloud_voice`, `speech`. 과거 행에는 `refund`도 있다. 새로 쓰지 않는다.
 
 가격은 백엔드 한 곳(`app/credits.py` 같은 모듈)의 표로 두고, 화면은 API로 받는다. 두 곳에 적지 않는다.
 
@@ -99,7 +99,7 @@ CREATE INDEX credits_by_user ON credits (user_id, id);
 
 내역 한 건: `{ at, amount, kind, detail }`.
 
-이벤트: 계정 스트림 `GET /api/me/events`에 `credits`를 더한다. `CreditRepo`가 충전, 차감, 환불을 커밋한 뒤 그 계정에 발행한다. 데이터는 싣지 않고 이름만 보낸다(프로젝트 규칙). 운영자가 충전하면 그 사람의 열린 탭에서 알약이 바로 바뀐다.
+이벤트: 계정 스트림 `GET /api/me/events`에 `credits`를 더한다. `CreditRepo`가 잔액을 바꾸는 쓰기를 커밋한 뒤 그 계정에 발행한다. 데이터는 싣지 않고 이름만 보낸다(프로젝트 규칙). 운영자가 충전하면 그 사람의 열린 탭에서 알약이 바로 바뀐다.
 
 ## 화면
 
@@ -115,9 +115,9 @@ CREATE INDEX credits_by_user ON credits (user_id, id);
 백엔드:
 - 잔액 3으로 10짜리 기능을 부르면 402이고 내역에 행이 없다. 잔액 10이면 성공하고 잔액 0, `kind`와 `detail`이 맞다.
 - 운영자는 잔액 0이어도 성공하고 내역에 행이 없다.
-- 기능이 꺼져 있으면(503) 차감하지 않는다. 제공자가 실패하면(502) 차감이 남는다.
+- 기능이 꺼져 있거나(503) 제공자가 실패하면(502) 차감하지 않는다.
 - 동시에 두 요청이 잔액 10으로 10짜리 기능을 부르면 하나만 성공한다.
-- 세션 생성: 시작 시 −200. 저장 전 실패와 취소는 +200 `refund`. 저장 뒤 실패와 취소는 환불 없음. job 안의 예상 못 한 예외도 `failed`로 끝나고, 저장 전이면 환불된다.
+- 세션 생성: 트랜잭션 설계의 결과표 한 줄마다 테스트가 있다.
 - Read aloud: 토큰 −5, 표시를 두 번 누르면 −5가 두 번.
 - 문장 듣기: 캐시에 있으면 차감 없음, 없으면 −1.
 - 충전: 운영자가 `+500`, `-100`, `0`(422), 자기 자신(400), 없는 계정(404). 충전 뒤 그 계정의 스트림에 `credits` 이벤트가 온다.
@@ -133,7 +133,6 @@ CREATE INDEX credits_by_user ON credits (user_id, id);
 ## 빌더에게 맡기는 것
 
 - `CreditRepo`의 메서드 이름과 서명, 가격표 모듈의 위치.
-- job의 끝에서 환불을 부르는 방식(콜백이든 runner가 repo를 알든). 세션 저장 전후를 가르는 기준은 `job.session_id`가 있는지다.
 - 알약 패널의 열고 닫기, 바깥 클릭과 Esc 처리, 모바일 폭에서의 자리.
 - 내역 `detail`의 문구와 자르는 길이.
 - Accounts 탭의 내역 줄 수(최근 10건 안에서).
