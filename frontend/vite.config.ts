@@ -10,7 +10,7 @@ export default defineConfig({
   plugins: [react()],
   define: { __APP_VERSION__: JSON.stringify(version) },
   server: {
-    proxy: { '/api': { target: process.env.VITE_API_PROXY ?? 'http://127.0.0.1:8765', ws: true } },
+    proxy: { '/api': { target: 'http://127.0.0.1:8765', ws: true } },
   },
   test: {
     environment: 'jsdom',
