@@ -1,7 +1,17 @@
 import { fireEvent, render, screen } from '@testing-library/react'
-import { describe, expect, it, vi } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { useCredits } from '../lib/credits'
 import { percentFor, type JobStatus } from '../lib/progress'
+import { creditsOf } from '../test/credits'
 import { GenerationProgress } from './GenerationProgress'
+
+vi.mock('../lib/credits', async (original) => ({ ...(await original<typeof import('../lib/credits')>()), useCredits: vi.fn() }))
+
+const PRICES = { session_cancelled: 100 }
+
+beforeEach(() => {
+  vi.mocked(useCredits).mockReturnValue(creditsOf(500, PRICES))
+})
 
 const base: JobStatus = {
   id: 'j',
@@ -20,9 +30,46 @@ const base: JobStatus = {
   expected_seconds: 150,
   session_id: null,
   error: null,
+  spent: false,
 }
 
 describe('GenerationProgress', () => {
+  it('costs nothing to stop before Claude is called', () => {
+    render(<GenerationProgress job={base} onClose={() => undefined} onOpen={() => undefined} />)
+    const cancel = screen.getByRole('button', { name: 'Cancel' })
+    expect(cancel).not.toHaveTextContent('100')
+    expect(cancel).not.toHaveAttribute('title')
+  })
+
+  it('names what stopping costs once Claude is working', () => {
+    render(<GenerationProgress job={{ ...base, spent: true }} onClose={() => undefined} onOpen={() => undefined} />)
+    const cancel = screen.getByRole('button', { name: 'Cancel' })
+    expect(cancel).toHaveTextContent('100')
+    expect(cancel).toHaveAttribute('title', 'Stops now. 100 credits stay charged.')
+  })
+
+  it('says the session goes once it is saved', () => {
+    render(<GenerationProgress job={{ ...base, spent: true, stage: 'illustrating', session_id: 21 }} onClose={() => undefined} onOpen={() => undefined} />)
+    const cancel = screen.getByRole('button', { name: 'Cancel and delete' })
+    expect(cancel).toHaveTextContent('100')
+    expect(cancel).toHaveAttribute('title', 'Stops now. The session is deleted and 100 credits stay charged.')
+  })
+
+  it('tells the admin, who pays nothing, only that the session goes', () => {
+    vi.mocked(useCredits).mockReturnValue(creditsOf(null, PRICES))
+    render(<GenerationProgress job={{ ...base, spent: true, stage: 'illustrating', session_id: 21 }} onClose={() => undefined} onOpen={() => undefined} />)
+    const cancel = screen.getByRole('button', { name: 'Cancel and delete' })
+    expect(cancel).not.toHaveTextContent('100')
+    expect(cancel).toHaveAttribute('title', 'Stops now. The session is deleted.')
+  })
+
+  it('asks nothing of a failed job, whatever it spent', () => {
+    render(<GenerationProgress job={{ ...base, spent: true, status: 'failed', session_id: 21 }} onClose={() => undefined} onOpen={() => undefined} />)
+    const close = screen.getByRole('button', { name: 'Close' })
+    expect(close).not.toHaveTextContent('100')
+    expect(close).not.toHaveAttribute('title')
+  })
+
   it('shows the activity, the clock, the counts, and a progress bar', () => {
     render(<GenerationProgress job={base} onClose={() => undefined} onOpen={() => undefined} />)
     expect(screen.getByText('Searching "silk road trade"')).toBeInTheDocument()

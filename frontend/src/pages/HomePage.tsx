@@ -9,6 +9,7 @@ import './HomePage.css'
 export function HomePage() {
   const [sessions, setSessions] = useState<SessionSummary[]>([])
   const [loadError, setLoadError] = useState<string | null>(null)
+  const [removeError, setRemoveError] = useState<string | null>(null)
 
   useAccountResource(
     'sessions',
@@ -22,8 +23,13 @@ export function HomePage() {
 
   /** My own session is deleted; a shared one only leaves my list. */
   async function remove(session: SessionSummary) {
-    await (session.mine ? api.deleteSession(session.id) : api.leaveSession(session.id))
-    setSessions((s) => s.filter((x) => x.id !== session.id))
+    setRemoveError(null)
+    try {
+      await (session.mine ? api.deleteSession(session.id) : api.leaveSession(session.id))
+      setSessions((s) => s.filter((x) => x.id !== session.id))
+    } catch (e) {
+      setRemoveError((e as Error).message)
+    }
   }
 
   return (
@@ -37,6 +43,7 @@ export function HomePage() {
 
       <SessionCreator />
       {loadError && <p className="error">Could not load past sessions: {loadError}</p>}
+      {removeError && <p className="error">{removeError}</p>}
 
       <section className="history">
         <h2 className="history-title">Past sessions</h2>

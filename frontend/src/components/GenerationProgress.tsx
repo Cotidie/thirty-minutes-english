@@ -1,6 +1,8 @@
 import { useEffect, useState } from 'react'
+import { useCredits } from '../lib/credits'
 import { formatClock } from '../lib/phases'
 import { labelFor, metaFor, percentFor, type JobStatus } from '../lib/progress'
+import { Price } from './Price'
 import './GenerationProgress.css'
 
 interface Props {
@@ -11,11 +13,20 @@ interface Props {
   onOpen: (sessionId: number) => void
 }
 
+/** What stopping a running job comes to, for the button that does it. */
+function stopNote(job: JobStatus, price: number): string | undefined {
+  if (job.session_id !== null) {
+    return price > 0 ? `Stops now. The session is deleted and ${price} credits stay charged.` : 'Stops now. The session is deleted.'
+  }
+  return job.spent && price > 0 ? `Stops now. ${price} credits stay charged.` : undefined
+}
+
 /** A failed job keeps its bar where it stopped and shows the error until the user closes it. */
 export function GenerationProgress({ job, onClose, onOpen }: Props) {
   const [percent, setPercent] = useState(() => percentFor(job))
   useEffect(() => setPercent((prev) => percentFor(job, prev)), [job])
   const failed = job.status === 'failed'
+  const price = useCredits().cost('session_cancelled')
 
   return (
     <section className={failed ? 'gen gen-failed' : 'gen'} aria-live="polite">
@@ -49,9 +60,15 @@ export function GenerationProgress({ job, onClose, onOpen }: Props) {
             Open session
           </button>
         )}
-        {(failed || job.status === 'running') && (
+        {failed && (
           <button type="button" className="btn btn-link" onClick={onClose}>
-            {failed ? 'Close' : 'Cancel'}
+            Close
+          </button>
+        )}
+        {job.status === 'running' && (
+          <button type="button" className="btn btn-link" onClick={onClose} title={stopNote(job, price)}>
+            {job.session_id === null ? 'Cancel' : 'Cancel and delete'}
+            {job.spent && <Price amount={price} />}
           </button>
         )}
       </div>

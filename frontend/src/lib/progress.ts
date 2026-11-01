@@ -20,6 +20,8 @@ export interface JobStatus {
   expected_seconds: number
   session_id: number | null
   error: string | null
+  /** Claude has been called, so stopping now costs half. */
+  spent: boolean
 }
 
 /** Where each stage starts on the bar. */

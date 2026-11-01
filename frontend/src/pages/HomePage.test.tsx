@@ -77,6 +77,16 @@ test('my session can be deleted, and a shared one only taken off my list', async
   await waitFor(() => expect(screen.queryByText('My trams')).not.toBeInTheDocument())
 })
 
+test('a session that cannot be deleted yet stays and says why', async () => {
+  const why = 'This session is still being drawn. Cancel it on the progress bar: the session goes and half the price stays charged.'
+  vi.mocked(api.listSessions).mockResolvedValue([MINE])
+  vi.mocked(api.deleteSession).mockRejectedValue(new Error(why))
+  open()
+  await userEvent.click(await screen.findByRole('button', { name: 'Delete My trams' }))
+  expect(await screen.findByText(why)).toBeInTheDocument()
+  expect(screen.getByRole('link', { name: /My trams/ })).toBeInTheDocument()
+})
+
 test('a session shared while the page is open appears, and leaves when the share ends', async () => {
   open()
   expect(await screen.findByText('Nothing yet. Sessions you make, and ones shared with you, appear here.')).toBeInTheDocument()

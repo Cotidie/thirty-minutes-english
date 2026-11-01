@@ -19,6 +19,7 @@ function job(over: Partial<JobStatus>): JobStatus {
     expected_seconds: 100,
     session_id: null,
     error: null,
+    spent: false,
     ...over,
   }
 }

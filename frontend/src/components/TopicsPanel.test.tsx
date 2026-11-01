@@ -47,6 +47,7 @@ const RUNNING: JobStatus = {
   expected_seconds: 150,
   session_id: null,
   error: null,
+  spent: false,
 }
 
 beforeEach(() => {

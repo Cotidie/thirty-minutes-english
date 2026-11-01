@@ -6,6 +6,7 @@ import './CreditsPill.css'
 const KIND_LABELS: Record<string, string> = {
   refund: 'Refund',
   session: 'Session',
+  session_cancelled: 'Cancelled session',
   redraw: 'New picture',
   practice_voice: 'Practice',
   practice_feedback: 'Practice feedback',

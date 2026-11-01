@@ -42,6 +42,16 @@ test('credits the admin took back read as taken back', async () => {
   expect(row).toHaveTextContent('−34')
 })
 
+test('a session its maker stopped reads as cancelled, at the half it cost', async () => {
+  has(100, [{ at: '2026-11-01T09:00:00Z', amount: -100, kind: 'session_cancelled', detail: 'Trams' }])
+  render(<CreditsPill />)
+  await userEvent.click(screen.getByRole('button', { name: 'Credits' }))
+  const row = within(screen.getByRole('dialog', { name: 'Credits' })).getByRole('listitem')
+  expect(row).toHaveTextContent('Cancelled session')
+  expect(row).toHaveTextContent('Trams')
+  expect(row).toHaveTextContent('−100')
+})
+
 test('a click outside closes it, and one inside does not', async () => {
   has(340)
   render(
