@@ -8,7 +8,7 @@ import { SILENCE_MS, type RoundOptions } from '../lib/useLiveRound'
 import type { Example, PracticeTarget } from '../types'
 import { Practice } from './Practice'
 
-const connection = { microphone: {} as MediaStream, say: vi.fn(), correct: vi.fn(), close: vi.fn(), dispose: vi.fn() }
+const connection = { microphone: {} as MediaStream, say: vi.fn(), correct: vi.fn(), close: vi.fn(), dispose: vi.fn(), giveBack: vi.fn() }
 let emit: (e: LiveEvent) => void = () => undefined
 const connect = vi.fn(async (_target: PracticeTarget, opts: RoundOptions): Promise<LiveConnection> => {
   emit = opts.onEvent
@@ -49,6 +49,7 @@ beforeEach(() => {
   connection.dispose.mockClear()
   connection.say.mockClear()
   connection.close.mockClear()
+  connection.giveBack.mockClear()
   vi.mocked(api.addExample).mockReset().mockResolvedValue(kept)
   vi.mocked(api.exampleFeedback).mockReset().mockResolvedValue(feedback)
 })
@@ -67,6 +68,96 @@ async function sayAndHear() {
 }
 
 describe('Practice', () => {
+  const left = (call = 0) => connect.mock.calls[call][1].signal!.aborted
+
+  async function beginRound() {
+    await userEvent.click(screen.getByRole('button', { name: /^Practice/ }))
+    act(() => emit({ type: 'session.started', session: { id: 'live_1' } }))
+  }
+
+  it('gives the voice back when the feedback fails', async () => {
+    vi.mocked(api.exampleFeedback).mockRejectedValue(new Error('feedback failed: down'))
+    renderPractice()
+    await beginRound()
+    act(() => emit({ type: 'session.input_transcript.delta', delta: 'The dam mitigate the flood.' }))
+    act(() => emit({ type: 'session.output_transcript.delta', delta: 'Got it.' }))
+    expect(await screen.findByText('feedback failed: down')).toBeInTheDocument()
+    expect(connection.giveBack).toHaveBeenCalledOnce()
+  })
+
+  it('gives the voice back when the reader spoke and the coach never answered', async () => {
+    renderPractice()
+    await beginRound()
+    act(() => emit({ type: 'session.input_transcript.delta', delta: 'The dam mitigate the flood.' }))
+    act(() => emit({ type: 'session.closed', usage: { seconds: 9 } }))
+    expect(connection.giveBack).toHaveBeenCalledOnce()
+  })
+
+  it('keeps the voice when the reader said nothing', async () => {
+    renderPractice()
+    await beginRound()
+    act(() => emit({ type: 'session.closed', usage: { seconds: 9 } }))
+    expect(connection.giveBack).not.toHaveBeenCalled()
+  })
+
+  it('keeps the voice when the coach answered', async () => {
+    renderPractice()
+    await sayAndHear()
+    expect(connection.giveBack).not.toHaveBeenCalled()
+  })
+
+  it('abandons a round still connecting when it is discarded or retried', async () => {
+    connect.mockImplementationOnce(() => new Promise(() => undefined))
+    connect.mockImplementationOnce(() => new Promise(() => undefined))
+    renderPractice()
+    await userEvent.click(screen.getByRole('button', { name: /^Practice/ }))
+    await userEvent.click(screen.getByRole('button', { name: 'Retry' }))
+    expect(left(0)).toBe(true)
+    expect(left(1)).toBe(false)
+    await userEvent.click(screen.getByRole('button', { name: 'Discard' }))
+    expect(left(1)).toBe(true)
+  })
+
+  it('gives back and drops a connection that arrives after the round was left', async () => {
+    let arrive!: (c: LiveConnection) => void
+    connect.mockImplementationOnce(() => new Promise((resolve) => (arrive = resolve)))
+    renderPractice()
+    await userEvent.click(screen.getByRole('button', { name: /^Practice/ }))
+    await userEvent.click(screen.getByRole('button', { name: 'Discard' }))
+    await act(async () => arrive(connection))
+    expect(connection.giveBack).toHaveBeenCalledOnce()
+    expect(connection.dispose).toHaveBeenCalledOnce()
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+  })
+
+  it('shows nothing of a round that failed after it was left', async () => {
+    let refuse!: (e: Error) => void
+    connect.mockImplementationOnce(() => new Promise((_, reject) => (refuse = reject)))
+    renderPractice()
+    await userEvent.click(screen.getByRole('button', { name: /^Practice/ }))
+    await userEvent.click(screen.getByRole('button', { name: 'Retry' }))
+    await act(async () => refuse(new Error('The round was left before it connected')))
+    expect(screen.queryByText('The round was left before it connected')).not.toBeInTheDocument()
+  })
+
+  it('after Retry, an old feedback failing touches only the old round', async () => {
+    const old = { ...connection, giveBack: vi.fn() }
+    const fresh = { ...connection, giveBack: vi.fn() }
+    connect.mockImplementationOnce(async (_t, opts) => ((emit = opts.onEvent), old))
+    connect.mockImplementationOnce(async (_t, opts) => ((emit = opts.onEvent), fresh))
+    let fail!: (e: Error) => void
+    vi.mocked(api.exampleFeedback).mockImplementationOnce(() => new Promise((_, reject) => (fail = reject)))
+    renderPractice()
+    await beginRound()
+    act(() => emit({ type: 'session.input_transcript.delta', delta: 'The dam mitigate the flood.' }))
+    act(() => emit({ type: 'session.output_transcript.delta', delta: 'Got it.' }))
+    await userEvent.click(screen.getByRole('button', { name: 'Retry' }))
+    await act(async () => fail(new Error('feedback failed: down')))
+    expect(old.giveBack).toHaveBeenCalledOnce()
+    expect(fresh.giveBack).not.toHaveBeenCalled()
+    expect(screen.queryByText('feedback failed: down')).not.toBeInTheDocument()
+  })
+
   it('opens a round on the target and stacks the kept sentence under it', async () => {
     const onKept = renderPractice()
     await sayAndHear()

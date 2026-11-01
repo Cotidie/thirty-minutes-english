@@ -8,7 +8,7 @@ import { SILENCE_MS, type RoundOptions } from '../lib/useLiveRound'
 import type { Summary, SummaryFeedback } from '../types'
 import { Paragraph } from './Paragraph'
 
-const connection = { microphone: {} as MediaStream, say: vi.fn(), correct: vi.fn(), close: vi.fn(), dispose: vi.fn() }
+const connection = { microphone: {} as MediaStream, say: vi.fn(), correct: vi.fn(), close: vi.fn(), dispose: vi.fn(), giveBack: vi.fn() }
 let emit: (e: LiveEvent) => void = () => undefined
 const connect = vi.fn(async (_paragraph: string, opts: RoundOptions): Promise<LiveConnection> => {
   emit = opts.onEvent
@@ -76,7 +76,33 @@ it('keeps the paragraph in view while it is summed up, then on Done judges the s
   // The slip closes; the kept card shows the judgment in its place.
   expect(screen.queryByRole('dialog', { name: 'Summarize this paragraph' })).toBeNull()
   expect(onEnd).toHaveBeenCalledOnce()
+  expect(connection.giveBack).not.toHaveBeenCalled()
   vi.useRealTimers()
+})
+
+it('gives the voice back when the judgment fails', async () => {
+  connection.giveBack.mockClear()
+  vi.mocked(api.summaryFeedback).mockRejectedValue(new Error('feedback failed: down'))
+  render(
+    <Paragraph
+      paragraph={{ id: 4, text: paragraph }}
+      pieces={[{ text: paragraph, start: 0, ko: null }]}
+      spans={[]}
+      summaries={[]}
+      saved={[]}
+      onSummary={vi.fn()}
+      active={false}
+      onStart={vi.fn()}
+      onEnd={vi.fn()}
+    />,
+  )
+  await userEvent.click(screen.getByRole('button', { name: 'Summarize' }))
+  act(() => emit({ type: 'session.started', session: { id: 'live_1' } }))
+  act(() => emit({ type: 'session.input_transcript.delta', delta: said }))
+  await userEvent.click(screen.getByRole('button', { name: 'Done' }))
+  act(() => emit({ type: 'session.closed', usage: { seconds: 20 } }))
+  expect(await screen.findByText(/feedback failed: down/)).toBeInTheDocument()
+  expect(connection.giveBack).toHaveBeenCalledOnce()
 })
 
 it('shows a kept summary in the card it was judged in, set apart from the article text', () => {

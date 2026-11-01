@@ -26,6 +26,8 @@ export interface LiveRound {
   dismiss(): void
   /** Hands the transcript to `keep`. Resolves true once it is written. */
   save(): Promise<boolean>
+  /** The round did not deliver: its price comes back. */
+  giveBack(): void
 }
 
 /**
@@ -48,6 +50,8 @@ export function useLiveRound(
   // The turn hand-off: not yet taken, taken and still being answered, or done.
   const turn = useRef<'open' | 'pending' | 'done'>('open')
   const handlers = useRef({ connect, keep, onTurn })
+  // Stops the latest round if it is still connecting: nothing else can, until `connRef` has it.
+  const leaving = useRef<AbortController | null>(null)
 
   // Handlers close over props that change; the round always calls the newest.
   useEffect(() => {
@@ -64,8 +68,14 @@ export function useLiveRound(
     silence.current = null
   }
 
+  const abandon = () => {
+    leaving.current?.abort()
+    leaving.current = null
+  }
+
   useEffect(() => () => {
     clearSilence()
+    abandon()
     connRef.current?.dispose()
   }, [])
 
@@ -98,9 +108,14 @@ export function useLiveRound(
   const takeTurn = useCallback(
     (round: LiveState) => {
       turn.current = 'pending'
+      const conn = connRef.current
       handlers.current
         .onTurn!(round, (text) => connRef.current?.say(text))
-        .catch((e: unknown) => apply((s) => ({ ...s, error: e instanceof Error ? e.message : String(e) })))
+        .catch((e: unknown) => {
+          conn?.giveBack()
+          // After a Retry the screen belongs to the new round.
+          if (connRef.current === conn) apply((s) => ({ ...s, error: e instanceof Error ? e.message : String(e) }))
+        })
         .finally(() => {
           if (turn.current !== 'pending') return
           turn.current = 'done'
@@ -110,37 +125,58 @@ export function useLiveRound(
     [armSilence],
   )
 
+  /** A round with a coach that closed on what the reader said, with nothing said back. */
+  const wentUnanswered = () => handlers.current.onTurn && turn.current === 'open' && latest.current?.user.trim()
+
   const start = useCallback(async () => {
     clearSilence()
+    abandon()
     connRef.current?.dispose()
     connRef.current = null
     setMicrophone(null)
     turn.current = 'open'
     latest.current = initialLiveState
     setState(initialLiveState)
+    const round = new AbortController()
+    leaving.current = round
+    const { signal } = round
     try {
       const conn = await handlers.current.connect({
         audio: audio.current!,
+        signal,
         onEvent: (event) => {
+          if (signal.aborted) return
           apply((s) => applyLiveEvent(s, event))
+          if (event.type === 'session.closed' && wentUnanswered()) connRef.current?.giveBack()
           if (event.type !== 'session.output_transcript.delta' || !handlers.current.onTurn) return
           if (turn.current === 'open') takeTurn(latest.current!)
           else if (turn.current === 'done') armSilence()
         },
         onDisconnect: () => {
+          if (signal.aborted) return
           setMicrophone(null)
           apply((s) => liveFailed(s, 'Connection dropped.'))
         },
       })
+      if (signal.aborted) {
+        conn.giveBack()
+        conn.dispose()
+        return
+      }
       connRef.current = conn
       setMicrophone(conn.microphone)
     } catch (e) {
-      apply((s) => liveFailed(s, e instanceof Error ? e.message : String(e)))
+      if (!signal.aborted) apply((s) => liveFailed(s, e instanceof Error ? e.message : String(e)))
     }
   }, [audio, armSilence, takeTurn])
 
+  const giveBack = useCallback(() => {
+    connRef.current?.giveBack()
+  }, [])
+
   const dismiss = useCallback(() => {
     clearSilence()
+    abandon()
     connRef.current?.dispose()
     connRef.current = null
     setMicrophone(null)
@@ -149,5 +185,5 @@ export function useLiveRound(
     setState(null)
   }, [])
 
-  return { state, microphone, start, close, dismiss, save }
+  return { state, microphone, start, close, dismiss, save, giveBack }
 }

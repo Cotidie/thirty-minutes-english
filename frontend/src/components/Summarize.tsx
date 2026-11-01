@@ -88,7 +88,11 @@ export function useSummary({ paragraph: { id: paragraphId, text: paragraph }, on
         onKept(summary)
         dismiss()
       })
-      .catch((e: Error) => live && setFailure(e.message))
+      .catch((e: Error) => {
+        if (!live) return
+        setFailure(e.message)
+        round.giveBack()
+      })
       .finally(() => live && setWriting(false))
     return () => {
       live = false
