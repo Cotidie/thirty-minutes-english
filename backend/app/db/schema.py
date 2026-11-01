@@ -8,7 +8,7 @@ from datetime import UTC, datetime
 from app.db import topics
 from app.models import Category
 
-VERSION = 13
+VERSION = 14
 
 # Added in v3, by session since v9: images under the article's paragraphs, and its cover (no paragraph) under the title.
 FIGURES = """
@@ -152,6 +152,13 @@ CREATE TABLE credits (
 CREATE INDEX credits_by_user ON credits (user_id, id);
 """
 
+# Added in v14: a charge is held while its work runs, then settled or released. `open_until` is
+# how long the browser may still report on a round it opened by itself.
+CREDIT_HOLDS = """
+ALTER TABLE credits ADD COLUMN state TEXT NOT NULL DEFAULT 'settled' CHECK (state IN ('held', 'settled', 'released'));
+ALTER TABLE credits ADD COLUMN open_until TEXT;
+"""
+
 SCHEMA = TOPICS + SESSIONS + """
 
 CREATE TABLE paragraphs (
@@ -242,7 +249,7 @@ CREATE INDEX session_expressions_expression ON session_expressions (expression_i
 CREATE INDEX readings_paragraph ON readings (paragraph_id);
 CREATE INDEX summaries_paragraph ON summaries (paragraph_id);
 CREATE INDEX stage_times_stage ON stage_times (stage, id);
-""" + FIGURES + SWAPS + KOREAN_EXAMPLES + EXAMPLES + ACCOUNTS + CREDITS
+""" + FIGURES + SWAPS + KOREAN_EXAMPLES + EXAMPLES + ACCOUNTS + CREDITS + CREDIT_HOLDS
 
 
 def _run(conn: sqlite3.Connection, script: str) -> None:
@@ -288,6 +295,8 @@ def upgrade(conn: sqlite3.Connection, version: int) -> None:
         _add_pool(conn, Category.TRAVEL, 12)
     if version < 13:
         _credits(conn)
+    if version < 14:
+        _credit_holds(conn)
 
 
 def _add_pool(conn: sqlite3.Connection, category: Category, version: int) -> None:
@@ -305,6 +314,14 @@ def _credits(conn: sqlite3.Connection) -> None:
     if any(column[1] == "can_create" for column in conn.execute("PRAGMA table_info(users)")):
         conn.execute("ALTER TABLE users DROP COLUMN can_create")
     conn.execute("PRAGMA user_version = 13")
+
+
+def _credit_holds(conn: sqlite3.Connection) -> None:
+    """Both columns or neither; every row already there is final, which is what the default says."""
+    conn.commit()
+    conn.execute("BEGIN")
+    _run(conn, CREDIT_HOLDS)
+    conn.execute("PRAGMA user_version = 14")
 
 
 def _figures_by_session(conn: sqlite3.Connection) -> None:

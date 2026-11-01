@@ -7,7 +7,17 @@ from app.db.pictures import PictureStat
 from app.generation.progress import Stage
 from app.models import Category
 from app.topics.curated import CURATED
-from tests.conftest import CURATED_TOPICS, sample_draft, seed_expressions
+from tests.conftest import CURATED_TOPICS, add_user, sample_draft, seed_expressions
+
+
+def as_v13(path) -> None:
+    """Rewrites a current file the way v13 kept it: a ledger of final rows."""
+    conn = sqlite3.connect(path)
+    with conn:
+        conn.execute("ALTER TABLE credits DROP COLUMN state")
+        conn.execute("ALTER TABLE credits DROP COLUMN open_until")
+        conn.execute("PRAGMA user_version = 13")
+    conn.close()
 
 
 def as_v12(path) -> None:
@@ -346,7 +356,7 @@ def test_upgrading_v12_adds_credits_and_drops_can_create_keeping_the_accounts(tm
     conn.close()
     db = Database(path)
     with db.connect() as conn:
-        assert conn.execute("PRAGMA user_version").fetchone()[0] == 13
+        assert conn.execute("PRAGMA user_version").fetchone()[0] == schema.VERSION
         assert [c[1] for c in conn.execute("PRAGMA table_info(users)")] == ["id", "created_at", "email", "password_hash", "is_admin"]
         assert conn.execute("SELECT count(*) FROM credits").fetchone()[0] == 0
     assert [(u.email, u.is_admin) for u in db.accounts.list_all()] == [("boss@example.com", True), ("mina@example.com", False)]
@@ -375,19 +385,48 @@ def test_a_v10_file_upgrades_through_steps_that_each_hold_a_transaction(tmp_path
     as_v10(path)
     db = Database(path)
     with db.connect() as conn:
-        assert conn.execute("PRAGMA user_version").fetchone()[0] == 13
+        assert conn.execute("PRAGMA user_version").fetchone()[0] == schema.VERSION
         assert "can_create" not in [c[1] for c in conn.execute("PRAGMA table_info(users)")]
 
 
-def test_a_v9_file_goes_straight_to_v13_though_its_accounts_never_had_the_flag(tmp_path):
+def test_a_v9_file_goes_straight_to_the_current_version_though_its_accounts_never_had_the_flag(tmp_path):
     path = tmp_path / "s.db"
     Database(path)
     as_v9(path)
     db = Database(path)
     with db.connect() as conn:
-        assert conn.execute("PRAGMA user_version").fetchone()[0] == 13
+        assert conn.execute("PRAGMA user_version").fetchone()[0] == schema.VERSION
         assert "can_create" not in [c[1] for c in conn.execute("PRAGMA table_info(users)")]
         assert conn.execute("SELECT count(*) FROM credits").fetchone()[0] == 0
+
+
+def test_v13_brings_its_ledger_along_with_every_row_settled(tmp_path):
+    path = tmp_path / "s.db"
+    db = Database(path)
+    mina = add_user(db, "mina@example.com")
+    db.credits.grant(mina.id, 50, by=mina.id)
+    as_v13(path)
+    db = Database(path)
+    assert db.credits.balance(mina.id) == 50
+    with db.connect() as conn:
+        assert conn.execute("PRAGMA user_version").fetchone()[0] == schema.VERSION == 14
+        assert [tuple(row) for row in conn.execute("SELECT state, open_until FROM credits")] == [("settled", None)]
+
+
+def test_an_upgrade_to_v14_that_fails_leaves_the_v13_file_as_it_was(tmp_path):
+    path = tmp_path / "s.db"
+    Database(path)
+    as_v13(path)
+    conn = sqlite3.connect(path)
+    with conn:
+        conn.execute("ALTER TABLE credits ADD COLUMN open_until TEXT")  # the second of the two columns cannot be added again
+    conn.close()
+    with pytest.raises(sqlite3.OperationalError):
+        Database(path)
+    conn = sqlite3.connect(path)
+    assert conn.execute("PRAGMA user_version").fetchone()[0] == 13
+    assert "state" not in [c[1] for c in conn.execute("PRAGMA table_info(credits)")]
+    conn.close()
 
 
 def test_upgrading_v11_adds_the_travel_topics_and_brings_no_deleted_topic_back(tmp_path):

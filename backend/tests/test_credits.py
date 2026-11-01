@@ -1,9 +1,11 @@
 import threading
+from datetime import timedelta
 
 import pytest
 
-from app.credits import PRICES
+from app.credits import CONFIRM_WINDOW, PRICES, REPORT_WINDOW
 from app.db import Database
+from app.db.credits import NotEnoughCredits
 from app.generation.jobs import EXPRESSION_COUNT
 from app.live.changes import AccountChange
 from app.llm import GenerationError
@@ -296,3 +298,167 @@ def test_a_session_the_server_could_not_start_gives_the_200_back(tmp_path):
     res = client_of(app, db, mina).post("/api/sessions", json={"topic": "Trams"})
     assert res.status_code == 202 and res.json()["status"] == "failed"
     assert db.credits.balance(mina.id) == 200
+
+
+def funded(store, amount: int):
+    mina = add_user(store, "mina@example.com")
+    store.credits.grant(mina.id, amount, by=mina.id)
+    return mina
+
+
+def kinds(store, user) -> list[str]:
+    return [e.kind for e in store.credits.recent(user.id)]
+
+
+def test_a_hold_takes_the_price_at_once_and_reads_like_a_charge(store):
+    mina = funded(store, 15)
+    store.credits.hold(mina, "redraw", "sprawl")
+    assert store.credits.balance(mina.id) == 5
+    entry = store.credits.recent(mina.id)[0]
+    assert (entry.amount, entry.kind, entry.detail) == (-10, "redraw", "sprawl")
+
+
+def test_a_hold_the_balance_cannot_cover_says_what_is_missing_and_leaves_no_row(store):
+    mina = funded(store, 3)
+    with pytest.raises(NotEnoughCredits) as refused:
+        store.credits.hold(mina, "redraw")
+    assert (refused.value.need, refused.value.have) == (10, 3)
+    assert kinds(store, mina) == ["grant"]
+
+
+def test_a_settled_hold_stays_and_a_released_one_is_as_if_it_never_was(store):
+    mina = funded(store, 30)
+    store.credits.settle(store.credits.hold(mina, "redraw"))
+    store.credits.release(store.credits.hold(mina, "redraw"))
+    assert store.credits.balance(mina.id) == 20
+    assert kinds(store, mina) == ["redraw", "grant"]
+
+
+def test_a_release_cannot_undo_what_was_settled(store):
+    mina = funded(store, 10)
+    hold = store.credits.hold(mina, "redraw")
+    store.credits.settle(hold)
+    store.credits.release(hold)
+    assert store.credits.balance(mina.id) == 0
+
+
+def test_settling_as_a_cancelled_session_takes_half_and_keeps_the_topic(store):
+    mina = funded(store, 200)
+    store.credits.settle(store.credits.hold(mina, "session", "Trams"), as_kind="session_cancelled")
+    assert store.credits.balance(mina.id) == 100
+    entry = store.credits.recent(mina.id)[0]
+    assert (entry.amount, entry.kind, entry.detail) == (-100, "session_cancelled", "Trams")
+    assert PRICES["session_cancelled"] == 100
+
+
+def test_the_admin_holds_nothing_and_every_step_on_that_does_nothing(store):
+    boss = add_user(store, "boss@example.com", admin=True)
+    hold = store.credits.hold(boss, "session", "Trams")
+    assert hold is None
+    store.credits.await_browser(hold, CONFIRM_WINDOW)
+    store.credits.settle(hold)
+    store.credits.release(hold)
+    assert store.credits.recent(boss.id) == []
+
+
+def test_two_holds_at_once_on_one_price_worth_of_balance_let_only_one_through(store):
+    mina = funded(store, 10)
+    results: list[str] = []
+    gate = threading.Barrier(2)
+
+    def go():
+        gate.wait()
+        try:
+            store.credits.hold(mina, "redraw")
+            results.append("held")
+        except NotEnoughCredits:
+            results.append("refused")
+
+    threads = [threading.Thread(target=go) for _ in range(2)]
+    for t in threads:
+        t.start()
+    for t in threads:
+        t.join()
+    assert sorted(results) == ["held", "refused"]
+    assert store.credits.balance(mina.id) == 0
+
+
+def test_a_browser_hold_stops_counting_when_its_window_passes(store):
+    mina = funded(store, 10)
+    hold = store.credits.hold(mina, "practice_voice")
+    store.credits.await_browser(hold, timedelta(seconds=-1))
+    assert store.credits.balance(mina.id) == 10
+    assert kinds(store, mina) == ["grant"]
+    assert store.credits.confirm(hold, mina.id, REPORT_WINDOW) is False
+    assert store.credits.give_back(hold, mina.id) is False
+    assert store.credits.balance(mina.id) == 10
+
+
+def test_a_confirmed_round_is_paid_and_can_be_given_back_once(store):
+    mina = funded(store, 10)
+    hold = store.credits.hold(mina, "practice_voice")
+    store.credits.await_browser(hold, CONFIRM_WINDOW)
+    assert store.credits.confirm(hold, mina.id, REPORT_WINDOW) is True
+    assert store.credits.balance(mina.id) == 0
+    assert store.credits.give_back(hold, mina.id) is True
+    assert store.credits.balance(mina.id) == 10
+    assert store.credits.give_back(hold, mina.id) is False
+
+
+def test_a_confirmed_round_is_final_once_the_report_window_passes(store):
+    mina = funded(store, 10)
+    hold = store.credits.hold(mina, "practice_voice")
+    store.credits.await_browser(hold, CONFIRM_WINDOW)
+    assert store.credits.confirm(hold, mina.id, timedelta(seconds=-1)) is True
+    assert store.credits.give_back(hold, mina.id) is False
+    assert store.credits.balance(mina.id) == 0
+
+
+def test_nobody_else_can_confirm_or_give_back_a_hold(store):
+    mina = funded(store, 10)
+    other = add_user(store, "other@example.com")
+    hold = store.credits.hold(mina, "practice_voice")
+    store.credits.await_browser(hold, CONFIRM_WINDOW)
+    assert store.credits.confirm(hold, other.id, REPORT_WINDOW) is False
+    assert store.credits.give_back(hold, other.id) is False
+    assert store.credits.balance(mina.id) == 0
+
+
+def test_the_browser_cannot_touch_what_the_server_is_still_working_on(store):
+    mina = funded(store, 10)
+    hold = store.credits.hold(mina, "redraw")
+    assert store.credits.confirm(hold, mina.id, REPORT_WINDOW) is False
+    assert store.credits.give_back(hold, mina.id) is False
+    assert store.credits.balance(mina.id) == 0
+
+
+def test_a_released_hold_keeps_its_number_so_a_late_report_cannot_touch_the_next(store):
+    mina = funded(store, 20)
+    first = store.credits.hold(mina, "practice_voice")
+    store.credits.await_browser(first, CONFIRM_WINDOW)
+    assert store.credits.give_back(first, mina.id) is True
+    second = store.credits.hold(mina, "practice_voice")
+    store.credits.await_browser(second, CONFIRM_WINDOW)
+    assert second != first
+    assert store.credits.give_back(first, mina.id) is False
+    assert store.credits.balance(mina.id) == 10
+
+
+def test_holds_a_dead_process_left_are_released_and_settled_rows_stay(store):
+    mina = funded(store, 30)
+    store.credits.settle(store.credits.hold(mina, "redraw"))
+    store.credits.hold(mina, "redraw")
+    store.credits.release_abandoned()
+    assert store.credits.balance(mina.id) == 20
+
+
+def test_only_what_changes_the_balance_tells_the_account_to_read_it_again(store, recorder):
+    mina = add_user(store, "mina@example.com")
+    boss = add_user(store, "boss@example.com", admin=True)
+    store.credits.grant(mina.id, 10, by=boss.id)
+    hold = store.credits.hold(mina, "speech")
+    store.credits.settle(hold)
+    assert recorder.published == [(mina.id, AccountChange.CREDITS)] * 2
+    store.credits.release(store.credits.hold(mina, "speech"))
+    store.credits.hold(boss, "speech")
+    assert recorder.published == [(mina.id, AccountChange.CREDITS)] * 4
