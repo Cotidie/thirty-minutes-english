@@ -1,3 +1,4 @@
+import sqlite3
 from io import BytesIO
 
 import httpx2
@@ -376,6 +377,67 @@ def test_a_cancel_while_the_pictures_are_drawn_deletes_the_session_and_its_files
     assert db.sessions.get(saved["session"]) is None
     assert list(db.images_dir.iterdir()) == []
     assert finished == [job]
+
+
+def cancels_while_drawing(runner: JobRunner) -> Draws:
+    return Draws(during=lambda job_id, on_picture: runner.close(job_id))
+
+
+def test_a_busy_moment_does_not_keep_a_cancelled_session(tmp_path, monkeypatch):
+    db = Database(tmp_path / "s.db")
+    seed_expressions(db, EXPRESSION_COUNT)
+    runner = runner_over(db)
+    delete = db.sessions.delete
+    tries = []
+
+    def busy_at_first(session_id):
+        tries.append(session_id)
+        if len(tries) == 1:
+            raise sqlite3.OperationalError("database is locked")
+        return delete(session_id)
+
+    monkeypatch.setattr(db.sessions, "delete", busy_at_first)
+    monkeypatch.setattr("app.db.retry.time.sleep", lambda _: None)
+    job = runner.start("Trams", Recording(), cancels_while_drawing(runner))
+    assert job.status == "cancelled" and job.session_id is None and len(tries) == 2
+    assert db.sessions.get(tries[0]) is None
+
+
+def test_a_cancelled_session_that_will_not_go_stays_named_on_the_job_which_still_ends(tmp_path, monkeypatch):
+    db = Database(tmp_path / "s.db")
+    seed_expressions(db, EXPRESSION_COUNT)
+    runner = runner_over(db)
+    finished = []
+
+    def refuses(session_id):
+        raise sqlite3.OperationalError("disk I/O error")
+
+    monkeypatch.setattr(db.sessions, "delete", refuses)
+    monkeypatch.setattr("app.db.retry.time.sleep", lambda _: None)
+    job = runner.start("Trams", Recording(), cancels_while_drawing(runner), on_finished=finished.append)
+    assert job.status == "cancelled" and job.session_id is not None and finished == [job]
+    assert db.sessions.get(job.session_id) is not None
+
+
+def test_a_picture_file_that_will_not_go_does_not_stop_a_cancelled_job_ending(tmp_path, monkeypatch):
+    db = Database(tmp_path / "s.db")
+    seed_expressions(db, EXPRESSION_COUNT)
+    runner = runner_over(db)
+    files = PictureFiles(db.images_dir)
+    finished = []
+
+    def landing_then_cancelling(job_id, on_picture):
+        picture_id = db.pictures.add(None, None, None)
+        files.write(picture_id, b"PNG")
+        on_picture(0, "example_image", picture_id)
+        runner.close(job_id)
+
+    def refuses(picture_id):
+        raise OSError("Read-only file system")
+
+    monkeypatch.setattr(runner._sources, "drop", refuses)
+    job = runner.start("Trams", Recording(), Draws(during=landing_then_cancelling), on_finished=finished.append)
+    assert job.status == "cancelled" and job.session_id is None and finished == [job]
 
 
 def test_a_cancel_after_the_last_progress_report_still_counts(tmp_path):

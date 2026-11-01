@@ -5,6 +5,7 @@ from datetime import UTC, datetime, timedelta
 from typing import TYPE_CHECKING
 
 from app.credits import PRICES
+from app.db.retry import when_free
 from app.live.changes import AccountChange
 from app.models import CreditEntry, User
 
@@ -53,6 +54,7 @@ class CreditRepo:
         price = PRICES[kind]
         with self._db.connect() as conn:
             conn.execute("BEGIN IMMEDIATE")
+            _release_expired(conn)
             balance = _balance(conn, user.id)
             if balance < price:
                 raise NotEnoughCredits(price, balance)
@@ -116,10 +118,15 @@ class CreditRepo:
             conn.execute("UPDATE credits SET state = 'released' WHERE state = 'held'")
 
     def _change(self, statement: str, *params: object) -> int | None:
-        """Runs an UPDATE ... RETURNING user_id on one row; whose it was, or None when no row qualified."""
-        with self._db.connect() as conn:
-            rows = conn.execute(statement, params).fetchall()
-        return rows[0][0] if rows else None
+        """Runs an UPDATE ... RETURNING user_id on one row; whose it was, or None when no row qualified.
+        A busy database is tried again: a hold left unfinished stays off the balance until the next restart."""
+
+        def write() -> int | None:
+            with self._db.connect() as conn:
+                rows = conn.execute(statement, params).fetchall()
+            return rows[0][0] if rows else None
+
+        return when_free(write)
 
     def _tell(self, user_id: int | None) -> None:
         if user_id is not None:
@@ -136,6 +143,11 @@ def _after(window: timedelta) -> str:
 
 def _balance(conn: sqlite3.Connection, user_id: int) -> int:
     return conn.execute(f"SELECT COALESCE(SUM(amount), 0) FROM credits WHERE user_id = ? AND {COUNTS}", (user_id, _now())).fetchone()[0]
+
+
+def _release_expired(conn: sqlite3.Connection) -> None:
+    """Rounds the browser never said connected already stop counting; this makes the rows say so too."""
+    conn.execute("UPDATE credits SET state = 'released' WHERE state = 'held' AND open_until <= ?", (_now(),))
 
 
 def _add_row(

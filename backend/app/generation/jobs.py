@@ -12,6 +12,7 @@ from threading import Lock
 from typing import Literal, NamedTuple, Protocol
 
 from app.db.expressions import ExpressionRepo
+from app.db.retry import when_free
 from app.db.sessions import SessionRepo
 from app.db.stages import StageRepo
 from app.generation.exclusions import Exclusions
@@ -208,16 +209,19 @@ class JobRunner:
         self._tell_finished(job, on_finished)
 
     def _discard_if_cancelled(self, job: Job) -> None:
-        """A cancelled job leaves nothing behind: the session it saved goes, with the pictures that landed on it."""
-        if job.status != "cancelled" or job.session_id is None:
+        """A cancelled job leaves nothing behind: the session it saved goes, with the pictures that landed on it.
+        A session that will not go stays named on the job, and in its maker's list to delete by hand."""
+        session_id = job.session_id
+        if job.status != "cancelled" or session_id is None:
             return
         try:
-            for picture_id in self._sessions.delete(job.session_id) or []:
+            pictures = when_free(lambda: self._sessions.delete(session_id)) or []
+            job.session_id = None
+            for picture_id in pictures:
                 if self._sources:
                     self._sources.drop(picture_id)
         except Exception:
-            log.exception("job %s: cancelled, and its session %s would not go", job.id, job.session_id)
-        job.session_id = None
+            log.exception("job %s: cancelled, and its session %s did not all go", job.id, session_id)
 
     @staticmethod
     def _tell_finished(job: Job, on_finished: Callable[[Job], None] | None) -> None:

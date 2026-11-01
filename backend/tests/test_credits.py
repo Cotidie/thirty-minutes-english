@@ -1,3 +1,4 @@
+import sqlite3
 import threading
 from datetime import timedelta
 
@@ -702,6 +703,73 @@ def test_a_session_whose_job_failed_can_be_deleted_and_stays_free(tmp_path):
     job = make_session(me)
     assert me.delete(f"/api/sessions/{job['session_id']}").status_code == 204
     assert db.credits.balance(mina.id) == 200
+
+
+def busy_for(store, monkeypatch, times: int) -> list[int]:
+    """The next `times` connections find the database busy. What is left of them, to look at afterwards."""
+    connect = store.connect
+    left = [times]
+
+    def flaky():
+        if left[0] > 0:
+            left[0] -= 1
+            raise sqlite3.OperationalError("database is locked")
+        return connect()
+
+    monkeypatch.setattr(store, "connect", flaky)
+    monkeypatch.setattr("app.db.retry.time.sleep", lambda _: None)
+    return left
+
+
+def test_a_busy_moment_does_not_leave_a_hold_open(store, monkeypatch):
+    mina = funded(store, 30)
+    kept, gone = store.credits.hold(mina, "redraw"), store.credits.hold(mina, "redraw")
+    busy_for(store, monkeypatch, 2)
+    store.credits.settle(kept)
+    busy_for(store, monkeypatch, 2)
+    store.credits.release(gone)
+    store.credits.release_abandoned()  # were the first still held, this would give it back too
+    assert store.credits.balance(mina.id) == 20
+
+
+def test_a_database_that_stays_busy_is_tried_three_times_then_said_out_loud(store, monkeypatch):
+    mina = funded(store, 10)
+    hold = store.credits.hold(mina, "redraw")
+    left = busy_for(store, monkeypatch, 99)
+    with pytest.raises(sqlite3.OperationalError):
+        store.credits.release(hold)
+    assert left == [96]
+
+
+def test_a_round_nobody_confirmed_reads_as_released_once_anyone_spends_and_live_holds_do_not(store):
+    mina = funded(store, 30)
+    other = add_user(store, "other@example.com")
+    store.credits.grant(other.id, 1, by=mina.id)
+    expired = store.credits.hold(mina, "practice_voice")
+    store.credits.await_browser(expired, timedelta(seconds=-1))
+    waiting = store.credits.hold(mina, "practice_voice")
+    store.credits.await_browser(waiting, CONFIRM_WINDOW)
+    working = store.credits.hold(mina, "redraw")
+    store.credits.hold(other, "speech")
+    with store.connect() as conn:
+        states = {row["id"]: row["state"] for row in conn.execute("SELECT id, state FROM credits")}
+    assert (states[expired], states[waiting], states[working]) == ("released", "held", "held")
+    assert store.credits.balance(mina.id) == 10
+
+
+def test_a_cancelled_session_that_will_not_go_stays_named_on_the_job_and_costs_half(tmp_path, monkeypatch):
+    db, mina, me = paid_world(tmp_path, 200)
+
+    def refuses(session_id):
+        raise sqlite3.OperationalError("disk I/O error")
+
+    monkeypatch.setattr(db.sessions, "delete", refuses)
+    monkeypatch.setattr("app.db.retry.time.sleep", lambda _: None)
+    me.app.state.services.illustrator = Pictures(during=lambda job_id: me.delete(f"/api/jobs/{job_id}"))
+    job = make_session(me)
+    assert job["status"] == "cancelled" and job["session_id"] is not None
+    assert me.get(f"/api/sessions/{job['session_id']}").status_code == 200
+    assert db.credits.balance(mina.id) == 100
 
 
 def test_a_restart_gives_back_what_the_dead_process_held(tmp_path):
