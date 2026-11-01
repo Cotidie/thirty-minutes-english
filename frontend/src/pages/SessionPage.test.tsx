@@ -57,6 +57,11 @@ function renderAt(path: string) {
   )
 }
 
+/** The first load and the effects it sets off all run inside act: whatever reads the room or the timer hears from the start. */
+async function load(path: string) {
+  await act(async () => renderAt(path))
+}
+
 beforeEach(() => {
   vi.mocked(useCredits).mockReturnValue(creditsOf(null))
 })
@@ -73,7 +78,7 @@ describe('SessionPage', () => {
   it('locks the redraw for its maker when the balance cannot cover it', async () => {
     vi.mocked(useCredits).mockReturnValue(creditsOf(3, { redraw: 10 }))
     vi.mocked(api.getSession).mockResolvedValueOnce(mine)
-    renderAt('/s/3#vocabulary')
+    await load('/s/3#vocabulary')
     const redraw = await screen.findByRole('button', { name: 'New picture for mitigate' })
     expect(redraw).toBeDisabled()
     expect(redraw).toHaveAttribute('title', 'Not enough credits: this needs 10 and you have 3.')
@@ -82,7 +87,7 @@ describe('SessionPage', () => {
   it('gives no redraw to whoever only had the session shared', async () => {
     vi.mocked(useCredits).mockReturnValue(creditsOf(50, { redraw: 10 }))
     vi.mocked(api.getSession).mockResolvedValueOnce({ ...mine, mine: false, shared_by: 'mina@example.com' })
-    renderAt('/s/3#vocabulary')
+    await load('/s/3#vocabulary')
     await screen.findByText('mitigate')
     expect(screen.queryByRole('button', { name: 'New picture for mitigate' })).not.toBeInTheDocument()
   })
@@ -91,25 +96,25 @@ describe('SessionPage', () => {
     vi.mocked(useCredits).mockReturnValue(creditsOf(0, { session: 200 }))
     vi.mocked(api.getSession).mockResolvedValueOnce(mine)
     vi.mocked(api.listShares).mockResolvedValueOnce([])
-    renderAt('/s/3')
+    await load('/s/3')
     expect(await screen.findByPlaceholderText('their email')).toBeInTheDocument()
   })
 
   it('opens on the tab named in the address, so a reload stays there', async () => {
-    renderAt('/s/3#vocabulary')
+    await load('/s/3#vocabulary')
     expect(await screen.findByText('mitigate')).toBeInTheDocument()
     expect(screen.queryByText('a moving target')).not.toBeInTheDocument()
   })
 
   it('names the picked tab in the address, and opens on Expressions without one', async () => {
-    renderAt('/s/3')
+    await load('/s/3')
     expect(await screen.findByText('a moving target')).toBeInTheDocument()
     await userEvent.click(screen.getByRole('button', { name: /Article/ }))
     expect(screen.getByLabelText('hash')).toHaveTextContent('#article')
   })
 
   it('stays on the tab it is on while the timer runs, past the end of a phase', async () => {
-    renderAt('/s/3#vocabulary')
+    await load('/s/3#vocabulary')
     await screen.findByText('mitigate')
     vi.useFakeTimers()
     try {
@@ -124,7 +129,7 @@ describe('SessionPage', () => {
   })
 
   it('keeps one note on every tab and saves it; Summary leaves it to the Notes box', async () => {
-    renderAt('/s/3')
+    await load('/s/3')
     await screen.findByText('a moving target')
 
     await userEvent.click(screen.getByRole('button', { name: 'Open notes' }))
@@ -142,7 +147,7 @@ describe('SessionPage', () => {
   })
 
   it('swaps an expression in place for the one the server picked', async () => {
-    renderAt('/s/3')
+    await load('/s/3')
     await userEvent.click(await screen.findByRole('button', { name: 'Swap a moving target for another expression' }))
     expect(await screen.findByText('touch base')).toBeInTheDocument()
     expect(screen.queryByText('a moving target')).not.toBeInTheDocument()
@@ -150,7 +155,7 @@ describe('SessionPage', () => {
   })
 
   it('adds the expression the server picked after the others', async () => {
-    renderAt('/s/3')
+    await load('/s/3')
     await userEvent.click(await screen.findByRole('button', { name: 'Add another expression' }))
     expect(await screen.findByText('circle back')).toBeInTheDocument()
     expect(screen.getByText('a moving target')).toBeInTheDocument()
@@ -160,7 +165,7 @@ describe('SessionPage', () => {
 
 describe('SessionPage, with someone else in the session', () => {
   it('shows a new expression without a reload', async () => {
-    renderAt('/s/3')
+    await load('/s/3')
     expect(await screen.findByText('a moving target')).toBeInTheDocument()
     const changed = { ...session.content.expressions[0], id: 9, phrase: 'touch base' }
     vi.mocked(api.getSession).mockResolvedValueOnce({ ...session, content: { ...session.content, expressions: [changed] } } as never)
@@ -170,7 +175,7 @@ describe('SessionPage, with someone else in the session', () => {
   })
 
   it('says so when the session goes away, and closes the stream', async () => {
-    renderAt('/s/3')
+    await load('/s/3')
     expect(await screen.findByText('a moving target')).toBeInTheDocument()
     act(() => FakeEventSource.open[0].send('gone'))
     expect(await screen.findByText('This session is no longer available.')).toBeInTheDocument()
@@ -180,12 +185,12 @@ describe('SessionPage, with someone else in the session', () => {
 
   it('says the same when the session cannot be found', async () => {
     vi.mocked(api.getSession).mockRejectedValueOnce(Object.assign(new Error('session not found'), { status: 404 }))
-    renderAt('/s/3')
+    await load('/s/3')
     expect(await screen.findByText('This session is no longer available.')).toBeInTheDocument()
   })
 
   it('keeps showing the session when a read fails for another reason', async () => {
-    renderAt('/s/3')
+    await load('/s/3')
     expect(await screen.findByText('a moving target')).toBeInTheDocument()
     vi.mocked(api.getSession).mockRejectedValueOnce(Object.assign(new Error('offline'), { status: 502 }))
     act(() => FakeEventSource.open[0].send('session'))
@@ -199,8 +204,8 @@ describe('SessionPage with someone else in the session', () => {
   const tabNamed = (name: RegExp) => screen.getByRole('button', { name })
 
   async function open(people: object[] = [], path = '/s/3') {
-    renderAt(path)
-    await screen.findByRole('navigation', { name: 'Session parts' })
+    await load(path)
+    screen.getByRole('navigation', { name: 'Session parts' })
     const socket = FakeWebSocket.only
     act(() => {
       socket.connect()
