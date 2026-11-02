@@ -17,7 +17,7 @@
 | 예상 못 한 예외 (500): 응답 파싱 오류, 디스크 꽉 참 등 | 차감 유지. 잡는 예외가 `GenerationError`, `HttpError`뿐이었다 | 같은 곳, `voice/speech.py`, `voice/live.py` |
 | 그림 그리는 중 세션이 지워짐 (404) | 차감 유지 | `api/sessions.py` |
 | 글 저장 뒤 job 실패 | 200 차감 유지 | `generation/jobs.py` |
-| 그림 제공자 장애 | 22장이 전부 없어도 job은 `done`, 200 차감. `paint`가 `McpError`를 `None` 목록으로 바꾸고 `illustrate`는 로그만 남겼다 | `pictures/painters.py`, `pictures/illustrator.py` |
+| 그림 제공자 장애 | 그림이 전부 없어도 job은 `done`, 200 차감. `paint`가 `McpError`를 `None` 목록으로 바꾸고 `illustrate`는 로그만 남겼다 | `pictures/painters.py`, `pictures/illustrator.py` |
 | 서버 재시작 | job이 메모리에서 사라져 200이 영영 돌아오지 않았다 | `generation/jobs.py` |
 | 환불 자체의 실패 (DB 잠김) | 로그만 남고 크레딧 유실 | `generation/jobs.py` |
 | 마이크 권한 거부 | 토큰을 먼저 받으므로 차감 후 실패 | `ReadAloud.tsx`, `geminiWebsocket.ts` |

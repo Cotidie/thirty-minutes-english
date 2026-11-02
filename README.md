@@ -10,7 +10,7 @@ Thirty minutes of English speaking practice for two people, a new session every 
 |---|---|---|
 | Expressions | 10 min | Read 5 expressions aloud, then make one sentence each |
 | Article | 10 min | Read a short article, summarize it, discuss 3 questions |
-| Vocabulary | 10 min | Explain 10 words in English, then check the meaning |
+| Vocabulary | 10 min | Explain 8 words in English, then check the meaning |
 | Summary | after | Review your notes, starred items, your sentences, and corrections |
 
 Press `Start 30 min` and the tabs move on every 10 minutes.

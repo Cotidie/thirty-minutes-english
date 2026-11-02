@@ -22,7 +22,7 @@ class Generator(Protocol):
     ) -> Draft: ...
 
 
-VOCABULARY_COUNT = 10
+VOCABULARY_COUNT = 8
 
 SESSION_SCHEMA: dict = {
     "type": "object",

@@ -69,6 +69,12 @@ def test_the_prompt_asks_for_no_expressions():
     assert "expressions" not in SESSION_SCHEMA["properties"]
 
 
+def test_a_session_teaches_exactly_eight_words():
+    vocabulary = SESSION_SCHEMA["properties"]["vocabulary"]
+    assert (vocabulary["minItems"], vocabulary["maxItems"]) == (8, 8)
+    assert "2. vocabulary: 8 words" in ClaudeGenerator(model="m").build_prompt("t", Exclusions(()))
+
+
 def test_only_the_apps_own_skills_run():
     import inspect
 
