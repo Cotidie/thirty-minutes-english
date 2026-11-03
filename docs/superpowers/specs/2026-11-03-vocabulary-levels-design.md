@@ -38,8 +38,9 @@
 ### 값
 
 - 저장 형식은 쉼표로 이은 수준 목록이다 (`B2,B2+,C1`). 순서는 늘 `B1, B1+, B2, B2+, C1, C2` 순이다.
-- 저장할 때 검사한다: 쉼표로 나눈 각 조각이 여섯 수준 중 하나이고, 하나 이상이며, 겹치지 않아야 한다. 아니면 400과 `VOCABULARY_LEVELS must name one or more of B1, B1+, B2, B2+, C1, C2`. 하나라도 틀리면 아무것도 저장하지 않는다 (기존 규칙).
+- 저장할 때 검사한다: 여섯 수준 중 하나 이상이 위 순서대로, 겹침과 공백 없이 쉼표로 이어져 있어야 한다. 아니면 400과 `VOCABULARY_LEVELS must name one or more of B1, B1+, B2, B2+, C1, C2, in that order, joined by commas`. 하나라도 틀리면 아무것도 저장하지 않는다 (기존 규칙).
 - 읽을 때는 너그럽다: 공백과 소문자를 받아 주고, 모르는 조각은 버리고, 남는 것이 없으면 기본값이다. 환경변수로 들어온 값은 저장 검사를 거치지 않기 때문이다.
+- 설정 화면에는 날것이 아니라 앱이 읽은 값을 보낸다. `.env`에 `b2, c1`이 있으면 화면은 `B2,C1`을 받아, 생성기가 쓰는 수준과 같은 칸이 켜진다.
 
 ### 수준 이름
 
@@ -54,7 +55,7 @@
 
 ### 프롬프트
 
-`2. vocabulary: 8 words at {수준} level connected to the topic.` 뒤에 둘 이상이면 ` Spread them about evenly across {수준}.`을 붙인다. 수준 표기는 하나면 `B1`, 이어진 범위면 `B2 to C1`(B2, B2+, C1), 사이가 빠져 있으면 `B2 and C1`(B2+를 뺀 경우), `B1+, C1 and C2`다.
+하나면 `2. vocabulary: 8 words at CEFR level B1 connected to the topic.`, 둘 이상이면 `8 words at CEFR levels B2, B2+ and C1 connected to the topic. Spread them about evenly across these levels.`이다. 수준은 범위("B2 to C1")로 줄이지 않고 하나하나 적는다. 범위로 적으면 plus 수준이 그 안에 묻혀 Claude가 건너뛸 수 있기 때문이다 (최종 리뷰 지적).
 
 ### 설정 화면
 

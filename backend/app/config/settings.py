@@ -7,7 +7,7 @@ stay out of here. The saved values live in app.db.settings."""
 from collections.abc import Mapping
 from dataclasses import dataclass
 
-from app.generation.levels import DEFAULT_LEVELS, LEVEL_LABELS, LEVELS, parse_levels
+from app.generation.levels import DEFAULT_LEVELS, LEVEL_LABELS, LEVELS
 from app.pictures.illustrator import STYLE_LABELS, STYLES
 from app.pictures.painters import DEFAULT_MODEL as IMAGE_DEFAULT_MODEL
 
@@ -136,7 +136,7 @@ def validate(values: Mapping[str, str]) -> None:
         if spec is None:
             raise InvalidSetting(f"unknown setting {key}")
         if spec.many and spec.choices and not _is_many_of(value, spec.choices):
-            raise InvalidSetting(f"{key} must name one or more of {', '.join(spec.choices)}")
+            raise InvalidSetting(f"{key} must name one or more of {', '.join(spec.choices)}, in that order, joined by commas")
         if not spec.many and spec.choices and value not in spec.choices:
             raise InvalidSetting(f"{key} must be one of {', '.join(spec.choices)}")
         if spec.number:
@@ -150,9 +150,14 @@ def validate(values: Mapping[str, str]) -> None:
 
 
 def _is_many_of(value: str, choices: tuple[str, ...]) -> bool:
-    """One or more of `choices`, comma-joined, none twice."""
-    pieces = [piece.strip() for piece in value.split(",")]
-    return all(pieces) and set(pieces) <= set(choices) and len(set(pieces)) == len(pieces)
+    """One or more of `choices`, in their order, joined by commas: the one form a saved value takes."""
+    pieces = value.split(",")
+    return pieces == [choice for choice in choices if choice in pieces]
+
+
+def _picked(value: str, spec: Spec) -> tuple[str, ...]:
+    named = {piece.strip().upper() for piece in value.split(",")}
+    return tuple(choice for choice in spec.choices or () if choice.upper() in named) or tuple(spec.default.split(","))
 
 
 class Settings:
@@ -168,9 +173,18 @@ class Settings:
         return self._env.get(key) or SPEC_BY_KEY[key].default
 
     def shown(self, key: str) -> str:
-        """The value for the modal: secrets masked."""
-        value = self.get(key)
-        return mask(value) if SPEC_BY_KEY[key].secret else value
+        """The value for the modal: secrets masked, several picks as the app reads them."""
+        spec = SPEC_BY_KEY[key]
+        if spec.secret:
+            return mask(self.get(key))
+        if spec.many:
+            return ",".join(self.picked(key))
+        return self.get(key)
+
+    def picked(self, key: str) -> tuple[str, ...]:
+        """A several-picks setting as the app reads it: the known choices in their order, the default when it names none.
+        Lenient on purpose: a value from the environment never went through `validate`."""
+        return _picked(self.get(key), SPEC_BY_KEY[key])
 
     # Typed accessors for the places that build services.
 
@@ -189,7 +203,7 @@ class Settings:
 
     @property
     def vocabulary_levels(self) -> tuple[str, ...]:
-        return parse_levels(self.get("VOCABULARY_LEVELS"))
+        return self.picked("VOCABULARY_LEVELS")
 
 
 def mask(secret: str) -> str:

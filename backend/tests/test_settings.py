@@ -152,8 +152,8 @@ def test_vocabulary_levels_take_any_set_of_known_levels(store):
     store.settings.save({"VOCABULARY_LEVELS": "B1,C2"})
     store.settings.save({"VOCABULARY_LEVELS": "B1+,B2+"})
     store.settings.save({"VOCABULARY_LEVELS": "C2"})
-    for bad in ("", "A2", "C1+", "B2,B2", "B2,X"):
-        with pytest.raises(InvalidSetting, match=re.escape("VOCABULARY_LEVELS must name one or more of B1, B1+, B2, B2+, C1, C2")):
+    for bad in ("", "A2", "C1+", "B2,B2", "B2,X", "C1,B2", "B2, C1", "b2"):
+        with pytest.raises(InvalidSetting, match=re.escape("VOCABULARY_LEVELS must name one or more of B1, B1+, B2, B2+, C1, C2, in that order, joined by commas")):
             store.settings.save({"VOCABULARY_LEVELS": bad})
     assert store.settings.load()["VOCABULARY_LEVELS"] == "C2"
 
@@ -184,3 +184,11 @@ def test_vocabulary_levels_show_as_named_checkboxes_on_the_claude_tab(tmp_path):
 def test_the_writer_of_new_sessions_takes_the_saved_levels(tmp_path):
     services = build_services(Settings({}, {"VOCABULARY_LEVELS": "B1+"}), agent_dirs({}, tmp_path))
     assert services.generator.levels == ("B1+",)
+
+
+def test_the_modal_shows_the_levels_the_app_reads_not_the_raw_environment_value(tmp_path):
+    assert Settings({"VOCABULARY_LEVELS": "b2, c1"}, {}).shown("VOCABULARY_LEVELS") == "B2,C1"
+    assert Settings({"VOCABULARY_LEVELS": "A1"}, {}).shown("VOCABULARY_LEVELS") == "B2,B2+,C1"
+    with settings_client(tmp_path, {"VOCABULARY_LEVELS": "c1, b1+"}) as c:
+        fields = {f["key"]: f for f in c.get("/api/settings").json()["fields"]}
+    assert fields["VOCABULARY_LEVELS"]["value"] == "B1+,C1"

@@ -120,23 +120,20 @@ def test_the_article_brings_a_cover_and_one_more_source_image_and_always_two_sce
     assert prompt.index("Always give picture") < prompt.index("paragraph_picture") < prompt.index("2. vocabulary")
 
 
-
 @pytest.mark.parametrize(
-    ("levels", "asked", "spread"),
+    ("levels", "asked"),
     [
-        (("B2", "B2+", "C1"), "8 words at B2 to C1 level connected to the topic.", " Spread them about evenly across B2 to C1."),
-        (("B1",), "8 words at B1 level connected to the topic.", None),
-        (("B2", "C1"), "8 words at B2 and C1 level", " Spread them about evenly across B2 and C1."),
-        (("B1+", "C1", "C2"), "8 words at B1+, C1 and C2 level", " Spread them about evenly across B1+, C1 and C2."),
-        (("B1", "B1+", "B2", "B2+", "C1", "C2"), "8 words at B1 to C2 level", " Spread them about evenly across B1 to C2."),
+        (("B2", "B2+", "C1"), "8 words at CEFR levels B2, B2+ and C1 connected to the topic. Spread them about evenly across these levels."),
+        (("B1",), "8 words at CEFR level B1 connected to the topic. Draw"),
+        (("B2", "C1"), "8 words at CEFR levels B2 and C1 connected to the topic. Spread them"),
+        (("B1", "B1+", "B2", "B2+", "C1", "C2"), "8 words at CEFR levels B1, B1+, B2, B2+, C1 and C2 connected"),
     ],
 )
-def test_the_words_come_from_the_levels_set(levels, asked, spread):
+def test_the_words_come_from_every_level_set_by_name(levels, asked):
     prompt = ClaudeGenerator(model="m", levels=levels).build_prompt("t")
     assert asked in prompt and "C1+" not in prompt
-    assert ("Spread them" in prompt) == (spread is not None)
-    assert spread is None or spread in prompt
+    assert ("Spread them" in prompt) == (len(levels) > 1)
 
 
-def test_a_generator_told_no_levels_asks_for_b2_to_c1():
-    assert "8 words at B2 to C1 level" in ClaudeGenerator(model="m").build_prompt("t")
+def test_a_generator_told_no_levels_asks_for_b2_through_c1():
+    assert "8 words at CEFR levels B2, B2+ and C1" in ClaudeGenerator(model="m").build_prompt("t")

@@ -173,7 +173,7 @@ Always give paragraph_picture as well: a different moment, from one paragraph, w
 (the paragraph it belongs under, counted from 1) and a one-sentence caption. It is drawn under that paragraph when \
 no image lands under a paragraph, so that the article always shows exactly 2 images.
 
-2. vocabulary: {vocabulary_count} words at {vocabulary_levels} level connected to the topic.{level_spread} Draw from the \
+2. vocabulary: {vocabulary_count} words at CEFR {vocabulary_levels} connected to the topic.{level_spread} Draw from the \
 article body where it offers strong candidates, and fill the rest with words a well-read speaker would \
 use when discussing this subject even if they do not appear in the article. Prefer words useful across \
 academic and professional English over topic-specific jargon; no proper nouns. \
@@ -198,9 +198,14 @@ instructions while producing every part of the content.
 """
 
 
+def _named(levels: tuple[str, ...]) -> str:
+    """"level B1", or "levels B2, B2+ and C1"."""
+    return f"level {levels[0]}" if len(levels) == 1 else f"levels {describe_levels(levels)}"
+
+
 def _spread(levels: tuple[str, ...]) -> str:
     """With more than one level, the words are shared out among them."""
-    return f" Spread them about evenly across {describe_levels(levels)}." if len(levels) > 1 else ""
+    return " Spread them about evenly across these levels." if len(levels) > 1 else ""
 
 
 def check_items_reply(exclude: Exclusions, args: dict) -> str:
@@ -256,7 +261,7 @@ class ClaudeGenerator:
         prompt = PROMPT_TEMPLATE.format(
             topic=topic,
             vocabulary_count=VOCABULARY_COUNT,
-            vocabulary_levels=describe_levels(self.levels),
+            vocabulary_levels=_named(self.levels),
             level_spread=_spread(self.levels),
             article_skill=ARTICLE_SKILL,
             scene_rules=SCENE_RULES,
