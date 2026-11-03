@@ -5,10 +5,11 @@ import json
 import sqlite3
 from datetime import UTC, datetime
 
+from app.accounts.usernames import random_username
 from app.db import topics
 from app.models import Category
 
-VERSION = 15
+VERSION = 16
 
 # Added in v3, by session since v9: images under the article's paragraphs, and its cover (no paragraph) under the title.
 FIGURES = """
@@ -167,6 +168,11 @@ UPDATE expressions SET usage_note = ltrim(substr(usage_note, length(setting) + 2
 ALTER TABLE expressions DROP COLUMN setting;
 """
 
+# Added in v16: the name others know an account by, unique whatever the case of its English letters. An account from
+# before it gets a random one; every account made since names its own, so the empty default is never kept.
+USERNAME_COLUMN = "ALTER TABLE users ADD COLUMN username TEXT NOT NULL DEFAULT ''"
+USERNAME_INDEX = "CREATE UNIQUE INDEX users_username ON users (username COLLATE NOCASE)"
+
 SCHEMA = TOPICS + SESSIONS + """
 
 CREATE TABLE paragraphs (
@@ -256,7 +262,7 @@ CREATE INDEX session_expressions_expression ON session_expressions (expression_i
 CREATE INDEX readings_paragraph ON readings (paragraph_id);
 CREATE INDEX summaries_paragraph ON summaries (paragraph_id);
 CREATE INDEX stage_times_stage ON stage_times (stage, id);
-""" + FIGURES + KOREAN_EXAMPLES + EXAMPLES + ACCOUNTS + CREDITS + CREDIT_HOLDS
+""" + FIGURES + KOREAN_EXAMPLES + EXAMPLES + ACCOUNTS + CREDITS + CREDIT_HOLDS + f"{USERNAME_COLUMN};\n{USERNAME_INDEX};\n"
 
 
 def _run(conn: sqlite3.Connection, script: str) -> None:
@@ -306,6 +312,8 @@ def upgrade(conn: sqlite3.Connection, version: int) -> None:
         _credit_holds(conn)
     if version < 15:
         _plain_expressions(conn)
+    if version < 16:
+        _usernames(conn)
 
 
 def _add_pool(conn: sqlite3.Connection, category: Category, version: int) -> None:
@@ -341,6 +349,22 @@ def _plain_expressions(conn: sqlite3.Connection) -> None:
         _run(conn, PLAIN_EXPRESSIONS)
     conn.execute("DROP TABLE IF EXISTS swapped_expressions")
     conn.execute("PRAGMA user_version = 15")
+
+
+def _usernames(conn: sqlite3.Connection) -> None:
+    """All of it or none: the column, a random name on each account there already, then the index that keeps names apart."""
+    conn.commit()
+    conn.execute("BEGIN")
+    conn.execute(USERNAME_COLUMN)
+    taken: set[str] = set()
+    for (user_id,) in conn.execute("SELECT id FROM users ORDER BY id").fetchall():
+        name = random_username()
+        while name in taken:
+            name = random_username()
+        taken.add(name)
+        conn.execute("UPDATE users SET username = ? WHERE id = ?", (name, user_id))
+    conn.execute(USERNAME_INDEX)
+    conn.execute("PRAGMA user_version = 16")
 
 
 def _figures_by_session(conn: sqlite3.Connection) -> None:

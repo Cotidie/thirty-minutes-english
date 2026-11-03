@@ -176,7 +176,7 @@ class SessionRepo:
         with self._db.connect() as conn:
             rows = conn.execute(
                 f"""SELECT s.id, s.created_at, t.text AS topic, s.title, s.created_by = ? AS mine,
-                           CASE WHEN s.created_by = ? THEN NULL ELSE u.email END AS shared_by
+                           CASE WHEN s.created_by = ? THEN NULL ELSE u.username END AS shared_by
                     FROM {WITH_TOPIC} LEFT JOIN users u ON u.id = s.created_by
                     WHERE s.id IN ({VISIBLE_SESSIONS})
                     ORDER BY s.id DESC""",
@@ -185,14 +185,14 @@ class SessionRepo:
         return [SessionSummary(**dict(row)) for row in rows]
 
     def viewpoint(self, session_id: int, user_id: int) -> tuple[bool, str | None]:
-        """Whether the account made the session, and if not, the email of who did."""
+        """Whether the account made the session, and if not, the username of who did."""
         with self._db.connect() as conn:
             row = conn.execute(
-                "SELECT s.created_by, u.email FROM sessions s LEFT JOIN users u ON u.id = s.created_by WHERE s.id = ?", (session_id,)
+                "SELECT s.created_by, u.username FROM sessions s LEFT JOIN users u ON u.id = s.created_by WHERE s.id = ?", (session_id,)
             ).fetchone()
         if row is None or row["created_by"] == user_id:
             return row is not None, None
-        return False, row["email"]
+        return False, row["username"]
 
     def delete(self, session_id: int) -> list[int] | None:
         """The ids of the pictures the session showed (its words', then its figures'), whose files the caller removes;

@@ -7,6 +7,8 @@ export type ViewValue = boolean | number | string | null
 
 export interface Person {
   id: string
+  /** Their username as it was when they came in. */
+  name: string
   color: number
   tab: number | null
 }
@@ -36,7 +38,7 @@ export type ServerMessage =
       view: Readonly<Record<string, ViewValue>>
       timer: { running: boolean; elapsed: number } | null
     }
-  | { type: 'joined'; id: string; color: number; tab: number | null }
+  | ({ type: 'joined' } & Person)
   | { type: 'left'; id: string }
   | { type: 'tab'; id: string; tab: number }
   | ({ type: 'cursor'; id: string; tab: number } & (CursorPlace | { anchor: null }))
@@ -141,7 +143,7 @@ export class PresenceStore {
         this.startOver(message)
         break
       case 'joined':
-        this.everyone = [...this.everyone, { id: message.id, color: message.color, tab: message.tab }]
+        this.everyone = [...this.everyone, { id: message.id, name: message.name, color: message.color, tab: message.tab }]
         this.changed()
         break
       case 'left':

@@ -7,17 +7,26 @@ import sqlite3
 from datetime import UTC, datetime, timedelta
 from typing import TYPE_CHECKING
 
+from app.accounts.usernames import normalize_username, random_username
+from app.live.changes import AccountChange, SessionChange
 from app.models import User
 
 if TYPE_CHECKING:
     from app.db import Database
 
 LOGIN_LIFETIME = timedelta(days=30)
-USER_COLUMNS = "id, created_at, email, is_admin"
+USER_COLUMNS = "id, created_at, email, username, is_admin"
+# The same columns of `users` read as `u`, for a query that joins it.
+JOINED_USER_COLUMNS = ", ".join(f"u.{column}" for column in USER_COLUMNS.split(", "))
 EMAIL = re.compile(r"[^\s@]+@[^\s@]+\.[^\s@]+")
+SEARCH_LIMIT = 8
 
 
 class EmailTaken(Exception):
+    pass
+
+
+class UsernameTaken(Exception):
     pass
 
 
@@ -37,20 +46,51 @@ def _digest(token: str) -> str:
     return hashlib.sha256(token.encode()).hexdigest()
 
 
+def _like_pattern(text: str) -> str:
+    """`text` for LIKE with `ESCAPE '\\'`, its % and _ standing for themselves."""
+    return text.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+
+
+def _free_name(conn: sqlite3.Connection) -> str:
+    """A random name nobody goes by yet."""
+    while True:
+        name = random_username()
+        if conn.execute("SELECT 1 FROM users WHERE username = ? COLLATE NOCASE", (name,)).fetchone() is None:
+            return name
+
+
+def _showing_the_name(conn: sqlite3.Connection, user_id: int) -> tuple[list[int], list[int]]:
+    """Where the account's name is on show to someone else: the sessions whose shares list it, and the accounts whose
+    list of sessions says it made one."""
+    shares = [row[0] for row in conn.execute("SELECT session_id FROM session_shares WHERE user_id = ?", (user_id,))]
+    lists = [
+        row[0]
+        for row in conn.execute(
+            "SELECT DISTINCT sh.user_id FROM session_shares sh JOIN sessions s ON s.id = sh.session_id WHERE s.created_by = ?",
+            (user_id,),
+        )
+    ]
+    return shares, lists
+
+
 class AccountRepo:
     def __init__(self, db: "Database") -> None:
         self._db = db
 
-    def create(self, email: str, password_hash: str) -> User:
-        """Raises EmailTaken when an account already uses the email."""
+    def create(self, email: str, password_hash: str, username: str | None = None) -> User:
+        """Raises EmailTaken when an account already uses the email, and failing that UsernameTaken when one goes by the
+        name. Without a name the account gets a random one."""
         try:
             with self._db.connect() as conn:
+                name = _free_name(conn) if username is None else normalize_username(username)
                 cur = conn.execute(
-                    "INSERT INTO users (created_at, email, password_hash) VALUES (?, ?, ?)",
-                    (datetime.now(UTC).isoformat(), normalize_email(email), password_hash),
+                    "INSERT INTO users (created_at, email, username, password_hash) VALUES (?, ?, ?, ?)",
+                    (datetime.now(UTC).isoformat(), normalize_email(email), name, password_hash),
                 )
         except sqlite3.IntegrityError:
-            raise EmailTaken(email) from None
+            if self.by_email(email) is not None:
+                raise EmailTaken(email) from None
+            raise UsernameTaken(username) from None
         assert cur.lastrowid is not None
         user = self.get(cur.lastrowid)
         assert user is not None
@@ -73,6 +113,40 @@ class AccountRepo:
                 f"SELECT {USER_COLUMNS}, password_hash FROM users WHERE email = ?", (normalize_email(email),)
             ).fetchone()
         return (user_from(row), row["password_hash"]) if row else None
+
+    def search(self, text: str, excluding: int) -> list[User]:
+        """Up to SEARCH_LIMIT accounts whose name holds `text`, its English letters in any case: the names it starts
+        first, then by name. `excluding` is whoever searches, never offered to themselves."""
+        needle = normalize_username(text)
+        if not needle:
+            return []
+        pattern = _like_pattern(needle)
+        with self._db.connect() as conn:
+            rows = conn.execute(
+                f"SELECT {USER_COLUMNS} FROM users WHERE username LIKE ? ESCAPE '\\' AND id != ?"
+                " ORDER BY username NOT LIKE ? ESCAPE '\\', username COLLATE NOCASE LIMIT ?",
+                (f"%{pattern}%", excluding, f"{pattern}%", SEARCH_LIMIT),
+            ).fetchall()
+        return [user_from(row) for row in rows]
+
+    def set_username(self, user_id: int, username: str) -> User:
+        """Raises UsernameTaken when another account goes by it. Whoever has the old name on show hears of the new one,
+        the account's own other tabs too."""
+        name = normalize_username(username)
+        try:
+            with self._db.connect() as conn:
+                conn.execute("UPDATE users SET username = ? WHERE id = ?", (name, user_id))
+                shares, lists = _showing_the_name(conn, user_id)
+        except sqlite3.IntegrityError:
+            raise UsernameTaken(name) from None
+        for session_id in shares:
+            self._db.changes.publish(session_id, SessionChange.SHARES)
+        for account_id in lists:
+            self._db.account_changes.publish(account_id, AccountChange.SESSIONS)
+        self._db.account_changes.publish(user_id, AccountChange.ME)
+        user = self.get(user_id)
+        assert user is not None
+        return user
 
     def list_all(self) -> list[User]:
         with self._db.connect() as conn:
@@ -101,7 +175,7 @@ class AccountRepo:
         """Who the token logs in, while it lasts."""
         with self._db.connect() as conn:
             row = conn.execute(
-                "SELECT u.id, u.created_at, u.email, u.is_admin FROM logins l JOIN users u ON u.id = l.user_id"
+                f"SELECT {JOINED_USER_COLUMNS} FROM logins l JOIN users u ON u.id = l.user_id"
                 " WHERE l.token_hash = ? AND l.expires_at > ?",
                 (_digest(token), datetime.now(UTC).isoformat()),
             ).fetchone()
@@ -125,8 +199,8 @@ class AccountRepo:
                 conn.execute("DELETE FROM logins WHERE user_id = ?", (user_id,))
             else:
                 user_id = conn.execute(
-                    "INSERT INTO users (created_at, email, password_hash, is_admin) VALUES (?, ?, ?, 1)",
-                    (datetime.now(UTC).isoformat(), address, password_hash),
+                    "INSERT INTO users (created_at, email, username, password_hash, is_admin) VALUES (?, ?, ?, ?, 1)",
+                    (datetime.now(UTC).isoformat(), address, _free_name(conn), password_hash),
                 ).lastrowid
             conn.execute("UPDATE sessions SET created_by = ? WHERE created_by IS NULL", (user_id,))
         assert user_id is not None

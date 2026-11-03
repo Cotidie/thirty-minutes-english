@@ -46,7 +46,7 @@ export function AuthLayout({ onSubmit, sentence, notes, submitLabel, busy, other
 interface BlankProps extends InputHTMLAttributes<HTMLInputElement> {
   id: string
   label: string
-  fits: 'email' | 'password'
+  fits: 'email' | 'name' | 'password'
   /** The punctuation that closes this part of the sentence. */
   end?: string
   bad?: boolean

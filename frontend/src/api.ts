@@ -14,6 +14,7 @@ import type {
   LiveSession,
   Me,
   Note,
+  PersonMatch,
   PictureFace,
   Summary,
   SummaryFeedback,
@@ -64,7 +65,12 @@ function credentials(email: string, password: string): RequestInit {
 export const api = {
   me: () => request<Me>('/api/auth/me'),
   login: (email: string, password: string) => request<Me>('/api/auth/login', credentials(email, password)),
-  signup: (email: string, password: string) => request<Me>('/api/auth/signup', credentials(email, password)),
+  signup: (email: string, username: string, password: string) =>
+    request<Me>('/api/auth/signup', { method: 'POST', body: JSON.stringify({ email, username, password }) }),
+  /** Fails with a 409 when someone else goes by it. */
+  setUsername: (username: string) => request<Me>('/api/me/username', { method: 'PUT', body: JSON.stringify({ username }) }),
+  /** The accounts whose name holds `text`, never this one. */
+  findPeople: (text: string) => request<PersonMatch[]>(`/api/users?q=${encodeURIComponent(text)}`),
   logout: () => request<void>('/api/auth/logout', { method: 'POST' }),
   topics: () => request<TopicListing>('/api/topics'),
   refreshTopics: () => request<TopicListing>('/api/topics/refresh', { method: 'POST' }),
@@ -88,8 +94,8 @@ export const api = {
   deleteSession: (id: number) => request<void>(`/api/sessions/${id}`, { method: 'DELETE' }),
   /** Whom the session is shared with; for the one who made it. */
   listShares: (sessionId: number) => request<ShareEntry[]>(`/api/sessions/${sessionId}/shares`),
-  addShare: (sessionId: number, email: string) =>
-    request<ShareEntry[]>(`/api/sessions/${sessionId}/shares`, { method: 'POST', body: JSON.stringify({ email }) }),
+  addShare: (sessionId: number, userId: number) =>
+    request<ShareEntry[]>(`/api/sessions/${sessionId}/shares`, { method: 'POST', body: JSON.stringify({ user_id: userId }) }),
   removeShare: (sessionId: number, userId: number) => request<void>(`/api/sessions/${sessionId}/shares/${userId}`, { method: 'DELETE' }),
   /** A session shared with me, off my list; it stays for everyone else. */
   leaveSession: (sessionId: number) => request<void>(`/api/sessions/${sessionId}/shares/me`, { method: 'DELETE' }),

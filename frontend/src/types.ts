@@ -148,10 +148,11 @@ export interface TopicListing {
   labels: Record<string, string>
 }
 
-/** The logged-in account. */
+/** The logged-in account. The email logs in; others know it by `username`. */
 export interface Me {
   id: number
   email: string
+  username: string
   is_admin: boolean
 }
 
@@ -180,7 +181,13 @@ export interface CreditsView {
 /** Someone a session is shared with. */
 export interface ShareEntry {
   user_id: number
-  email: string
+  username: string
+}
+
+/** Someone a search for a name found: all one account may know of another. */
+export interface PersonMatch {
+  id: number
+  username: string
 }
 
 export interface SessionSummary {

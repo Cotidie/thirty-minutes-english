@@ -19,7 +19,7 @@
 | 화면 | B안, 폼이 영어 문장 하나다 (시안: https://claude.ai/artifact/RPb6kDVgvmYvur1qadbLaP, B 행) |
 | 가입 항목 | 이메일 형식 아이디, 비밀번호, 비밀번호 확인. 이메일 인증 없음 |
 | 세션 생성 | 운영자가 승인한 계정만. 가입 직후에는 권한 없음 |
-| 공유 | 세션마다 만든 사람이 이메일로 대상을 지정 |
+| 공유 | 세션마다 만든 사람이 username을 검색해 대상을 고른다 |
 | 별표, 노트, 말하기 연습 기록 | 세션에 하나씩, 공유자가 함께 쓴다 (지금 구조 유지). 노트는 나중에 저장한 내용으로 덮어쓰인다 |
 | 운영자의 열람 | 데이터베이스 페이지의 링크로 다른 사람의 세션을 열 수 있다 |
 | 표현과 단어의 중복 체크 | 사람별로 한다. 그 사람이 만들었거나 공유받은 세션에 나온 것을 피한다 |
@@ -85,6 +85,7 @@ CREATE TABLE users (
     id            INTEGER PRIMARY KEY AUTOINCREMENT,
     created_at    TEXT    NOT NULL,
     email         TEXT    NOT NULL UNIQUE,   -- 앞뒤 공백 제거, 소문자로 저장
+    username      TEXT    NOT NULL,          -- v16. NFC, 앞뒤 공백 제거. users_username 인덱스가 영문 대소문자 무시로 유일하게 지킨다
     password_hash TEXT    NOT NULL,
     is_admin      INTEGER NOT NULL DEFAULT 0,
     can_create    INTEGER NOT NULL DEFAULT 0
@@ -124,7 +125,8 @@ ALTER TABLE sessions ADD COLUMN created_by INTEGER REFERENCES users(id);
 | 로그인 실패 | 없는 이메일과 틀린 비밀번호를 같은 문구, 같은 401로 답한다. 없는 이메일에도 해시를 한 번 계산해 응답 시간을 맞춘다 |
 | 로그인 제한 | 이메일별 15분에 실패 10회를 넘으면 429. 메모리에 둔다 |
 | 가입 제한 | 전체 시간당 20건을 넘으면 429. 메모리에 둔다. 터널 뒤라 클라이언트 IP를 믿을 수 없어 IP 단위로 세지 않는다 |
-| 가입 | 성공하면 바로 로그인 상태가 된다. 중복 이메일은 409. 서버는 `email`, `password`만 받고, 비밀번호 확인은 화면에서 검사한다 |
+| 가입 | 성공하면 바로 로그인 상태가 된다. 중복 이메일은 409, 중복 username도 409. 서버는 `email`, `username`, `password`를 받고, 비밀번호 확인은 화면에서 검사한다 |
+| username | 2~20자의 한글 음절, 영문, 숫자, `_`. 공백 없음. 남에게 보이는 이름이고 로그인에는 쓰지 않는다. v16 전에 있던 계정은 `user_` 뒤에 16진수 6자리인 임의 이름을 받는다. 본인이 오른쪽 위 이름 버튼에서 `PUT /api/me/username`으로 바꾼다 |
 | 로그아웃 | `logins` 행을 지우고 쿠키를 만료시킨다. 만료된 행은 로그인할 때 함께 지운다 |
 | 비밀번호 재설정 | 이메일 인증이 없어 화면 기능을 두지 않는다. `docker compose exec backend uv run --no-dev python -m app.accounts.reset_password EMAIL`이 임시 비밀번호를 한 번 출력하고 그 계정의 로그인을 모두 끊는다 |
 
@@ -153,9 +155,10 @@ app/api/deps.py                  Me, 역할 검사, 세션 접근 검사
   - `JobRunner._run`은 job을 시작한 계정을 넘긴다. `swap_expression`과 `add_expression`은 요청한 계정을 넘긴다. 같은 세션 안의 중복을 막는 `_had`는 그대로다.
   - `SessionRepo.used_words`도 같은 세션들 중 최근 40개만 본다. 다른 사람이 쓴 단어는 다시 나올 수 있다.
   - 공유는 나중에 받아도 그 시점부터 계산에 들어간다. 이미 만든 세션은 바꾸지 않는다.
-- **공유:** `GET`, `POST /api/sessions/{id}/shares`, `DELETE /api/sessions/{id}/shares/{user_id}`. 가입된 계정의 이메일만 받는다. 없으면 404 "No account uses that email." 자기 자신과 중복 지정은 그대로 성공으로 처리한다.
+- **공유:** `GET`, `POST /api/sessions/{id}/shares`, `DELETE /api/sessions/{id}/shares/{user_id}`. `POST`는 `{"user_id"}`를 받는다. 없는 계정이면 404 "That account is not here any more." 자기 자신과 중복 지정은 그대로 성공으로 처리한다. 대상은 `GET /api/users?q=`로 찾는다. username에 `q`가 들어간 계정을 최대 8개, `q`로 시작하는 이름부터 돌려준다. 검색한 사람은 빠지고, 응답에는 `id`와 `username`만 있다. 공유 목록 응답도 `user_id`와 `username`이다.
 - **별표:** 지금은 브라우저가 가진 전체 목록을 저장해서, 두 사람이 같은 세션을 열어 두면 한 사람의 별표가 다른 사람의 저장으로 지워진다. `PUT /api/sessions/{id}/stars`를 `PUT /api/sessions/{id}/stars/{kind}/{item}` (`{"starred": bool}`, `kind`는 `expressions` 또는 `words`)로 바꾸고, `useStars`는 누른 항목만 보낸 뒤 응답의 전체 목록으로 화면을 갱신한다.
-- **응답 추가:** `SessionSummary`와 `Session`에 `mine: bool`, `shared_by: str | None`(만든 사람의 이메일, 내 세션이면 없음)을 더한다.
+- **응답 추가:** `SessionSummary`와 `Session`에 `mine: bool`, `shared_by: str | None`(만든 사람의 username, 내 세션이면 없음)을 더한다.
+- **이름 변경 알림:** username을 바꾸면 그 계정이 들어 있는 세션들에 `shares`, 그 계정이 만든 세션을 공유받은 계정들에 `sessions`를 알린다.
 
 ## 실시간 반영
 
@@ -255,7 +258,7 @@ UI 문구는 지금 앱과 같이 영어다.
 시안의 B안을 따른다.
 
 - 로그인: "Hi, my email is ___ and my password is ___."
-- 가입: "Hi, I'm new here. My email is ___, I'd like my password to be ___, and one more time, that's ___."
+- 가입: "Hi, I'm new here. My email is ___, people here can call me ___, I'd like my password to be ___, and one more time, that's ___." username 칸은 `autocomplete="nickname"`을 쓰고, 규칙을 어기면 칸 아래 안내를 빨갛게 표시한다.
 - 빈칸마다 화면에 보이지 않는 `<label>`을 둔다. 포커스된 빈칸은 형광펜 색(`--marker`)으로 칠한다.
 - 비밀번호 확인이 다르면 입력 중에 "The two passwords don't match yet."를 보여 주고 제출하지 않는다.
 - PC: 문장이 한 덩어리로 이어지고, 쉼표와 마침표는 빈칸에 붙어 줄이 갈리지 않는다.
@@ -265,7 +268,7 @@ UI 문구는 지금 앱과 같이 영어다.
 ### 나머지 화면
 
 - **라우팅:** `/login`, `/signup`을 뺀 모든 경로는 로그인이 필요하다. 로그인 후 `next`로 돌아가되 같은 사이트 안의 경로만 허용한다. API의 401은 `/login`으로 보낸다. 이미 로그인했으면 `/login`, `/signup`은 `/`로 보낸다.
-- **홈:** `can_create`가 없으면 주제 선택 대신 "Session creation isn't on for this account yet. Ask the admin to turn it on."을 보여 준다. 세션 목록이 비면 "Nothing here yet. Sessions shared with you appear here."를 보여 준다. 공유받은 세션에는 공유한 사람의 이메일을 표시하고, Delete 대신 Remove 버튼을 둔다. Remove는 `DELETE /api/sessions/{id}/shares/me`를 호출해 내 목록에서만 뺀다.
+- **홈:** `can_create`가 없으면 주제 선택 대신 "Session creation isn't on for this account yet. Ask the admin to turn it on."을 보여 준다. 세션 목록이 비면 "Nothing here yet. Sessions shared with you appear here."를 보여 준다. 공유받은 세션에는 공유한 사람의 username을 표시하고, Delete 대신 Remove 버튼을 둔다. Remove는 `DELETE /api/sessions/{id}/shares/me`를 호출해 내 목록에서만 뺀다.
 - **세션 화면:** 만든 사람에게만 왼쪽 레일에 공유 대상 목록과 해제 버튼을 보여 준다. 공유 입력란과 그림 다시 그리기는 만든 사람이면서 생성 권한도 있어야 보인다. 표현 교체와 추가를 포함한 그 외 기능은 공유받은 사람도 그대로 쓴다.
 - **오른쪽 위 버튼:** 모든 사용자에게 로그아웃 버튼을 더한다. 데이터베이스와 설정 버튼은 운영자에게만 보인다.
 - **계정 관리:** 설정 창에 운영자 전용 Accounts 구역을 더한다. 이메일, 가입일, "Can create sessions" 토글을 나열한다.
@@ -298,7 +301,8 @@ UI 문구는 지금 앱과 같이 영어다.
 ## 알려진 한계
 
 - 이메일을 확인하지 않으므로 남의 이메일로 먼저 가입할 수 있다. 그 이메일로 세션을 공유하면 먼저 가입한 사람이 받는다. 운영자가 승인할 때도 이메일만 보고 판단한다.
-- 공유 입력란과 가입의 409로 어떤 이메일이 가입되어 있는지 알 수 있다. 공유 입력란은 세션 생성 권한자만 쓴다.
+- 가입의 409로 어떤 이메일이 가입되어 있는지 알 수 있다. 공유는 username으로 찾으므로 남의 이메일은 드러나지 않는다.
+- 로그인한 사람은 누구나 username 검색으로 다른 계정의 이름을 훑어볼 수 있다. 소유자가 허용한 동작이다.
 - 횟수 제한은 메모리에 있어 재시작하면 초기화된다.
 - `ADMIN_PASSWORD`는 `.env`에 평문으로 있다. 다른 키와 같은 수준으로 다룬다. 비워 두어도 지금 비밀번호는 유지된다.
 

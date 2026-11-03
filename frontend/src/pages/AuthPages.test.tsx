@@ -1,9 +1,10 @@
-import { render, screen, waitFor } from '@testing-library/react'
+import { act, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter, Route, Routes } from 'react-router-dom'
 import { beforeEach, expect, test, vi } from 'vitest'
 import { ApiError, api } from '../api'
-import { AuthProvider, RequireAuth, useAuth } from '../lib/auth'
+import { AuthProvider, MeKeptFresh, RequireAuth, useAuth } from '../lib/auth'
+import { FakeEventSource } from '../test/fakeEventSource'
 import type { Me } from '../types'
 import { LoginPage } from './LoginPage'
 import { SignupPage } from './SignupPage'
@@ -13,7 +14,7 @@ vi.mock('../api', async (original) => ({
   api: { me: vi.fn(), login: vi.fn(), signup: vi.fn(), logout: vi.fn() },
 }))
 
-const MINA: Me = { id: 1, email: 'mina@example.com', is_admin: false }
+const MINA: Me = { id: 1, email: 'mina@example.com', username: 'mina', is_admin: false }
 
 function Inside() {
   const { me, logOut } = useAuth()
@@ -97,8 +98,9 @@ test('signing in and signing up link to each other', async () => {
   expect(await screen.findByRole('button', { name: 'Sign in' })).toBeInTheDocument()
 })
 
-async function fillSignup(email: string, password: string, confirm: string) {
+async function fillSignup(email: string, password: string, confirm: string, username = 'mina') {
   await userEvent.type(await screen.findByLabelText('Email'), email)
+  if (username) await userEvent.type(screen.getByLabelText('Username'), username)
   await userEvent.type(screen.getByLabelText('Password'), password)
   await userEvent.type(screen.getByLabelText('Confirm password'), confirm)
 }
@@ -134,7 +136,7 @@ test('a good signup logs you in and goes on', async () => {
   open('/signup')
   await fillSignup('mina@example.com', '12345678', '12345678')
   await userEvent.click(screen.getByRole('button', { name: 'Create account' }))
-  expect(api.signup).toHaveBeenCalledWith('mina@example.com', '12345678')
+  expect(api.signup).toHaveBeenCalledWith('mina@example.com', 'mina', '12345678')
   expect(await screen.findByText('home')).toBeInTheDocument()
 })
 
@@ -180,4 +182,50 @@ test('a next that points at the login page does not loop', async () => {
   vi.mocked(api.me).mockResolvedValue(MINA)
   open('/login?next=%2Flogin')
   expect(await screen.findByText('home')).toBeInTheDocument()
+})
+
+test('a username that breaks the rule marks the hint and never reaches the server', async () => {
+  open('/signup')
+  await fillSignup('mina@example.com', '12345678', '12345678', 'mi na')
+  const hint = screen.getAllByText(/2 to 20 letters, digits or _/)[0]
+  expect(hint).not.toHaveClass('is-bad')
+  await userEvent.click(screen.getByRole('button', { name: 'Create account' }))
+  expect(hint).toHaveClass('is-bad')
+  expect(api.signup).not.toHaveBeenCalled()
+})
+
+test('a Korean username goes to the server as typed', async () => {
+  vi.mocked(api.signup).mockResolvedValue({ ...MINA, username: '미나' })
+  open('/signup')
+  await fillSignup('mina@example.com', '12345678', '12345678', '미나')
+  await userEvent.click(screen.getByRole('button', { name: 'Create account' }))
+  expect(api.signup).toHaveBeenCalledWith('mina@example.com', '미나', '12345678')
+})
+
+test('a username someone has shows what the server said', async () => {
+  vi.mocked(api.signup).mockRejectedValue(new ApiError(409, 'Someone already goes by that name.'))
+  open('/signup')
+  await fillSignup('mina@example.com', '12345678', '12345678')
+  await userEvent.click(screen.getByRole('button', { name: 'Create account' }))
+  expect(await screen.findByRole('alert')).toHaveTextContent('Someone already goes by that name.')
+})
+
+test('a new username from another tab shows without a reload', async () => {
+  FakeEventSource.instances = []
+  vi.mocked(api.me).mockResolvedValue(MINA)
+  render(
+    <MemoryRouter initialEntries={['/s/1']}>
+      <AuthProvider>
+        <Routes>
+          <Route path="/s/:id" element={<RequireAuth><MeKeptFresh /><Inside /></RequireAuth>} />
+        </Routes>
+      </AuthProvider>
+    </MemoryRouter>,
+  )
+  expect(await screen.findByText('inside as mina@example.com')).toBeInTheDocument()
+  const stream = FakeEventSource.open.find((source) => source.url === '/api/me/events')
+  expect(stream).toBeDefined()
+  vi.mocked(api.me).mockResolvedValue({ ...MINA, email: 'renamed@example.com', username: '미나' })
+  act(() => stream?.send('me'))
+  expect(await screen.findByText('inside as renamed@example.com')).toBeInTheDocument()
 })

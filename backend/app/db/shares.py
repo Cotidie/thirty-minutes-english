@@ -3,7 +3,7 @@
 from datetime import UTC, datetime
 from typing import TYPE_CHECKING
 
-from app.db.accounts import user_from
+from app.db.accounts import JOINED_USER_COLUMNS, user_from
 from app.live.changes import AccountChange, SessionChange
 from app.models import User
 
@@ -50,8 +50,8 @@ class ShareRepo:
     def shared_with(self, session_id: int) -> list[User]:
         with self._db.connect() as conn:
             rows = conn.execute(
-                "SELECT u.id, u.created_at, u.email, u.is_admin FROM session_shares s"
-                " JOIN users u ON u.id = s.user_id WHERE s.session_id = ? ORDER BY u.email",
+                f"SELECT {JOINED_USER_COLUMNS} FROM session_shares s"
+                " JOIN users u ON u.id = s.user_id WHERE s.session_id = ? ORDER BY u.username COLLATE NOCASE",
                 (session_id,),
             ).fetchall()
         return [user_from(row) for row in rows]

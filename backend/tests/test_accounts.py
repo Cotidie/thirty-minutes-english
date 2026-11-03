@@ -1,7 +1,10 @@
+import re
+import unicodedata
+
 import pytest
 
 from app.accounts.passwords import hash_password, verify_password
-from app.db.accounts import EmailTaken
+from app.db.accounts import SEARCH_LIMIT, EmailTaken, UsernameTaken
 from tests.conftest import add_user, sample_draft
 
 
@@ -58,6 +61,59 @@ def test_a_new_password_ends_every_login(store):
     store.accounts.set_password(user.id, "new")
     assert store.accounts.with_hash("a@example.com")[1] == "new"
     assert store.accounts.user_of_login(token) is None
+
+
+def test_an_account_keeps_the_name_it_chose_and_one_made_without_a_name_gets_a_random_one(store):
+    assert store.accounts.create("a@example.com", "h", "미나").username == "미나"
+    first, second = (store.accounts.create(f"{n}@example.com", "h").username for n in ("b", "c"))
+    assert first != second and all(re.fullmatch(r"user_[0-9a-f]{6}", name) for name in (first, second))
+
+
+def test_a_name_is_taken_whatever_its_case_or_how_its_korean_was_typed(store):
+    store.accounts.create("a@example.com", "h", "Mina")
+    with pytest.raises(UsernameTaken):
+        store.accounts.create("b@example.com", "h", "mina")
+    store.accounts.create("c@example.com", "h", "한글")
+    with pytest.raises(UsernameTaken):
+        store.accounts.create("d@example.com", "h", unicodedata.normalize("NFD", "한글"))
+
+
+def test_an_email_in_use_is_named_first_when_the_name_is_in_use_too(store):
+    store.accounts.create("a@example.com", "h", "mina")
+    with pytest.raises(EmailTaken):
+        store.accounts.create("a@example.com", "h", "mina")
+
+
+def test_a_new_name_is_kept_and_recasing_ones_own_name_is_no_clash(store):
+    me = store.accounts.create("a@example.com", "h", "mina")
+    store.accounts.create("b@example.com", "h", "jo")
+    assert store.accounts.set_username(me.id, "Mina").username == "Mina"
+    with pytest.raises(UsernameTaken):
+        store.accounts.set_username(me.id, "JO")
+    assert store.accounts.get(me.id).username == "Mina"
+
+
+def test_a_search_finds_names_containing_the_text_starts_first_and_leaves_out_who_searches(store):
+    me = store.accounts.create("me@example.com", "h", "mina_me")
+    for name in ("jomina", "Mina", "minsu", "sumin"):
+        store.accounts.create(f"{name}@example.com", "h", name)
+    assert [u.username for u in store.accounts.search("MIN", excluding=me.id)] == ["Mina", "minsu", "jomina", "sumin"]
+    assert [u.username for u in store.accounts.search("  ", excluding=me.id)] == []
+
+
+def test_a_search_reads_percent_and_underscore_as_themselves(store):
+    me = store.accounts.create("me@example.com", "h", "me")
+    for name in ("a_b", "axb"):
+        store.accounts.create(f"{name}@example.com", "h", name)
+    assert [u.username for u in store.accounts.search("a_", excluding=me.id)] == ["a_b"]
+    assert store.accounts.search("%", excluding=me.id) == []
+
+
+def test_a_search_stops_at_the_limit(store):
+    me = store.accounts.create("me@example.com", "h", "me")
+    for i in range(12):
+        store.accounts.create(f"u{i}@example.com", "h", f"kim{i:02}")
+    assert len(store.accounts.search("kim", excluding=me.id)) == SEARCH_LIMIT
 
 
 def test_ensure_admin_claims_old_sessions_once_and_then_does_nothing(store):

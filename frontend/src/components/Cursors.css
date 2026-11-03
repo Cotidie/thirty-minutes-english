@@ -24,6 +24,38 @@
   clip-path: polygon(0 0, 100% 72%, 55% 72%, 78% 100%, 58% 100%, 36% 76%, 0 100%);
 }
 
+/* Whose it is, beside the tail of the arrow, so the tip stays clear of what it points at. */
+.cursor-name {
+  position: absolute;
+  top: 17px;
+  left: 9px;
+  max-width: 10rem;
+  overflow: hidden;
+  padding: 0 0.35rem;
+  border-radius: 3px;
+  background: var(--person);
+  color: var(--paper);
+  font-size: 0.7rem;
+  font-weight: 600;
+  line-height: 1.5;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* At the bottom edge the name goes above the triangle, which points down off the screen. */
+.cursor.is-below .cursor-name {
+  top: auto;
+  bottom: 14px;
+  left: 0;
+  transform: translateX(-50%);
+}
+
+.cursor.is-above .cursor-name {
+  top: 14px;
+  left: 0;
+  transform: translateX(-50%);
+}
+
 /* Off the top or bottom of this screen: a triangle at the edge pointing the way. */
 .cursor.is-above .cursor-arrow,
 .cursor.is-below .cursor-arrow {

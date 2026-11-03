@@ -21,8 +21,8 @@ def rooms_with_a_second_between_writes():
 
 def two_people(rooms=None):
     rooms = rooms or Rooms()
-    room, mina = rooms.join(1, 10, 0)
-    _, jo = rooms.join(1, 20, 1)
+    room, mina = rooms.join(1, 10, "mina", 0)
+    _, jo = rooms.join(1, 20, "jo", 1)
     for member in (mina, jo):
         member.outbox.take()
     return room, mina, jo
@@ -30,36 +30,36 @@ def two_people(rooms=None):
 
 def test_joining_tells_me_who_is_here_and_tells_them_about_me():
     rooms = Rooms()
-    room, mina = rooms.join(1, 10, 0)
-    _, jo = rooms.join(1, 20, 1)
+    room, mina = rooms.join(1, 10, "mina", 0)
+    _, jo = rooms.join(1, 20, "jo", 1)
     welcome = room.welcome(jo)
     assert welcome["type"] == "welcome"
     assert welcome["you"] == {"id": jo.id, "color": 1}
-    assert welcome["people"] == [{"id": mina.id, "color": 0, "tab": None}]
+    assert welcome["people"] == [{"id": mina.id, "name": "mina", "color": 0, "tab": None}]
     assert welcome["view"] == {} and welcome["timer"] is None
-    assert mina.outbox.take() == [{"type": "joined", "id": jo.id, "color": 1, "tab": None}]
+    assert mina.outbox.take() == [{"type": "joined", "id": jo.id, "name": "jo", "color": 1, "tab": None}]
 
 
 def test_a_cursor_and_a_tab_go_to_other_accounts_only():
     rooms = Rooms()
-    room, mine = rooms.join(1, 10, 0)
-    _, my_other_tab = rooms.join(1, 10, 0)
-    _, jo = rooms.join(1, 20, 1)
+    room, mine = rooms.join(1, 10, "mina", 0)
+    _, my_other_tab = rooms.join(1, 10, "mina", 0)
+    _, jo = rooms.join(1, 20, "jo", 1)
     for member in (mine, my_other_tab, jo):
         member.outbox.take()
     room.handle(mine, cursor())
     room.handle(mine, json.dumps({"type": "tab", "tab": 2}))
     assert my_other_tab.outbox.take() == []
     assert [m["type"] for m in jo.outbox.take()] == ["cursor", "tab"]
-    assert room.welcome(my_other_tab)["people"] == [{"id": jo.id, "color": 1, "tab": None}]
-    assert {"id": mine.id, "color": 0, "tab": 2} in room.welcome(jo)["people"]
+    assert room.welcome(my_other_tab)["people"] == [{"id": jo.id, "name": "jo", "color": 1, "tab": None}]
+    assert {"id": mine.id, "name": "mina", "color": 0, "tab": 2} in room.welcome(jo)["people"]
 
 
 def test_someone_coming_late_sees_a_cursor_that_is_standing_still():
     rooms = Rooms()
-    room, mina = rooms.join(1, 10, 0)
+    room, mina = rooms.join(1, 10, "mina", 0)
     room.handle(mina, cursor(0.3))
-    _, jo = rooms.join(1, 20, 1)
+    _, jo = rooms.join(1, 20, "jo", 1)
     assert [(m["type"], m["id"], m["x"]) for m in jo.outbox.take()] == [("cursor", mina.id, 0.3)]
 
 
@@ -68,7 +68,7 @@ def test_a_cursor_may_say_there_is_none():
     room.handle(mina, cursor(0.3))
     room.handle(mina, json.dumps({"type": "cursor", "tab": 0, "anchor": None}))
     assert jo.outbox.take() == [{"type": "cursor", "id": mina.id, "tab": 0, "anchor": None}]
-    _, late = rooms.join(1, 30, 2)
+    _, late = rooms.join(1, 30, "sam", 2)
     assert late.outbox.take() == []
 
 
@@ -144,7 +144,7 @@ def test_a_bad_frame_is_dropped_and_changes_nothing(raw):
 
 def test_a_room_stops_taking_new_keys_at_2000_but_keeps_updating_old_ones():
     rooms = rooms_with_a_second_between_writes()
-    room, mina = rooms.join(1, 10, 0)
+    room, mina = rooms.join(1, 10, "mina", 0)
     for i in range(2000):
         room.handle(mina, view(key=f"k:{i}"))
         mina.outbox.take()
@@ -206,7 +206,7 @@ def test_a_write_past_the_limit_changes_nothing():
 def test_a_second_connection_buys_no_more_writes():
     rooms = Rooms(clock=lambda: 0.0)
     room, mina, jo = two_people(rooms)
-    _, jo_again = rooms.join(1, 20, 1)
+    _, jo_again = rooms.join(1, 20, "jo", 1)
     mina.outbox.take()
     for i in range(1000):
         room.handle(jo if i % 2 else jo_again, view(key=f"k:{i}"))
@@ -219,7 +219,7 @@ def test_coming_back_does_not_start_the_limit_again():
     for i in range(40):
         room.handle(jo, view(key=f"k:{i}"))
     rooms.leave(1, jo)
-    _, back = rooms.join(1, 20, 1)
+    _, back = rooms.join(1, 20, "jo", 1)
     mina.outbox.take()
     room.handle(back, view(key="k:40"))
     assert mina.outbox.take() == []
@@ -259,22 +259,22 @@ def test_a_full_outbox_says_so():
 def test_the_room_outlives_the_last_person_by_ten_minutes():
     now = [0.0]
     rooms = Rooms(clock=lambda: now[0])
-    room, mina = rooms.join(1, 10, 0)
+    room, mina = rooms.join(1, 10, "mina", 0)
     room.handle(mina, view())
     rooms.leave(1, mina)
     now[0] = 599.0
-    room, jo = rooms.join(1, 20, 1)
+    room, jo = rooms.join(1, 20, "jo", 1)
     assert room.welcome(jo)["view"] == {"chip:word:2": True}
     rooms.leave(1, jo)
     now[0] = 599.0 + 601.0
-    room, jo = rooms.join(1, 20, 1)
+    room, jo = rooms.join(1, 20, "jo", 1)
     assert room.welcome(jo)["view"] == {}
 
 
 def test_the_timer_counts_on_while_running_and_stands_still_when_paused():
     now = [0.0]
     rooms = Rooms(clock=lambda: now[0])
-    room, mina = rooms.join(1, 10, 0)
+    room, mina = rooms.join(1, 10, "mina", 0)
     room.handle(mina, json.dumps({"type": "timer", "running": True, "elapsed": 60, "seq": 1}))
     now[0] = 5.0
     assert room.welcome(mina)["timer"] == {"running": True, "elapsed": 65}
@@ -285,8 +285,8 @@ def test_the_timer_counts_on_while_running_and_stands_still_when_paused():
 
 def test_rooms_of_different_sessions_hear_nothing_of_each_other():
     rooms = Rooms()
-    room, mina = rooms.join(1, 10, 0)
-    _, jo = rooms.join(2, 20, 0)
+    room, mina = rooms.join(1, 10, "mina", 0)
+    _, jo = rooms.join(2, 20, "jo", 0)
     room.handle(mina, view())
     assert jo.outbox.take() == []
 
@@ -301,7 +301,7 @@ def test_color_order():
 
 def test_a_taken_color_gives_way_and_a_second_connection_keeps_its_color():
     rooms = Rooms()
-    _, mina = rooms.join(1, 10, 0)
-    _, jo = rooms.join(1, 20, 0)
-    _, mina_again = rooms.join(1, 10, 3)
+    _, mina = rooms.join(1, 10, "mina", 0)
+    _, jo = rooms.join(1, 20, "jo", 0)
+    _, mina_again = rooms.join(1, 10, "mina", 3)
     assert (mina.color, jo.color, mina_again.color) == (0, 1, 0)

@@ -9,7 +9,7 @@ import { renderInRoom, WELCOME } from '../test/presenceRoom'
 import { Cursors } from './Cursors'
 
 const RECT = { left: 100, top: 200, width: 400, height: 100 }
-const WITH_B = { ...WELCOME, people: [{ id: 'b', color: 1, tab: 0 }] }
+const WITH_B = { ...WELCOME, people: [{ id: 'b', name: '미나', color: 1, tab: 0 }] }
 
 function Page({ tab = 0 }: { tab?: number }) {
   useTellMyTab(tab)
@@ -47,6 +47,12 @@ describe('Cursors, what is drawn', () => {
     expect(cursors()).toHaveLength(1)
     expect(cursors()[0].style.transform).toBe('translate(300px, 250px)')
     expect(cursors()[0].getAttribute('style')).toContain('--person-2')
+  })
+
+  it('labels the cursor with their username', () => {
+    const { socket } = inRoom()
+    theyPoint(socket)
+    expect(cursors()[0].querySelector('.cursor-name')?.textContent).toBe('미나')
   })
 
   it('draws nothing for someone on another tab', () => {

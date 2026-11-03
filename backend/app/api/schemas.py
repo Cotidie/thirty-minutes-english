@@ -14,6 +14,21 @@ class Credentials(BaseModel):
     password: str
 
 
+class Signup(Credentials):
+    username: str
+
+
+class UsernameRequest(BaseModel):
+    username: str
+
+
+class PersonMatch(BaseModel):
+    """Someone a search found: all that one account may know of another."""
+
+    id: int
+    username: str
+
+
 class StarRequest(BaseModel):
     starred: bool
 
@@ -46,12 +61,12 @@ class CreditsView(BaseModel):
 
 
 class ShareRequest(BaseModel):
-    email: str
+    user_id: int
 
 
 class ShareEntry(BaseModel):
     user_id: int
-    email: str
+    username: str
 
 
 class CreateSessionRequest(BaseModel):

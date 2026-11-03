@@ -1,0 +1,68 @@
+.corner-button.name-tag-button {
+  width: auto;
+  max-width: 11rem;
+  display: block;
+  overflow: hidden;
+  padding: 0 0.8rem;
+  color: var(--ink);
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.name-tag-panel {
+  position: fixed;
+  top: 4rem;
+  right: 1rem;
+  width: min(17rem, calc(100vw - 2rem));
+  padding: 0.9rem 1rem;
+  background: var(--paper);
+  border: 1px solid var(--line);
+  border-top: 3px solid var(--marker);
+  box-shadow: 0 10px 28px rgb(27 36 49 / 16%);
+}
+
+.name-tag-label {
+  display: block;
+  margin-bottom: 0.3rem;
+  font-weight: 600;
+}
+
+.name-tag-input {
+  width: 100%;
+  border: 0;
+  border-bottom: 2px solid var(--ink);
+  background: transparent;
+  padding: 0.2rem 0.1rem;
+  font-size: 1.05rem;
+}
+
+.name-tag-input:focus {
+  outline: 0;
+  background: var(--marker-soft);
+}
+
+.name-tag-input.is-bad {
+  border-bottom-color: var(--error);
+}
+
+.name-tag-hint {
+  margin: 0.35rem 0 0;
+  color: var(--muted);
+  font-size: 0.82rem;
+}
+
+.name-tag-hint.is-bad,
+.name-tag-error {
+  color: var(--error);
+}
+
+.name-tag-error {
+  margin: 0.5rem 0 0;
+  font-size: 0.88rem;
+  font-weight: 500;
+}
+
+.name-tag-save {
+  margin-top: 0.75rem;
+}

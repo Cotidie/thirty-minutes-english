@@ -15,12 +15,15 @@ function drawCursors(store: PresenceStore, layer: HTMLElement): () => void {
     drawn.get(id)?.remove()
     drawn.delete(id)
   }
-  const cursorOf = (id: string) => {
+  const cursorOf = (id: string, name: string) => {
     const existing = drawn.get(id)
     if (existing) return existing
     const cursor = document.createElement('div')
     cursor.className = 'cursor'
-    cursor.append(Object.assign(document.createElement('span'), { className: 'cursor-arrow' }))
+    cursor.append(
+      Object.assign(document.createElement('span'), { className: 'cursor-arrow' }),
+      Object.assign(document.createElement('span'), { className: 'cursor-name', textContent: name }),
+    )
     layer.append(cursor)
     drawn.set(id, cursor)
     return cursor
@@ -35,7 +38,7 @@ function drawCursors(store: PresenceStore, layer: HTMLElement): () => void {
       remove(id)
       return
     }
-    const cursor = cursorOf(id)
+    const cursor = cursorOf(id, person.name)
     cursor.style.setProperty('--person', personColor(person.color))
     cursor.classList.toggle('is-above', point.top < 0)
     cursor.classList.toggle('is-below', point.top > window.innerHeight)
@@ -64,7 +67,7 @@ function drawCursors(store: PresenceStore, layer: HTMLElement): () => void {
   }
 }
 
-/** Where the others are pointing, over the page and never in its way. */
+/** Where the others are pointing, each under their username, over the page and never in its way. */
 export function Cursors() {
   const store = usePresenceStore()
   const layer = useRef<HTMLDivElement>(null)

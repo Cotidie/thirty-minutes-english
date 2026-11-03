@@ -1,4 +1,5 @@
-import { useEffect, useRef, useState } from 'react'
+import { useCallback, useRef, useState } from 'react'
+import { useCloseOnLeave } from '../lib/useCloseOnLeave'
 import { useCredits } from '../lib/credits'
 import type { CreditEntry } from '../types'
 import './CreditsPill.css'
@@ -22,22 +23,8 @@ export function CreditsPill() {
   const { balance, recent } = useCredits()
   const [open, setOpen] = useState(false)
   const here = useRef<HTMLDivElement>(null)
-
-  useEffect(() => {
-    if (!open) return
-    const closeOnEscape = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') setOpen(false)
-    }
-    const closeOutside = (event: PointerEvent) => {
-      if (!here.current?.contains(event.target as Node)) setOpen(false)
-    }
-    document.addEventListener('keydown', closeOnEscape)
-    document.addEventListener('pointerdown', closeOutside)
-    return () => {
-      document.removeEventListener('keydown', closeOnEscape)
-      document.removeEventListener('pointerdown', closeOutside)
-    }
-  }, [open])
+  const close = useCallback(() => setOpen(false), [])
+  useCloseOnLeave(open, here, close)
 
   if (balance === null) return null
   const short = balance < 0 ? ' is-short' : ''

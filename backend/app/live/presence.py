@@ -1,7 +1,8 @@
 """Who is in a session right now and what is on their screens: cursors, tabs, what they have turned over, the shared
 timer. None of it is saved, and losing it costs no more than a reload. Whatever must survive goes through REST.
 
-Messages name people by a random id for the connection and a color, never by account. Everything here runs on the
+Messages tell people apart by a random id for the connection, and show them by a color and their username: never by
+account number or email. A username changed while someone is here shows from their next connection. Everything here runs on the
 event loop, so nothing needs a lock, and the readers live in this process, so the app must run as one process."""
 
 import asyncio
@@ -90,6 +91,7 @@ class _Rate:
 class Member:
     id: str
     user_id: int
+    name: str
     color: int
     tab: int | None = None
     cursor: dict | None = None  # the last place they pointed at, for whoever comes in while the mouse stands still
@@ -160,8 +162,8 @@ class Room:
             "timer": self._read_timer,
         }
 
-    def add(self, user_id: int, preferred_color: int) -> Member:
-        member = Member(secrets.token_hex(4), user_id, self._color_for(user_id, preferred_color))
+    def add(self, user_id: int, name: str, preferred_color: int) -> Member:
+        member = Member(secrets.token_hex(4), user_id, name, self._color_for(user_id, preferred_color))
         others = self._other_accounts(member)
         for other in others:
             other.outbox.put({"type": "joined", **self._person(member)})
@@ -285,7 +287,7 @@ class Room:
 
     @staticmethod
     def _person(member: Member) -> dict:
-        return {"id": member.id, "color": member.color, "tab": member.tab}
+        return {"id": member.id, "name": member.name, "color": member.color, "tab": member.tab}
 
 
 class Rooms:
@@ -297,12 +299,12 @@ class Rooms:
         self._clock = clock
         self._rooms: dict[int, Room] = {}
 
-    def join(self, session_id: int, user_id: int, preferred_color: int) -> tuple[Room, Member]:
+    def join(self, session_id: int, user_id: int, name: str, preferred_color: int) -> tuple[Room, Member]:
         self._forget_stale()
         room = self._rooms.get(session_id)
         if room is None:
             room = self._rooms[session_id] = Room(self._clock)
-        return room, room.add(user_id, preferred_color)
+        return room, room.add(user_id, name, preferred_color)
 
     def leave(self, session_id: int, member: Member) -> None:
         self._rooms[session_id].remove(member)

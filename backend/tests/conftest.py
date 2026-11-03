@@ -52,9 +52,10 @@ def seed_expressions(db: Database, n: int = 5) -> list[int]:
     ]
 
 
-def add_user(db: Database, email: str = "a@example.com", *, admin: bool = False) -> User:
-    """An account whose password nothing can check, for tests that log in through a token."""
-    user = db.accounts.create(email, "no password")
+def add_user(db: Database, email: str = "a@example.com", *, admin: bool = False, username: str | None = None) -> User:
+    """An account whose password nothing can check, for tests that log in through a token. Its name is the part of the
+    email before the @ unless `username` says otherwise."""
+    user = db.accounts.create(email, "no password", username or email.split("@")[0].strip())
     with db.connect() as conn:
         conn.execute("UPDATE users SET is_admin = ? WHERE id = ?", (int(admin), user.id))
     result = db.accounts.get(user.id)

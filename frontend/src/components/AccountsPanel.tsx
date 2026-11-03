@@ -34,6 +34,7 @@ export function AccountsPanel() {
           <li key={account.id} className="accounts-item">
             <span className="accounts-who">
               <span className="accounts-email">{account.email}</span>
+              <span className="accounts-name">{account.username}</span>
               <time className="accounts-joined" dateTime={account.created_at}>
                 Joined {new Date(account.created_at).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' })}
               </time>

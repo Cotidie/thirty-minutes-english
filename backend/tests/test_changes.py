@@ -6,6 +6,7 @@ from fastapi.testclient import TestClient
 
 from app.api.events import events_of
 from app.db import Database
+from app.db.accounts import UsernameTaken
 from app.live.changes import AccountChange, Changes, SessionChange
 from app.main import create_app
 from app.models import Note, SummaryFeedback
@@ -116,6 +117,31 @@ def test_deleting_a_session_tells_its_maker_and_everyone_it_was_shared_with(worl
     db.sessions.delete(session.id)
     assert set(db.account_changes.published) == {(maker.id, AccountChange.SESSIONS), (friend.id, AccountChange.SESSIONS)}
     assert stranger.id not in {account for account, _ in db.account_changes.published}
+
+
+def test_a_new_name_tells_the_shares_it_is_on_and_whoever_lists_a_session_it_made(world):
+    db, _ = world
+    maker, friend, other, stranger = (add_user(db, f"{name}@example.com") for name in ("maker", "friend", "other", "stranger"))
+    made = db.sessions.create(sample_draft(), [], created_by=maker.id)
+    db.shares.share(made.id, friend.id)
+    theirs = db.sessions.create(sample_draft(), [], created_by=other.id)
+    db.shares.share(theirs.id, maker.id)
+    db.changes.published.clear()
+    db.account_changes.published.clear()
+    db.accounts.set_username(maker.id, "new_name")
+    assert db.changes.published == [(theirs.id, SessionChange.SHARES)]
+    assert db.account_changes.published == [(friend.id, AccountChange.SESSIONS), (maker.id, AccountChange.ME)]
+
+
+def test_a_name_that_is_taken_tells_nobody(world):
+    db, _ = world
+    maker, friend = add_user(db, "maker@example.com"), add_user(db, "friend@example.com")
+    db.shares.share(db.sessions.create(sample_draft(), [], created_by=maker.id).id, friend.id)
+    db.changes.published.clear()
+    db.account_changes.published.clear()
+    with pytest.raises(UsernameTaken):
+        db.accounts.set_username(maker.id, "friend")
+    assert db.changes.published == [] and db.account_changes.published == []
 
 
 def test_deleting_a_session_that_is_not_there_tells_no_account(world):

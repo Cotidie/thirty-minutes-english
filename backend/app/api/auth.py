@@ -6,8 +6,9 @@ from fastapi import APIRouter, HTTPException, Request, Response
 
 from app.accounts.passwords import MAX_LENGTH, MIN_LENGTH, burn_time, hash_password, verify_password
 from app.api.deps import LOGIN_COOKIE, Db, Me
-from app.api.schemas import Credentials
-from app.db.accounts import LOGIN_LIFETIME, EmailTaken, is_email, normalize_email
+from app.api.people import NAME_TAKEN, chosen_username
+from app.api.schemas import Credentials, Signup
+from app.db.accounts import LOGIN_LIFETIME, EmailTaken, UsernameTaken, is_email, normalize_email
 from app.models import User
 
 public_router = APIRouter(prefix="/api/auth")
@@ -27,6 +28,7 @@ def _start_login(request: Request, response: Response, user: User) -> None:
 
 
 def _check_signup(email: str, password: str) -> None:
+    """The username is checked on its own, since it comes back as kept."""
     if not is_email(email):
         raise HTTPException(status_code=400, detail="Enter an email address, like you@example.com.")
     if len(password) < MIN_LENGTH:
@@ -36,16 +38,19 @@ def _check_signup(email: str, password: str) -> None:
 
 
 @public_router.post("/signup", response_model=User, status_code=201)
-def sign_up(body: Credentials, db: Db, request: Request, response: Response) -> User:
+def sign_up(body: Signup, db: Db, request: Request, response: Response) -> User:
     """An account with no rights, logged in at once. The confirmation of the password is the page's to check."""
     email = normalize_email(body.email)
     _check_signup(email, body.password)
+    username = chosen_username(body.username)
     if not request.app.state.signups.allow():
         raise HTTPException(status_code=429, detail="Too many sign-ups right now. Try again in an hour.")
     try:
-        user = db.accounts.create(email, hash_password(body.password))
+        user = db.accounts.create(email, hash_password(body.password), username)
     except EmailTaken:
         raise HTTPException(status_code=409, detail="An account already uses that email.") from None
+    except UsernameTaken:
+        raise HTTPException(status_code=409, detail=NAME_TAKEN) from None
     _start_login(request, response, user)
     return user
 

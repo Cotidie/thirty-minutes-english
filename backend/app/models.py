@@ -217,11 +217,13 @@ class SessionContent(BaseModel):
 
 
 class User(BaseModel):
-    """An account. `is_admin` is the one who runs the place; everyone else spends credits."""
+    """An account. `is_admin` is the one who runs the place; everyone else spends credits. The email logs in and only
+    its owner and the admin see it; others know the account by `username`."""
 
     id: int
     created_at: datetime
     email: str
+    username: str
     is_admin: bool
 
 

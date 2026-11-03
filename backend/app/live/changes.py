@@ -21,6 +21,7 @@ class SessionChange(StrEnum):
 class AccountChange(StrEnum):
     SESSIONS = "sessions"  # the list of sessions the account sees
     CREDITS = "credits"  # the account's balance or its history
+    ME = "me"  # the account itself as it reads at /api/auth/me: its username
 
 
 type Change = SessionChange | AccountChange

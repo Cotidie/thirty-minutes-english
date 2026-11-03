@@ -1,6 +1,6 @@
 import { BrowserRouter, Outlet, Route, Routes } from 'react-router-dom'
 import { CornerTools } from './components/CornerTools'
-import { AuthProvider, RequireAuth } from './lib/auth'
+import { AuthProvider, MeKeptFresh, RequireAuth } from './lib/auth'
 import { CreditsProvider } from './lib/credits'
 import { DatabasePage } from './pages/DatabasePage'
 import { HomePage } from './pages/HomePage'
@@ -13,6 +13,7 @@ function SignedIn() {
   return (
     <RequireAuth>
       <CreditsProvider>
+        <MeKeptFresh />
         <Outlet />
         <CornerTools />
       </CreditsProvider>

@@ -16,7 +16,7 @@ const session = {
   topic: 'X',
   title: 'T',
   mine: false,
-  shared_by: 'mina@example.com',
+  shared_by: 'mina',
   content: {
     topic: 'X',
     expressions: [{ id: 1, phrase: 'a moving target', meaning: 'keeps changing', usage_note: 'n', examples: ['e1', 'e2'] }],
@@ -86,7 +86,7 @@ describe('SessionPage', () => {
 
   it('gives no redraw to whoever only had the session shared', async () => {
     vi.mocked(useCredits).mockReturnValue(creditsOf(50, { redraw: 10 }))
-    vi.mocked(api.getSession).mockResolvedValueOnce({ ...mine, mine: false, shared_by: 'mina@example.com' })
+    vi.mocked(api.getSession).mockResolvedValueOnce({ ...mine, mine: false, shared_by: 'mina' })
     await load('/s/3#vocabulary')
     await screen.findByText('mitigate')
     expect(screen.queryByRole('button', { name: 'New picture for mitigate' })).not.toBeInTheDocument()
@@ -97,7 +97,7 @@ describe('SessionPage', () => {
     vi.mocked(api.getSession).mockResolvedValueOnce(mine)
     vi.mocked(api.listShares).mockResolvedValueOnce([])
     await load('/s/3')
-    expect(await screen.findByPlaceholderText('their email')).toBeInTheDocument()
+    expect(await screen.findByPlaceholderText('their username')).toBeInTheDocument()
   })
 
   it('opens on the tab named in the address, so a reload stays there', async () => {
@@ -215,13 +215,13 @@ describe('SessionPage with someone else in the session', () => {
   }
 
   it('says which tab the other person is on, in their color', async () => {
-    await open([{ id: 'b', color: 1, tab: 2 }])
+    await open([{ id: 'b', name: 'jo', color: 1, tab: 2 }])
     expect(within(tabNamed(/Vocabulary/)).getByRole('img', { name: HERE }).getAttribute('style')).toContain('--person-2')
     expect(within(tabNamed(/Article/)).queryByRole('img')).toBeNull()
   })
 
   it('moves the mark when they move, and takes it away when they leave', async () => {
-    const socket = await open([{ id: 'b', color: 1, tab: 2 }])
+    const socket = await open([{ id: 'b', name: 'jo', color: 1, tab: 2 }])
     act(() => socket.receive({ type: 'tab', id: 'b', tab: 1 }))
     expect(within(tabNamed(/Vocabulary/)).queryByRole('img')).toBeNull()
     expect(within(tabNamed(/Article/)).getByRole('img', { name: HERE })).toBeInTheDocument()
@@ -231,7 +231,7 @@ describe('SessionPage with someone else in the session', () => {
 
   it('marks whoever comes in, once they say where they are', async () => {
     const socket = await open()
-    act(() => socket.receive({ type: 'joined', id: 'b', color: 1, tab: null }))
+    act(() => socket.receive({ type: 'joined', id: 'b', name: 'jo', color: 1, tab: null }))
     expect(screen.queryByRole('img', { name: HERE })).toBeNull()
     act(() => socket.receive({ type: 'tab', id: 'b', tab: 0 }))
     expect(within(tabNamed(/Expressions/)).getByRole('img', { name: HERE })).toBeInTheDocument()
@@ -254,20 +254,20 @@ describe('SessionPage with someone else in the session', () => {
 
   it('shows one mark for one person on two connections, and one each for two people', async () => {
     await open([
-      { id: 'b', color: 1, tab: 0 },
-      { id: 'c', color: 1, tab: 0 },
-      { id: 'd', color: 2, tab: 0 },
+      { id: 'b', name: 'jo', color: 1, tab: 0 },
+      { id: 'c', name: 'jo', color: 1, tab: 0 },
+      { id: 'd', name: 'jo', color: 2, tab: 0 },
     ])
     expect(within(tabNamed(/Expressions/)).getAllByRole('img', { name: HERE })).toHaveLength(2)
   })
 
   it('marks the Summary tab too', async () => {
-    await open([{ id: 'b', color: 0, tab: 3 }])
+    await open([{ id: 'b', name: 'jo', color: 0, tab: 3 }])
     expect(within(tabNamed(/Summary/)).getByRole('img', { name: HERE })).toBeInTheDocument()
   })
 
   it('goes round the colors past the last one', async () => {
-    await open([{ id: 'b', color: 6, tab: 0 }])
+    await open([{ id: 'b', name: 'jo', color: 6, tab: 0 }])
     expect(within(tabNamed(/Expressions/)).getByRole('img', { name: HERE }).getAttribute('style')).toContain('--person-1')
   })
 })

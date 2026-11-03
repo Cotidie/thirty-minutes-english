@@ -15,7 +15,7 @@ vi.mock('../api', () => ({
 vi.mock('../lib/credits', () => ({ useCredits: vi.fn() }))
 
 const MINE: SessionSummary = { id: 7, created_at: '2026-10-30T10:00:00Z', topic: 'Trams', title: 'My trams', mine: true, shared_by: null }
-const SHARED: SessionSummary = { id: 8, created_at: '2026-10-30T10:00:00Z', topic: 'Boats', title: 'Their boats', mine: false, shared_by: 'mina@example.com' }
+const SHARED: SessionSummary = { id: 8, created_at: '2026-10-30T10:00:00Z', topic: 'Boats', title: 'Their boats', mine: false, shared_by: 'mina' }
 
 function open() {
   render(
@@ -64,7 +64,7 @@ test('the admin, who is not charged, sees no price', async () => {
 test('my session can be deleted, and a shared one only taken off my list', async () => {
   vi.mocked(api.listSessions).mockResolvedValue([SHARED, MINE])
   open()
-  expect(await screen.findByText('Shared by mina@example.com')).toBeInTheDocument()
+  expect(await screen.findByText('Shared by mina')).toBeInTheDocument()
 
   expect(screen.queryByRole('button', { name: 'Delete Their boats' })).not.toBeInTheDocument()
   await userEvent.click(screen.getByRole('button', { name: 'Remove Their boats from your list' }))
@@ -93,11 +93,11 @@ test('a session shared while the page is open appears, and leaves when the share
 
   vi.mocked(api.listSessions).mockResolvedValue([SHARED])
   act(() => FakeEventSource.open[0].send('sessions'))
-  expect(await screen.findByText('Shared by mina@example.com')).toBeInTheDocument()
+  expect(await screen.findByText('Shared by mina')).toBeInTheDocument()
 
   vi.mocked(api.listSessions).mockResolvedValue([])
   act(() => FakeEventSource.open[0].send('sessions'))
-  await waitFor(() => expect(screen.queryByText('Shared by mina@example.com')).not.toBeInTheDocument())
+  await waitFor(() => expect(screen.queryByText('Shared by mina')).not.toBeInTheDocument())
 })
 
 test('a failed read says so, and the next good one clears it', async () => {
@@ -107,6 +107,6 @@ test('a failed read says so, and the next good one clears it', async () => {
 
   vi.mocked(api.listSessions).mockResolvedValue([SHARED])
   act(() => FakeEventSource.open[0].send('sessions'))
-  expect(await screen.findByText('Shared by mina@example.com')).toBeInTheDocument()
+  expect(await screen.findByText('Shared by mina')).toBeInTheDocument()
   expect(screen.queryByText('Could not load past sessions: offline')).not.toBeInTheDocument()
 })

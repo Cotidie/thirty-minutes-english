@@ -23,6 +23,11 @@
   overflow-wrap: anywhere;
 }
 
+.accounts-name {
+  overflow-wrap: anywhere;
+  font-size: 0.85rem;
+}
+
 .accounts-joined {
   color: var(--muted);
   font-size: 0.85rem;

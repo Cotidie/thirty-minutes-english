@@ -5,10 +5,10 @@ import { useCallback, useEffect, useRef } from 'react'
  * account. The streams hold no data, and this file is the only place that connects to them.
  */
 export type SessionChange = 'session' | 'stars' | 'note' | 'records' | 'shares'
-export type AccountChange = 'sessions' | 'credits'
+export type AccountChange = 'sessions' | 'credits' | 'me'
 type Change = SessionChange | AccountChange
 
-const CHANGES: Change[] = ['session', 'stars', 'note', 'records', 'shares', 'sessions', 'credits']
+const CHANGES: Change[] = ['session', 'stars', 'note', 'records', 'shares', 'sessions', 'credits', 'me']
 const ACCOUNT_STREAM = '/api/me/events'
 const REOPEN_MS = 5000
 /** The server speaks at least every 25 seconds. A connection that died quietly tells a browser nothing, so this does. */

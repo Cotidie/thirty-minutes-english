@@ -1,8 +1,11 @@
 import re
+import secrets
+import unicodedata
 
 import pytest
 from fastapi.testclient import TestClient
 
+from app.accounts import usernames
 from app.accounts.limits import FailedLogins, SignupLimit
 from app.db import Database
 from app.main import create_app
@@ -17,8 +20,10 @@ def client(tmp_path):
         yield c
 
 
-def sign_up(client, email="a@example.com", password="12345678"):
-    return client.post("/api/auth/signup", json={"email": email, "password": password})
+def sign_up(client, email="a@example.com", password="12345678", username=None):
+    """A fresh name for each call unless one is given, so only the email can clash."""
+    username = username or f"u{secrets.token_hex(4)}"
+    return client.post("/api/auth/signup", json={"email": email, "username": username, "password": password})
 
 
 def log_in(client, email="a@example.com", password="12345678"):
@@ -43,6 +48,26 @@ def test_a_bad_signup_gets_a_400_with_a_readable_reason(client, email, password)
     res = sign_up(client, email, password)
     assert res.status_code == 400 and isinstance(res.json()["detail"], str)
     assert client.get("/api/auth/me").status_code == 401
+
+
+def test_signing_up_keeps_the_name_as_typed_but_composed_and_trimmed(client):
+    res = sign_up(client, username=f" {unicodedata.normalize('NFD', '미나')}_Kim ")
+    assert res.status_code == 201 and res.json()["username"] == "미나_Kim"
+    assert client.get("/api/auth/me").json()["username"] == "미나_Kim"
+
+
+@pytest.mark.parametrize("username", ["", "a", "x" * 21, "mi na", "mina!", "ㅁㅣ", "mina@x"])
+def test_a_name_that_breaks_the_rule_gets_a_400_saying_the_rule(client, username):
+    res = client.post("/api/auth/signup", json={"email": "a@example.com", "username": username, "password": "12345678"})
+    assert res.status_code == 400 and res.json()["detail"] == usernames.RULE
+    assert client.get("/api/auth/me").status_code == 401
+
+
+def test_a_name_in_use_gets_a_409_whatever_its_case(client):
+    sign_up(client, username="Mina")
+    client.cookies.clear()
+    res = sign_up(client, "b@example.com", username="mINA")
+    assert res.status_code == 409 and res.json()["detail"] == "Someone already goes by that name."
 
 
 def test_an_email_in_use_gets_a_409(client):

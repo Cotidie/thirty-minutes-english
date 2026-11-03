@@ -7,8 +7,8 @@ import { AccountsPanel } from './AccountsPanel'
 
 vi.mock('../api', () => ({ api: { listAccounts: vi.fn(), accountCredits: vi.fn(), grantCredits: vi.fn() } }))
 
-const ADMIN = { id: 1, email: 'boss@example.com', is_admin: true, created_at: '2026-10-30T10:00:00Z', credits: null }
-const MINA = { id: 2, email: 'mina@example.com', is_admin: false, created_at: '2026-10-31T10:00:00Z', credits: 340 }
+const ADMIN = { id: 1, email: 'boss@example.com', username: 'boss', is_admin: true, created_at: '2026-10-30T10:00:00Z', credits: null }
+const MINA = { id: 2, email: 'mina@example.com', username: '미나', is_admin: false, created_at: '2026-10-31T10:00:00Z', credits: 340 }
 
 beforeEach(() => {
   vi.mocked(api.listAccounts).mockReset().mockResolvedValue([ADMIN, MINA])
@@ -19,6 +19,7 @@ beforeEach(() => {
 test('each account shows its balance; the admin is not charged', async () => {
   render(<AccountsPanel />)
   expect(await screen.findByText('340')).toBeInTheDocument()
+  expect(screen.getByText('미나')).toBeInTheDocument()
   expect(screen.getByText('not charged')).toBeInTheDocument()
   expect(screen.queryByRole('checkbox')).not.toBeInTheDocument()
   expect(screen.queryByRole('spinbutton', { name: 'boss@example.com credits to add' })).not.toBeInTheDocument()

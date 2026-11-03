@@ -77,10 +77,10 @@ test('a cursor that says there is none takes it away', () => {
 
 test('people come, move between tabs and go', () => {
   const { store } = joined('a')
-  store.receive({ type: 'joined', id: 'b', color: 1, tab: null })
-  expect(store.people()).toEqual([{ id: 'b', color: 1, tab: null }])
+  store.receive({ type: 'joined', id: 'b', name: 'jo', color: 1, tab: null })
+  expect(store.people()).toEqual([{ id: 'b', name: 'jo', color: 1, tab: null }])
   store.receive({ type: 'tab', id: 'b', tab: 2 })
-  expect(store.people()).toEqual([{ id: 'b', color: 1, tab: 2 }])
+  expect(store.people()).toEqual([{ id: 'b', name: 'jo', color: 1, tab: 2 }])
   store.receive({ type: 'cursor', id: 'b', tab: 2, anchor: 'brief', x: 0, y: 0 })
   const cursors = vi.fn()
   store.onCursor(cursors)
@@ -98,7 +98,7 @@ test('the list of people keeps its identity until it changes', () => {
 
 test('a welcome after a reconnect replaces everyone and forgets their cursors', () => {
   const { store } = joined('a')
-  store.receive({ type: 'joined', id: 'b', color: 1, tab: 2 })
+  store.receive({ type: 'joined', id: 'b', name: 'jo', color: 1, tab: 2 })
   store.receive({ type: 'cursor', id: 'b', tab: 2, anchor: 'brief', x: 0, y: 0 })
   const gone = vi.fn()
   store.onCursor(gone)

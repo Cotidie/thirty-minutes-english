@@ -100,6 +100,10 @@
   width: 17ch;
 }
 
+.auth-blank-name {
+  width: 12ch;
+}
+
 .auth-blank-password {
   width: 11ch;
 }

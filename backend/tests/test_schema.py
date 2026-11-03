@@ -1,8 +1,10 @@
+import re
 import sqlite3
 
 import pytest
 
 from app.db import Database, schema
+from app.db.accounts import UsernameTaken
 from app.db.pictures import PictureStat
 from app.generation.progress import Stage
 from app.models import Category
@@ -10,8 +12,19 @@ from app.topics.curated import CURATED
 from tests.conftest import CURATED_TOPICS, add_user, sample_draft, seed_expressions
 
 
+def as_v15(path) -> None:
+    """Rewrites a current file the way v15 kept it: accounts with no username."""
+    conn = sqlite3.connect(path)
+    with conn:
+        conn.execute("DROP INDEX users_username")
+        conn.execute("ALTER TABLE users DROP COLUMN username")
+        conn.execute("PRAGMA user_version = 15")
+    conn.close()
+
+
 def as_v14(path) -> None:
     """Rewrites a current file the way v14 kept it: a setting on each expression, and the swaps table."""
+    as_v15(path)
     conn = sqlite3.connect(path)
     with conn:
         conn.execute("ALTER TABLE expressions ADD COLUMN setting TEXT")
@@ -24,6 +37,7 @@ def as_v14(path) -> None:
 
 def as_v13(path) -> None:
     """Rewrites a current file the way v13 kept it: a ledger of final rows."""
+    as_v15(path)
     conn = sqlite3.connect(path)
     with conn:
         conn.execute("ALTER TABLE credits DROP COLUMN state")
@@ -34,6 +48,7 @@ def as_v13(path) -> None:
 
 def as_v12(path) -> None:
     """Rewrites a current file the way v12 kept it: no credits, and a creation flag on each account."""
+    as_v15(path)
     conn = sqlite3.connect(path)
     with conn:
         conn.execute("DROP TABLE credits")
@@ -369,7 +384,7 @@ def test_upgrading_v12_adds_credits_and_drops_can_create_keeping_the_accounts(tm
     db = Database(path)
     with db.connect() as conn:
         assert conn.execute("PRAGMA user_version").fetchone()[0] == schema.VERSION
-        assert [c[1] for c in conn.execute("PRAGMA table_info(users)")] == ["id", "created_at", "email", "password_hash", "is_admin"]
+        assert [c[1] for c in conn.execute("PRAGMA table_info(users)")] == ["id", "created_at", "email", "password_hash", "is_admin", "username"]
         assert conn.execute("SELECT count(*) FROM credits").fetchone()[0] == 0
     assert [(u.email, u.is_admin) for u in db.accounts.list_all()] == [("boss@example.com", True), ("mina@example.com", False)]
     assert any(".bak-v12-" in p.name for p in tmp_path.iterdir())
@@ -469,10 +484,42 @@ def test_v14_drops_swaps_and_settings_and_takes_the_setting_off_each_note(tmp_pa
         conn.execute("INSERT INTO swapped_expressions VALUES (?, ?, ?)", (session, plain, "2026-11-01T00:00:00+00:00"))
     db = Database(path)
     with db.connect() as conn:
-        assert conn.execute("PRAGMA user_version").fetchone()[0] == schema.VERSION == 15
+        assert conn.execute("PRAGMA user_version").fetchone()[0] == schema.VERSION
         assert conn.execute("SELECT 1 FROM sqlite_master WHERE name = 'swapped_expressions'").fetchone() is None
         assert "setting" not in [c[1] for c in conn.execute("PRAGMA table_info(expressions)")]
     notes = [db.expressions.get(i).usage_note for i in (casual, plain, bare, unset)]
     assert notes == ["Signs on broken elevators.", "Use it at work.", "", "Casual. Kept as it is."]
     assert list(tmp_path.glob("s.db.bak-v14-????-??-??"))
     assert [e.id for e in db.sessions.get(session).content.expressions] == [casual]
+
+
+def test_v15_gives_every_account_its_own_random_name_and_keeps_them_apart_from_then_on(tmp_path):
+    path = tmp_path / "s.db"
+    db = Database(path)
+    for name in ("mina", "jo", "sam"):
+        add_user(db, f"{name}@example.com")
+    as_v15(path)
+    db = Database(path)
+    with db.connect() as conn:
+        assert conn.execute("PRAGMA user_version").fetchone()[0] == schema.VERSION
+    names = [u.username for u in db.accounts.list_all()]
+    assert len(set(names)) == 3 and all(re.fullmatch(r"user_[0-9a-f]{6}", name) for name in names)
+    with pytest.raises(UsernameTaken):
+        db.accounts.set_username(db.accounts.by_email("mina@example.com").id, names[1].upper())
+
+
+def test_an_upgrade_to_v16_that_fails_leaves_the_v15_file_as_it_was(tmp_path):
+    path = tmp_path / "s.db"
+    db = Database(path)
+    add_user(db, "mina@example.com")
+    as_v15(path)
+    conn = sqlite3.connect(path)
+    with conn:
+        conn.execute("CREATE INDEX users_username ON users (email)")  # the index the upgrade makes is already there
+    conn.close()
+    with pytest.raises(sqlite3.OperationalError):
+        Database(path)
+    conn = sqlite3.connect(path)
+    assert conn.execute("PRAGMA user_version").fetchone()[0] == 15
+    assert "username" not in [c[1] for c in conn.execute("PRAGMA table_info(users)")]
+    conn.close()

@@ -81,7 +81,7 @@ async def _take_part(websocket: WebSocket, db: Database, token: str, session_id:
     rooms = websocket.app.state.presence
     subscription = db.changes.subscribe(session_id)
     color = await run_in_threadpool(_color_of, db, session_id, user.id)
-    room, member = rooms.join(session_id, user.id, color)
+    room, member = rooms.join(session_id, user.id, user.username, color)
     try:
         await websocket.send_json(room.welcome(member))
         await _run_until_one_ends(

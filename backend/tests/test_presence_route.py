@@ -71,13 +71,16 @@ def test_no_origin_only_needs_the_login(tmp_path):
         assert ws.receive_json()["type"] == "welcome"
 
 
-def test_welcome_gives_the_makers_color_and_names_no_account(tmp_path):
-    db, client, maker, session = world(tmp_path)
-    sign_in(client, db, maker)
-    with client.websocket_connect(url_of(session), headers=HOME) as ws:
-        welcome = ws.receive_json()
-    assert welcome["type"] == "welcome" and welcome["you"]["color"] == 0
-    assert "maker@example.com" not in json.dumps(welcome) and "user_id" not in json.dumps(welcome)
+def test_welcome_gives_the_makers_color_and_tells_no_email_or_account_number(tmp_path):
+    db, mine, theirs, _, session = with_a_friend(tmp_path)
+    with mine.websocket_connect(url_of(session), headers=HOME) as me:
+        me.receive_json()
+        with theirs.websocket_connect(url_of(session), headers=HOME) as them:
+            welcome = them.receive_json()
+    assert welcome["type"] == "welcome" and welcome["you"]["color"] == 1
+    assert welcome["people"][0]["name"] == "maker"
+    for secret in ("maker@example.com", "friend@example.com", "user_id"):
+        assert secret not in json.dumps(welcome)
 
 
 def test_two_people_hear_each_other_and_a_departure(tmp_path):
@@ -87,7 +90,7 @@ def test_two_people_hear_each_other_and_a_departure(tmp_path):
         with theirs.websocket_connect(url_of(session), headers=HOME) as them:
             welcome = them.receive_json()
             assert welcome["you"]["color"] == 1 and welcome["people"][0]["color"] == 0
-            assert me.receive_json() == {"type": "joined", "id": welcome["you"]["id"], "color": 1, "tab": None}
+            assert me.receive_json() == {"type": "joined", "id": welcome["you"]["id"], "name": "friend", "color": 1, "tab": None}
 
             them.send_json({"type": "cursor", "tab": 0, "anchor": "brief", "x": 0.5, "y": 0.25})
             assert me.receive_json() == {"type": "cursor", "id": welcome["you"]["id"], "tab": 0, "anchor": "brief", "x": 0.5, "y": 0.25}

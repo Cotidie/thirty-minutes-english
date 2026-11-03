@@ -116,7 +116,7 @@ def delete_session(session_id: int, db: Db, files: Files, jobs: Jobs, me: Me) ->
 
 
 def _shares_of(db: Database, session_id: int) -> list[ShareEntry]:
-    return [ShareEntry(user_id=user.id, email=user.email) for user in db.shares.shared_with(session_id)]
+    return [ShareEntry(user_id=user.id, username=user.username) for user in db.shares.shared_with(session_id)]
 
 
 @router.get("/sessions/{session_id}/shares", response_model=list[ShareEntry])
@@ -129,9 +129,9 @@ def list_shares(session_id: int, db: Db, me: Me) -> list[ShareEntry]:
 def add_share(session_id: int, body: ShareRequest, db: Db, me: Me) -> list[ShareEntry]:
     """Only an account that exists; sharing with oneself or sharing again changes nothing."""
     require_creator(db, me, session_id)
-    user = db.accounts.by_email(body.email)
+    user = db.accounts.get(body.user_id)
     if user is None:
-        raise HTTPException(status_code=404, detail="No account uses that email.")
+        raise HTTPException(status_code=404, detail="That account is not here any more.")
     if user.id != me.id:
         db.shares.share(session_id, user.id)
     return _shares_of(db, session_id)
