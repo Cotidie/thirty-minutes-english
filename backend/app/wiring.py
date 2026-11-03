@@ -81,6 +81,7 @@ def build_services(
             model=settings.get("CLAUDE_MODEL"),
             effort=effort(settings, "CLAUDE_EFFORT", efforts_of),
             firecrawl_key=settings.get("FIRECRAWL_API_KEY"),
+            levels=settings.vocabulary_levels,
         ),
         topic_source=ClaudeTopicSource(settings.get("TOPICS_MODEL"), effort(settings, "TOPICS_EFFORT", efforts_of)),
         agents=_live_agents(settings, agent_dirs),

@@ -6,6 +6,7 @@ from claude_agent_sdk import create_sdk_mcp_server, tool
 from pydantic import ValidationError
 
 from app.generation.exclusions import Exclusions
+from app.generation.levels import DEFAULT_LEVELS, describe_levels
 from app.generation.progress import Progress, StreamTracker
 from app.llm import WEB_TOOLS, Claude, GenerationError, McpServer, firecrawl
 from app.models import Draft
@@ -172,7 +173,7 @@ Always give paragraph_picture as well: a different moment, from one paragraph, w
 (the paragraph it belongs under, counted from 1) and a one-sentence caption. It is drawn under that paragraph when \
 no image lands under a paragraph, so that the article always shows exactly 2 images.
 
-2. vocabulary: {vocabulary_count} words at B2 to C1+ level connected to the topic. Draw from the \
+2. vocabulary: {vocabulary_count} words at {vocabulary_levels} level connected to the topic.{level_spread} Draw from the \
 article body where it offers strong candidates, and fill the rest with words a well-read speaker would \
 use when discussing this subject even if they do not appear in the article. Prefer words useful across \
 academic and professional English over topic-specific jargon; no proper nouns. \
@@ -195,6 +196,11 @@ SKILLS_PREAMBLE = """Before writing, invoke the {skill} skill with the Skill too
 instructions while producing every part of the content.
 
 """
+
+
+def _spread(levels: tuple[str, ...]) -> str:
+    """With more than one level, the words are shared out among them."""
+    return f" Spread them about evenly across {describe_levels(levels)}." if len(levels) > 1 else ""
 
 
 def check_items_reply(exclude: Exclusions, args: dict) -> str:
@@ -232,7 +238,9 @@ class ClaudeGenerator:
         effort: str | None = "xhigh",
         firecrawl_key: str = "",
         timeout_s: float = TIMEOUT_S,
+        levels: tuple[str, ...] = DEFAULT_LEVELS,
     ) -> None:
+        self.levels = levels
         self.claude = Claude(
             model,
             effort,
@@ -248,6 +256,8 @@ class ClaudeGenerator:
         prompt = PROMPT_TEMPLATE.format(
             topic=topic,
             vocabulary_count=VOCABULARY_COUNT,
+            vocabulary_levels=describe_levels(self.levels),
+            level_spread=_spread(self.levels),
             article_skill=ARTICLE_SKILL,
             scene_rules=SCENE_RULES,
             caption_rules=CAPTION_RULES,

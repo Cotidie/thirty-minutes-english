@@ -5,7 +5,7 @@ import pytest
 from app.config.settings import InvalidSetting, Settings
 from app.db import Database
 from app.main import create_app
-from app.wiring import Services
+from app.wiring import Services, agent_dirs, build_services
 from tests.test_api import FakeGenerator, InlineExecutor
 from tests.conftest import admin_client
 
@@ -179,3 +179,8 @@ def test_vocabulary_levels_show_as_named_checkboxes_on_the_claude_tab(tmp_path):
         ("C2", "Proficient"),
     ]
     assert fields["VOICE_NAME"]["many"] is False
+
+
+def test_the_writer_of_new_sessions_takes_the_saved_levels(tmp_path):
+    services = build_services(Settings({}, {"VOCABULARY_LEVELS": "B1+"}), agent_dirs({}, tmp_path))
+    assert services.generator.levels == ("B1+",)
