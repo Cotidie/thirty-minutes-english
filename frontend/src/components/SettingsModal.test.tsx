@@ -16,6 +16,7 @@ function field(partial: Partial<SettingField> & Pick<SettingField, 'key' | 'grou
     default: '',
     options: [],
     free: false,
+    many: false,
     catalog: null,
     inline: false,
     testable: false,
@@ -67,6 +68,22 @@ const FIELDS: SettingField[] = [
     options: [opt('opus', 'Most capable', 'Opus 5.5', ['low', 'max']), opt('sonnet', 'Efficient', 'Sonnet 5', ['low', 'high']), opt('haiku', 'Fastest', 'Haiku 4.5', [])],
   }),
   field({ key: 'CLAUDE_EFFORT', group: 'claude', value: 'high', default: 'xhigh', effort_of: 'CLAUDE_MODEL', help: 'Higher is slower.' }),
+  field({
+    key: 'VOCABULARY_LEVELS',
+    group: 'claude',
+    value: 'B2,B2+,C1',
+    default: 'B2,B2+,C1',
+    many: true,
+    help: "The CEFR levels a new session's words come from.",
+    options: [
+      opt('B1', 'Intermediate'),
+      opt('B1+', 'Strong intermediate'),
+      opt('B2', 'Upper intermediate'),
+      opt('B2+', 'Strong upper intermediate'),
+      opt('C1', 'Advanced'),
+      opt('C2', 'Proficient'),
+    ],
+  }),
   field({ key: 'IMAGE_PROVIDER', group: 'images', value: 'openrouter', default: 'openrouter', options: [opt('openrouter'), opt('off')] }),
   field({
     key: 'IMAGE_MODEL',
@@ -362,5 +379,42 @@ describe('SettingsModal assessor', () => {
     expect(await within(row).findByRole('status')).toHaveTextContent('✓ key works')
     await showTab('Read aloud assessor')
     expect(screen.getByLabelText('AZURE_SPEECH_REGION')).toHaveValue('koreacentral')
+  })
+})
+
+describe('SettingsModal vocabulary levels', () => {
+  const LEVELS = ['B1', 'B1+', 'B2', 'B2+', 'C1', 'C2']
+
+  function levelBox(level: string): HTMLInputElement {
+    const group = screen.getByRole('group', { name: 'VOCABULARY_LEVELS' })
+    return within(group).getByRole('checkbox', { name: (name) => name.startsWith(`${level} `) }) as HTMLInputElement
+  }
+
+  const ticked = () => LEVELS.map((level) => levelBox(level).checked)
+
+  it('picks levels as checkboxes, keeps one at least, and saves them in level order', async () => {
+    await open()
+    await showTab('Claude generation')
+    expect(ticked()).toEqual([false, false, true, true, true, false])
+    await userEvent.click(levelBox('C2'))
+    await userEvent.click(levelBox('B2'))
+    await userEvent.click(levelBox('B2+'))
+    await userEvent.click(levelBox('C1'))
+    expect(levelBox('C2')).toBeChecked()
+    expect(levelBox('C2')).toBeDisabled()
+    await userEvent.click(levelBox('B1+'))
+    expect(levelBox('C2')).toBeEnabled()
+    await userEvent.click(screen.getByRole('button', { name: 'Save' }))
+    await waitFor(() => expect(api.putSettings).toHaveBeenCalledTimes(1))
+    expect(vi.mocked(api.putSettings).mock.calls[0][0]).toEqual({ VOCABULARY_LEVELS: 'B1+,C2' })
+  })
+
+  it('brings the saved levels back on Discard', async () => {
+    await open()
+    await showTab('Claude generation')
+    await userEvent.click(levelBox('B1'))
+    expect(screen.getByText('1 unsaved change')).toBeInTheDocument()
+    await userEvent.click(screen.getByRole('button', { name: 'Discard' }))
+    expect(ticked()).toEqual([false, false, true, true, true, false])
   })
 })

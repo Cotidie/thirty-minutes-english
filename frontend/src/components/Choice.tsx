@@ -1,6 +1,8 @@
 import { useRef, useState } from 'react'
 import {
   Button,
+  Checkbox,
+  CheckboxGroup,
   ComboBox,
   Header,
   Input,
@@ -72,6 +74,50 @@ export function ChoiceSelect({ labelledBy, options, value, onChange, placeholder
         </ListBox>
       </Popover>
     </Select>
+  )
+}
+
+interface ChoiceChecksProps {
+  labelledBy: string
+  options: SettingOption[]
+  /** The picked ids joined with commas, in `options` order. */
+  value: string
+  onChange: (value: string) => void
+}
+
+/** Several picks from `options`, one at least: the last one ticked cannot be cleared. */
+export function ChoiceChecks({ labelledBy, options, value, onChange }: ChoiceChecksProps) {
+  const picked = value.split(',').filter(Boolean)
+  const pick = (ids: string[]) =>
+    onChange(
+      options
+        .map((o) => o.id)
+        .filter((id) => ids.includes(id))
+        .join(','),
+    )
+  return (
+    <CheckboxGroup className="choice-checks" aria-labelledby={labelledBy} value={picked} onChange={pick}>
+      {options.map((o) => (
+        <Checkbox key={o.id} className="choice-check" value={o.id} isDisabled={picked.length === 1 && picked[0] === o.id}>
+          {({ isSelected }) => (
+            <>
+              <span className="choice-check-box" aria-hidden="true">
+                {isSelected && <CheckMark />}
+              </span>
+              <b>{o.id}</b> <span className="choice-check-desc">{o.description}</span>
+            </>
+          )}
+        </Checkbox>
+      ))}
+    </CheckboxGroup>
+  )
+}
+
+function CheckMark() {
+  return (
+    <svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2.2">
+      <path d="M3.5 8.5l3 3 6-7" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
   )
 }
 

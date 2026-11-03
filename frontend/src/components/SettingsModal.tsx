@@ -3,7 +3,7 @@ import { UNSAFE_PortalProvider } from 'react-aria'
 import { api } from '../api'
 import type { KeyTestResult, SettingField, SettingGroup, SettingOption, SettingsUpdate } from '../types'
 import { AccountsPanel } from './AccountsPanel'
-import { ChoiceSelect, ModelCombo } from './Choice'
+import { ChoiceChecks, ChoiceSelect, ModelCombo } from './Choice'
 import { ModelList } from './ModelList'
 import './SettingsModal.css'
 
@@ -538,6 +538,7 @@ interface ControlProps {
 }
 
 function Control({ id, labelledBy = `${id}-label`, field, value, menu, onChange, onPin }: ControlProps) {
+  if (field.many) return <ChoiceChecks labelledBy={labelledBy} options={menu.options} value={value} onChange={onChange} />
   if (field.inline && menu.catalog)
     return (
       <ModelList

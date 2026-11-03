@@ -177,3 +177,49 @@
   padding: 0.6rem 0.75rem;
   color: var(--muted);
 }
+
+/* Several picks: one checkbox per option. */
+.choice-checks {
+  flex: 1;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem 1rem;
+}
+
+.choice-check {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  cursor: pointer;
+}
+
+.choice-check-box {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 18px;
+  height: 18px;
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  background: #fff;
+  color: #fff;
+}
+
+.choice-check[data-selected] .choice-check-box {
+  border-color: var(--ink);
+  background: var(--ink);
+}
+
+.choice-check[data-focus-visible] .choice-check-box {
+  outline: 2px solid var(--ink);
+  outline-offset: 2px;
+}
+
+.choice-check[data-disabled] {
+  cursor: default;
+  opacity: 0.6;
+}
+
+.choice-check-desc {
+  color: var(--muted);
+}

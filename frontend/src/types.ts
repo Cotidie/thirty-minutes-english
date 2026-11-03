@@ -244,6 +244,8 @@ export interface SettingField {
   options: SettingOption[]
   /** Any text is allowed; `options` only suggest (model ids). */
   free: boolean
+  /** Several of `options` at once: the value joins their ids with commas. */
+  many: boolean
   /** The model list behind `options`; pins are kept per list. */
   catalog: string | null
   /** Draw the model menu as a list in the panel, with prices, not a dropdown. */
