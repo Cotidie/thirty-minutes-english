@@ -9,8 +9,8 @@ from tests.test_api import FakeGenerator, InlineExecutor
 
 
 def test_add_upserts_by_normalized_key_and_keeps_the_id(store):
-    a = store.expressions.add("play the devil's advocate", "m", [], [], "n", None, "casual", "s")
-    b = store.expressions.add("play devil's advocate", "m2", ["argue"], ["e"], "n2", "반론", "casual", "s")
+    a = store.expressions.add("play the devil's advocate", "m", [], [], "n", None, "s")
+    b = store.expressions.add("play devil's advocate", "m2", ["argue"], ["e"], "n2", "반론", "s")
     assert a == b and store.expressions.count() == 1
     assert store.expressions.get(a).meaning == "m2"
     assert store.expressions.get(a).synonyms == ["argue"]
@@ -18,30 +18,28 @@ def test_add_upserts_by_normalized_key_and_keeps_the_id(store):
 
 def test_get_misses_and_list_all_runs_in_the_order_added(store):
     assert store.expressions.get(1) is None
-    first = store.expressions.add("one", "m", [], [], "n", None, None, "s")
-    second = store.expressions.add("two", "m", [], [], "n", None, "workplace", "s")
-    assert [(e.id, e.setting) for e in store.expressions.list_all()] == [(first, None), (second, "workplace")]
+    first = store.expressions.add("one", "m", [], [], "n", None, "s")
+    second = store.expressions.add("two", "m", [], [], "n", None, "s")
+    assert [e.id for e in store.expressions.list_all()] == [first, second]
 
 
-def test_pick_prefers_untaught_and_mixes_settings(store):
-    for r in ("casual", "workplace", None):
-        for i in range(3):
-            store.expressions.add(f"{r} {NAMES[i]}", "m", [], [], "n", None, r, "s")
-    picked = store.expressions.pick(3, random.Random(1))
-    assert {e.setting for e in picked} == {"casual", "workplace", None}
+def test_an_expression_carries_no_setting(store):
+    expression = store.expressions.add("out of order", "broken", [], [], "Signs on broken elevators.", "고장", "s")
+    assert "setting" not in store.expressions.get(expression).model_dump()
+    assert "setting" not in store.expressions.list_all()[0].model_dump()
 
 
 def test_pick_takes_untaught_before_any_taught_one(store):
-    taught = store.expressions.add("old", "m", [], [], "n", None, None, "s")
+    taught = store.expressions.add("old", "m", [], [], "n", None, "s")
     store.sessions.create(sample_draft(), [taught])
-    fresh = [store.expressions.add(f"new {name}", "m", [], [], "n", None, None, "s") for name in NAMES[:2]]
+    fresh = [store.expressions.add(f"new {name}", "m", [], [], "n", None, "s") for name in NAMES[:2]]
     picked = [e.id for e in store.expressions.pick(3, random.Random(0))]
     assert sorted(picked[:2]) == fresh and picked[2] == taught
 
 
 def test_pick_fills_from_the_longest_ago_taught_when_untaught_run_out(store):
-    first = store.expressions.add("one", "m", [], [], "n", None, None, "s")
-    second = store.expressions.add("two", "m", [], [], "n", None, None, "s")
+    first = store.expressions.add("one", "m", [], [], "n", None, "s")
+    second = store.expressions.add("two", "m", [], [], "n", None, "s")
     store.sessions.create(sample_draft(), [first])
     store.sessions.create(sample_draft(), [second])
     assert [e.id for e in store.expressions.pick(2, random.Random(0))] == [first, second]
@@ -52,8 +50,8 @@ def test_pick_returns_what_there_is(store):
 
 
 def test_list_all_carries_each_source_and_the_sessions_that_taught_it(store):
-    taught = store.expressions.add("old", "m", [], ["e"], "n", "한", "casual", "https://www.youtube.com/post/x")
-    fresh = store.expressions.add("new", "m", [], [], "n", None, None, "session")
+    taught = store.expressions.add("old", "m", [], ["e"], "n", "한", "https://www.youtube.com/post/x")
+    fresh = store.expressions.add("new", "m", [], [], "n", None, "session")
     first = store.sessions.create(sample_draft(), [taught]).id
     second = store.sessions.create(sample_draft(), [taught]).id
     entries = {e.id: e for e in store.expressions.list_all()}
@@ -63,10 +61,11 @@ def test_list_all_carries_each_source_and_the_sessions_that_taught_it(store):
 
 def test_the_corpus_is_served_whole(tmp_path):
     db = Database(tmp_path / "s.db")
-    db.expressions.add("touch base", "m", [], ["Let's touch base."], "n", "연락하다", "workplace", "session")
+    db.expressions.add("touch base", "m", [], ["Let's touch base."], "n", "연락하다", "session")
     with admin_client(create_app(db, Services(FakeGenerator()), InlineExecutor())) as c:
         [entry] = c.get("/api/expressions").json()
-    assert (entry["phrase"], entry["setting"], entry["source"], entry["sessions"]) == ("touch base", "workplace", "session", [])
+    assert (entry["phrase"], entry["source"], entry["sessions"]) == ("touch base", "session", [])
+    assert "setting" not in entry and "swapped" not in entry
 
 
 def test_delete_takes_an_expression_out_of_the_corpus_and_every_session_that_taught_it(store):

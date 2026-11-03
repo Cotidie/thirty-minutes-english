@@ -69,8 +69,6 @@ class Expression(BaseModel):
     examples: list[str]
     """The Korean equivalent, hidden behind a chip until tapped."""
     korean: str | None = None
-    """Where it is said: casual, workplace or discussion; None when the source does not say."""
-    setting: str | None = None
     """None until the corpus has one."""
     korean_example: KoreanExample | None = None
 
@@ -81,10 +79,8 @@ class CorpusEntry(Expression):
     """The post it was read from."""
     source: str
     added_at: str
-    """Ids of the sessions that taught it, oldest first."""
+    """Ids of the sessions that teach it now, oldest first."""
     sessions: list[int] = []
-    """Ids of the sessions it was swapped out of, oldest first; those count as using it too."""
-    swapped: list[int] = []
 
 
 class Question(BaseModel):

@@ -155,7 +155,7 @@ def remove_share(session_id: int, user_id: int, db: Db, me: Me) -> Response:
 
 @router.post("/sessions/{session_id}/expressions/{expression_id}/swap", response_model=Expression)
 def swap_expression(session_id: int, expression_id: int, db: Db, me: Me) -> Expression:
-    """Another corpus expression in this one's place; the one swapped out counts as used, so new sessions pick it last."""
+    """Another corpus expression in this one's place; the one swapped out is unused again unless another session teaches it."""
     require_access(db, me, session_id)
     expression = db.sessions.swap_expression(session_id, expression_id, seen_by=me.id)
     if expression is None:

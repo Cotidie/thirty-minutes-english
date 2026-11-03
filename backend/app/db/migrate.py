@@ -137,7 +137,7 @@ class Migration:
                 log.warning("session %s teaches %r twice; kept once", session_id, phrase)
                 continue
             expression_id = upsert_expression(
-                conn, phrase, raw["meaning"], raw.get("synonyms", []), raw["examples"], raw["usage_note"], raw.get("korean"), None, "session", created_at
+                conn, phrase, raw["meaning"], raw.get("synonyms", []), raw["examples"], raw["usage_note"], raw.get("korean"), "session", created_at
             )
             conn.execute(
                 "INSERT INTO session_expressions (session_id, expression_id, position, starred) VALUES (?, ?, ?, ?)",

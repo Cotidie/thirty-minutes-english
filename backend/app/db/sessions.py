@@ -1,5 +1,5 @@
 """Sessions and what belongs to them: the article's paragraphs, the words, the expressions taught
-from the corpus (and the ones swapped out), the stars on those, and the note."""
+from the corpus, the stars on those, and the note."""
 
 import json
 import random
@@ -124,12 +124,12 @@ class SessionRepo:
         self, session_id: int, expression_id: int, rng: random.Random | None = None, seen_by: int | None = None
     ) -> Expression | None:
         """The expression put in place of `expression_id`, picked as a new session picks one for `seen_by` but never
-        one this session has had; the one swapped out counts as used here, and its star goes.
+        one this session teaches; the one swapped out is no longer used here, and its star goes.
         None when the session does not teach `expression_id`, or the corpus has nothing else to offer."""
-        had = self._had(session_id)
-        if expression_id not in had:
+        teaches = self._teaches(session_id)
+        if expression_id not in teaches:
             return None
-        picked = self._db.expressions.pick(1, rng or random.Random(), exclude=had, seen_by=seen_by)
+        picked = self._db.expressions.pick(1, rng or random.Random(), exclude=teaches, seen_by=seen_by)
         if not picked:
             return None
         with self._db.connect() as conn:
@@ -141,10 +141,6 @@ class SessionRepo:
             conn.execute(
                 "INSERT INTO session_expressions (session_id, expression_id, position) VALUES (?, ?, ?)", (session_id, picked[0].id, row[0])
             )
-            conn.execute(
-                "INSERT INTO swapped_expressions (session_id, expression_id, swapped_at) VALUES (?, ?, ?)",
-                (session_id, expression_id, datetime.now(UTC).isoformat()),
-            )
         self._db.changes.publish(session_id, SessionChange.SESSION)
         self._db.changes.publish(session_id, SessionChange.STARS)
         return picked[0]
@@ -154,7 +150,7 @@ class SessionRepo:
         None when there is no such session, or the corpus has nothing else to offer."""
         if not self.exists(session_id):
             return None
-        picked = self._db.expressions.pick(1, rng or random.Random(), exclude=self._had(session_id), seen_by=seen_by)
+        picked = self._db.expressions.pick(1, rng or random.Random(), exclude=self._teaches(session_id), seen_by=seen_by)
         if not picked:
             return None
         with self._db.connect() as conn:
@@ -166,16 +162,10 @@ class SessionRepo:
         self._db.changes.publish(session_id, SessionChange.SESSION)
         return picked[0]
 
-    def _had(self, session_id: int) -> set[int]:
-        """The expressions the session teaches or swapped out."""
+    def _teaches(self, session_id: int) -> set[int]:
+        """The expressions the session teaches now."""
         with self._db.connect() as conn:
-            return {
-                row[0] for row in conn.execute(
-                    "SELECT expression_id FROM session_expressions WHERE session_id = ?"
-                    " UNION SELECT expression_id FROM swapped_expressions WHERE session_id = ?",
-                    (session_id, session_id),
-                )
-            }
+            return {row[0] for row in conn.execute("SELECT expression_id FROM session_expressions WHERE session_id = ?", (session_id,))}
 
     def exists(self, session_id: int) -> bool:
         with self._db.connect() as conn:

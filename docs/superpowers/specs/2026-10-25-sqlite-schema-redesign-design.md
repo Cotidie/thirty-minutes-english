@@ -74,15 +74,14 @@ CREATE TABLE expressions (
     meaning    TEXT    NOT NULL,
     synonyms   TEXT    NOT NULL,                 -- JSON [str], 쉬운 말 풀이
     examples   TEXT    NOT NULL,                 -- JSON [str]
-    usage_note TEXT    NOT NULL,
+    usage_note TEXT    NOT NULL,                 -- v15부터 setting 이름("Casual. ")으로 시작하지 않는다
     korean     TEXT,
-    setting    TEXT,                             -- casual | workplace | discussion | NULL(모름). 말하는 자리
     source     TEXT    NOT NULL,                 -- 출처 이름. 세션에서 옮긴 것은 'session'
     added_at   TEXT    NOT NULL,
     korean_example TEXT                          -- JSON {korean, english}: 한국어 예문과 영어 모범 답안. NULL이면 아직 없음 (v6)
 ) STRICT;
 
-CREATE TABLE session_expressions (               -- 배운 기록. 행이 있으면 가르친 것
+CREATE TABLE session_expressions (               -- 지금 가르치는 것. 행이 있으면 쓴 표현
     id            INTEGER PRIMARY KEY AUTOINCREMENT,
     session_id    INTEGER NOT NULL REFERENCES sessions(id) ON DELETE CASCADE,
     expression_id INTEGER NOT NULL REFERENCES expressions(id),
@@ -90,14 +89,6 @@ CREATE TABLE session_expressions (               -- 배운 기록. 행이 있으
     starred       INTEGER NOT NULL DEFAULT 0,
     UNIQUE (session_id, expression_id),
     UNIQUE (session_id, position)
-) STRICT;
-
--- v5: 세션에서 바꿔 뺀 표현. 그 세션이 쓴 것으로 친다
-CREATE TABLE swapped_expressions (
-    session_id    INTEGER NOT NULL REFERENCES sessions(id) ON DELETE CASCADE,
-    expression_id INTEGER NOT NULL REFERENCES expressions(id) ON DELETE CASCADE,
-    swapped_at    TEXT    NOT NULL,
-    PRIMARY KEY (session_id, expression_id)
 ) STRICT;
 
 -- 그린 그림 하나가 행 하나. 파일은 images/{id}.png. image_stats 대체.
@@ -148,18 +139,18 @@ CREATE TABLE topic_days (day TEXT NOT NULL, position INTEGER NOT NULL, topic_id 
 CREATE TABLE stage_times (id INTEGER PRIMARY KEY AUTOINCREMENT, stage TEXT NOT NULL, seconds REAL NOT NULL, finished_at TEXT NOT NULL) STRICT;
 ```
 
-인덱스: `paragraphs(session_id)`, `vocabulary(session_id)`, `session_expressions(session_id)`, `session_expressions(expression_id)`, `examples(session_expression_id)`, `examples(vocabulary_id)`, `readings(paragraph_id)`, `summaries(paragraph_id)`, `stage_times(stage, id)`, `sessions(topic_id)`, `topic_days(topic_id)`, `swapped_expressions(expression_id)`.
+인덱스: `paragraphs(session_id)`, `vocabulary(session_id)`, `session_expressions(session_id)`, `session_expressions(expression_id)`, `examples(session_expression_id)`, `examples(vocabulary_id)`, `readings(paragraph_id)`, `summaries(paragraph_id)`, `stage_times(stage, id)`, `sessions(topic_id)`, `topic_days(topic_id)`.
 
-버전: v3에 `figures`, v4(2026-10-26)에 `topics`와 참조형 `topic_days`·`sessions.topic_id`. v3→v4 업그레이드는 날짜 붙은 백업(`.bak-v3-…`)을 남기고, 큐레이션 주제를 넣고(이후엔 코드가 아니라 DB가 원본, `app/topics/curated.py`는 시드), 뉴스 JSON과 세션 주제 텍스트를 참조로 바꾸고, foreign key를 끈 채 `sessions`를 다시 만든 뒤 키를 검사한다. v5(2026-10-27)에 `swapped_expressions`. 테이블 하나 추가라 백업(`.bak-v4-…`) 뒤 만들기만 한다. v6(2026-10-27)에 `expressions.korean_example`. 열 하나 추가라 백업(`.bak-v5-…`) 뒤 `ALTER TABLE`만 한다. v7(2026-10-27)에 표현의 Your turn이 빠져 `examples`를 단어 전용으로 다시 만든다: 백업(`.bak-v6-…`) 뒤 `session_expression_id`와 CHECK를 없애고, 표현으로 만든 문장은 버리며, id 카운터는 이어 간다.
+버전: v3에 `figures`, v4(2026-10-26)에 `topics`와 참조형 `topic_days`·`sessions.topic_id`. v3→v4 업그레이드는 날짜 붙은 백업(`.bak-v3-…`)을 남기고, 큐레이션 주제를 넣고(이후엔 코드가 아니라 DB가 원본, `app/topics/curated.py`는 시드), 뉴스 JSON과 세션 주제 텍스트를 참조로 바꾸고, foreign key를 끈 채 `sessions`를 다시 만든 뒤 키를 검사한다. v5(2026-10-27)에 `swapped_expressions`(v15에서 없어짐). v6(2026-10-27)에 `expressions.korean_example`. 열 하나 추가라 백업(`.bak-v5-…`) 뒤 `ALTER TABLE`만 한다. v7(2026-10-27)에 표현의 Your turn이 빠져 `examples`를 단어 전용으로 다시 만든다: 백업(`.bak-v6-…`) 뒤 `session_expression_id`와 CHECK를 없애고, 표현으로 만든 문장은 버리며, id 카운터는 이어 간다. v15(2026-11-04)에 `swapped_expressions`와 `expressions.setting`을 지우고, 사용 메모 앞의 setting 이름("Casual. ")을 걷어낸다. 한 트랜잭션이고 백업(`.bak-v14-…`)을 남긴다.
 
 ## 표현 선택 규칙
 
 - 세션 저장 시 corpus에서 5개(`EXPRESSION_COUNT`). 생성기는 더 이상 표현을 쓰지 않는다 (프롬프트·스키마·`Exclusions.expressions` 제거. `check_items`는 단어만).
-- 쓴 표현 = `session_expressions`(가르침)나 `swapped_expressions`(바꿔 뺌)에 행이 있는 표현.
-- 후보 = 한 번도 안 쓴 표현. setting별로 돌아가며(NULL도 한 묶음) 무작위로 뽑아 섞는다.
+- 쓴 표현 = 지금 `session_expressions`에 행이 있는 표현. 바꿔 뺀 표현은 기록을 남기지 않아, 다른 세션이 가르치지 않으면 다시 안 쓴 표현이 된다. 계정 단위로는 그 계정이 만들었거나 공유받은 세션만 본다.
+- 후보 = 안 쓴 표현. 종류 구분 없이 무작위로 뽑는다.
 - 안 쓴 것이 5개 미만이면 가장 오래전에 쓴 것(마지막 세션 id 오름차순)으로 채운다. 표현에는 `REPEAT_ALLOWANCE` 안 씀(단어에만).
 - corpus가 비어 있으면 표현 0개인 세션. Expressions 탭은 "This session has no expressions."
-- 바꾸기(Expressions 탭의 ↻): 같은 규칙으로 하나를 뽑되 그 세션이 가르쳤거나 바꿔 뺀 표현은 빼고, 같은 position에 넣는다. 뺀 표현은 `swapped_expressions`에 남고, 그 자리의 별표는 지운다. 남은 후보가 없으면 404.
+- 바꾸기(Expressions 탭의 ↻): 같은 규칙으로 하나를 뽑되 그 세션이 지금 가르치는 표현은 빼고, 같은 position에 넣는다. 그 자리의 별표는 지운다. 남은 후보가 없으면 404.
 - 더하기(Expressions 탭 맨 아래 가로로 긴 +): 바꾸기와 같은 규칙으로 하나를 뽑아 맨 뒤 position에 넣는다. 세션이 없거나 남은 후보가 없으면 404.
 - 한국어 예문: 표현마다 하나. 카드의 영어 예문 아래에 한국어로 보이고, 둘이 각자 영어로 말해 본 뒤 누르면 영어 모범 답안(표현에 형광펜)으로 바뀐다. 다시 누르면 한국어. 앱에는 쓰는 경로가 없고, `backend/data/corpus-temment-2026-10-26/scripts/write_korean_examples.py`가 Claude로 만들어 `--apply`로 채운다(영어 예문과 다른 상황, 모범 답안엔 표현이 꼭 들어감).
 - 삭제(Database 페이지): 표현은 corpus와 그 표현을 가르친 모든 세션에서 지운다(별표 포함). 주제는 그 주제로 쓴 세션이 없을 때만 지운다(있으면 409). 그날 뉴스 목록에서도 빠진다.
@@ -224,7 +215,7 @@ CREATE TABLE stage_times (id INTEGER PRIMARY KEY AUTOINCREMENT, stage TEXT NOT N
 1. `sessions.db` → `sessions.db.bak-v1-<날짜>` 복사. 한 트랜잭션.
 2. 새 테이블 생성. 옛 `sessions`는 `sessions_v1`로 rename.
 3. 세션마다 `content_json` 파싱 → `sessions`(note는 `notes`에서), `paragraphs`(`\n\s*\n`으로 나누고 trim, 빈 것 제외), `vocabulary`(`starred` = `stars`에 word 있음).
-4. 표현: `key(phrase)`로 `expressions` upsert(`source='session'`, `setting NULL`, `added_at` = 세션 `created_at`), `session_expressions`(`starred` = `stars`에 phrase 있음).
+4. 표현: `key(phrase)`로 `expressions` upsert(`source='session'`, `added_at` = 세션 `created_at`), `session_expressions`(`starred` = `stars`에 phrase 있음).
 5. 그림: vocabulary의 `image`/`example_image` 파일명마다 `pictures` 행(`created_at` = 세션, model NULL). 파일이 없으면 FK NULL. `image_stats` 행 → `pictures` 행(파일 없음). 파일 rename(`{id}.png`)은 DB 트랜잭션 커밋 뒤에 한다. rename 실패는 경고 로그.
 6. `readings`/`summaries`: 단락 텍스트 → 같은 세션 단락과 trim 비교, 안 맞으면 공백 정규화 비교, 그래도 없으면 버리고 경고 로그.
 7. `examples`: `key(expression)` → 그 세션의 `session_expressions`, 아니면 그 세션의 vocabulary word. 없으면 버리고 경고.

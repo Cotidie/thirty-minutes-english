@@ -14,9 +14,9 @@ function sourceOf(entry: CorpusEntry): Source {
   return entry.source.includes('instagram.com') ? 'instagram' : 'youtube'
 }
 
-/** Taught in a session, or swapped out of one. */
+/** Taught in a session now. */
 function isUsed(entry: CorpusEntry): boolean {
-  return entry.sessions.length + entry.swapped.length > 0
+  return entry.sessions.length > 0
 }
 
 /** The expression corpus new sessions pick from, to read through with search and filters, and to prune. */
@@ -24,7 +24,6 @@ export function CorpusPanel() {
   const [corpus, setCorpus] = useState<CorpusEntry[] | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [query, setQuery] = useState('')
-  const [setting, setSetting] = useState('all')
   const [source, setSource] = useState<Source | 'all'>('all')
   const [used, setUsed] = useState<Used>('all')
 
@@ -37,12 +36,11 @@ export function CorpusPanel() {
     return (corpus ?? []).filter(
       (e) =>
         (!q || [e.phrase, e.meaning, e.korean ?? ''].some((text) => text.toLowerCase().includes(q))) &&
-        (setting === 'all' || e.setting === setting) &&
         (source === 'all' || sourceOf(e) === source) &&
         (used === 'all' || (used === 'used') === isUsed(e)),
     )
-  }, [corpus, query, setting, source, used])
-  const { shown, more, sentinel } = useChunks(found, [query, setting, source, used].join('|'))
+  }, [corpus, query, source, used])
+  const { shown, more, sentinel } = useChunks(found, [query, source, used].join('|'))
 
   async function remove(id: number) {
     await api.deleteExpression(id)
@@ -60,13 +58,6 @@ export function CorpusPanel() {
           value={query}
           onChange={(e) => setQuery(e.target.value)}
         />
-        <label htmlFor="corpus-setting">Setting</label>
-        <select id="corpus-setting" value={setting} onChange={(e) => setSetting(e.target.value)}>
-          <option value="all">All</option>
-          <option value="casual">Casual</option>
-          <option value="workplace">Workplace</option>
-          <option value="discussion">Discussion</option>
-        </select>
         <label htmlFor="corpus-source">Source</label>
         <select id="corpus-source" value={source} onChange={(e) => setSource(e.target.value as Source | 'all')}>
           <option value="all">All</option>
@@ -99,7 +90,6 @@ function CorpusItem({ entry, onDelete }: { entry: CorpusEntry; onDelete: () => P
     <li className="db-item">
       <div className="db-head">
         <h2 className="corpus-phrase">{entry.phrase}</h2>
-        {entry.setting && <span className="corpus-setting">{entry.setting}</span>}
         <ConfirmDelete label={entry.phrase} warning={taughtIn && `Also takes it out of ${taughtIn}.`} onDelete={onDelete} />
       </div>
       {entry.korean && <p className="corpus-korean">{entry.korean}</p>}
@@ -123,12 +113,6 @@ function CorpusItem({ entry, onDelete }: { entry: CorpusEntry; onDelete: () => P
           <>
             {' · Taught in '}
             <SessionLinks ids={entry.sessions} />
-          </>
-        )}
-        {entry.swapped.length > 0 && (
-          <>
-            {' · Swapped out of '}
-            <SessionLinks ids={entry.swapped} />
           </>
         )}
       </p>

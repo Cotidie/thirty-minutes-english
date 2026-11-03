@@ -23,15 +23,11 @@ export interface KoreanExample {
 
 /** An expression as the corpus keeps it, for the corpus page. */
 export interface CorpusEntry extends Expression {
-  /** casual, workplace or discussion; null when the source did not say. */
-  setting: string | null
   /** The post it was read from. */
   source: string
   added_at: string
-  /** Ids of the sessions that taught it, oldest first. */
+  /** Ids of the sessions that teach it now, oldest first. */
   sessions: number[]
-  /** Ids of the sessions it was swapped out of, oldest first; those count as using it too. */
-  swapped: number[]
 }
 
 export interface Question {

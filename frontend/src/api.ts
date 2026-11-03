@@ -99,7 +99,7 @@ export const api = {
   grantCredits: (id: number, amount: number) =>
     request<Account>(`/api/accounts/${id}/credits`, { method: 'POST', body: JSON.stringify({ amount }) }),
   myCredits: () => request<CreditsView>('/api/me/credits'),
-  /** Another corpus expression in this one's place; the one swapped out counts as used. */
+  /** Another corpus expression in this one's place; the one swapped out is free to come back. */
   swapExpression: (sessionId: number, expressionId: number) =>
     request<Expression>(`/api/sessions/${sessionId}/expressions/${expressionId}/swap`, { method: 'POST' }),
   /** One more corpus expression, taught after the others and picked as a swap picks one. */

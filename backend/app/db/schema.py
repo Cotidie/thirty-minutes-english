@@ -8,7 +8,7 @@ from datetime import UTC, datetime
 from app.db import topics
 from app.models import Category
 
-VERSION = 14
+VERSION = 15
 
 # Added in v3, by session since v9: images under the article's paragraphs, and its cover (no paragraph) under the title.
 FIGURES = """
@@ -45,7 +45,7 @@ CREATE TABLE topic_days (
 CREATE INDEX topic_days_topic ON topic_days (topic_id);
 """
 
-# Added in v5: the expressions swapped out of a session, which count as used there.
+# Added in v5: the expressions swapped out of a session, which counted as used there. Gone in v15.
 SWAPS = """
 CREATE TABLE swapped_expressions (
     session_id    INTEGER NOT NULL REFERENCES sessions(id) ON DELETE CASCADE,
@@ -159,6 +159,14 @@ ALTER TABLE credits ADD COLUMN state TEXT NOT NULL DEFAULT 'settled' CHECK (stat
 ALTER TABLE credits ADD COLUMN open_until TEXT;
 """
 
+# v15: an expression is used where a session teaches it now, so swaps keep no record; and expressions
+# are no longer told apart by setting, in a column or at the head of their usage note ("Casual. ...").
+PLAIN_EXPRESSIONS = """
+UPDATE expressions SET usage_note = ltrim(substr(usage_note, length(setting) + 2))
+    WHERE setting IS NOT NULL AND lower(substr(usage_note, 1, length(setting) + 1)) = lower(setting) || '.';
+ALTER TABLE expressions DROP COLUMN setting;
+"""
+
 SCHEMA = TOPICS + SESSIONS + """
 
 CREATE TABLE paragraphs (
@@ -196,7 +204,6 @@ CREATE TABLE expressions (
     examples   TEXT    NOT NULL,
     usage_note TEXT    NOT NULL,
     korean     TEXT,
-    setting    TEXT,
     source     TEXT    NOT NULL,
     added_at   TEXT    NOT NULL
 ) STRICT;
@@ -249,7 +256,7 @@ CREATE INDEX session_expressions_expression ON session_expressions (expression_i
 CREATE INDEX readings_paragraph ON readings (paragraph_id);
 CREATE INDEX summaries_paragraph ON summaries (paragraph_id);
 CREATE INDEX stage_times_stage ON stage_times (stage, id);
-""" + FIGURES + SWAPS + KOREAN_EXAMPLES + EXAMPLES + ACCOUNTS + CREDITS + CREDIT_HOLDS
+""" + FIGURES + KOREAN_EXAMPLES + EXAMPLES + ACCOUNTS + CREDITS + CREDIT_HOLDS
 
 
 def _run(conn: sqlite3.Connection, script: str) -> None:
@@ -297,6 +304,8 @@ def upgrade(conn: sqlite3.Connection, version: int) -> None:
         _credits(conn)
     if version < 14:
         _credit_holds(conn)
+    if version < 15:
+        _plain_expressions(conn)
 
 
 def _add_pool(conn: sqlite3.Connection, category: Category, version: int) -> None:
@@ -322,6 +331,16 @@ def _credit_holds(conn: sqlite3.Connection) -> None:
     conn.execute("BEGIN")
     _run(conn, CREDIT_HOLDS)
     conn.execute("PRAGMA user_version = 14")
+
+
+def _plain_expressions(conn: sqlite3.Connection) -> None:
+    """All of it or none. A file that never had a setting column (one rebuilt by hand, as tests do) only loses the swaps."""
+    conn.commit()
+    conn.execute("BEGIN")
+    if any(column[1] == "setting" for column in conn.execute("PRAGMA table_info(expressions)")):
+        _run(conn, PLAIN_EXPRESSIONS)
+    conn.execute("DROP TABLE IF EXISTS swapped_expressions")
+    conn.execute("PRAGMA user_version = 15")
 
 
 def _figures_by_session(conn: sqlite3.Connection) -> None:

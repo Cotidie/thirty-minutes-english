@@ -15,18 +15,16 @@ const entry = (over: Partial<CorpusEntry>): CorpusEntry => ({
   usage_note: 'n',
   examples: [],
   korean: null,
-  setting: 'casual',
   source: 'https://www.youtube.com/post/Ugkx2',
   added_at: '2026-10-26T00:00:00+00:00',
   sessions: [],
-  swapped: [],
   ...over,
 })
 
 const corpus = [
   entry({ id: 1, phrase: 'Be my guest', korean: '그러세요', examples: ['"Can I use your charger?" "Be my guest."'], source: 'https://www.youtube.com/post/Ugkx1' }),
-  entry({ id: 2, phrase: 'touch base', meaning: 'to contact someone briefly', korean: '잠깐 연락하다', setting: 'workplace', sessions: [7] }),
-  entry({ id: 3, phrase: 'Bold plan.', korean: '야심 찬 계획이네', source: 'https://www.instagram.com/p/DQ1/', swapped: [9] }),
+  entry({ id: 2, phrase: 'touch base', meaning: 'to contact someone briefly', korean: '잠깐 연락하다', sessions: [7] }),
+  entry({ id: 3, phrase: 'Bold plan.', korean: '야심 찬 계획이네', source: 'https://www.instagram.com/p/DQ1/' }),
 ]
 
 beforeEach(() => {
@@ -63,19 +61,17 @@ it('searches the phrase, the meaning and the Korean', async () => {
   expect(shown()).toEqual(['touch base'])
 })
 
-it('filters by setting, source and whether a session used it', async () => {
+it('filters by source and whether a session teaches it, with no setting to filter by', async () => {
   renderPage()
   await screen.findByText('Be my guest')
+  expect(screen.queryByLabelText('Setting')).not.toBeInTheDocument()
   fireEvent.change(screen.getByLabelText('Source'), { target: { value: 'instagram' } })
   expect(shown()).toEqual(['Bold plan.'])
   fireEvent.change(screen.getByLabelText('Source'), { target: { value: 'all' } })
-  fireEvent.change(screen.getByLabelText('Setting'), { target: { value: 'workplace' } })
-  expect(shown()).toEqual(['touch base'])
-  fireEvent.change(screen.getByLabelText('Setting'), { target: { value: 'all' } })
   fireEvent.change(screen.getByLabelText('Used'), { target: { value: 'new' } })
-  expect(shown()).toEqual(['Be my guest'])
+  expect(shown()).toEqual(['Be my guest', 'Bold plan.'])
   fireEvent.change(screen.getByLabelText('Used'), { target: { value: 'used' } })
-  expect(shown()).toEqual(['touch base', 'Bold plan.'])
+  expect(shown()).toEqual(['touch base'])
 })
 
 it('links each entry to its post and to the sessions that taught it', async () => {
@@ -95,11 +91,11 @@ it('says so when the corpus does not load', async () => {
   expect(await screen.findByText(/Could not load the corpus: 500/)).toBeInTheDocument()
 })
 
-it('says which session an expression was swapped out of', async () => {
+it('names no setting and no swap on an entry', async () => {
   renderPage()
   await screen.findByText('Be my guest')
-  expect(screen.getByText(/Swapped out of/)).toBeInTheDocument()
-  expect(screen.getByRole('link', { name: 'Session 9' })).toHaveAttribute('href', '/s/9')
+  expect(document.querySelector('.corpus-setting')).toBeNull()
+  expect(screen.queryByText(/Swapped out of/)).not.toBeInTheDocument()
 })
 
 it('deletes an expression after a confirm that names the sessions it leaves', async () => {

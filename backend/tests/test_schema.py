@@ -10,6 +10,18 @@ from app.topics.curated import CURATED
 from tests.conftest import CURATED_TOPICS, add_user, sample_draft, seed_expressions
 
 
+def as_v14(path) -> None:
+    """Rewrites a current file the way v14 kept it: a setting on each expression, and the swaps table."""
+    conn = sqlite3.connect(path)
+    with conn:
+        conn.execute("ALTER TABLE expressions ADD COLUMN setting TEXT")
+        for statement in schema.SWAPS.split(";"):
+            if statement.strip():
+                conn.execute(statement)
+        conn.execute("PRAGMA user_version = 14")
+    conn.close()
+
+
 def as_v13(path) -> None:
     """Rewrites a current file the way v13 kept it: a ledger of final rows."""
     conn = sqlite3.connect(path)
@@ -96,7 +108,7 @@ def as_v3(path) -> None:
         conn.execute("DROP TABLE topics")
         conn.execute("CREATE TABLE topic_days (day TEXT PRIMARY KEY, topics TEXT NOT NULL) STRICT")
         conn.executemany("INSERT INTO topic_days VALUES (?, ?)", days)
-        conn.execute("DROP TABLE swapped_expressions")
+        conn.execute("DROP TABLE IF EXISTS swapped_expressions")
         conn.execute("ALTER TABLE expressions DROP COLUMN korean_example")
         conn.execute("PRAGMA user_version = 3")
     conn.close()
@@ -170,18 +182,18 @@ def test_a_v3_file_moves_its_topics_into_rows_and_keeps_everything_else(tmp_path
     assert db.sessions.create(sample_draft(), []).id == curated.id + 2
 
 
-def test_a_v4_file_gains_the_swapped_expressions_table_and_keeps_its_sessions(tmp_path):
+def test_a_v4_file_keeps_its_sessions_through_every_step(tmp_path):
     path = tmp_path / "s.db"
     session = Database(path).sessions.create(sample_draft(), [])
     as_v9(path)
     with sqlite3.connect(path) as conn:
-        conn.execute("DROP TABLE swapped_expressions")
+        conn.execute("DROP TABLE IF EXISTS swapped_expressions")
         conn.execute("ALTER TABLE expressions DROP COLUMN korean_example")
         conn.execute("PRAGMA user_version = 4")
     db = Database(path)
     with db.connect() as conn:
         assert conn.execute("PRAGMA user_version").fetchone()[0] == schema.VERSION
-        assert conn.execute("SELECT sql FROM sqlite_master WHERE name = 'swapped_expressions'").fetchone()[0].rstrip().endswith("STRICT")
+        assert conn.execute("SELECT 1 FROM sqlite_master WHERE name = 'swapped_expressions'").fetchone() is None  # made at v5, gone at v15
     assert list(tmp_path.glob("s.db.bak-v4-????-??-??"))
     assert db.sessions.get(session.id).content.article.title == session.content.article.title
 
@@ -409,7 +421,7 @@ def test_v13_brings_its_ledger_along_with_every_row_settled(tmp_path):
     db = Database(path)
     assert db.credits.balance(mina.id) == 50
     with db.connect() as conn:
-        assert conn.execute("PRAGMA user_version").fetchone()[0] == schema.VERSION == 14
+        assert conn.execute("PRAGMA user_version").fetchone()[0] == schema.VERSION
         assert [tuple(row) for row in conn.execute("SELECT state, open_until FROM credits")] == [("settled", None)]
 
 
@@ -441,3 +453,26 @@ def test_upgrading_v11_adds_the_travel_topics_and_brings_no_deleted_topic_back(t
     assert set(CURATED[Category.TRAVEL]) <= set(texts)
     with upgraded.connect() as conn:
         assert conn.execute("PRAGMA user_version").fetchone()[0] == schema.VERSION
+
+
+def test_v14_drops_swaps_and_settings_and_takes_the_setting_off_each_note(tmp_path):
+    path = tmp_path / "s.db"
+    db = Database(path)
+    casual = db.expressions.add("out of order", "broken", [], [], "Casual. Signs on broken elevators.", "고장", "youtube")
+    plain = db.expressions.add("touch base", "m", [], [], "Use it at work.", None, "s")
+    bare = db.expressions.add("on the fence", "m", [], [], "discussion.", None, "s")
+    unset = db.expressions.add("call it a day", "m", [], [], "Casual. Kept as it is.", None, "s")
+    session = db.sessions.create(sample_draft(), [casual]).id
+    as_v14(path)
+    with sqlite3.connect(path) as conn:
+        conn.executemany("UPDATE expressions SET setting = ? WHERE id = ?", [("casual", casual), ("workplace", plain), ("discussion", bare)])
+        conn.execute("INSERT INTO swapped_expressions VALUES (?, ?, ?)", (session, plain, "2026-11-01T00:00:00+00:00"))
+    db = Database(path)
+    with db.connect() as conn:
+        assert conn.execute("PRAGMA user_version").fetchone()[0] == schema.VERSION == 15
+        assert conn.execute("SELECT 1 FROM sqlite_master WHERE name = 'swapped_expressions'").fetchone() is None
+        assert "setting" not in [c[1] for c in conn.execute("PRAGMA table_info(expressions)")]
+    notes = [db.expressions.get(i).usage_note for i in (casual, plain, bare, unset)]
+    assert notes == ["Signs on broken elevators.", "Use it at work.", "", "Casual. Kept as it is."]
+    assert list(tmp_path.glob("s.db.bak-v14-????-??-??"))
+    assert [e.id for e in db.sessions.get(session).content.expressions] == [casual]

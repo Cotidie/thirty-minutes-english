@@ -171,13 +171,6 @@
   margin: 0;
 }
 
-.corpus-setting {
-  color: var(--muted);
-  font-size: 0.8rem;
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
-}
-
 .corpus-korean {
   color: var(--phrase);
   margin: 0.2rem 0 0.4rem;

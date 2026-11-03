@@ -44,10 +44,10 @@ CURATED_TOPICS = [Topic(text=text, category=category) for category, texts in CUR
 NAMES = ("alpha", "bravo", "charlie", "delta", "echo", "foxtrot", "golf", "hotel", "india", "juliet")
 
 
-def seed_expressions(db: Database, n: int = 5, setting: str | None = None) -> list[int]:
+def seed_expressions(db: Database, n: int = 5) -> list[int]:
     """`n` corpus expressions ("alpha phrase", "bravo phrase", ...), their ids in the order added."""
     return [
-        db.expressions.add(f"{name} phrase", f"meaning {i}", [f"syn {i}"], [f"ex {i}a", f"ex {i}b"], f"note {i}", f"표현 {i}", setting, "test")
+        db.expressions.add(f"{name} phrase", f"meaning {i}", [f"syn {i}"], [f"ex {i}a", f"ex {i}b"], f"note {i}", f"표현 {i}", "test")
         for i, name in enumerate(NAMES[:n])
     ]
 
