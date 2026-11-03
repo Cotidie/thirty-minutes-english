@@ -11,7 +11,7 @@
 | # | 읽는 방식 | 기대 반응 |
 |---|---|---|
 | 1 | 전부 정확하게 읽기 | 표시 없음. Done을 누르면 기록 없이 끝 |
-| 2 | verified를 "버리파이드"로 | 구가 끝난 뒤 verified에 붉은 밑줄. 클릭하면 "You said berify. It's verify. Try it." 4초 이내 |
+| 2 | verified를 "버리파이드"로 | 구가 끝난 뒤 verified에 붉은 밑줄. 클릭하면 "You said berify. It's verify." 4초 이내. "Try it" 같은 따라 하라는 말 없음 |
 | 3 | production의 강세를 PRO-duction으로 | 표시. 클릭하면 pro-DUC-tion |
 | 4 | factory를 "팩토리"(f→p)로 | 표시. 클릭하면 f 교정 |
 | 5 | three를 "쓰리"(th→s)로 | 표시. 클릭하면 th 교정 |

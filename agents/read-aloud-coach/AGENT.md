@@ -12,7 +12,7 @@
 
 1. 호스트가 세션을 열고 마이크 트랙을 끈다.
 2. `session.started`에 지시 하나를 보낸다: `Correction: "verified", heard b for v.`
-3. 코치가 두 박자로 말한다: "You said berify. It's verify. Try it." 인사도 마무리도 없다.
+3. 코치가 두 박자로 말한다: "You said berify. It's verify." 인사도 마무리도, 따라 해 보라는 말도 없다.
 4. 코치 transcript가 2초간 멈추면 호스트가 `close`. 최대 15초.
 
 지시는 text turn으로 보낸다. 자막은 `session.output_transcript.delta`를 이어 붙인다(Gemini의 `<no speech>` 태그는 호스트가 지운다).
