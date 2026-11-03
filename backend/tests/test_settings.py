@@ -1,3 +1,4 @@
+import re
 
 import pytest
 
@@ -145,3 +146,36 @@ def test_skills_come_with_the_app_and_none_are_picked_in_settings(tmp_path):
         assert all("multi" not in f for f in fields)
         refused = c.put("/api/settings", json={"values": {"CLAUDE_SKILLS": "stop-slop"}})
         assert refused.status_code == 400 and "unknown setting CLAUDE_SKILLS" in refused.json()["detail"]
+
+
+def test_vocabulary_levels_take_any_set_of_known_levels(store):
+    store.settings.save({"VOCABULARY_LEVELS": "B1,C2"})
+    store.settings.save({"VOCABULARY_LEVELS": "B1+,B2+"})
+    store.settings.save({"VOCABULARY_LEVELS": "C2"})
+    for bad in ("", "A2", "C1+", "B2,B2", "B2,X"):
+        with pytest.raises(InvalidSetting, match=re.escape("VOCABULARY_LEVELS must name one or more of B1, B1+, B2, B2+, C1, C2")):
+            store.settings.save({"VOCABULARY_LEVELS": bad})
+    assert store.settings.load()["VOCABULARY_LEVELS"] == "C2"
+
+
+def test_vocabulary_levels_read_in_level_order_and_fall_back_to_b2_through_c1():
+    assert Settings({}, {}).vocabulary_levels == ("B2", "B2+", "C1")
+    assert Settings({}, {"VOCABULARY_LEVELS": "C1,B2"}).vocabulary_levels == ("B2", "C1")
+    assert Settings({"VOCABULARY_LEVELS": "b1+, c2"}, {}).vocabulary_levels == ("B1+", "C2")
+    assert Settings({"VOCABULARY_LEVELS": "A1"}, {}).vocabulary_levels == ("B2", "B2+", "C1")
+
+
+def test_vocabulary_levels_show_as_named_checkboxes_on_the_claude_tab(tmp_path):
+    with settings_client(tmp_path, {}) as c:
+        fields = {f["key"]: f for f in c.get("/api/settings").json()["fields"]}
+    levels = fields["VOCABULARY_LEVELS"]
+    assert (levels["group"], levels["value"], levels["default"], levels["many"], levels["free"]) == ("claude", "B2,B2+,C1", "B2,B2+,C1", True, False)
+    assert [(o["id"], o["description"]) for o in levels["options"]] == [
+        ("B1", "Intermediate"),
+        ("B1+", "Strong intermediate"),
+        ("B2", "Upper intermediate"),
+        ("B2+", "Strong upper intermediate"),
+        ("C1", "Advanced"),
+        ("C2", "Proficient"),
+    ]
+    assert fields["VOICE_NAME"]["many"] is False

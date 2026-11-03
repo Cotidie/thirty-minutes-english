@@ -69,6 +69,7 @@ def field_of(spec: Spec, settings: Settings, menus: ModelMenus) -> SettingField:
         default=spec.default,
         options=options_of(spec, settings, menus),
         free=bool(spec.catalog),
+        many=spec.many,
         catalog=spec.catalog,
         inline=spec.inline,
         testable=spec.key in KEYS,

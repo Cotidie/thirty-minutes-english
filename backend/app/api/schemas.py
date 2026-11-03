@@ -214,6 +214,7 @@ class SettingField(BaseModel):
     default: str
     options: list[Option] = []  # the menu; strict unless `free`
     free: bool = False  # any text is allowed, `options` only suggest (model ids)
+    many: bool = False  # several of `options` at once, joined with commas
     catalog: str | None = None  # the model list behind `options` (pins are kept per list)
     inline: bool = False  # draw the model menu as a list in the panel, with prices
     testable: bool = False  # a Test button checks the key

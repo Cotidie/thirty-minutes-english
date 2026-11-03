@@ -7,6 +7,7 @@ stay out of here. The saved values live in app.db.settings."""
 from collections.abc import Mapping
 from dataclasses import dataclass
 
+from app.generation.levels import DEFAULT_LEVELS, LEVEL_LABELS, LEVELS, parse_levels
 from app.pictures.illustrator import STYLE_LABELS, STYLES
 from app.pictures.painters import DEFAULT_MODEL as IMAGE_DEFAULT_MODEL
 
@@ -66,6 +67,7 @@ class Spec:
     secret: bool = False
     choices: tuple[str, ...] | None = None  # strict: a value outside is rejected
     labels: Mapping[str, str] | None = None  # a short description per choice, for the menu
+    many: bool = False  # the value is one or more of `choices`, joined with commas
     catalog: str | None = None  # free text with the provider's model list as the menu
     effort_of: str | None = None  # an effort level, offered as the chosen Claude model allows
     inline: bool = False  # the model menu shows as a list in the panel (with prices), not a dropdown
@@ -111,6 +113,8 @@ SPECS: tuple[Spec, ...] = (
          help="Judges spoken summaries, writes model answers."),
     Spec("SUMMARY_EFFORT", "claude", "medium", effort_of="SUMMARY_MODEL",
          help="Medium keeps it quick; low gets shallow."),
+    Spec("VOCABULARY_LEVELS", "claude", ",".join(DEFAULT_LEVELS), choices=LEVELS, labels=LEVEL_LABELS, many=True,
+         help="The CEFR levels a new session's words come from. Sessions already made keep their words."),
     Spec("IMAGE_PROVIDER", "images", "openrouter", choices=IMAGE_PROVIDERS,
          help="Who draws the vocabulary pictures. OpenRouter draws them all at once; off skips pictures."),
     Spec("IMAGE_MODEL", "images", IMAGE_DEFAULT_MODEL, catalog="openrouter_images", inline=True, shown_when=("IMAGE_PROVIDER", "openrouter"),
@@ -131,7 +135,9 @@ def validate(values: Mapping[str, str]) -> None:
         spec = SPEC_BY_KEY.get(key)
         if spec is None:
             raise InvalidSetting(f"unknown setting {key}")
-        if spec.choices and value not in spec.choices:
+        if spec.many and spec.choices and not _is_many_of(value, spec.choices):
+            raise InvalidSetting(f"{key} must name one or more of {', '.join(spec.choices)}")
+        if not spec.many and spec.choices and value not in spec.choices:
             raise InvalidSetting(f"{key} must be one of {', '.join(spec.choices)}")
         if spec.number:
             lo, hi = spec.number
@@ -141,6 +147,12 @@ def validate(values: Mapping[str, str]) -> None:
                 raise InvalidSetting(f"{key} must be a number") from None
             if not lo <= number <= hi:
                 raise InvalidSetting(f"{key} must be between {lo:g} and {hi:g}")
+
+
+def _is_many_of(value: str, choices: tuple[str, ...]) -> bool:
+    """One or more of `choices`, comma-joined, none twice."""
+    pieces = [piece.strip() for piece in value.split(",")]
+    return all(pieces) and set(pieces) <= set(choices) and len(set(pieces)) == len(pieces)
 
 
 class Settings:
@@ -174,6 +186,10 @@ class Settings:
     @property
     def assess_word_score(self) -> int:
         return int(float(self.get("ASSESS_WORD_SCORE")))
+
+    @property
+    def vocabulary_levels(self) -> tuple[str, ...]:
+        return parse_levels(self.get("VOCABULARY_LEVELS"))
 
 
 def mask(secret: str) -> str:
