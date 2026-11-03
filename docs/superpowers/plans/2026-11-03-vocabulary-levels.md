@@ -10,6 +10,8 @@
 
 **Spec:** `docs/superpowers/specs/2026-11-03-vocabulary-levels-design.md`
 
+**구현 중 바뀐 것:** 사용자가 공식 plus 수준을 넣자고 해서 수준은 B1, B1+, B2, B2+, C1, C2 여섯 개이고 기본값은 `B2,B2+,C1`이다. 아래 태스크의 네 수준 예시는 그 전에 쓴 것이다. 커밋된 테스트와 spec이 기준이다.
+
 ## Global Constraints
 
 - 브랜치 `feat/vocabulary-levels`에서 작업한다 (이 문서가 이미 그 위에 있다). `main`에는 `--ff-only`로 합치고, 그 뒤 `scripts/bump-version patch`만 쓴다. minor나 major는 올리지 않는다. push와 배포는 사용자가 말할 때만 한다.
