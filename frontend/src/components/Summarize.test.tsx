@@ -125,6 +125,7 @@ it('shows a kept summary in the card it was judged in, set apart from the articl
   expect(within(card).getByText('You').nextElementSibling).toHaveTextContent(said)
   expect(within(card).getByText('Missed').nextElementSibling).toHaveTextContent(feedback.missed[0])
   expect(within(card).getByText('Say it better').nextElementSibling).toHaveTextContent('was remove → got rid of')
+  expect(within(card).getByText('was remove')).toHaveClass('summary-said')  // grey, not struck through
   expect(within(card).getByText('Model answer').nextElementSibling).toHaveTextContent(feedback.summary)
   expect(screen.getByRole('button', { name: 'Summarize again' })).toBeEnabled()
 })

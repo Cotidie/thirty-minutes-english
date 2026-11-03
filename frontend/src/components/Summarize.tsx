@@ -189,7 +189,7 @@ function Feedback({ answer }: { answer: SummaryFeedback }) {
           <dd>
             {answer.fixes.map((fix) => (
               <span key={fix.said} className="summary-fix">
-                <s>{fix.said}</s> → <b>{fix.better}</b>
+                <span className="summary-said">{fix.said}</span> → <b>{fix.better}</b>
               </span>
             ))}
           </dd>
