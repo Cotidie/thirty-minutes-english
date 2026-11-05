@@ -1,6 +1,6 @@
-"""A session's text, written by Claude in passes: a researched draft, an edit for reading aloud, a polish
-against machine-sounding prose, one repair if a length limit still breaks, then everything copied from
-the final article (questions, translation, figures, pictures to draw) and the words."""
+"""A session's text, written by Claude in three passes: a researched draft, an edit for reading aloud that
+also takes out machine-sounding prose, then everything copied from the final article (questions, translation,
+figures, pictures to draw) and the words. One repair runs between the last two if a length limit still breaks."""
 
 import logging
 from collections.abc import Callable
@@ -33,7 +33,6 @@ from app.generation.prompts import (
     draft_prompt,
     edit_prompt,
     finish_prompt,
-    polish_prompt,
     repair_prompt,
 )
 from app.generation.readability import problems, repair_holds
@@ -96,10 +95,10 @@ class ClaudeGenerator:
             model, effort, timeout_s, tools=("Read", *WEB_TOOLS), mcp=(firecrawl(firecrawl_key),),
             skills=(APP_SKILL,), plugins=plugins, partial=True,
         )
-        self.editor = Claude(model, effort, timeout_s, partial=True)  # the edit and the repair: text in, text out
-        self.polisher = Claude(
+        self.editor = Claude(
             model, effort, timeout_s, tools=("Read",), skills=(HUMANIZER_SKILL, STOP_SLOP_SKILL), plugins=plugins, partial=True,
         )
+        self.repairer = Claude(model, effort, timeout_s, partial=True)  # text in, text out
         self.finisher = Claude(model, effort, timeout_s, tools=("Read",), skills=(APP_SKILL,), plugins=plugins, partial=True)
 
     def generate(
@@ -111,8 +110,7 @@ class ClaudeGenerator:
         tracker = StreamTracker(on_progress or (lambda _: None))
         first = self._draft(topic, tracker)
         edited = self._edit(first, tracker)
-        polished = self._polish(edited, tracker)
-        final = self._fix_lengths(polished, tracker)
+        final = self._fix_lengths(edited, tracker)
         finish = self._finish(topic, final, first.images, exclude, tracker)
         return assemble(final, first, finish)
 
@@ -124,34 +122,30 @@ class ClaudeGenerator:
         tracker.begin(Stage.EDITING)
         return self._run("editing", self.editor, edit_prompt(text), TEXT_SCHEMA, ArticleText, tracker)
 
-    def _polish(self, text: ArticleText, tracker: StreamTracker) -> ArticleText:
-        tracker.begin(Stage.POLISHING)
-        return self._run("polishing", self.polisher, polish_prompt(text), TEXT_SCHEMA, ArticleText, tracker)
-
     def _fix_lengths(self, text: ArticleText, tracker: StreamTracker) -> ArticleText:
-        """One repair when the polished article breaks a length limit. The repair goes on only when it holds
-        (`repair_holds`); a failed repair leaves the polished text, since a length is never worth failing the session over."""
+        """One repair when the edited article breaks a length limit. The repair goes on only when it holds
+        (`repair_holds`); a failed repair leaves the edited text, since a length is never worth failing the session over."""
         found = problems(text.body)
         if not found:
-            log.info("readability: clean after polishing")
+            log.info("readability: clean after editing")
             return text
         try:
             repaired = self._repair(text, found, tracker)
         except GenerationError as e:
-            log.warning("readability: repair failed, keeping the polished text (%d problems): %s", len(found), e)
+            log.warning("readability: repair failed, keeping the edited text (%d problems): %s", len(found), e)
             return text
         kept = repaired if repair_holds(text.body, repaired.body) else text
         log.info(
-            "readability: %d problems after polishing, %d after repair; kept the %s text",
-            len(found), len(problems(repaired.body)), "repaired" if kept is repaired else "polished",
+            "readability: %d problems after editing, %d after repair; kept the %s text",
+            len(found), len(problems(repaired.body)), "repaired" if kept is repaired else "edited",
         )
         if still := problems(kept.body):
             log.warning("readability: still %s", still)
         return kept
 
     def _repair(self, text: ArticleText, found: list[str], tracker: StreamTracker) -> ArticleText:
-        tracker.begin(Stage.POLISHING, REPAIR_ACTIVITY)
-        return self._run("repair", self.editor, repair_prompt(text, found), TEXT_SCHEMA, ArticleText, tracker)
+        tracker.begin(Stage.EDITING, REPAIR_ACTIVITY)
+        return self._run("repair", self.repairer, repair_prompt(text, found), TEXT_SCHEMA, ArticleText, tracker)
 
     def _finish(
         self, topic: str, text: ArticleText, images: list[ImageCandidate], exclude: Exclusions | None, tracker: StreamTracker

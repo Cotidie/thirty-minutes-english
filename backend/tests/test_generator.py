@@ -10,54 +10,52 @@ from tests.conftest import readable_body, sample_finish, sample_first_draft
 from tests.fake_claude import ScriptedQuery, assistant, result, stream, text, tool_use
 
 LONG = " ".join(["Long"] + ["word"] * 24) + "."  # 25 words, over the limit
-POLISHED_WITH_A_LONG_SENTENCE = readable_body("polished").replace("Polished", LONG + " Polished", 1)
+EDITED_WITH_A_LONG_SENTENCE = readable_body("edited").replace("Edited", LONG + " Edited", 1)
 
 
 def generator_with(fake, **kwargs) -> ClaudeGenerator:
     gen = ClaudeGenerator(model="sonnet", **kwargs)
-    for claude in (gen.drafter, gen.editor, gen.polisher, gen.finisher):
+    for claude in (gen.drafter, gen.editor, gen.repairer, gen.finisher):
         object.__setattr__(claude, "query", fake)
     return gen
 
 
-def passes(*, draft=None, edit=None, polish=None, repair=None, finish=None) -> ScriptedQuery:
+def passes(*, draft=None, edit=None, repair=None, finish=None) -> ScriptedQuery:
     """One script per call, in order; `repair` only when given."""
     scripts = [
         draft or (result(sample_first_draft()),),
         edit or (result({"title": "Twins at Work", "body": readable_body("edited")}),),
-        polish or (result({"title": "Twins at Work", "body": readable_body("polished")}),),
         *([repair] if repair else []),
         finish or (result(sample_finish()),),
     ]
     return ScriptedQuery(*scripts)
 
 
-def test_the_article_goes_through_draft_edit_polish_and_finish_in_order():
+def test_the_article_goes_through_draft_edit_and_finish_in_order():
     fake = passes()
     draft = generator_with(fake).generate("Digital twins")
     prompts = [prompt for prompt, _ in fake.calls]
-    assert len(prompts) == 4
+    assert len(prompts) == 3
     assert "Today's article topic: Digital twins" in prompts[0]
-    assert readable_body("draft") in prompts[1] and readable_body("edited") in prompts[2] and readable_body("polished") in prompts[3]
-    assert draft.article.body == readable_body("polished") and draft.article.sources[0].url == "https://example.com"
-    assert "session" not in fake.calls[3][1].mcp_servers  # no past words, no check tool
+    assert readable_body("draft") in prompts[1] and readable_body("edited") in prompts[2]
+    assert draft.article.body == readable_body("edited") and draft.article.sources[0].url == "https://example.com"
+    assert "session" not in fake.calls[2][1].mcp_servers  # no past words, no check tool
 
 
 def test_each_pass_runs_with_its_own_tools_and_skills():
     fake = passes()
     generator_with(fake).generate("x", exclude=Exclusions(("scrutiny",)))
-    (_, drafting), (_, editing), (_, polishing), (finishing_prompt, finishing) = fake.calls
+    (_, drafting), (_, editing), (finishing_prompt, finishing) = fake.calls
     assert drafting.skills == [APP_SKILL] and "WebSearch" in drafting.allowed_tools and "firecrawl" in drafting.mcp_servers
-    assert (editing.tools, editing.allowed_tools, editing.mcp_servers, editing.skills) == ([], [], {}, None)
-    assert polishing.skills == [HUMANIZER_SKILL, STOP_SLOP_SKILL] and polishing.tools == ["Read", "Skill"]
+    assert editing.skills == [HUMANIZER_SKILL, STOP_SLOP_SKILL] and editing.tools == ["Read", "Skill"] and editing.mcp_servers == {}
     assert finishing.skills == [APP_SKILL] and "session" in finishing.mcp_servers and "session" not in drafting.mcp_servers
     assert CHECK_ITEMS_RULE in finishing_prompt and "scrutiny" not in finishing_prompt
-    assert all(o.plugins == [{"type": "local", "path": str(PLUGIN_DIR)}] for o in (drafting, polishing, finishing))
+    assert all(o.plugins == [{"type": "local", "path": str(PLUGIN_DIR)}] for o in (drafting, editing, finishing))
 
 
 def test_every_pass_keeps_the_ten_minute_limit():
     gen = ClaudeGenerator(model="opus")
-    assert {c.timeout_s for c in (gen.drafter, gen.editor, gen.polisher, gen.finisher)} == {600}
+    assert {c.timeout_s for c in (gen.drafter, gen.editor, gen.repairer, gen.finisher)} == {600}
 
 
 def test_check_items_names_close_variants_of_taught_words():
@@ -69,38 +67,39 @@ def test_check_items_names_close_variants_of_taught_words():
 
 def test_a_long_sentence_gets_one_repair_that_names_it():
     fake = passes(
-        polish=(result({"title": "t", "body": POLISHED_WITH_A_LONG_SENTENCE}),),
+        edit=(result({"title": "t", "body": EDITED_WITH_A_LONG_SENTENCE}),),
         repair=(result({"title": "t", "body": readable_body("repaired")}),),
     )
     draft = generator_with(fake).generate("x")
-    assert len(fake.calls) == 5
-    assert f'Sentence of 25 words (limit 20): "{LONG}"' in fake.calls[3][0]
-    assert fake.calls[3][1].skills is None  # the repair runs on the editor
+    assert len(fake.calls) == 4
+    repair_prompt, repairing = fake.calls[2]
+    assert f'Sentence of 25 words (limit 20): "{LONG}"' in repair_prompt
+    assert (repairing.tools, repairing.skills) == ([], None)  # text in, text out
     assert draft.article.body == readable_body("repaired")
 
 
 def test_a_repair_that_leaves_more_problems_is_set_aside():
     fake = passes(
-        polish=(result({"title": "t", "body": POLISHED_WITH_A_LONG_SENTENCE}),),
-        repair=(result({"title": "t", "body": "One.\n\nTwo.\n\nThree."}),),  # 4 problems against the polished 2
+        edit=(result({"title": "t", "body": EDITED_WITH_A_LONG_SENTENCE}),),
+        repair=(result({"title": "t", "body": "One.\n\nTwo.\n\nThree."}),),  # 4 problems against the edited 2
     )
-    assert generator_with(fake).generate("x").article.body == POLISHED_WITH_A_LONG_SENTENCE
+    assert generator_with(fake).generate("x").article.body == EDITED_WITH_A_LONG_SENTENCE
 
 
-def test_a_failed_repair_keeps_the_polished_article_and_goes_on():
+def test_a_failed_repair_keeps_the_edited_article_and_goes_on():
     fake = passes(
-        polish=(result({"title": "t", "body": POLISHED_WITH_A_LONG_SENTENCE}),),
+        edit=(result({"title": "t", "body": EDITED_WITH_A_LONG_SENTENCE}),),
         repair=(result(is_error=True, text="overloaded"),),
     )
     draft = generator_with(fake).generate("x")
-    assert draft.article.body == POLISHED_WITH_A_LONG_SENTENCE and len(fake.calls) == 5
+    assert draft.article.body == EDITED_WITH_A_LONG_SENTENCE and len(fake.calls) == 4
 
 
 def test_a_cancel_during_the_repair_is_not_swallowed():
     thinking = stream({"type": "content_block_start", "content_block": {"type": "thinking"}})
     fake = passes(
-        polish=(result({"title": "t", "body": POLISHED_WITH_A_LONG_SENTENCE}),),
-        repair=(thinking, result({"title": "t", "body": POLISHED_WITH_A_LONG_SENTENCE})),
+        edit=(result({"title": "t", "body": EDITED_WITH_A_LONG_SENTENCE}),),
+        repair=(thinking, result({"title": "t", "body": EDITED_WITH_A_LONG_SENTENCE})),
     )
     seen: list[Progress] = []
 
@@ -112,7 +111,7 @@ def test_a_cancel_during_the_repair_is_not_swallowed():
 
     with pytest.raises(Cancelled):
         generator_with(fake).generate("x", on_progress=cancel_in_repair)
-    assert len(fake.calls) == 4
+    assert len(fake.calls) == 3
 
 
 def test_a_failed_edit_fails_the_whole_generation():
@@ -136,7 +135,6 @@ def test_progress_runs_through_the_passes_in_order():
         Stage.SEARCHING,
         Stage.DRAFTING,
         Stage.EDITING,
-        Stage.POLISHING,
         Stage.FINISHING,
     ]
 
@@ -144,24 +142,24 @@ def test_progress_runs_through_the_passes_in_order():
 def test_a_repair_that_merges_paragraphs_out_of_range_is_set_aside():
     """Fewer problems by count (one paragraph-count line instead of two), but a reader's turn is gone."""
     fake = passes(
-        polish=(result({"title": "t", "body": POLISHED_WITH_A_LONG_SENTENCE}),),
+        edit=(result({"title": "t", "body": EDITED_WITH_A_LONG_SENTENCE}),),
         repair=(result({"title": "t", "body": readable_body("repaired", paragraphs=3)}),),
     )
-    assert generator_with(fake).generate("x").article.body == POLISHED_WITH_A_LONG_SENTENCE
+    assert generator_with(fake).generate("x").article.body == EDITED_WITH_A_LONG_SENTENCE
 
 
 def test_a_repair_that_returns_part_of_the_article_is_set_aside():
-    polished = readable_body("polished", paragraphs=5).replace("Polished", LONG + " Polished", 1)
+    edited = readable_body("edited", paragraphs=5).replace("Edited", LONG + " Edited", 1)
     fake = passes(
-        polish=(result({"title": "t", "body": polished}),),
+        edit=(result({"title": "t", "body": edited}),),
         repair=(result({"title": "t", "body": readable_body("repaired", paragraphs=4)}),),  # clean, but a fifth of it is gone
     )
-    assert generator_with(fake).generate("x").article.body == polished
+    assert generator_with(fake).generate("x").article.body == edited
 
 
 def test_a_repair_that_ties_on_problems_and_keeps_the_shape_wins():
     extra = " " + " ".join(["Extra"] + ["word"] * 14) + "."  # 15 words: a paragraph of 70
     paragraphs = readable_body("repaired").split("\n\n")
-    repaired = "\n\n".join([paragraphs[0] + extra, paragraphs[1] + extra, *paragraphs[2:]])  # 2 problems, as polished
-    fake = passes(polish=(result({"title": "t", "body": POLISHED_WITH_A_LONG_SENTENCE}),), repair=(result({"title": "t", "body": repaired}),))
+    repaired = "\n\n".join([paragraphs[0] + extra, paragraphs[1] + extra, *paragraphs[2:]])  # 2 problems, as edited
+    fake = passes(edit=(result({"title": "t", "body": EDITED_WITH_A_LONG_SENTENCE}),), repair=(result({"title": "t", "body": repaired}),))
     assert generator_with(fake).generate("x").article.body == repaired

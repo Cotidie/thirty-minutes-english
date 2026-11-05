@@ -42,8 +42,8 @@ You are writing the article for a 30-minute English conversation practice sessio
 
 Today's article topic: {topic}
 
-Write a draft of a short article for a smart general reader. Later passes shorten its sentences and polish it, \
-but write to these limits from the start. {limits}
+Write a draft of a short article for a smart general reader. The next pass shortens its sentences and polishes \
+it, but write to these limits from the start. {limits}
 
 Run at most 3 web searches, with firecrawl_search first and WebSearch only when firecrawl_search fails or finds \
 nothing usable, to ground the article in accurate, current facts, and prefer a recent development or debate as the \
@@ -62,7 +62,9 @@ Use American English. {done}"""
 
 _EDIT = """You are editing a short article so that it reads well aloud. {reader}
 
-Edit the title and body below and return the whole article.
+Edit the title and body below in two steps and return the whole article.
+
+First, edit it for reading aloud:
 
 1. Sentences: at most {max_words} words each. One idea per sentence. At most one inserted phrase per sentence \
 (an appositive, a parenthesis, or a clause set off by commas). Keep the subject close to its verb. Split a long \
@@ -82,19 +84,11 @@ to even them out.
 does not settle the question.
 7. Words: prefer the common word a B2 reader knows.
 
-{article}
+Then run the {humanizer} skill and then the {stop_slop} skill on the edited title and body, in embedded mode: \
+return only the final text. The article is a factual, third-person news piece, so its voice stays neutral and \
+plain. Keep every fact the edit kept, and keep the paragraphs as the edit divided them.
 
-{done}"""
-
-_POLISH = """{reader}
-
-Run the {humanizer} skill and then the {stop_slop} skill on the title and body below, in embedded mode: return \
-only the final text. The article is a factual, third-person news piece, so its voice stays neutral and plain.
-
-Keep the limits the article already meets. {limits} Never add a fact, name, number, date, quote, or source, and \
-keep every fact that is there. Keep the paragraphs as they are divided.
-
-Where the skills ask for something these limits forbid, the limits win:
+Where the skills ask for something the rules above forbid, the rules above win:
 - "Be specific" means naming the actor and the thing. It never means adding a number, name, or date.
 - Do not address the reader as "you" and do not put the reader in the scene; the article stays in the third person.
 - Cut filler adverbs only, not every adverb.
@@ -192,7 +186,8 @@ def draft_prompt(topic: str) -> str:
 
 
 def edit_prompt(text: ArticleText) -> str:
-    """The second pass: short sentences, round numbers, paragraphs of one reader's turn each."""
+    """The second pass: short sentences, round numbers, paragraphs of one reader's turn each, then the
+    humanizer and stop-slop skills held to those rules."""
     paragraphs_low, paragraphs_high = PARAGRAPH_COUNT
     words_low, words_high = PARAGRAPH_WORDS
     return _EDIT.format(
@@ -203,26 +198,15 @@ def edit_prompt(text: ArticleText) -> str:
         paragraphs_high=paragraphs_high,
         words_low=words_low,
         words_high=words_high,
-        article=_article(text),
-        done=_RETURN,
-    )
-
-
-def polish_prompt(text: ArticleText) -> str:
-    """The third pass: the humanizer and stop-slop skills, held to the limits the edit met."""
-    return _POLISH.format(
-        reader=READER,
         humanizer=HUMANIZER_SKILL,
         stop_slop=STOP_SLOP_SKILL,
-        limits=limits(),
-        max_words=MAX_SENTENCE_WORDS,
         article=_article(text),
         done=_RETURN,
     )
 
 
 def repair_prompt(text: ArticleText, problems: list[str]) -> str:
-    """One extra call when the polished article still breaks a limit: fix the named places only."""
+    """One extra call when the edited article still breaks a limit: fix the named places only."""
     paragraphs_low, paragraphs_high = PARAGRAPH_COUNT
     return _REPAIR.format(
         reader=READER,

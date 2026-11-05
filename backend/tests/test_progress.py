@@ -103,23 +103,22 @@ def test_later_passes_hold_their_stage_and_only_the_finishing_output_finalizes()
     seen: list[Progress] = []
     t = StreamTracker(seen.append)
     t.begin(Stage.EDITING)
+    t.feed(assistant(tool_use("Skill", skill="english-session:stop-slop")))
+    assert (t.progress.stage, t.progress.activity) == (Stage.EDITING, "Loading the stop-slop skill")
     t.feed(assistant(text()))
     t.feed(assistant(tool_use("StructuredOutput")))
-    t.begin(Stage.POLISHING)
-    t.feed(assistant(tool_use("Skill", skill="english-session:stop-slop")))
-    assert (t.progress.stage, t.progress.activity) == (Stage.POLISHING, "Loading the stop-slop skill")
     t.begin(Stage.FINISHING)
     t.feed(assistant(tool_use("StructuredOutput")))
-    assert stages(seen) == [(Stage.EDITING, 0), (Stage.POLISHING, 0), (Stage.POLISHING, 0), (Stage.FINISHING, 0), (Stage.FINALIZING, 0)]
+    assert stages(seen) == [(Stage.EDITING, 0), (Stage.EDITING, 0), (Stage.EDITING, 0), (Stage.FINISHING, 0), (Stage.FINALIZING, 0)]
 
 
 def test_a_pass_activity_shows_between_thoughts():
     t = StreamTracker(lambda _: None)
-    t.begin(Stage.POLISHING, "Fixing sentence and paragraph lengths")
+    t.begin(Stage.EDITING, "Fixing sentence and paragraph lengths")
     t.feed(stream({"type": "content_block_start", "content_block": {"type": "thinking"}}))
     assert t.progress.activity == "Thinking"
     t.feed(assistant(text()))
-    assert (t.progress.stage, t.progress.activity) == (Stage.POLISHING, "Fixing sentence and paragraph lengths")
+    assert (t.progress.stage, t.progress.activity) == (Stage.EDITING, "Fixing sentence and paragraph lengths")
 
 
 def test_tokens_add_up_across_passes():

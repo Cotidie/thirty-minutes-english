@@ -46,9 +46,9 @@ describe('percentFor', () => {
   })
 
   it('climbs through the passes in order', () => {
-    const stages = ['drafting', 'editing', 'polishing', 'finishing', 'finalizing', 'illustrating'] as const
+    const stages = ['drafting', 'editing', 'finishing', 'finalizing', 'illustrating'] as const
     const floors = stages.map((stage) => percentFor(job({ stage })))
-    expect(floors).toEqual([45, 55, 62, 70, 80, 84])
+    expect(floors).toEqual([45, 55, 70, 80, 84])
   })
 
   it('moves through the pictures by how many are drawn', () => {
@@ -67,7 +67,7 @@ describe('labelFor', () => {
   it('shows what the model is doing, else the stage in plain words', () => {
     expect(labelFor(job({ stage: 'searching', activity: 'Searching "preprints"' }))).toBe('Searching "preprints"')
     expect(labelFor(job({ stage: 'searching' }))).toBe('Searching the web')
-    expect(labelFor(job({ stage: 'polishing' }))).toBe('Taking out machine-sounding phrasing')
+    expect(labelFor(job({ stage: 'editing' }))).toBe('Editing for reading aloud')
     expect(labelFor(job({ status: 'failed', stage: 'drafting' }))).toBe('Failed while writing a draft')
     expect(labelFor(job({ status: 'done' }))).toBe('Done')
   })

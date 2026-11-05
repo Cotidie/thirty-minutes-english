@@ -11,7 +11,6 @@ from app.generation.prompts import (
     draft_prompt,
     edit_prompt,
     finish_prompt,
-    polish_prompt,
     repair_prompt,
 )
 
@@ -24,7 +23,6 @@ def every_prompt() -> list[str]:
     return [
         draft_prompt("Digital twins"),
         edit_prompt(TEXT),
-        polish_prompt(TEXT),
         repair_prompt(TEXT, ["Paragraph 1 has 2 words (range 50 to 65)."]),
         finish_prompt("Digital twins", TEXT, [IMAGE], LEVELS, False),
     ]
@@ -36,21 +34,22 @@ def test_every_pass_is_told_who_reads_the_article_and_how():
 
 
 def test_the_edits_carry_the_limits_from_the_readability_constants():
-    for prompt in (edit_prompt(TEXT), polish_prompt(TEXT), repair_prompt(TEXT, ["x"])):
+    for prompt in (edit_prompt(TEXT), repair_prompt(TEXT, ["x"])):
         assert "at most 20 words" in prompt and "50 to 65 words" in prompt and "4 to 5 paragraphs" in prompt
     assert "at most 2 per paragraph, not counting a bare year" in edit_prompt(TEXT)
     assert '"about 150 theaters"' in edit_prompt(TEXT) and "Never add a fact" in edit_prompt(TEXT)
 
 
 def test_the_article_text_goes_into_the_editing_passes():
-    for prompt in (edit_prompt(TEXT), polish_prompt(TEXT), repair_prompt(TEXT, ["x"]), finish_prompt("t", TEXT, [], LEVELS, False)):
+    for prompt in (edit_prompt(TEXT), repair_prompt(TEXT, ["x"]), finish_prompt("t", TEXT, [], LEVELS, False)):
         assert "Title: Twins at Work" in prompt and "First paragraph.\n\nSecond paragraph." in prompt
 
 
-def test_the_polish_runs_both_skills_and_says_where_the_limits_win():
-    prompt = polish_prompt(TEXT)
-    assert prompt.index(HUMANIZER_SKILL) < prompt.index(STOP_SLOP_SKILL)
+def test_the_edit_runs_both_skills_after_the_reading_rules_and_the_rules_win():
+    prompt = edit_prompt(TEXT)
+    assert prompt.index("1. Sentences") < prompt.index(HUMANIZER_SKILL) < prompt.index(STOP_SLOP_SKILL)
     assert '"Be specific"' in prompt and "third person" in prompt and "filler adverbs" in prompt and "embedded mode" in prompt
+    assert "the rules above win" in prompt
 
 
 def test_the_repair_names_each_problem_and_leaves_the_rest_alone():

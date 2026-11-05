@@ -4,7 +4,6 @@ type Stage =
   | 'searching'
   | 'drafting'
   | 'editing'
-  | 'polishing'
   | 'finishing'
   | 'finalizing'
   | 'illustrating'
@@ -40,7 +39,6 @@ const FLOORS: Record<Stage, number> = {
   searching: 15,
   drafting: 45,
   editing: 55,
-  polishing: 62,
   finishing: 70,
   finalizing: 80,
   illustrating: 84,
@@ -50,8 +48,7 @@ const NEXT: Record<Stage, number> = {
   skills: FLOORS.searching,
   searching: FLOORS.drafting,
   drafting: FLOORS.editing,
-  editing: FLOORS.polishing,
-  polishing: FLOORS.finishing,
+  editing: FLOORS.finishing,
   finishing: FLOORS.finalizing,
   finalizing: FLOORS.illustrating,
   illustrating: 100,
@@ -103,9 +100,7 @@ function stageLabel(stage: Stage): string {
     case 'drafting':
       return 'Writing a draft'
     case 'editing':
-      return 'Shortening sentences and evening out paragraphs'
-    case 'polishing':
-      return 'Taking out machine-sounding phrasing'
+      return 'Editing for reading aloud'
     case 'finishing':
       return 'Writing questions, translation, and words'
     case 'finalizing':
