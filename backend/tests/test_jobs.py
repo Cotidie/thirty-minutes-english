@@ -1,3 +1,4 @@
+import logging
 import sqlite3
 from io import BytesIO
 
@@ -12,6 +13,7 @@ from app.pictures.figures import SourceImages
 from app.pictures.files import PictureFiles
 from app.pictures.illustrator import Illustrator
 from app.pictures.painters import Drawn
+from app.generation.joblog import JobTag
 from app.generation.jobs import DEFAULT_STAGE_SECONDS, EXPRESSION_COUNT, Job, JobRunner
 from app.generation.progress import Progress, Stage
 from tests.conftest import add_user, sample_draft, seed_expressions
@@ -514,3 +516,17 @@ def test_a_job_the_executor_refuses_is_failed_and_reported(tmp_path):
     job = JobRunner(db.sessions, db.expressions, db.stages, ShutDown()).start("Trams", Recording(), on_finished=finished.append)
     assert job.status == "failed" and "shutdown" in job.error
     assert finished == [job]
+
+
+def test_everything_a_job_logs_while_it_runs_names_the_job(tmp_path):
+    tags = []
+
+    class Peeking(Recording):
+        def generate(self, topic, on_progress=None, exclude=None):
+            line = logging.LogRecord("app.llm", logging.INFO, __file__, 1, "opus run: 1.0s", None, None)
+            JobTag().filter(line)
+            tags.append(line.job)
+            return super().generate(topic, on_progress, exclude)
+
+    job = runner_over(Database(tmp_path / "s.db")).start("A", Peeking())
+    assert tags == [f" job {job.id}"]

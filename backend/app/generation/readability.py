@@ -10,11 +10,18 @@ NUMBERS_PER_PARAGRAPH = 2  # told to the model only; not checked here
 # A repair trims a long paragraph or two; losing more than this share of the words means it dropped content.
 REPAIR_KEEPS_WORDS = 0.85
 
-# A period after one of these does not end a sentence.
-ABBREVIATIONS = ("U.S.", "U.K.", "U.N.", "E.U.", "a.m.", "p.m.", "Dr.", "Mr.", "Mrs.", "Ms.", "St.", "Jr.", "e.g.", "i.e.", "vs.")
+# A period after one of these does not end a sentence. A company name can end one ("... bought Acme Inc."):
+# that joins two sentences, and at worst costs a repair call; splitting inside a name would hide a long sentence.
+ABBREVIATIONS = (
+    "U.S.", "U.K.", "U.N.", "E.U.", "a.m.", "p.m.", "e.g.", "i.e.", "vs.", "No.",
+    "Dr.", "Mr.", "Mrs.", "Ms.", "St.", "Jr.", "Prof.", "Sen.", "Rep.", "Gov.", "Gen.",
+    "Jan.", "Feb.", "Aug.", "Sept.", "Oct.", "Nov.", "Dec.",
+    "Inc.", "Corp.", "Ltd.",
+)
 
+_OPENING = "\"“‘'("
 # An end mark, any closing quotes or brackets, then space and what can start the next sentence.
-_SENTENCE_END = re.compile(r"""[.!?]["'”’)]*(?=\s+["“'(]?[A-Z0-9])""")
+_SENTENCE_END = re.compile(r"""[.!?]["'”’)]*(?=\s+["“‘'(]?[A-Z0-9])""")
 _BLANK_LINE = re.compile(r"\n\s*\n")
 
 
@@ -34,7 +41,7 @@ def sentences(paragraph: str) -> list[str]:
     start = 0
     for end in _SENTENCE_END.finditer(paragraph):
         piece = paragraph[start : end.end()].strip()
-        if piece.split()[-1] in ABBREVIATIONS:
+        if _ends_in_abbreviation(piece):
             continue
         found.append(piece)
         start = end.end()
@@ -61,6 +68,11 @@ def repair_holds(before: str, after: str) -> bool:
         and _count_distance(len(paragraphs(after))) <= _count_distance(len(paragraphs(before)))
         and word_count(after) >= REPAIR_KEEPS_WORDS * word_count(before)
     )
+
+
+def _ends_in_abbreviation(piece: str) -> bool:
+    """Whether the last word is an abbreviation, also when a quote or bracket opens it ("“Mr.")."""
+    return piece.split()[-1].lstrip(_OPENING) in ABBREVIATIONS
 
 
 def _count_distance(count: int) -> int:

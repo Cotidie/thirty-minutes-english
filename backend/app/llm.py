@@ -83,9 +83,14 @@ class Claude:
         )
 
     def run(
-        self, prompt: str, schema: dict, on_message: OnMessage | None = None, extra: tuple[McpServer, ...] = ()
+        self,
+        prompt: str,
+        schema: dict,
+        on_message: OnMessage | None = None,
+        extra: tuple[McpServer, ...] = (),
+        label: str = "",
     ) -> dict:
-        """The structured output of one run. Raises GenerationError for every failure."""
+        """The structured output of one run. Raises GenerationError for every failure. `label` names the run on its cost line."""
         try:
             result = asyncio.run(self._run(prompt, self.options(schema, extra), on_message))
         except TimeoutError as e:
@@ -99,7 +104,8 @@ class Claude:
         if result.structured_output is None:
             raise GenerationError("claude returned no structured output")
         log.info(
-            "%s run: %.1fs, %d turns, $%.3f", self.model, result.duration_ms / 1000, result.num_turns, result.total_cost_usd or 0
+            "%s run%s: %.1fs, %d turns, $%.3f",
+            self.model, f" ({label})" if label else "", result.duration_ms / 1000, result.num_turns, result.total_cost_usd or 0,
         )
         return result.structured_output
 

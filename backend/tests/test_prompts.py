@@ -40,6 +40,13 @@ def test_the_edits_carry_the_limits_from_the_readability_constants():
     assert '"about 150 theaters"' in edit_prompt(TEXT) and "Never add a fact" in edit_prompt(TEXT)
 
 
+def test_the_number_cap_rides_on_the_draft_and_the_edit_only_and_calls_them_numbers():
+    assert "At most 2 numbers per paragraph, not counting a bare year." in draft_prompt("t")
+    assert "at most 2 per paragraph, not counting a bare year" in edit_prompt(TEXT)
+    assert "not counting a bare year" not in repair_prompt(TEXT, ["x"])
+    assert all("figures per paragraph" not in prompt for prompt in every_prompt())
+
+
 def test_the_article_text_goes_into_the_editing_passes():
     for prompt in (edit_prompt(TEXT), repair_prompt(TEXT, ["x"]), finish_prompt("t", TEXT, [], LEVELS, False)):
         assert "Title: Twins at Work" in prompt and "First paragraph.\n\nSecond paragraph." in prompt
@@ -101,6 +108,13 @@ def test_stop_slop_is_vendored_unchanged_with_its_license():
     assert (skill / "SKILL.md").read_text().startswith("---\nname: stop-slop\n")
     assert (skill / "LICENSE").is_file() and "hardikpandya/stop-slop" in (skill / "SOURCE.md").read_text()
     assert all((skill / "references" / name).is_file() for name in ("phrases.md", "structures.md", "examples.md"))
+
+
+def test_session_writing_keeps_its_article_checklist_off_a_final_article():
+    text = (PLUGIN_DIR / "skills" / "session-writing" / "SKILL.md").read_text()
+    checklist = text[text.index("## Before returning the structured output") :]
+    assert "When this call writes the article" in checklist and "stays exactly as copied" in checklist
+    assert "Reread the first sentence of the article. Cut it" not in checklist
 
 
 def test_session_writing_no_longer_asks_for_more_numbers():

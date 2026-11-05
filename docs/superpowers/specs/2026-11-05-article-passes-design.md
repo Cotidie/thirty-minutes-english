@@ -106,7 +106,7 @@ topic
 | 문장 최대 단어 수 | 20 | 1·2단계와 고치기의 프롬프트, 길이 검사 |
 | 문단 개수 | 4~5 | 같음 |
 | 문단 단어 수 | 50~65 | 같음 |
-| 문단당 수치 | 2개까지, 연도만 있는 것은 세지 않음 | 1·2단계 프롬프트만 |
+| 문단당 수치 | 2개까지, 연도만 있는 것은 세지 않음 | 1·2단계 프롬프트만 (고치기 프롬프트의 `limits()`에는 없음) |
 
 기준 값은 상수 한 곳(`backend/app/generation/readability.py`)에만 두고 프롬프트에 끼워 넣는다. 단어 수는 공백으로 나눈 토큰 수다. 하이픈으로 이은 단어는 하나로 센다. 문장, 문단, 기사 전체 분량(200~325단어)은 이 값에서 따라 나온다. 예전 프롬프트의 "250 to 350 words"와 "3 to 5 paragraphs"는 이 기준으로 바뀌었다.
 
@@ -148,7 +148,7 @@ topic
 - 50~65단어 범위를 벗어난 문단마다 한 항목. 문단 번호(1부터)와 단어 수를 적는다.
 - 문단 개수가 4~5가 아니면 한 항목.
 
-문장 나누기는 `.`, `!`, `?` 뒤에서 하되 다음을 지킨다. 닫는 따옴표나 괄호가 붙은 끝(`."`, `.)`)도 문장 끝이다. `U.S.`, `U.K.`, `a.m.`, `p.m.`, `Dr.`, `Mr.`, `Mrs.`, `Ms.`, `St.`, `e.g.`, `i.e.`, `vs.` 같은 약어 뒤와 소수점(`3.80`)에서는 나누지 않는다.
+문장 나누기는 `.`, `!`, `?` 뒤에서 하되 다음을 지킨다. 닫는 따옴표나 괄호가 붙은 끝(`."`, `.)`)도 문장 끝이다. 다음 문장은 여는 따옴표나 괄호(`"`, `“`, `‘`, `'`, `(`)로 시작할 수 있다. 약어 뒤와 소수점(`3.80`)에서는 나누지 않는다. 약어 목록(`readability.ABBREVIATIONS`)에는 `U.S.`, `a.m.`, `e.g.` 같은 것과 기사에 흔한 직함(`Dr.`, `Sen.`, `Gov.`), 달(`Oct.`), `No.`, 회사 이름 끝(`Inc.`, `Corp.`, `Ltd.`)이 있고, 여는 따옴표나 괄호가 붙어 있어도(`“Mr.`) 약어로 본다. 회사 이름이 문장 끝에 오면 두 문장이 하나로 세어져 고치기가 한 번 더 돌 수 있다. 반대로 이름 안에서 나누면 긴 문장을 놓치므로 이쪽을 택한다.
 
 목록이 비어 있으면 3단계로 간다. 목록이 있으면 고치기 호출을 한 번 한다. 고치기는 도구도 스킬도 없는 별도 호출이다. 프롬프트는 독자 상황, 2단계 결과, 어긋난 항목 목록을 주고, 그 항목만 고치게 한다. 긴 문장은 나누고, 문단은 문장을 옮기거나 줄여서 범위에 맞추고, 문단 개수가 틀리면 문단을 나누거나 합친다. 나머지 문장은 그대로 둔다. 사실을 더하지 않고, em dash를 쓰지 않고, 제목과 본문 전체를 돌려준다.
 
@@ -160,6 +160,7 @@ topic
 
 - 프롬프트가 "기사는 확정되었으니 고치지 말라"고 한다. 출력 schema에 title과 body가 없으므로 본문은 구조적으로 바뀌지 않는다.
 - figures는 이미지 후보에서 고른다. cover는 `after` 0, 두 번째는 해당 문단 번호(1부터)이고, caption은 그 이미지와 기사(또는 문단)의 관계를 한 문장으로 쓴다. 후보에 없는 `image_url`은 코드가 버린다.
+- 질문의 evidence는 기사 화면이 표시할 수 있는 것만 남긴다. 화면(`frontend/src/lib/highlight.ts`의 `markedSpans`)처럼 앞뒤 공백을 떼고 대소문자를 가리지 않고, 한 문단 안에서 찾는다. 찾지 못한 구절은 코드가 버리고 경고로 남긴다.
 - 문단 번호는 body의 빈 줄로 나눈 순서로 센다. 프롬프트에 body를 번호 없이 그대로 넣어 evidence와 번역에 번호가 섞이지 않게 한다.
 
 ### Draft 조립
@@ -181,7 +182,7 @@ topic
 | `finalizing` | Checking the structure | 3단계의 StructuredOutput |
 | `illustrating` | Drawing a picture for each word | 예전과 같음 |
 
-- 생성기는 호출을 시작할 때마다 하나의 `StreamTracker`에 지금 단계를 알린다(`StreamTracker.begin`). 1단계 안에서는 메시지로 `skills`, `searching`, `drafting`을 추정한다. 2·3단계와 고치기에서는 모든 메시지가 그 단계에 머물고, 스킬 불러오기와 도구 호출은 activity 문구만 바꾼다. 앞 단계들의 StructuredOutput은 단계를 바꾸지 않고, 3단계의 StructuredOutput만 `finalizing`으로 간다. 고치기 중에는 activity를 "Fixing sentence and paragraph lengths"로 둔다.
+- 생성기는 호출을 시작할 때마다 하나의 `StreamTracker`에 지금 단계를 알린다(`StreamTracker.begin`). 1단계 안에서는 메시지로 `skills`, `searching`, `drafting`을 추정한다. 2·3단계와 고치기에서는 모든 메시지가 그 단계에 머물고, 스킬 불러오기와 도구 호출은 activity 문구만 바꾼다. 앞 단계들의 StructuredOutput은 단계를 바꾸지 않고, 3단계의 StructuredOutput만 `finalizing`으로 간다. 고치기 중에는 activity를 "Fixing sentence and paragraph lengths"로 둔다. 모델이 생각하는 동안에는 따로 "Thinking"이라고 쓰지 않고 그 단계의 activity를 그대로 둔다. activity가 비어 있으면 화면은 단계 문구를 보여준다.
 - 토큰 수는 모든 호출에 걸쳐 누적된다. `TokenMeter`는 메시지 id로 세므로 tracker 하나를 계속 쓰면 된다.
 - 취소는 progress 콜백(`Job.apply`)이 `Cancelled`를 던져서 일어난다. 단계가 바뀔 때마다 콜백이 불리므로 단계 사이에서도 멈춘다.
 - 프런트엔드 `frontend/src/lib/progress.ts`의 `Stage` 타입, `FLOORS`, `NEXT`, `stageLabel`을 같은 값과 순서로 맞춘다. 막대가 뒤로 가지 않는 규칙(`percentFor`)은 유지한다.
@@ -189,7 +190,8 @@ topic
 
 ### 기록
 
-- 각 호출 앞에 "session pass: <단계>" 로그를 남기고, 이어서 `Claude.run`의 "%s run: %.1fs, %d turns, $%.3f" 로그가 나온다.
+- 각 호출 앞에 "session pass: <단계>" 로그를 남긴다. 호출이 끝나면 `Claude.run`의 비용 줄에 단계 이름이 붙는다: "opus run (editing): 229.8s, 8 turns, $0.723".
+- 한 job 안에서 찍히는 모든 줄에 job id가 붙는다 (`backend/app/generation/joblog.py`, 형식 "INFO app.llm job 3f2a9c1b07de: ..."). 생성 두 개가 동시에 돌아도 줄을 가를 수 있다.
 - 길이 검사 결과를 한 줄로 남긴다: 2단계 뒤 어긋난 항목 수, 고치기 뒤 항목 수, 어느 결과를 썼는지, 남은 항목.
 
 ### `session-writing` 스킬 수정
@@ -199,7 +201,7 @@ topic
 - 첫 문단의 독자 설명에 "문단 하나씩 돌아가며 끝까지 소리 내어 읽는다"를 더한다.
 - "Specific over general" 항목을 "Concrete over vague"로 바꾼다. 행위자, 장소, 작동 방식을 밝히고, 수치는 주장에 필요할 때만 소리 내어 말하듯 반올림해서 쓴다. 확인하지 않은 수치를 지어내지 않는다는 규칙은 남긴다.
 - "Sentence length" 항목은 프롬프트의 읽기 기준이 이긴다고 적고, 22단어 같은 별도 숫자를 두지 않는다.
-- "Final pass before the structured output"은 편집 단계가 맡게 된 항목을 빼고 정리한다. 수치, 이름, 날짜가 검색한 페이지에서 왔는지 확인하는 항목은 남긴다.
+- 마지막 점검 목록("Before returning the structured output")은 두 항목이다. 첫 문장 자르기와 수치·이름·날짜의 출처 확인은 그 호출이 기사를 쓸 때만 한다. 프롬프트가 기사를 확정했다고 하면 기사는 그대로 둔다. 금지 낱말과 em dash 고치기는 그 호출이 쓴 글에만 하고, 확정된 기사에서 복사한 글(evidence, 번역의 영어 쪽)은 복사한 그대로 둔다.
 
 ### stop-slop 가져오기
 

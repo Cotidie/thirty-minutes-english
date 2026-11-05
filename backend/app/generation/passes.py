@@ -2,10 +2,12 @@
 answers make one `Draft`. The draft brings the research, the edits bring the article's final text,
 and the finish brings everything copied from that text."""
 
+import logging
 from typing import TypeVar
 
 from pydantic import BaseModel, ValidationError
 
+from app.generation.readability import paragraphs
 from app.llm import GenerationError
 from app.models import (
     ArticleDraft,
@@ -22,6 +24,7 @@ from app.models import (
 VOCABULARY_COUNT = 8
 
 M = TypeVar("M", bound=BaseModel)
+log = logging.getLogger(__name__)
 
 
 class ArticleText(BaseModel):
@@ -158,14 +161,15 @@ def parse(model: type[M], payload: dict) -> M:
 
 def assemble(text: ArticleText, first: FirstDraft, finish: Finish) -> Draft:
     """The session as the job stores it: the final text, the draft's sources, and the finish's parts.
-    A figure whose image the draft never saw is dropped, since nothing checked that address."""
+    A figure whose image the draft never saw is dropped, since nothing checked that address, and so is
+    evidence the article view could not find to mark."""
     seen = {image.image_url for image in first.images}
     return Draft(
         topic=finish.topic,
         article=ArticleDraft(
             title=text.title,
             body=text.body,
-            questions=finish.questions,
+            questions=[_with_evidence_in(text.body, question) for question in finish.questions],
             sources=first.sources,
             translation=finish.translation,
             figures=[figure for figure in finish.figures if figure.image_url in seen],
@@ -174,3 +178,18 @@ def assemble(text: ArticleText, first: FirstDraft, finish: Finish) -> Draft:
         ),
         vocabulary=finish.vocabulary,
     )
+
+
+def _with_evidence_in(body: str, question: Question) -> Question:
+    """The question with only the passages the article view marks: each inside one paragraph, any case, trimmed
+    (`markedSpans` in frontend/src/lib/highlight.ts)."""
+    parts = [part.lower() for part in paragraphs(body)]
+    found = [passage for passage in question.evidence if _marked_in(passage, parts)]
+    if dropped := [passage for passage in question.evidence if passage not in found]:
+        log.warning("finish: evidence not in the article, dropped: %s", dropped)
+    return question.model_copy(update={"evidence": found})
+
+
+def _marked_in(passage: str, parts: list[str]) -> bool:
+    needle = passage.strip().lower()
+    return bool(needle) and any(needle in part for part in parts)

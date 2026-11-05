@@ -48,7 +48,7 @@ it, but write to these limits from the start. {limits}
 Run at most 3 web searches, with firecrawl_search first and WebSearch only when firecrawl_search fails or finds \
 nothing usable, to ground the article in accurate, current facts, and prefer a recent development or debate as the \
 angle; never invent specifics you did not verify. Use a number only when the argument needs it, rounded the way a \
-person would say it aloud. In sources, list only the web pages you actually drew on (page title and exact URL from \
+person would say it aloud. At most {numbers} numbers per paragraph, not counting a bare year. In sources, list only the web pages you actually drew on (page title and exact URL from \
 the search results); leave it empty if you used none. Take a clear angle so there is something to discuss.
 
 Then give images: up to 4 images you saw on the pages you drew on (firecrawl_scrape with the images format lists \
@@ -170,19 +170,26 @@ Set topic to the article topic. Use American English. {done}"""
 
 
 def limits() -> str:
-    """The readability limits in one sentence each, as every writing pass quotes them."""
+    """The length limits, as the draft and the repair quote them. The edit spells them out as rules of its own."""
     paragraphs_low, paragraphs_high = PARAGRAPH_COUNT
     words_low, words_high = PARAGRAPH_WORDS
     return (
         f"Limits: every sentence at most {MAX_SENTENCE_WORDS} words. {paragraphs_low} to {paragraphs_high} paragraphs "
-        f"separated by blank lines, each {words_low} to {words_high} words. At most {NUMBERS_PER_PARAGRAPH} figures per "
-        "paragraph, not counting a bare year."
+        f"separated by blank lines, each {words_low} to {words_high} words."
     )
 
 
 def draft_prompt(topic: str) -> str:
     """The first pass: research the topic, draft the article, collect images it could show."""
-    return _DRAFT.format(app_skill=APP_SKILL, session=_SESSION, reader=READER, topic=topic, limits=limits(), done=_RETURN)
+    return _DRAFT.format(
+        app_skill=APP_SKILL,
+        session=_SESSION,
+        reader=READER,
+        topic=topic,
+        limits=limits(),
+        numbers=NUMBERS_PER_PARAGRAPH,
+        done=_RETURN,
+    )
 
 
 def edit_prompt(text: ArticleText) -> str:

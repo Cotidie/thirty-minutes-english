@@ -54,6 +54,5 @@ Keep a listed word only when it is the exact right word and nothing plain replac
 
 ## Before returning the structured output
 
-1. Reread the first sentence of the article. Cut it if the piece works without it.
-2. Search your draft for the words above and for em dashes. Rewrite each hit.
-3. Check that every figure, name and date in the article came from a page you searched.
+1. When this call writes the article: reread its first sentence and cut it if the piece works without it, and check that every number, name and date in it came from a page you searched. When the prompt says the article is final, leave it as it is.
+2. Search what you wrote for the words above and for em dashes, and rewrite each hit. Text copied from a final article (evidence passages, the English side of a translation) stays exactly as copied.

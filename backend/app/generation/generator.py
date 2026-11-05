@@ -165,5 +165,5 @@ class ClaudeGenerator:
         tracker: StreamTracker,
         extra: tuple[McpServer, ...] = (),
     ) -> M:
-        log.info("session pass: %s", name)
-        return parse(model, claude.run(prompt, schema, tracker.feed, extra))
+        log.info("session pass: %s", name)  # its start; the cost line names it again at the end
+        return parse(model, claude.run(prompt, schema, tracker.feed, extra, label=name))

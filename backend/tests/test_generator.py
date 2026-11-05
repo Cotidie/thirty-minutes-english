@@ -7,7 +7,7 @@ from app.generation.progress import Progress, Stage
 from app.generation.prompts import APP_SKILL, CHECK_ITEMS_RULE, HUMANIZER_SKILL, REPAIR_ACTIVITY, STOP_SLOP_SKILL
 from app.llm import GenerationError
 from tests.conftest import readable_body, sample_finish, sample_first_draft
-from tests.fake_claude import ScriptedQuery, assistant, result, stream, text, tool_use
+from tests.fake_claude import HANG, ScriptedQuery, assistant, result, text, tool_use
 
 LONG = " ".join(["Long"] + ["word"] * 24) + "."  # 25 words, over the limit
 EDITED_WITH_A_LONG_SENTENCE = readable_body("edited").replace("Edited", LONG + " Edited", 1)
@@ -95,11 +95,18 @@ def test_a_failed_repair_keeps_the_edited_article_and_goes_on():
     assert draft.article.body == EDITED_WITH_A_LONG_SENTENCE and len(fake.calls) == 4
 
 
+def test_a_repair_that_times_out_keeps_the_edited_article_and_goes_on(caplog):
+    fake = passes(edit=(result({"title": "t", "body": EDITED_WITH_A_LONG_SENTENCE}),), repair=HANG)
+    draft = generator_with(fake, timeout_s=0.05).generate("x")
+    assert draft.article.body == EDITED_WITH_A_LONG_SENTENCE and len(fake.calls) == 4
+    assert "repair failed, keeping the edited text" in caplog.text and "timed out" in caplog.text
+
+
 def test_a_cancel_during_the_repair_is_not_swallowed():
-    thinking = stream({"type": "content_block_start", "content_block": {"type": "thinking"}})
+    turn = assistant(text(), usage={"input_tokens": 10, "output_tokens": 1}, message_id="r1")  # tokens move, so progress fires
     fake = passes(
         edit=(result({"title": "t", "body": EDITED_WITH_A_LONG_SENTENCE}),),
-        repair=(thinking, result({"title": "t", "body": EDITED_WITH_A_LONG_SENTENCE})),
+        repair=(turn, result({"title": "t", "body": EDITED_WITH_A_LONG_SENTENCE})),
     )
     seen: list[Progress] = []
 
@@ -119,6 +126,13 @@ def test_a_failed_edit_fails_the_whole_generation():
     with pytest.raises(GenerationError, match="overloaded"):
         generator_with(fake).generate("x")
     assert len(fake.calls) == 2
+
+
+def test_each_pass_names_itself_on_the_cost_line(caplog):
+    caplog.set_level("INFO")
+    generator_with(passes()).generate("x")
+    runs = [r.getMessage() for r in caplog.records if " run (" in r.getMessage()]
+    assert [line.split(" run (")[1].split(")")[0] for line in runs] == ["drafting", "editing", "finishing"]
 
 
 def test_a_draft_that_fails_validation_raises():

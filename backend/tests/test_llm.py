@@ -13,6 +13,13 @@ def test_run_returns_the_structured_output_and_passes_every_message_on():
     assert fake.calls[0][0] == "hi"
 
 
+def test_the_cost_line_names_the_run_when_given_a_label(caplog):
+    caplog.set_level("INFO")
+    Claude("sonnet", query=FakeQuery(result({"x": 1}))).run("p", {}, label="editing")
+    Claude("sonnet", query=FakeQuery(result({"x": 1}))).run("p", {})
+    assert [r.getMessage() for r in caplog.records if r.name == "app.llm"] == ["sonnet run (editing): 1.2s, 2 turns, $0.010", "sonnet run: 1.2s, 2 turns, $0.010"]
+
+
 def test_an_error_result_raises_with_its_text():
     with pytest.raises(GenerationError, match="rate limited"):
         Claude("sonnet", query=FakeQuery(result(is_error=True, text="rate limited"))).run("p", {})

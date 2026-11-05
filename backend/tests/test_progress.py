@@ -92,7 +92,7 @@ def test_a_block_that_starts_streaming_updates_the_label_at_once():
     t.feed(assistant(tool_use("mcp__session__check_items")))
     assert t.progress.activity == "Checking picks against past sessions"
     t.feed(stream({"type": "content_block_start", "content_block": {"type": "thinking"}}))
-    assert (t.progress.stage, t.progress.activity) == (Stage.FINISHING, "Thinking")
+    assert (t.progress.stage, t.progress.activity) == (Stage.FINISHING, "")  # the stage's own label shows
     t.feed(stream({"type": "content_block_start", "content_block": {"type": "tool_use", "name": "StructuredOutput"}}))
     assert t.progress.activity == "Writing out the session"
     t.feed(assistant(tool_use("StructuredOutput")))
@@ -112,11 +112,14 @@ def test_later_passes_hold_their_stage_and_only_the_finishing_output_finalizes()
     assert stages(seen) == [(Stage.EDITING, 0), (Stage.EDITING, 0), (Stage.EDITING, 0), (Stage.FINISHING, 0), (Stage.FINALIZING, 0)]
 
 
-def test_a_pass_activity_shows_between_thoughts():
+def test_a_pass_activity_shows_while_the_model_thinks():
     t = StreamTracker(lambda _: None)
     t.begin(Stage.EDITING, "Fixing sentence and paragraph lengths")
     t.feed(stream({"type": "content_block_start", "content_block": {"type": "thinking"}}))
-    assert t.progress.activity == "Thinking"
+    assert t.progress.activity == "Fixing sentence and paragraph lengths"
+    t.feed(assistant(tool_use("Read", file_path="x")))
+    t.feed(stream({"type": "content_block_start", "content_block": {"type": "redacted_thinking"}}))
+    assert t.progress.activity == "Fixing sentence and paragraph lengths"
     t.feed(assistant(text()))
     assert (t.progress.stage, t.progress.activity) == (Stage.EDITING, "Fixing sentence and paragraph lengths")
 

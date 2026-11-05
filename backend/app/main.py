@@ -14,6 +14,7 @@ from app.api.deps import Rebuild, signed_in
 from app.config.catalog import Catalog
 from app.config.settings import Settings
 from app.db import Database
+from app.generation.joblog import LOG_FORMAT, tag_job_logs
 from app.generation.jobs import Executor, JobRunner
 from app.live.presence import Rooms
 from app.pictures.figures import SourceImages
@@ -58,7 +59,8 @@ def create_app(
 
 def default_app() -> FastAPI:
     """The app over the real data folder; uvicorn calls it (--factory), so importing this module opens nothing."""
-    logging.basicConfig(level=logging.INFO, format="%(levelname)s %(name)s: %(message)s")
+    logging.basicConfig(level=logging.INFO, format=LOG_FORMAT)
+    tag_job_logs(logging.getLogger().handlers)
     db = Database(os.environ.get("DB_PATH", ROOT / "data" / "sessions.db"))
     ensure_admin_from(db, os.environ)
     dirs = agent_dirs(os.environ, ROOT.parent / "agents")

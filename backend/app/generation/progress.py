@@ -32,7 +32,7 @@ class Stage(StrEnum):
 class Progress:
     stage: Stage
     searches: int = 0
-    activity: str = ""  # the tool call under way, in words; blank outside skills and searching
+    activity: str = ""  # what the model is doing, in words: a tool call, or the pass's own task; blank shows the stage label
     input_tokens: int = 0
     output_tokens: int = 0
     pictures_done: int = 0
@@ -140,7 +140,7 @@ class StreamTracker:
         kind = block.get("type")
         if kind in ("thinking", "redacted_thinking", "text") and self._stage != Stage.FINALIZING:
             self._stage = self._pass
-            self._activity = "Thinking" if kind != "text" else self._pass_activity
+            self._activity = self._pass_activity  # blank leaves the stage's own label showing
         elif kind == "tool_use" and block.get("name") == "StructuredOutput" and self._stage != Stage.FINALIZING:
             self._stage = self._pass
             self._activity = "Writing out the session" if self._pass == Stage.FINISHING else "Writing out the article"

@@ -54,6 +54,9 @@ class FakeQuery:
             yield message
 
 
+HANG: tuple = ("hang",)  # a script for a call that never answers, so its timeout fires
+
+
 class ScriptedQuery(FakeQuery):
     """One script of messages per call, in call order, for a run that calls Claude several times."""
 
@@ -62,8 +65,13 @@ class ScriptedQuery(FakeQuery):
         self.scripts = scripts
 
     async def __call__(self, *, prompt, options):
+        import asyncio
+
         self.calls.append((prompt, options))
         if len(self.calls) > len(self.scripts):
             raise AssertionError("more calls than scripts")
-        for message in self.scripts[len(self.calls) - 1]:
+        script = self.scripts[len(self.calls) - 1]
+        if script is HANG:
+            await asyncio.sleep(10)
+        for message in script:
             yield message

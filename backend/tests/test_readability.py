@@ -17,6 +17,21 @@ def test_abbreviations_and_decimals_do_not_end_a_sentence():
     assert sentences(text) == ["The U.S. Ambassador wrote at 1:30 a.m. that 3.80 was low.", "Dr. Kim agreed."]
 
 
+def test_an_abbreviation_after_an_opening_quote_or_bracket_does_not_end_a_sentence():
+    assert sentences('He said, “Mr. Lee will decide.” Then he left. (Dr. Kim agreed.) It held.') == [
+        'He said, “Mr. Lee will decide.”', "Then he left.", "(Dr. Kim agreed.)", "It held.",
+    ]
+
+
+def test_news_abbreviations_do_not_end_a_sentence():
+    text = "Sen. Warren met Gov. Hochul in Oct. 2025 at No. 10. Acme Inc. Chief Jo Park came too."
+    assert sentences(text) == ["Sen. Warren met Gov. Hochul in Oct. 2025 at No. 10.", "Acme Inc. Chief Jo Park came too."]
+
+
+def test_a_sentence_can_open_with_a_single_curly_quote():
+    assert sentences("It ended. ‘Never again,’ she said.") == ["It ended.", "‘Never again,’ she said."]
+
+
 def test_a_hyphenated_word_counts_once():
     assert word_count("A U.S.-based, 13-episode run.") == 4
 

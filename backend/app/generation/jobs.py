@@ -17,6 +17,7 @@ from app.db.sessions import SessionRepo
 from app.db.stages import StageRepo
 from app.generation.exclusions import Exclusions
 from app.generation.generator import VOCABULARY_COUNT, Generator
+from app.generation.joblog import job_logs
 from app.generation.progress import Progress, Stage, with_pictures
 from app.llm import GenerationError
 from app.models import ArticleDraft, FigureDraft, PictureDraft, Session
@@ -206,9 +207,10 @@ class JobRunner:
         return total
 
     def _run(self, job: Job, generator: Generator, illustrator: Illustrator | None, on_finished: Callable[[Job], None] | None) -> None:
-        self._generate(job, generator, illustrator)
-        self._discard_if_cancelled(job)
-        self._tell_finished(job, on_finished)
+        with job_logs(job.id):
+            self._generate(job, generator, illustrator)
+            self._discard_if_cancelled(job)
+            self._tell_finished(job, on_finished)
 
     def _discard_if_cancelled(self, job: Job) -> None:
         """A cancelled job leaves nothing behind: the session it saved goes, with the pictures that landed on it.

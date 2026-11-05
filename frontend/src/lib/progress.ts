@@ -14,7 +14,7 @@ export interface JobStatus {
   status: 'running' | 'done' | 'failed' | 'cancelled'
   stage: Stage
   searches: number
-  /** The tool call under way in words, e.g. `Searching "preprints"`; blank outside skills and searching. */
+  /** What the model is doing in words, e.g. `Searching "preprints"` or the pass's own task; blank shows the stage label. */
   activity: string
   input_tokens: number
   output_tokens: number
