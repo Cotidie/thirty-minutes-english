@@ -66,7 +66,7 @@ export function NameTag() {
         <div className="name-tag-panel" role="dialog" aria-label="Username">
           <form noValidate onSubmit={(e) => void save(e)}>
             <label htmlFor="name-tag-input" className="name-tag-label">
-              Others know you as
+              Username
             </label>
             <input
               id="name-tag-input"
@@ -78,7 +78,7 @@ export function NameTag() {
               value={draft}
               onChange={(e) => setDraft(e.target.value)}
             />
-            <p className={`name-tag-hint${bad ? ' is-bad' : ''}`}>{USERNAME_HINT}</p>
+            {bad && <p className="name-tag-hint is-bad">{USERNAME_HINT}</p>}
             {error && (
               <p role="alert" className="name-tag-error">
                 {error}
