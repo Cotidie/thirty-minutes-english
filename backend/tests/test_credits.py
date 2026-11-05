@@ -190,6 +190,13 @@ def test_each_coach_takes_its_own_price_and_then_refuses(tmp_path, path, body, k
     assert db.credits.balance(mina.id) == 1
 
 
+def test_a_whole_summarize_round_costs_10(tmp_path):
+    db, mina, me = paid_world(tmp_path, 10, transcriber=LiveRound(), summary_coach=SummaryCoach())
+    assert me.post("/api/summary/sessions", json=PARAGRAPH).status_code < 300
+    assert me.post("/api/summary/feedback", json=PARAGRAPH | {"user_text": "It is words."}).status_code < 300
+    assert db.credits.balance(mina.id) == 0
+
+
 def test_hearing_the_coach_is_charged_each_time(tmp_path):
     db, mina, me = paid_world(tmp_path, 12, agents={"read-aloud": LiveRound()})
     assert me.post("/api/read-aloud/sessions", json=PARAGRAPH).status_code == 201
@@ -460,7 +467,7 @@ class DownAssessor:
         raise HttpError(502, "down")
 
 
-VOICE_ROUTES = [("/api/example/sessions", WORD, 10), ("/api/summary/sessions", PARAGRAPH, 10), ("/api/read-aloud/sessions", PARAGRAPH, 5)]
+VOICE_ROUTES = [("/api/example/sessions", WORD, 10), ("/api/summary/sessions", PARAGRAPH, 5), ("/api/read-aloud/sessions", PARAGRAPH, 5)]
 
 
 @pytest.mark.parametrize("path,body,price", VOICE_ROUTES)

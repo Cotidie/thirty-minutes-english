@@ -30,7 +30,7 @@ function renderMarked() {
   )
 }
 
-const PRICES = { read_aloud_token: 5, read_aloud_voice: 5, summary_voice: 10, summary_feedback: 10 }
+const PRICES = { read_aloud_token: 5, read_aloud_voice: 5, summary_voice: 5, summary_feedback: 5 }
 
 beforeEach(() => {
   vi.mocked(useCredits).mockReset()
@@ -47,10 +47,10 @@ test('short of credits, a mark, Read again and Summarize are off and say why', (
   expect(read).toHaveAttribute('title', 'Not enough credits: this needs 5 and you have 2.')
   const summarize = screen.getByRole('button', { name: 'Summarize' })
   expect(summarize).toBeDisabled()
-  expect(summarize).toHaveAttribute('title', 'Not enough credits: this needs 20 and you have 2.')
+  expect(summarize).toHaveAttribute('title', 'Not enough credits: this needs 10 and you have 2.')
 })
 
-test('with 5 left, a mark and Read again still work and Summarize, which takes 20, does not', () => {
+test('with 5 left, a mark and Read again still work and Summarize, which takes 10, does not', () => {
   vi.mocked(useCredits).mockReturnValue(creditsOf(5, PRICES))
   renderMarked()
   expect(screen.getByRole('button', { name: 'flawed: flowed' })).toBeEnabled()
@@ -63,7 +63,7 @@ test('with enough credits each button shows its price and a mark names what hear
   renderMarked()
   expect(screen.getByRole('button', { name: 'flawed: flowed' })).toHaveAttribute('title', 'flawed: flowed · Hear the coach · 5')
   expect(screen.getByRole('button', { name: 'Read again' })).toHaveTextContent('5')
-  expect(screen.getByRole('button', { name: 'Summarize' })).toHaveTextContent('20')
+  expect(screen.getByRole('button', { name: 'Summarize' })).toHaveTextContent('10')
 })
 
 test('the admin, who is charged nothing, sees no price', () => {

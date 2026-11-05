@@ -34,8 +34,8 @@
 | 그림 다시 그리기 (장당) | `POST /api/sessions/{id}/pictures/{index}` | 10 |
 | Practice 음성 세션 시작 | `POST /api/example/sessions` | 10 |
 | Practice 글 피드백 | `POST /api/example/feedback` | 10 |
-| Summarize 녹취 세션 시작 | `POST /api/summary/sessions` | 10 |
-| Summarize 피드백 | `POST /api/summary/feedback` | 10 |
+| Summarize 녹취 세션 시작 | `POST /api/summary/sessions` | 5 |
+| Summarize 피드백 | `POST /api/summary/feedback` | 5 |
 | Read aloud 발음 평가 토큰 (한 회에 한 번) | `GET /api/assessor/token` | 5 |
 | Read aloud 코치가 표시된 단어를 말해 주기 (표시를 누를 때마다) | `POST /api/read-aloud/sessions` | 5 |
 | 문장 듣기, 캐시에 없는 문장만 | `POST /api/speech` | 1 |
@@ -43,7 +43,7 @@
 
 설계자가 승인된 표에서 바꾼 것 하나: Read aloud는 호출이 둘이다. 한 회를 시작할 때 Azure 토큰을 한 번 받고, 평가가 끝난 뒤 틀린 단어의 표시를 누를 때마다 Gemini 코치 연결을 새로 열어 그 단어를 말해 준다(`frontend/src/components/ReadAloud.tsx`의 `ask` → `speak`). 표에는 토큰 5만 있었다. 코치 경로에도 가격이 있어야 그 경로만 직접 불러 공짜로 쓰는 길이 막힌다. 그래서 토큰 5, 표시 누르기 5다. 한 회의 값은 5 + 5 × (누른 표시 수)이고, 같은 표시를 두 번 누르면 두 번 나간다. 한 회에 코치 연결을 하나만 열어 두는 방식은 흐름을 고쳐야 하고 Gemini 음성은 연결 시간으로 과금되어 더 비쌀 수 있어 택하지 않았다.
 
-한 회에 유료 호출이 둘인 Practice와 Summarize(음성 세션 10, 피드백 10)는 버튼에 회당 합계 20을 붙이고 잔액이 20보다 적으면 비활성으로 한다. 회 중간에 402가 나서 음성 세션 값만 날아가는 일을 막기 위해서다. 말을 하지 않고 끝낸 회는 10만 나간다. 이것은 설계자의 결정이다.
+한 회에 유료 호출이 둘인 Practice(음성 세션 10, 피드백 10)와 Summarize(음성 세션 5, 피드백 5)는 버튼에 회당 합계(Practice 20, Summarize 10)를 붙이고 잔액이 그보다 적으면 비활성으로 한다. 회 중간에 402가 나서 음성 세션 값만 날아가는 일을 막기 위해서다. 말을 하지 않고 끝낸 회는 음성 세션 값만 나간다. 이것은 설계자의 결정이다. Summarize 한 회를 10으로 맞춘 것은 운영자의 결정이다(2026-11-06).
 
 이 문서의 나머지는 설계자의 판단이며, 승인 전까지 바꿀 수 있다.
 
@@ -107,7 +107,7 @@ CREATE INDEX credits_by_user ON credits (user_id, id);
 
 - 구석 알약 (`CornerTools`): 운영자가 아닌 계정에만. 노란 코인과 잔액 숫자. `useAccountResource('credits', ...)`로 구독해 새로고침 없이 바뀐다. 누르면 잔액, 최근 내역 10건, "Ask the admin for more." 한 줄이 든 작은 패널이 열린다. 내역 한 줄은 날짜, 종류, 보충 설명, 금액이다. 예: `Nov 1 · Session · Blame for the Java Sea ferry… · −200`.
 - 홈: `SessionCreator`를 모든 계정에 보인다. Generate 버튼에 `200`이 붙는다. 모자라면 버튼이 비활성이고 아래에 `120 credits left. A session costs 200. Ask the admin for more.`를 보인다. "Session creation isn't on for this account yet" 문구는 없어진다. 빈 목록 문구는 하나로 합친다.
-- 세션 페이지: Practice와 Summarize 버튼에 회당 합계 `20`, Read aloud 버튼에 `5`가 붙는다. Read aloud에서 틀린 단어의 표시는 누르면 코치가 말해 주므로 `title`에 `Hear the coach · 5`를 보이고, 잔액이 5보다 적으면 표시가 비활성이다. 그림 다시 그리기(↻)는 만든 사람에게만 보이고(`canRedraw={session.mine}`), 툴팁에 `New picture · 10`을 보인다. 문장 듣기 버튼에는 가격을 붙이지 않는다(캐시에 있으면 무료라 미리 알 수 없다). 모자라서 402가 오면 기존 오류 자리에 보인다. `SharePanel`은 만든 사람에게 항상 추가 칸을 보인다.
+- 세션 페이지: Practice 버튼에 회당 합계 `20`, Summarize 버튼에 회당 합계 `10`, Read aloud 버튼에 `5`가 붙는다. Read aloud에서 틀린 단어의 표시는 누르면 코치가 말해 주므로 `title`에 `Hear the coach · 5`를 보이고, 잔액이 5보다 적으면 표시가 비활성이다. 그림 다시 그리기(↻)는 만든 사람에게만 보이고(`canRedraw={session.mine}`), 툴팁에 `New picture · 10`을 보인다. 문장 듣기 버튼에는 가격을 붙이지 않는다(캐시에 있으면 무료라 미리 알 수 없다). 모자라서 402가 오면 기존 오류 자리에 보인다. `SharePanel`은 만든 사람에게 항상 추가 칸을 보인다.
 - 데이터베이스 화면의 Accounts 탭 (운영자, `/database/accounts`): 계정마다 이메일과 가입일, 잔액, 숫자 칸(기본 200)과 `Add` 버튼, 그 아래 최근 내역. 음수를 넣으면 회수. 운영자 자신의 행은 `∞ not charged`이고 칸이 없다. 저장은 지금 토글처럼 즉시다.
 
 ## 테스트
