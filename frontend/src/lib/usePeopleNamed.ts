@@ -43,3 +43,9 @@ export function usePeopleNamed(text: string): PeopleNamed {
   if (!needle) return BLANK
   return { people: answer?.people ?? [], settled: answer?.text === needle, failed: failedText === needle }
 }
+
+/** What a search that lists nobody says. */
+export function nobodySaying(found: PeopleNamed): string {
+  if (found.settled) return 'No one goes by a name like that.'
+  return found.failed ? 'The search did not go through. Type again to retry.' : 'Looking…'
+}

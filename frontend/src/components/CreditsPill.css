@@ -81,6 +81,112 @@
   font-size: 0.85rem;
 }
 
+.credits-gift {
+  width: 100%;
+  margin-top: 0.7rem;
+}
+
+/* The gift screen, in the panel's place. */
+.gift {
+  display: grid;
+  gap: 0.45rem;
+}
+
+.gift-back {
+  justify-self: start;
+}
+
+.gift-title {
+  margin: 0.2rem 0 0;
+  font-size: 1.05rem;
+  overflow-wrap: anywhere;
+}
+
+.gift-label {
+  font-weight: 600;
+  font-size: 0.9rem;
+}
+
+.gift-input {
+  box-sizing: border-box;
+  width: 100%;
+  border: 0;
+  border-bottom: 1px solid var(--ink);
+  background: transparent;
+  padding: 0.2rem 0.1rem;
+}
+
+.gift-input:focus {
+  outline: 0;
+  background: var(--marker-soft);
+  box-shadow: 0 1px 0 var(--ink);
+}
+
+.gift-matches {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.gift-match {
+  width: 100%;
+  padding: 0.4rem 0.6rem;
+  border: 0;
+  background: transparent;
+  text-align: left;
+  overflow-wrap: anywhere;
+  cursor: pointer;
+}
+
+.gift-match:hover,
+.gift-match:focus-visible {
+  background: var(--ground);
+  outline: none;
+}
+
+.gift-none,
+.gift-have {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.85rem;
+}
+
+/* The question covers the panel, inside it, so pressing it is not leaving the panel. */
+.gift-confirm {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  padding: 0.8rem;
+  background: rgb(251 252 250 / 88%);
+}
+
+.gift-confirm-card {
+  display: grid;
+  gap: 0.5rem;
+  padding: 1rem;
+  border: 1px solid var(--line);
+  background: var(--paper);
+  box-shadow: 0 10px 28px rgb(27 36 49 / 18%);
+}
+
+.gift-confirm-card h3 {
+  margin: 0;
+  font-size: 1rem;
+  overflow-wrap: anywhere;
+}
+
+.gift-confirm-card p {
+  margin: 0;
+  font-size: 0.85rem;
+}
+
+.gift-confirm-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.5rem;
+}
+
 @media (max-width: 40rem) {
   .credits-panel {
     width: calc(100vw - 2rem);

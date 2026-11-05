@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { ComboBox, Input, type Key, Label, ListBox, ListBoxItem, Popover } from 'react-aria-components'
 import { api } from '../api'
-import { type PeopleNamed, usePeopleNamed } from '../lib/usePeopleNamed'
+import { nobodySaying, usePeopleNamed } from '../lib/usePeopleNamed'
 import { useSessionResource } from '../lib/sessionChanges'
 import type { PersonMatch, ShareEntry } from '../types'
 import './SharePanel.css'
@@ -76,7 +76,7 @@ export function SharePanel({ sessionId }: Props) {
         <Popover className="share-popover" placement="bottom start">
           <ListBox<PersonMatch>
             className="share-matches"
-            renderEmptyState={() => <p className="share-none">{emptySaying(found)}</p>}
+            renderEmptyState={() => <p className="share-none">{nobodySaying(found)}</p>}
           >
             {(person) => (
               <ListBoxItem id={person.id} textValue={person.username} className="share-match">
@@ -112,10 +112,4 @@ export function SharePanel({ sessionId }: Props) {
       )}
     </section>
   )
-}
-
-/** What the menu says when it lists nobody. */
-function emptySaying(found: PeopleNamed): string {
-  if (found.settled) return 'No one goes by a name like that.'
-  return found.failed ? 'The search did not go through. Type again to retry.' : 'Looking…'
 }

@@ -105,6 +105,9 @@ export const api = {
   grantCredits: (id: number, amount: number) =>
     request<Account>(`/api/accounts/${id}/credits`, { method: 'POST', body: JSON.stringify({ amount }) }),
   myCredits: () => request<CreditsView>('/api/me/credits'),
+  /** Hands `amount` of my credits to the account `to`; both balances are read again on the credits event. */
+  giftCredits: (to: number, amount: number) =>
+    request<void>('/api/me/credits/gifts', { method: 'POST', body: JSON.stringify({ to, amount }) }),
   /** Another corpus expression in this one's place; the one swapped out is free to come back. */
   swapExpression: (sessionId: number, expressionId: number) =>
     request<Expression>(`/api/sessions/${sessionId}/expressions/${expressionId}/swap`, { method: 'POST' }),
