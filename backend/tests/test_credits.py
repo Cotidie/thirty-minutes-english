@@ -841,3 +841,61 @@ def test_a_gift_tells_both_accounts_to_read_their_credits_again(store, recorder)
     recorder.published.clear()
     store.credits.gift(mina, jun, 50)
     assert recorder.published == [(mina.id, AccountChange.CREDITS), (jun.id, AccountChange.CREDITS)]
+
+
+def gift_world(tmp_path):
+    """mina with 300 credits and jun with none, and the app they use."""
+    db = Database(tmp_path / "s.db")
+    app = create_app(db, Services(FakeGenerator()), InlineExecutor())
+    mina = funded(db, 300)
+    jun = add_user(db, "jun@example.com")
+    return db, app, mina, jun
+
+
+def test_a_gift_through_the_route_answers_204_and_moves_the_credits(tmp_path):
+    db, app, mina, jun = gift_world(tmp_path)
+    answer = client_of(app, db, mina).post("/api/me/credits/gifts", json={"to": jun.id, "amount": 200})
+    assert answer.status_code == 204
+    assert (db.credits.balance(mina.id), db.credits.balance(jun.id)) == (100, 200)
+
+
+def test_a_gift_to_oneself_is_refused(tmp_path):
+    db, app, mina, _ = gift_world(tmp_path)
+    answer = client_of(app, db, mina).post("/api/me/credits/gifts", json={"to": mina.id, "amount": 50})
+    assert (answer.status_code, answer.json()["detail"]) == (400, "You cannot gift credits to yourself.")
+    assert db.credits.balance(mina.id) == 300
+
+
+def test_a_gift_to_the_admin_is_refused(tmp_path):
+    db, app, mina, _ = gift_world(tmp_path)
+    boss = add_user(db, "boss@example.com", admin=True)
+    answer = client_of(app, db, mina).post("/api/me/credits/gifts", json={"to": boss.id, "amount": 50})
+    assert (answer.status_code, answer.json()["detail"]) == (400, "The admin is not charged, so there is nothing to add to.")
+    assert db.credits.balance(mina.id) == 300
+
+
+def test_the_admin_has_no_credits_to_give(tmp_path):
+    db, app, _, jun = gift_world(tmp_path)
+    answer = admin_client(app).post("/api/me/credits/gifts", json={"to": jun.id, "amount": 50})
+    assert (answer.status_code, answer.json()["detail"]) == (400, "The admin has no credits to give.")
+    assert db.credits.balance(jun.id) == 0
+
+
+def test_a_gift_to_no_account_is_not_found(tmp_path):
+    db, app, mina, _ = gift_world(tmp_path)
+    answer = client_of(app, db, mina).post("/api/me/credits/gifts", json={"to": 999, "amount": 50})
+    assert (answer.status_code, answer.json()["detail"]) == (404, "account not found")
+
+
+@pytest.mark.parametrize("amount", [0, -5])
+def test_a_gift_of_nothing_or_less_is_not_a_gift(tmp_path, amount):
+    db, app, mina, jun = gift_world(tmp_path)
+    answer = client_of(app, db, mina).post("/api/me/credits/gifts", json={"to": jun.id, "amount": amount})
+    assert answer.status_code == 422
+    assert (db.credits.balance(mina.id), db.credits.balance(jun.id)) == (300, 0)
+
+
+def test_a_gift_beyond_the_balance_says_what_it_needs(tmp_path):
+    db, app, mina, jun = gift_world(tmp_path)
+    answer = client_of(app, db, mina).post("/api/me/credits/gifts", json={"to": jun.id, "amount": 500})
+    assert (answer.status_code, answer.json()["detail"]) == (402, "Not enough credits: this needs 500 and you have 300.")

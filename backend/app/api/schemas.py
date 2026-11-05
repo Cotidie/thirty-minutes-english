@@ -52,6 +52,13 @@ class GrantRequest(BaseModel):
         return value
 
 
+class GiftRequest(BaseModel):
+    """Credits the one who asks hands to another account."""
+
+    to: int
+    amount: int = Field(ge=1)
+
+
 class CreditsView(BaseModel):
     """What an account has to spend, what things cost, and its last charges. The admin has no balance and no charges."""
 

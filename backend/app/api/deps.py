@@ -105,7 +105,12 @@ def held_or_402(db: Database, me: User, kind: str, detail: str | None = None) ->
     try:
         return db.credits.hold(me, kind, detail)
     except NotEnoughCredits as e:
-        raise HTTPException(status_code=402, detail=f"Not enough credits: this needs {e.need} and you have {e.have}.") from None
+        raise short_of_credits(e) from None
+
+
+def short_of_credits(e: NotEnoughCredits) -> HTTPException:
+    """The 402 for credits that do not cover something: what it needs and what there is."""
+    return HTTPException(status_code=402, detail=f"Not enough credits: this needs {e.need} and you have {e.have}.")
 
 
 @contextmanager
