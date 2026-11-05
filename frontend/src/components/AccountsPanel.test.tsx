@@ -36,6 +36,18 @@ test('each account shows what it last spent', async () => {
   expect(within(history).getByRole('listitem')).toHaveTextContent('−200')
 })
 
+test('the history stays folded until its toggle opens it, and folds again', async () => {
+  vi.mocked(api.accountCredits).mockResolvedValue([{ at: '2026-11-01T09:00:00Z', amount: -200, kind: 'session', detail: 'Trams' }])
+  render(<AccountsPanel />)
+  const toggle = await screen.findByText('History · 1')
+  const history = screen.getByRole('list', { name: 'mina@example.com recent charges' })
+  expect(history).not.toBeVisible()
+  await userEvent.click(toggle)
+  expect(history).toBeVisible()
+  await userEvent.click(toggle)
+  expect(history).not.toBeVisible()
+})
+
 test('credits taken back read as taken back by you', async () => {
   vi.mocked(api.accountCredits).mockResolvedValue([{ at: '2026-11-01T09:00:00Z', amount: -34, kind: 'grant', detail: null }])
   render(<AccountsPanel />)

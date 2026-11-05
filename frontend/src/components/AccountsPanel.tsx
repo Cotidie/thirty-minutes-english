@@ -121,11 +121,14 @@ function Charged({ account, credits, onSaved, onError }: ChargedProps) {
         </button>
       </span>
       {history.length > 0 && (
-        <ul className="credit-lines accounts-history" aria-label={`${account.email} recent charges`}>
-          {history.map((entry, i) => (
-            <CreditLine key={i} entry={entry} grantedBy="you" />
-          ))}
-        </ul>
+        <details className="accounts-history">
+          <summary>History · {history.length}</summary>
+          <ul className="credit-lines accounts-history-lines" aria-label={`${account.email} recent charges`}>
+            {history.map((entry, i) => (
+              <CreditLine key={i} entry={entry} grantedBy="you" />
+            ))}
+          </ul>
+        </details>
       )}
     </>
   )
