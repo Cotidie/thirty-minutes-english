@@ -2,6 +2,8 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:executing-plans. 태스크를 이 세션에서 직접 실행하고, 끝에 새 서브에이전트 리뷰를 한 번만 한다 (사용자가 정한 방식). Steps use checkbox (`- [ ]`) syntax for tracking.
 
+> **구현 뒤 바뀐 점:** 이 계획대로 4단계를 구현한 뒤, 사용자가 편집과 다듬기를 한 호출로 합쳐 3단계로 줄였다 (`9ca00be`). 아래의 `polishing` 단계, `polish_prompt`, `polisher`는 이제 없다. 단계 구성은 spec이 맞다.
+
 **Goal:** 세션 생성기가 기사를 초안, 소리 내어 읽기용 편집, 다듬기(humanizer + stop-slop), 마무리의 네 Claude 호출로 쓰고, 다듬기 뒤에 코드가 문장과 문단 길이를 검사해 한 번 고치게 한다.
 
 **Architecture:** `readability.py`는 읽기 기준 상수와 길이 검사를 갖는다. `passes.py`는 단계별 출력 모델, JSON schema, `Draft` 조립을 갖고, `prompts.py`는 단계별 프롬프트를 갖는다. `generator.py`의 `ClaudeGenerator.generate`는 단계를 차례로 부르는 흐름만 남는다. 진행 표시는 `StreamTracker.begin(stage)`로 단계를 넘겨받고, 프런트엔드는 같은 단계 값을 표시한다.
