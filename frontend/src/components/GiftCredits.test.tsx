@@ -98,6 +98,21 @@ test('while the gift is on its way neither button can be pressed', async () => {
   await waitFor(() => expect(onClose).toHaveBeenCalledTimes(1))
 })
 
+test('while the question is open nothing behind it can be used', async () => {
+  let land = () => {}
+  vi.mocked(api.giftCredits).mockReturnValue(new Promise<void>((resolve) => (land = resolve)))
+  const { onClose } = setup()
+  await askToGift('200')
+  expect(screen.getByRole('button', { name: 'Back' })).toBeDisabled()
+  expect(screen.getByRole('textbox', { name: 'Credits to gift' })).toBeDisabled()
+  expect(screen.getByRole('button', { name: 'Gift 200 credits' })).toBeDisabled()
+  await userEvent.click(within(screen.getByRole('alertdialog')).getByRole('button', { name: 'Gift' }))
+  await userEvent.click(screen.getByRole('button', { name: 'Back' }))
+  expect(onClose).not.toHaveBeenCalled()
+  land()
+  await waitFor(() => expect(onClose).toHaveBeenCalledTimes(1))
+})
+
 test('a name nobody has says so', async () => {
   vi.mocked(api.findPeople).mockResolvedValue([])
   setup()

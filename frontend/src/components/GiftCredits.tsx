@@ -19,25 +19,31 @@ export function GiftCredits({ balance, onClose, onSending }: Props) {
   const [recipient, setRecipient] = useState<PersonMatch | null>(null)
   return (
     <div className="gift">
-      <button type="button" className="btn-link gift-back" onClick={onClose}>
-        Back
-      </button>
       {recipient ? (
-        <GiftAmount recipient={recipient} balance={balance} onGiven={onClose} onSending={onSending} />
+        <GiftAmount recipient={recipient} balance={balance} onBack={onClose} onGiven={onClose} onSending={onSending} />
       ) : (
-        <FindRecipient onPick={setRecipient} />
+        <FindRecipient onBack={onClose} onPick={setRecipient} />
       )}
     </div>
   )
 }
 
+function BackLink({ onBack, disabled = false }: { onBack: () => void; disabled?: boolean }) {
+  return (
+    <button type="button" className="btn-link gift-back" disabled={disabled} onClick={onBack}>
+      Back
+    </button>
+  )
+}
+
 /** A search by username, the same one sharing a session uses; whoever searches is never offered. */
-function FindRecipient({ onPick }: { onPick: (person: PersonMatch) => void }) {
+function FindRecipient({ onBack, onPick }: { onBack: () => void; onPick: (person: PersonMatch) => void }) {
   const [typed, setTyped] = useState('')
   const found = usePeopleNamed(typed)
   const id = useId()
   return (
     <>
+      <BackLink onBack={onBack} />
       <label className="gift-label" htmlFor={id}>
         Gift credits to
       </label>
@@ -76,23 +82,28 @@ interface Asked {
   left: number
 }
 
+/** The amount for the one chosen. While the question is open, nothing behind it can be used, by pointer or keyboard. */
 function GiftAmount({
   recipient,
   balance,
+  onBack,
   onGiven,
   onSending,
 }: {
   recipient: PersonMatch
   balance: number
+  onBack: () => void
   onGiven: () => void
   onSending: (sending: boolean) => void
 }) {
   const [typed, setTyped] = useState('')
   const [asked, setAsked] = useState<Asked | null>(null)
   const amount = giftable(typed, balance)
+  const asking = asked !== null
   const id = useId()
   return (
     <>
+      <BackLink onBack={onBack} disabled={asking} />
       <h3 className="gift-title">Gift to {recipient.username}</h3>
       <label className="gift-label" htmlFor={id}>
         Credits to gift
@@ -104,13 +115,14 @@ function GiftAmount({
         inputMode="numeric"
         value={typed}
         onChange={(event) => setTyped(event.target.value)}
+        disabled={asking}
         autoFocus
       />
       <p className="gift-have">You have {balance}.</p>
       <button
         type="button"
         className="btn btn-primary gift-send"
-        disabled={amount === null}
+        disabled={amount === null || asking}
         onClick={() => amount !== null && setAsked({ amount, left: balance - amount })}
       >
         {amount === null ? 'Gift credits' : `Gift ${creditCount(amount)}`}
