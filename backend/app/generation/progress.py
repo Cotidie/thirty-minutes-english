@@ -21,7 +21,10 @@ class Stage(StrEnum):
     STARTING = "starting"
     SKILLS = "skills"
     SEARCHING = "searching"
-    WRITING = "writing"
+    DRAFTING = "drafting"  # the first pass: research done, the draft written
+    EDITING = "editing"  # sentences shortened and paragraphs evened out for reading aloud
+    POLISHING = "polishing"  # machine-sounding phrasing taken out, and lengths repaired
+    FINISHING = "finishing"  # questions, translation, figures and words for the final article
     FINALIZING = "finalizing"
     ILLUSTRATING = "illustrating"  # pictures for the words, after the text is done
 
@@ -103,12 +106,22 @@ class StreamTracker:
         self._searches = 0
         self._activity = ""
         self._tokens = TokenMeter()
+        self._pass = Stage.DRAFTING  # the call under way; the first one finds its way here from its messages
+        self._pass_activity = ""  # what the pass shows while no tool says otherwise
 
     @property
     def progress(self) -> Progress:
         return Progress(
             self._stage, self._searches, self._activity, self._tokens.input_tokens, self._tokens.output_tokens
         )
+
+    def begin(self, stage: Stage, activity: str = "") -> None:
+        """A new call starts: everything it streams stays in `stage`, showing `activity` between tools."""
+        before = self.progress
+        self._pass = self._stage = stage
+        self._pass_activity = self._activity = activity
+        if self.progress != before:
+            self._on_progress(self.progress)
 
     def feed(self, message: Message) -> None:
         before = self.progress
@@ -127,25 +140,33 @@ class StreamTracker:
         """A block just began streaming: say so now, not when it ends minutes later."""
         kind = block.get("type")
         if kind in ("thinking", "redacted_thinking", "text") and self._stage != Stage.FINALIZING:
-            self._stage = Stage.WRITING
-            self._activity = "Thinking" if kind != "text" else ""
-        elif kind == "tool_use" and block.get("name") == "StructuredOutput":
-            self._stage = Stage.WRITING
-            self._activity = "Writing out the session"
+            self._stage = self._pass
+            self._activity = "Thinking" if kind != "text" else self._pass_activity
+        elif kind == "tool_use" and block.get("name") == "StructuredOutput" and self._stage != Stage.FINALIZING:
+            self._stage = self._pass
+            self._activity = "Writing out the session" if self._pass == Stage.FINISHING else "Writing out the article"
 
     def _apply(self, block) -> None:
         if isinstance(block, ToolUseBlock):
-            if block.name == "Skill":
-                self._stage = Stage.SKILLS
-            elif block.name in WEB_TOOLS or block.name in FIRECRAWL_TOOLS:
+            if block.name in WEB_TOOLS or block.name in FIRECRAWL_TOOLS:
                 self._searches += 1
-                self._stage = Stage.SEARCHING
-            elif block.name == "StructuredOutput":
-                self._stage = Stage.FINALIZING
-            self._activity = "" if self._stage == Stage.FINALIZING else describe(block)
+            self._stage = self._stage_of(block.name)
+            self._activity = "" if self._stage == Stage.FINALIZING else describe(block) or self._pass_activity
         elif isinstance(block, (TextBlock, ThinkingBlock)) and self._stage != Stage.FINALIZING:
-            self._stage = Stage.WRITING
-            self._activity = ""
+            self._stage = self._pass
+            self._activity = self._pass_activity
+
+    def _stage_of(self, tool: str) -> Stage:
+        """The first pass shows its skills and searches as stages of their own; only the last pass's output finalizes."""
+        if tool == "StructuredOutput":
+            return Stage.FINALIZING if self._pass == Stage.FINISHING else self._pass
+        if self._pass != Stage.DRAFTING:
+            return self._stage
+        if tool == "Skill":
+            return Stage.SKILLS
+        if tool in WEB_TOOLS or tool in FIRECRAWL_TOOLS:
+            return Stage.SEARCHING
+        return self._stage
 
 
 def with_pictures(progress: Progress, done: int, total: int) -> Progress:

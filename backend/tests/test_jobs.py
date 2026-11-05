@@ -97,7 +97,7 @@ def test_stage_times_of_a_finished_run_are_kept_and_become_the_next_estimate(tmp
     job.stage_seconds = {Stage.STARTING: 2.0}
     job.progress = Progress(Stage.SEARCHING, 1)
     # starting as it took (2), searching at least its median (4), the four after it at 4 each
-    assert fresh.expected_seconds(job) == 2 + 4 + 4 * 3
+    assert fresh.expected_seconds(job) == 2 + 4 + 4 * 6
 
 
 def test_a_brief_detour_into_a_later_stage_does_not_shrink_the_estimate(tmp_path):
@@ -105,9 +105,9 @@ def test_a_brief_detour_into_a_later_stage_does_not_shrink_the_estimate(tmp_path
     for stage in Stage:
         db.stages.add(stage, 4.0)
     job = Job(id="j", topic="t")
-    job.stage_seconds = {Stage.STARTING: 2.0, Stage.WRITING: 0.5}  # thought once between searches
+    job.stage_seconds = {Stage.STARTING: 2.0, Stage.DRAFTING: 0.5}  # thought once between searches
     job.progress = Progress(Stage.SEARCHING, 2)
-    assert runner_over(db).expected_seconds(job) == 2 + 4 + 4 * 3
+    assert runner_over(db).expected_seconds(job) == 2 + 4 + 4 * 6
 
 
 def test_a_fresh_runner_expects_the_default_time_of_every_stage(tmp_path):

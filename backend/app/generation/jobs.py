@@ -37,7 +37,10 @@ DEFAULT_STAGE_SECONDS: dict[Stage, float] = {
     Stage.STARTING: 10,
     Stage.SKILLS: 10,
     Stage.SEARCHING: 40,
-    Stage.WRITING: 100,
+    Stage.DRAFTING: 70,
+    Stage.EDITING: 40,
+    Stage.POLISHING: 60,
+    Stage.FINISHING: 120,
     Stage.FINALIZING: 10,
     Stage.ILLUSTRATING: 90,
 }

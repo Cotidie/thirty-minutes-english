@@ -28,7 +28,7 @@ def test_generate_validates_the_payload_and_reports_progress():
     seen = []
     content = generator_with(fake).generate("Digital twins", seen.append)
     assert content.article.title == "Twins at Work"
-    assert seen == [Progress(Stage.SEARCHING, 1), Progress(Stage.FINALIZING, 1)]
+    assert seen == [Progress(Stage.SEARCHING, 1), Progress(Stage.DRAFTING, 1)]
 
 
 def test_a_payload_that_fails_validation_raises():

@@ -1,4 +1,13 @@
-type Stage = 'starting' | 'skills' | 'searching' | 'writing' | 'finalizing' | 'illustrating'
+type Stage =
+  | 'starting'
+  | 'skills'
+  | 'searching'
+  | 'drafting'
+  | 'editing'
+  | 'polishing'
+  | 'finishing'
+  | 'finalizing'
+  | 'illustrating'
 
 export interface JobStatus {
   id: string
@@ -29,15 +38,21 @@ const FLOORS: Record<Stage, number> = {
   starting: 3,
   skills: 8,
   searching: 15,
-  writing: 45,
+  drafting: 45,
+  editing: 55,
+  polishing: 62,
+  finishing: 70,
   finalizing: 80,
   illustrating: 84,
 }
 const NEXT: Record<Stage, number> = {
   starting: FLOORS.searching,
   skills: FLOORS.searching,
-  searching: FLOORS.writing,
-  writing: FLOORS.finalizing,
+  searching: FLOORS.drafting,
+  drafting: FLOORS.editing,
+  editing: FLOORS.polishing,
+  polishing: FLOORS.finishing,
+  finishing: FLOORS.finalizing,
   finalizing: FLOORS.illustrating,
   illustrating: 100,
 }
@@ -85,8 +100,14 @@ function stageLabel(stage: Stage): string {
       return 'Loading writing skills'
     case 'searching':
       return 'Searching the web'
-    case 'writing':
-      return 'Writing the article, expressions, and words'
+    case 'drafting':
+      return 'Writing a draft'
+    case 'editing':
+      return 'Shortening sentences and evening out paragraphs'
+    case 'polishing':
+      return 'Taking out machine-sounding phrasing'
+    case 'finishing':
+      return 'Writing questions, translation, and words'
     case 'finalizing':
       return 'Checking the structure'
     case 'illustrating':

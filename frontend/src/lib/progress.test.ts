@@ -40,9 +40,15 @@ describe('percentFor', () => {
     expect(percentFor(job({ stage: 'starting' }), 60)).toBe(60)
   })
 
-  it('creeps through writing against the usual time of that stage', () => {
-    expect(percentFor(job({ stage: 'writing', stage_elapsed_seconds: 10, stage_expected_seconds: 20 }))).toBe(63)
-    expect(percentFor(job({ stage: 'writing', stage_elapsed_seconds: 600, stage_expected_seconds: 20 }))).toBe(78)
+  it('creeps through drafting against the usual time of that stage', () => {
+    expect(percentFor(job({ stage: 'drafting', stage_elapsed_seconds: 10, stage_expected_seconds: 20 }))).toBe(50)
+    expect(percentFor(job({ stage: 'drafting', stage_elapsed_seconds: 600, stage_expected_seconds: 20 }))).toBe(54)
+  })
+
+  it('climbs through the passes in order', () => {
+    const stages = ['drafting', 'editing', 'polishing', 'finishing', 'finalizing', 'illustrating'] as const
+    const floors = stages.map((stage) => percentFor(job({ stage })))
+    expect(floors).toEqual([45, 55, 62, 70, 80, 84])
   })
 
   it('moves through the pictures by how many are drawn', () => {
@@ -61,6 +67,8 @@ describe('labelFor', () => {
   it('shows what the model is doing, else the stage in plain words', () => {
     expect(labelFor(job({ stage: 'searching', activity: 'Searching "preprints"' }))).toBe('Searching "preprints"')
     expect(labelFor(job({ stage: 'searching' }))).toBe('Searching the web')
+    expect(labelFor(job({ stage: 'polishing' }))).toBe('Taking out machine-sounding phrasing')
+    expect(labelFor(job({ status: 'failed', stage: 'drafting' }))).toBe('Failed while writing a draft')
     expect(labelFor(job({ status: 'done' }))).toBe('Done')
   })
 })

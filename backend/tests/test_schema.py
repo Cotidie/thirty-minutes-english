@@ -143,8 +143,8 @@ def test_a_fresh_file_is_at_the_current_version_with_strict_tables_and_live_fore
 def test_stage_times_keep_the_latest_runs_oldest_first(tmp_path):
     stages = Database(tmp_path / "s.db").stages
     for s in (10, 20, 30, 40, 50, 60):
-        stages.add(Stage.WRITING, s)
-    assert stages.recent(Stage.WRITING, 5) == [20, 30, 40, 50, 60]
+        stages.add(Stage.DRAFTING, s)
+    assert stages.recent(Stage.DRAFTING, 5) == [20, 30, 40, 50, 60]
     assert stages.recent(Stage.SEARCHING) == []
 
 

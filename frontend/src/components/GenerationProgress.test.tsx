@@ -106,7 +106,7 @@ describe('GenerationProgress', () => {
   })
 
   it('keeps the bar from moving backwards across updates', () => {
-    const { rerender } = render(<GenerationProgress job={{ ...base, stage: 'writing' }} onClose={() => undefined} onOpen={() => undefined} />)
+    const { rerender } = render(<GenerationProgress job={{ ...base, stage: 'drafting' }} onClose={() => undefined} onOpen={() => undefined} />)
     expect(Number(screen.getByRole('progressbar').getAttribute('aria-valuenow'))).toBeGreaterThanOrEqual(45)
     rerender(<GenerationProgress job={{ ...base, stage: 'starting', searches: 0 }} onClose={() => undefined} onOpen={() => undefined} />)
     expect(Number(screen.getByRole('progressbar').getAttribute('aria-valuenow'))).toBeGreaterThanOrEqual(45)
@@ -130,9 +130,9 @@ describe('GenerationProgress', () => {
 
   it('keeps a failed run on screen with its error until closed', () => {
     const onCancel = vi.fn()
-    const failed: JobStatus = { ...base, status: 'failed', stage: 'writing', activity: '', elapsed_seconds: 300, error: 'claude timed out after 300s' }
+    const failed: JobStatus = { ...base, status: 'failed', stage: 'drafting', activity: '', elapsed_seconds: 300, error: 'claude timed out after 300s' }
     render(<GenerationProgress job={failed} onClose={onCancel} onOpen={() => undefined} />)
-    expect(screen.getByText('Failed while writing the article, expressions, and words')).toBeInTheDocument()
+    expect(screen.getByText('Failed while writing a draft')).toBeInTheDocument()
     expect(screen.getByText('after 05:00')).toBeInTheDocument()
     expect(screen.getByRole('alert')).toHaveTextContent('claude timed out after 300s')
     expect(screen.queryByRole('button', { name: 'Cancel' })).not.toBeInTheDocument()
