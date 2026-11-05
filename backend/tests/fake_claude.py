@@ -52,3 +52,18 @@ class FakeQuery:
             await asyncio.sleep(10)
         for message in self.messages:
             yield message
+
+
+class ScriptedQuery(FakeQuery):
+    """One script of messages per call, in call order, for a run that calls Claude several times."""
+
+    def __init__(self, *scripts: tuple):
+        super().__init__()
+        self.scripts = scripts
+
+    async def __call__(self, *, prompt, options):
+        self.calls.append((prompt, options))
+        if len(self.calls) > len(self.scripts):
+            raise AssertionError("more calls than scripts")
+        for message in self.scripts[len(self.calls) - 1]:
+            yield message

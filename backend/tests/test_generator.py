@@ -1,55 +1,63 @@
-import jsonschema
 import pytest
 
 from app.generation.exclusions import Exclusions
-from app.generation.generator import (
-    APP_SKILL,
-    ARTICLE_SKILL,
-    CHECK_ITEMS_RULE,
-    PLUGIN_DIR,
-    SESSION_SCHEMA,
-    ClaudeGenerator,
-    check_items_reply,
-)
+from app.generation.generator import PLUGIN_DIR, ClaudeGenerator, check_items_reply
+from app.generation.jobs import Cancelled
 from app.generation.progress import Progress, Stage
+from app.generation.prompts import APP_SKILL, CHECK_ITEMS_RULE, HUMANIZER_SKILL, REPAIR_ACTIVITY, STOP_SLOP_SKILL
 from app.llm import GenerationError
-from tests.conftest import sample_draft
-from tests.fake_claude import FakeQuery, assistant, result, tool_use
+from tests.conftest import readable_body, sample_finish, sample_first_draft
+from tests.fake_claude import ScriptedQuery, assistant, result, stream, text, tool_use
+
+LONG = " ".join(["Long"] + ["word"] * 24) + "."  # 25 words, over the limit
+POLISHED_WITH_A_LONG_SENTENCE = readable_body("polished").replace("Polished", LONG + " Polished", 1)
 
 
-def generator_with(fake: FakeQuery, **kwargs) -> ClaudeGenerator:
+def generator_with(fake, **kwargs) -> ClaudeGenerator:
     gen = ClaudeGenerator(model="sonnet", **kwargs)
-    object.__setattr__(gen.claude, "query", fake)
+    for claude in (gen.drafter, gen.editor, gen.polisher, gen.finisher):
+        object.__setattr__(claude, "query", fake)
     return gen
 
 
-def test_generate_validates_the_payload_and_reports_progress():
-    fake = FakeQuery(assistant(tool_use("WebSearch")), assistant(tool_use("StructuredOutput")), result(sample_draft().model_dump()))
-    seen = []
-    content = generator_with(fake).generate("Digital twins", seen.append)
-    assert content.article.title == "Twins at Work"
-    assert seen == [Progress(Stage.SEARCHING, 1), Progress(Stage.DRAFTING, 1)]
+def passes(*, draft=None, edit=None, polish=None, repair=None, finish=None) -> ScriptedQuery:
+    """One script per call, in order; `repair` only when given."""
+    scripts = [
+        draft or (result(sample_first_draft()),),
+        edit or (result({"title": "Twins at Work", "body": readable_body("edited")}),),
+        polish or (result({"title": "Twins at Work", "body": readable_body("polished")}),),
+        *([repair] if repair else []),
+        finish or (result(sample_finish()),),
+    ]
+    return ScriptedQuery(*scripts)
 
 
-def test_a_payload_that_fails_validation_raises():
-    with pytest.raises(GenerationError, match="validation"):
-        generator_with(FakeQuery(result({"topic": "x"}))).generate("x")
+def test_the_article_goes_through_draft_edit_polish_and_finish_in_order():
+    fake = passes()
+    draft = generator_with(fake).generate("Digital twins")
+    prompts = [prompt for prompt, _ in fake.calls]
+    assert len(prompts) == 4
+    assert "Today's article topic: Digital twins" in prompts[0]
+    assert readable_body("draft") in prompts[1] and readable_body("edited") in prompts[2] and readable_body("polished") in prompts[3]
+    assert draft.article.body == readable_body("polished") and draft.article.sources[0].url == "https://example.com"
+    assert "session" not in fake.calls[3][1].mcp_servers  # no past words, no check tool
 
 
-def test_past_items_go_to_a_check_tool_not_the_prompt():
-    fake = FakeQuery(result(sample_draft().model_dump()))
+def test_each_pass_runs_with_its_own_tools_and_skills():
+    fake = passes()
     generator_with(fake).generate("x", exclude=Exclusions(("scrutiny",)))
-    prompt, options = fake.calls[0]
-    assert CHECK_ITEMS_RULE in prompt and "scrutiny" not in prompt
-    assert "session" in options.mcp_servers
-    assert "mcp__session__check_items" in options.allowed_tools
+    (_, drafting), (_, editing), (_, polishing), (finishing_prompt, finishing) = fake.calls
+    assert drafting.skills == [APP_SKILL] and "WebSearch" in drafting.allowed_tools and "firecrawl" in drafting.mcp_servers
+    assert (editing.tools, editing.allowed_tools, editing.mcp_servers, editing.skills) == ([], [], {}, None)
+    assert polishing.skills == [HUMANIZER_SKILL, STOP_SLOP_SKILL] and polishing.tools == ["Read", "Skill"]
+    assert finishing.skills == [APP_SKILL] and "session" in finishing.mcp_servers and "session" not in drafting.mcp_servers
+    assert CHECK_ITEMS_RULE in finishing_prompt and "scrutiny" not in finishing_prompt
+    assert all(o.plugins == [{"type": "local", "path": str(PLUGIN_DIR)}] for o in (drafting, polishing, finishing))
 
 
-def test_no_check_tool_without_past_items():
-    fake = FakeQuery(result(sample_draft().model_dump()))
-    generator_with(fake).generate("x", exclude=Exclusions())
-    prompt, options = fake.calls[0]
-    assert CHECK_ITEMS_RULE not in prompt and "session" not in options.mcp_servers
+def test_every_pass_keeps_the_ten_minute_limit():
+    gen = ClaudeGenerator(model="opus")
+    assert {c.timeout_s for c in (gen.drafter, gen.editor, gen.polisher, gen.finisher)} == {600}
 
 
 def test_check_items_names_close_variants_of_taught_words():
@@ -59,81 +67,75 @@ def test_check_items_names_close_variants_of_taught_words():
     assert check_items_reply(exclude, {"words": ["candor"]}) == "None of these were taught before."
 
 
-def test_a_full_draft_fits_the_schema_the_model_answers_in():
-    jsonschema.validate(sample_draft().model_dump(), SESSION_SCHEMA)
+def test_a_long_sentence_gets_one_repair_that_names_it():
+    fake = passes(
+        polish=(result({"title": "t", "body": POLISHED_WITH_A_LONG_SENTENCE}),),
+        repair=(result({"title": "t", "body": readable_body("repaired")}),),
+    )
+    draft = generator_with(fake).generate("x")
+    assert len(fake.calls) == 5
+    assert f'Sentence of 25 words (limit 20): "{LONG}"' in fake.calls[3][0]
+    assert fake.calls[3][1].skills is None  # the repair runs on the editor
+    assert draft.article.body == readable_body("repaired")
 
 
-def test_the_prompt_asks_for_no_expressions():
-    prompt = ClaudeGenerator(model="m").build_prompt("t", Exclusions(("scrutiny",)))
-    assert "expression" not in prompt.lower() and "1. article" in prompt and "2. vocabulary" in prompt
-    assert "expressions" not in SESSION_SCHEMA["properties"]
+def test_a_repair_that_leaves_more_problems_is_set_aside():
+    fake = passes(
+        polish=(result({"title": "t", "body": POLISHED_WITH_A_LONG_SENTENCE}),),
+        repair=(result({"title": "t", "body": "One.\n\nTwo.\n\nThree."}),),  # 4 problems against the polished 2
+    )
+    assert generator_with(fake).generate("x").article.body == POLISHED_WITH_A_LONG_SENTENCE
 
 
-def test_a_session_teaches_exactly_eight_words():
-    vocabulary = SESSION_SCHEMA["properties"]["vocabulary"]
-    assert (vocabulary["minItems"], vocabulary["maxItems"]) == (8, 8)
-    assert "2. vocabulary: 8 words" in ClaudeGenerator(model="m").build_prompt("t", Exclusions(()))
+def test_a_failed_repair_keeps_the_polished_article_and_goes_on():
+    fake = passes(
+        polish=(result({"title": "t", "body": POLISHED_WITH_A_LONG_SENTENCE}),),
+        repair=(result(is_error=True, text="overloaded"),),
+    )
+    draft = generator_with(fake).generate("x")
+    assert draft.article.body == POLISHED_WITH_A_LONG_SENTENCE and len(fake.calls) == 5
 
 
-def test_only_the_apps_own_skills_run():
-    import inspect
+def test_a_cancel_during_the_repair_is_not_swallowed():
+    thinking = stream({"type": "content_block_start", "content_block": {"type": "thinking"}})
+    fake = passes(
+        polish=(result({"title": "t", "body": POLISHED_WITH_A_LONG_SENTENCE}),),
+        repair=(thinking, result({"title": "t", "body": POLISHED_WITH_A_LONG_SENTENCE})),
+    )
+    seen: list[Progress] = []
 
-    fake = FakeQuery(result(sample_draft().model_dump()))
-    generator_with(fake).generate("x")
-    prompt, options = fake.calls[0]
-    assert options.skills == [APP_SKILL, ARTICLE_SKILL]
-    assert options.plugins == [{"type": "local", "path": str(PLUGIN_DIR)}]
-    assert f"invoke the {APP_SKILL} skill" in prompt
-    assert "skills" not in inspect.signature(ClaudeGenerator).parameters  # nothing comes from the host
-    assert (PLUGIN_DIR / "skills" / "session-writing" / "SKILL.md").is_file()
+    def cancel_in_repair(progress):
+        """Lets the repair start, then cancels on its first message, inside the Claude run."""
+        seen.append(progress)
+        if any(p.activity == REPAIR_ACTIVITY for p in seen[:-1]):
+            raise Cancelled
 
-
-def test_the_time_limit_leaves_room_for_a_five_minute_run():
-    """An Opus xhigh run took 303.6s and died at a 300s limit, one tool call from done."""
-    assert ClaudeGenerator(model="opus").claude.timeout_s == 600
-
-
-def test_the_humanizer_rewrites_the_article_before_its_evidence_and_translation_are_copied():
-    fake = FakeQuery(result(sample_draft().model_dump()))
-    generator_with(fake).generate("x")
-    prompt, options = fake.calls[0]
-    assert ARTICLE_SKILL in options.skills
-    humanize = prompt.index(f"run the {ARTICLE_SKILL} skill on the title and body")
-    assert prompt.index("1. article") < humanize < prompt.index("Then write 3 discussion questions") < prompt.index("Then give translation")
-    assert ARTICLE_SKILL not in prompt[: prompt.index("\n\n")]  # only the article, not every part of the session
-    skill = PLUGIN_DIR / "skills" / "humanizer"
-    assert (skill / "SKILL.md").read_text().startswith("---\nname: humanizer\n") and (skill / "LICENSE").is_file()
+    with pytest.raises(Cancelled):
+        generator_with(fake).generate("x", on_progress=cancel_in_repair)
+    assert len(fake.calls) == 4
 
 
-def test_the_article_brings_a_cover_and_one_more_source_image_and_always_two_scenes_to_draw_instead():
-    article = SESSION_SCHEMA["properties"]["article"]
-    assert {"figures", "picture", "paragraph_picture"} <= set(article["required"])
-    assert set(article["properties"]["paragraph_picture"]["required"]) == {"after", "scene", "caption"}
-    assert article["properties"]["figures"]["maxItems"] == 2
-    assert set(article["properties"]["figures"]["items"]["required"]) == {"after", "image_url", "page_url", "credit", "caption"}
-    assert article["properties"]["figures"]["items"]["properties"]["after"]["minimum"] == 0  # 0: the cover
-    assert set(article["properties"]["picture"]["required"]) == {"scene", "caption"}
-    prompt = ClaudeGenerator(model="m").build_prompt("t")
-    figures = prompt.index("Then give figures:")
-    assert prompt.index("Then give translation") < figures < prompt.index("2. vocabulary")
-    assert "firecrawl_scrape" in prompt[figures:] and "Never a logo" in prompt[figures:] and "after 0" in prompt[figures:]
-    assert prompt.index("Always give picture") < prompt.index("paragraph_picture") < prompt.index("2. vocabulary")
+def test_a_failed_edit_fails_the_whole_generation():
+    fake = passes(edit=(result(is_error=True, text="overloaded"),))
+    with pytest.raises(GenerationError, match="overloaded"):
+        generator_with(fake).generate("x")
+    assert len(fake.calls) == 2
 
 
-@pytest.mark.parametrize(
-    ("levels", "asked"),
-    [
-        (("B2", "B2+", "C1"), "8 words at CEFR levels B2, B2+ and C1 connected to the topic. Spread them about evenly across these levels."),
-        (("B1",), "8 words at CEFR level B1 connected to the topic. Draw"),
-        (("B2", "C1"), "8 words at CEFR levels B2 and C1 connected to the topic. Spread them"),
-        (("B1", "B1+", "B2", "B2+", "C1", "C2"), "8 words at CEFR levels B1, B1+, B2, B2+, C1 and C2 connected"),
-    ],
-)
-def test_the_words_come_from_every_level_set_by_name(levels, asked):
-    prompt = ClaudeGenerator(model="m", levels=levels).build_prompt("t")
-    assert asked in prompt and "C1+" not in prompt
-    assert ("Spread them" in prompt) == (len(levels) > 1)
+def test_a_draft_that_fails_validation_raises():
+    with pytest.raises(GenerationError, match="validation"):
+        generator_with(passes(draft=(result({"title": "x"}),))).generate("x")
 
 
-def test_a_generator_told_no_levels_asks_for_b2_through_c1():
-    assert "8 words at CEFR levels B2, B2+ and C1" in ClaudeGenerator(model="m").build_prompt("t")
+def test_progress_runs_through_the_passes_in_order():
+    fake = passes(draft=(assistant(tool_use("WebSearch")), assistant(text()), result(sample_first_draft())))
+    seen: list[Progress] = []
+    generator_with(fake).generate("x", seen.append)
+    order = [p.stage for p in seen]
+    assert [s for i, s in enumerate(order) if i == 0 or order[i - 1] != s] == [
+        Stage.SEARCHING,
+        Stage.DRAFTING,
+        Stage.EDITING,
+        Stage.POLISHING,
+        Stage.FINISHING,
+    ]
