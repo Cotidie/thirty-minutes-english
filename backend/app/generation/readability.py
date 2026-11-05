@@ -7,6 +7,8 @@ MAX_SENTENCE_WORDS = 20
 PARAGRAPH_COUNT = (4, 5)
 PARAGRAPH_WORDS = (50, 65)
 NUMBERS_PER_PARAGRAPH = 2  # told to the model only; not checked here
+# A repair trims a long paragraph or two; losing more than this share of the words means it dropped content.
+REPAIR_KEEPS_WORDS = 0.85
 
 # A period after one of these does not end a sentence.
 ABBREVIATIONS = ("U.S.", "U.K.", "U.N.", "E.U.", "a.m.", "p.m.", "Dr.", "Mr.", "Mrs.", "Ms.", "St.", "Jr.", "e.g.", "i.e.", "vs.")
@@ -49,6 +51,21 @@ def problems(body: str) -> list[str]:
     for number, paragraph in enumerate(parts, 1):
         found += _long_sentences(paragraph) + _length_problem(number, paragraph)
     return found
+
+
+def repair_holds(before: str, after: str) -> bool:
+    """Whether a repaired body may replace `before`: it breaks no more limits, its paragraph count is no farther
+    from the range (a merged-away paragraph is a lost turn), and it keeps nearly all of the words (trimming, not cutting)."""
+    return (
+        len(problems(after)) <= len(problems(before))
+        and _count_distance(len(paragraphs(after))) <= _count_distance(len(paragraphs(before)))
+        and word_count(after) >= REPAIR_KEEPS_WORDS * word_count(before)
+    )
+
+
+def _count_distance(count: int) -> int:
+    low, high = PARAGRAPH_COUNT
+    return max(low - count, count - high, 0)
 
 
 def _count_problem(count: int) -> list[str]:

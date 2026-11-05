@@ -139,3 +139,29 @@ def test_progress_runs_through_the_passes_in_order():
         Stage.POLISHING,
         Stage.FINISHING,
     ]
+
+
+def test_a_repair_that_merges_paragraphs_out_of_range_is_set_aside():
+    """Fewer problems by count (one paragraph-count line instead of two), but a reader's turn is gone."""
+    fake = passes(
+        polish=(result({"title": "t", "body": POLISHED_WITH_A_LONG_SENTENCE}),),
+        repair=(result({"title": "t", "body": readable_body("repaired", paragraphs=3)}),),
+    )
+    assert generator_with(fake).generate("x").article.body == POLISHED_WITH_A_LONG_SENTENCE
+
+
+def test_a_repair_that_returns_part_of_the_article_is_set_aside():
+    polished = readable_body("polished", paragraphs=5).replace("Polished", LONG + " Polished", 1)
+    fake = passes(
+        polish=(result({"title": "t", "body": polished}),),
+        repair=(result({"title": "t", "body": readable_body("repaired", paragraphs=4)}),),  # clean, but a fifth of it is gone
+    )
+    assert generator_with(fake).generate("x").article.body == polished
+
+
+def test_a_repair_that_ties_on_problems_and_keeps_the_shape_wins():
+    extra = " " + " ".join(["Extra"] + ["word"] * 14) + "."  # 15 words: a paragraph of 70
+    paragraphs = readable_body("repaired").split("\n\n")
+    repaired = "\n\n".join([paragraphs[0] + extra, paragraphs[1] + extra, *paragraphs[2:]])  # 2 problems, as polished
+    fake = passes(polish=(result({"title": "t", "body": POLISHED_WITH_A_LONG_SENTENCE}),), repair=(result({"title": "t", "body": repaired}),))
+    assert generator_with(fake).generate("x").article.body == repaired

@@ -112,8 +112,9 @@ Fix only these problems:
 {problems}
 
 Split each long sentence where its ideas divide. Bring each paragraph into range by moving a sentence to a neighbor \
-or trimming words. Leave every other sentence word for word. Never add a fact, name, number, date, quote, or source. \
-Do not use em dashes.
+or trimming words. Split or merge paragraphs to reach {paragraphs_low} to {paragraphs_high}. Leave every other \
+sentence word for word. Never add a fact, name, number, date, quote, or source. Do not use em dashes. Return the \
+whole title and body.
 
 {article}
 
@@ -222,7 +223,16 @@ def polish_prompt(text: ArticleText) -> str:
 
 def repair_prompt(text: ArticleText, problems: list[str]) -> str:
     """One extra call when the polished article still breaks a limit: fix the named places only."""
-    return _REPAIR.format(reader=READER, limits=limits(), problems=_bullets(problems), article=_article(text), done=_RETURN)
+    paragraphs_low, paragraphs_high = PARAGRAPH_COUNT
+    return _REPAIR.format(
+        reader=READER,
+        limits=limits(),
+        problems=_bullets(problems),
+        paragraphs_low=paragraphs_low,
+        paragraphs_high=paragraphs_high,
+        article=_article(text),
+        done=_RETURN,
+    )
 
 
 def finish_prompt(topic: str, text: ArticleText, images: list[ImageCandidate], levels: tuple[str, ...], check_items: bool) -> str:

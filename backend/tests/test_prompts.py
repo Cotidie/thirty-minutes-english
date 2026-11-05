@@ -108,3 +108,8 @@ def test_session_writing_no_longer_asks_for_more_numbers():
     text = (PLUGIN_DIR / "skills" / "session-writing" / "SKILL.md").read_text()
     assert "Specific over general" not in text and "Mostly 12 to 22 words" not in text
     assert "aloud in turns, one paragraph each" in text
+
+
+def test_the_repair_asks_for_the_whole_article_and_says_how_to_fix_the_paragraph_count():
+    prompt = repair_prompt(TEXT, ["The article has 3 paragraphs (range 4 to 5)."])
+    assert "Split or merge paragraphs to reach 4 to 5." in prompt and "Return the whole title and body." in prompt

@@ -36,7 +36,7 @@ from app.generation.prompts import (
     polish_prompt,
     repair_prompt,
 )
-from app.generation.readability import problems
+from app.generation.readability import problems, repair_holds
 from app.llm import WEB_TOOLS, Claude, GenerationError, McpServer, firecrawl
 from app.models import Draft
 
@@ -129,8 +129,8 @@ class ClaudeGenerator:
         return self._run("polishing", self.polisher, polish_prompt(text), TEXT_SCHEMA, ArticleText, tracker)
 
     def _fix_lengths(self, text: ArticleText, tracker: StreamTracker) -> ArticleText:
-        """One repair when the polished article breaks a length limit. Whichever text breaks fewer goes on;
-        a failed repair leaves the polished one, since a length is never worth failing the session over."""
+        """One repair when the polished article breaks a length limit. The repair goes on only when it holds
+        (`repair_holds`); a failed repair leaves the polished text, since a length is never worth failing the session over."""
         found = problems(text.body)
         if not found:
             log.info("readability: clean after polishing")
@@ -140,10 +140,12 @@ class ClaudeGenerator:
         except GenerationError as e:
             log.warning("readability: repair failed, keeping the polished text (%d problems): %s", len(found), e)
             return text
-        left = problems(repaired.body)
-        log.info("readability: %d problems after polishing, %d after repair", len(found), len(left))
-        kept, still = (repaired, left) if len(left) <= len(found) else (text, found)
-        if still:
+        kept = repaired if repair_holds(text.body, repaired.body) else text
+        log.info(
+            "readability: %d problems after polishing, %d after repair; kept the %s text",
+            len(found), len(problems(repaired.body)), "repaired" if kept is repaired else "polished",
+        )
+        if still := problems(kept.body):
             log.warning("readability: still %s", still)
         return kept
 
