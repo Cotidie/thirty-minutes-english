@@ -1,6 +1,6 @@
 # 크레딧 선물
 
-- 상태: 설계 (2026-11-05). 아직 구현하지 않았다.
+- 상태: 구현됨 (2026-11-05). 구현 계획: `docs/superpowers/plans/2026-11-05-credit-gifts.md`.
 - 범위: 일반 사용자가 자기 크레딧 일부를 다른 일반 사용자에게 보낸다. 오른쪽 위 크레딧 버튼의 패널에서 시작한다. DB 스키마는 바뀌지 않는다. `credits` 테이블에 새 `kind` 두 개가 생긴다.
 
 ## 목적
@@ -102,12 +102,14 @@
 - 경로는 성공 시 204를 돌려주고, 화면은 이벤트로 새로 읽는다.
 - 요청이 도는 동안 확인 모달은 어떤 방법으로도 닫히지 않는다.
 
-## 빌더에게 맡기는 것
+## 구현에서 정한 것
 
-- 확인 모달의 구현 방식. `SettingsModal`의 `role="alertdialog"` 카드나 `<dialog>`의 `showModal()`을 쓸 수 있다.
-- 패널이 바깥 누르기로 닫히는 문제를 푸는 방식. 크레딧 패널은 `useCloseOnLeave`로 패널 DOM 바깥을 누르면 닫힌다. 그런데 `SharePanel`의 검색 결과는 react-aria `Popover`라서 portal로 패널 DOM 바깥에 그려진다. 그대로 가져오면 이름을 고르는 순간 패널이 닫힌다. 확인 모달도 portal로 그리면 같은 문제가 생긴다. 검색 결과와 모달 둘 다 누르는 동안 패널이 열린 채로 남아야 한다.
-- 선물 화면을 `CreditsPill.tsx` 안에 둘지, 새 컴포넌트 파일로 뺄지.
-- CSS 모양. 기존 `CreditsPill.css`와 `SharePanel`의 검색 목록 모양을 따른다.
+- 선물 화면은 `frontend/src/components/GiftCredits.tsx`다. 액수 검사(`giftable`)와 "1 credit"/"N credits" 문구(`creditCount`)는 `frontend/src/lib/gifts.ts`에 있다.
+- 검색 결과는 react-aria `Popover`가 아니라 패널 안의 평범한 목록이다. 확인 모달도 패널 DOM 안의 `role="alertdialog"` 카드로, CSS로 패널 위를 덮는다. 둘 다 portal이 아니므로 누를 때 `useCloseOnLeave`가 패널을 닫지 않는다. 카드가 뜨면 "Cancel"에 focus가 간다.
+- 확인 카드는 물은 순간의 액수와 남을 잔액을 붙잡아 둔다. 선물 자신의 크레딧 이벤트가 POST 응답보다 먼저 와도 카드 내용이 바뀌거나 사라지지 않는다.
+- 요청이 도는 동안 `CreditsPill`은 Escape, 바깥 누르기, 크레딧 버튼 다시 누르기를 모두 무시한다.
+- 402 문구는 `backend/app/api/deps.py`의 `short_of_credits`가 만든다. 다른 유료 경로의 `held_or_402`와 같이 쓴다.
+- CSS는 `CreditsPill.css`에 있고, `SharePanel`의 검색칸 모양과 `SettingsModal`의 확인 카드 모양을 따른다.
 
 ## 시험할 것
 
