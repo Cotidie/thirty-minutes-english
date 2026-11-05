@@ -62,6 +62,20 @@ class CreditRepo:
         self._db.account_changes.publish(user.id, AccountChange.CREDITS)
         return hold
 
+    def gift(self, sender: User, recipient: User, amount: int) -> None:
+        """Hands `amount` of the sender's credits to the recipient, or raises NotEnoughCredits. Both rows go in or neither
+        does, each naming the other account; credits held for work still running cannot be given."""
+        with self._db.connect() as conn:
+            conn.execute("BEGIN IMMEDIATE")
+            _release_expired(conn)
+            balance = _balance(conn, sender.id)
+            if balance < amount:
+                raise NotEnoughCredits(amount, balance)
+            _add_row(conn, sender.id, -amount, "gift_sent", recipient.username, sender.id)
+            _add_row(conn, recipient.id, amount, "gift_received", sender.username, sender.id)
+        for user in (sender, recipient):
+            self._db.account_changes.publish(user.id, AccountChange.CREDITS)
+
     def settle(self, hold: int | None, as_kind: str | None = None) -> None:
         """The work is over and the price stays: at the price of `as_kind`, under that name, when that is what it came to."""
         if hold is None:

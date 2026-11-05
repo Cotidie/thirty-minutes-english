@@ -778,3 +778,66 @@ def test_a_restart_gives_back_what_the_dead_process_held(tmp_path):
     assert db.credits.balance(mina.id) == 0
     create_app(db, Services(FakeGenerator()), InlineExecutor())
     assert db.credits.balance(mina.id) == 200
+
+
+def test_a_gift_moves_credits_and_each_side_reads_who_it_was(store):
+    mina = funded(store, 300)
+    jun = add_user(store, "jun@example.com")
+    store.credits.gift(mina, jun, 200)
+    assert (store.credits.balance(mina.id), store.credits.balance(jun.id)) == (100, 200)
+    sent, received = store.credits.recent(mina.id)[0], store.credits.recent(jun.id)[0]
+    assert (sent.amount, sent.kind, sent.detail) == (-200, "gift_sent", "jun")
+    assert (received.amount, received.kind, received.detail) == (200, "gift_received", "mina")
+    with store.connect() as conn:
+        givers = [row[0] for row in conn.execute("SELECT granted_by FROM credits WHERE kind LIKE 'gift_%' ORDER BY id")]
+    assert givers == [mina.id, mina.id]
+
+
+def test_a_gift_beyond_the_balance_moves_nothing(store):
+    mina = funded(store, 150)
+    jun = add_user(store, "jun@example.com")
+    with pytest.raises(NotEnoughCredits) as refused:
+        store.credits.gift(mina, jun, 200)
+    assert (refused.value.need, refused.value.have) == (200, 150)
+    assert (store.credits.balance(mina.id), store.credits.balance(jun.id)) == (150, 0)
+    assert store.credits.recent(jun.id) == []
+
+
+def test_credits_held_for_running_work_cannot_be_gifted(store):
+    mina = funded(store, 250)
+    jun = add_user(store, "jun@example.com")
+    store.credits.hold(mina, "session", "Trams")
+    with pytest.raises(NotEnoughCredits) as refused:
+        store.credits.gift(mina, jun, 100)
+    assert (refused.value.need, refused.value.have) == (100, 50)
+
+
+def test_two_gifts_at_once_on_one_gift_worth_of_balance_let_only_one_through(store):
+    mina = funded(store, 200)
+    jun = add_user(store, "jun@example.com")
+    results: list[str] = []
+    gate = threading.Barrier(2)
+
+    def go():
+        gate.wait()
+        try:
+            store.credits.gift(mina, jun, 200)
+            results.append("given")
+        except NotEnoughCredits:
+            results.append("refused")
+
+    threads = [threading.Thread(target=go) for _ in range(2)]
+    for t in threads:
+        t.start()
+    for t in threads:
+        t.join()
+    assert sorted(results) == ["given", "refused"]
+    assert (store.credits.balance(mina.id), store.credits.balance(jun.id)) == (0, 200)
+
+
+def test_a_gift_tells_both_accounts_to_read_their_credits_again(store, recorder):
+    mina = funded(store, 300)
+    jun = add_user(store, "jun@example.com")
+    recorder.published.clear()
+    store.credits.gift(mina, jun, 50)
+    assert recorder.published == [(mina.id, AccountChange.CREDITS), (jun.id, AccountChange.CREDITS)]
