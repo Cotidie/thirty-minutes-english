@@ -271,7 +271,7 @@ UI 문구는 지금 앱과 같이 영어다.
 - **홈:** `can_create`가 없으면 주제 선택 대신 "Session creation isn't on for this account yet. Ask the admin to turn it on."을 보여 준다. 세션 목록이 비면 "Nothing here yet. Sessions shared with you appear here."를 보여 준다. 공유받은 세션에는 공유한 사람의 username을 표시하고, Delete 대신 Remove 버튼을 둔다. Remove는 `DELETE /api/sessions/{id}/shares/me`를 호출해 내 목록에서만 뺀다.
 - **세션 화면:** 만든 사람에게만 왼쪽 레일에 공유 대상 목록과 해제 버튼을 보여 준다. 공유 입력란과 그림 다시 그리기는 만든 사람이면서 생성 권한도 있어야 보인다. 표현 교체와 추가를 포함한 그 외 기능은 공유받은 사람도 그대로 쓴다.
 - **오른쪽 위 버튼:** 모든 사용자에게 로그아웃 버튼을 더한다. 데이터베이스와 설정 버튼은 운영자에게만 보인다.
-- **계정 관리:** 설정 창에 운영자 전용 Accounts 구역을 더한다. 이메일, 가입일, "Can create sessions" 토글을 나열한다.
+- **계정 관리:** 운영자 전용 Accounts 탭은 데이터베이스 화면(`/database/accounts`)에 있다. 무엇을 보여 주는지는 `2026-11-01-credits-design.md`가 정한다.
 
 ## 배포
 

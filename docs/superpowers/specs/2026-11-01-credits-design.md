@@ -23,7 +23,7 @@
 | `can_create` | 크레딧이 "Can create sessions" 토글과 Practice 잠금을 대체한다. 더는 필요 없는 기능과 제한은 과감히 지운다 |
 | 공유받은 세션에서의 사용 | 기능을 쓴 사람의 크레딧에서 나간다 |
 | 잔액 표시 | A안: 모든 페이지 구석의 둥근 버튼들 옆에 코인 알약으로 잔액을 보이고, 누르면 최근 내역이 열린다. 유료 버튼마다 가격이 붙는다 |
-| 운영자 화면 | 설정의 Accounts 탭에서 토글 대신 계정마다 잔액, 충전 칸, 최근 내역을 본다 |
+| 운영자 화면 | 데이터베이스 화면의 Accounts 탭에서 토글 대신 계정마다 잔액, 충전 칸, 최근 내역을 본다 |
 
 가격표 (사용자 승인):
 
@@ -108,7 +108,7 @@ CREATE INDEX credits_by_user ON credits (user_id, id);
 - 구석 알약 (`CornerTools`): 운영자가 아닌 계정에만. 노란 코인과 잔액 숫자. `useAccountResource('credits', ...)`로 구독해 새로고침 없이 바뀐다. 누르면 잔액, 최근 내역 10건, "Ask the admin for more." 한 줄이 든 작은 패널이 열린다. 내역 한 줄은 날짜, 종류, 보충 설명, 금액이다. 예: `Nov 1 · Session · Blame for the Java Sea ferry… · −200`.
 - 홈: `SessionCreator`를 모든 계정에 보인다. Generate 버튼에 `200`이 붙는다. 모자라면 버튼이 비활성이고 아래에 `120 credits left. A session costs 200. Ask the admin for more.`를 보인다. "Session creation isn't on for this account yet" 문구는 없어진다. 빈 목록 문구는 하나로 합친다.
 - 세션 페이지: Practice와 Summarize 버튼에 회당 합계 `20`, Read aloud 버튼에 `5`가 붙는다. Read aloud에서 틀린 단어의 표시는 누르면 코치가 말해 주므로 `title`에 `Hear the coach · 5`를 보이고, 잔액이 5보다 적으면 표시가 비활성이다. 그림 다시 그리기(↻)는 만든 사람에게만 보이고(`canRedraw={session.mine}`), 툴팁에 `New picture · 10`을 보인다. 문장 듣기 버튼에는 가격을 붙이지 않는다(캐시에 있으면 무료라 미리 알 수 없다). 모자라서 402가 오면 기존 오류 자리에 보인다. `SharePanel`은 만든 사람에게 항상 추가 칸을 보인다.
-- 설정 Accounts 탭 (운영자): 계정마다 이메일과 가입일, 잔액, 숫자 칸(기본 200)과 `Add` 버튼, 그 아래 최근 내역. 음수를 넣으면 회수. 운영자 자신의 행은 `∞ not charged`이고 칸이 없다. 저장은 지금 토글처럼 즉시다.
+- 데이터베이스 화면의 Accounts 탭 (운영자, `/database/accounts`): 계정마다 이메일과 가입일, 잔액, 숫자 칸(기본 200)과 `Add` 버튼, 그 아래 최근 내역. 음수를 넣으면 회수. 운영자 자신의 행은 `∞ not charged`이고 칸이 없다. 저장은 지금 토글처럼 즉시다.
 
 ## 테스트
 
@@ -136,4 +136,4 @@ CREATE INDEX credits_by_user ON credits (user_id, id);
 - 알약 패널의 열고 닫기, 바깥 클릭과 Esc 처리, 모바일 폭에서의 자리.
 - 내역 `detail`의 문구와 자르는 길이.
 - Accounts 탭의 내역 줄 수(최근 10건 안에서).
-- 설정 Accounts 탭의 운영자 행 표기와 CSS.
+- Accounts 탭의 운영자 행 표기와 CSS.
