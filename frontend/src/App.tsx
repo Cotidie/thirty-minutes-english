@@ -33,6 +33,7 @@ export default function App() {
             <Route path="/s/:id" element={<SessionPage />} />
             <Route path="/database" element={<DatabasePage tab="expressions" />} />
             <Route path="/database/topics" element={<DatabasePage tab="topics" />} />
+            <Route path="/database/accounts" element={<DatabasePage tab="accounts" />} />
           </Route>
         </Routes>
       </AuthProvider>

@@ -2,7 +2,6 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { UNSAFE_PortalProvider } from 'react-aria'
 import { api } from '../api'
 import type { KeyTestResult, SettingField, SettingGroup, SettingOption, SettingsUpdate } from '../types'
-import { AccountsPanel } from './AccountsPanel'
 import { ChoiceChecks, ChoiceSelect, ModelCombo } from './Choice'
 import { ModelList } from './ModelList'
 import './SettingsModal.css'
@@ -13,9 +12,6 @@ interface Props {
 }
 
 type KeyTestState = KeyTestResult | 'testing'
-
-/** The one tab that is not a group of settings: its changes save at once, apart from Save. */
-const ACCOUNTS_TAB = 'accounts'
 
 /** What a field's control offers right now: its menu, the placeholder, and why it is off, if it is. */
 interface Menu {
@@ -102,7 +98,7 @@ export function SettingsModal({ open, onClose }: Props) {
       ({ groups, fields }) => {
         if (!live) return
         setGroups(groups)
-        setTab((t) => (t === ACCOUNTS_TAB || groups.some((g) => g.id === t) ? t : (groups[0]?.id ?? '')))
+        setTab((t) => (groups.some((g) => g.id === t) ? t : (groups[0]?.id ?? '')))
         setFields(fields)
         setDraft(draftOf(fields))
       },
@@ -287,17 +283,6 @@ export function SettingsModal({ open, onClose }: Props) {
                     </button>
                   )
                 })}
-                <button
-                  type="button"
-                  role="tab"
-                  id={`settings-tab-${ACCOUNTS_TAB}`}
-                  aria-selected={tab === ACCOUNTS_TAB}
-                  aria-controls="settings-panel"
-                  className="settings-tab"
-                  onClick={() => setTab(ACCOUNTS_TAB)}
-                >
-                  <span className="settings-tab-title">Accounts</span>
-                </button>
               </div>
               <section
                 className="settings-panel"
@@ -307,7 +292,6 @@ export function SettingsModal({ open, onClose }: Props) {
               >
                 <div className="settings-panel-head">
                   {current && <h3 className="settings-panel-title">{current.title}</h3>}
-                  {tab === ACCOUNTS_TAB && <h3 className="settings-panel-title">Accounts</h3>}
                   {hasModels && (
                     <button
                       type="button"
@@ -319,7 +303,6 @@ export function SettingsModal({ open, onClose }: Props) {
                     </button>
                   )}
                 </div>
-                {tab === ACCOUNTS_TAB && <AccountsPanel />}
                 {inGroup(tab).map((f) => {
                   if (f.effort_of) return null // on its model's row
                   const effort = inGroup(tab).find((e) => e.effort_of === f.key)

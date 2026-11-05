@@ -1,4 +1,5 @@
 import { Link, NavLink } from 'react-router-dom'
+import { AccountsPanel } from '../components/AccountsPanel'
 import { CorpusPanel } from '../components/CorpusPanel'
 import { TopicsPanel } from '../components/TopicsPanel'
 import './DatabasePage.css'
@@ -6,10 +7,14 @@ import './DatabasePage.css'
 const TABS = [
   { to: '/database', label: 'Expressions' },
   { to: '/database/topics', label: 'Topics' },
+  { to: '/database/accounts', label: 'Accounts' },
 ]
 
-/** What the database holds, to read through: the expression corpus, and the topics. */
-export function DatabasePage({ tab }: { tab: 'expressions' | 'topics' }) {
+const PANELS = { expressions: CorpusPanel, topics: TopicsPanel, accounts: AccountsPanel }
+
+/** What the database holds, to read through: the expression corpus, the topics, and the accounts. */
+export function DatabasePage({ tab }: { tab: keyof typeof PANELS }) {
+  const Panel = PANELS[tab]
   return (
     <main className="database">
       <header>
@@ -25,7 +30,7 @@ export function DatabasePage({ tab }: { tab: 'expressions' | 'topics' }) {
           ))}
         </nav>
       </header>
-      {tab === 'expressions' ? <CorpusPanel /> : <TopicsPanel />}
+      <Panel />
     </main>
   )
 }

@@ -85,19 +85,13 @@ test('an empty field or a fraction is refused the same way', async () => {
   expect(screen.getByRole('alert')).toHaveTextContent('Enter a number other than 0.')
 })
 
-test('Enter in the field adds, and does not save the settings the panel sits in', async () => {
+test('Enter in the field adds', async () => {
   vi.mocked(api.grantCredits).mockResolvedValue({ ...MINA, credits: 540 })
-  const saveSettings = vi.fn((e: React.FormEvent) => e.preventDefault())
-  render(
-    <form onSubmit={saveSettings}>
-      <AccountsPanel />
-    </form>,
-  )
+  render(<AccountsPanel />)
   const field = await screen.findByRole('spinbutton', { name: 'mina@example.com credits to add' })
   await userEvent.type(field, '{Enter}')
   expect(api.grantCredits).toHaveBeenCalledWith(2, 200)
   expect(await screen.findByText('540')).toBeInTheDocument()
-  expect(saveSettings).not.toHaveBeenCalled()
 })
 
 test('a second press while the first is on its way adds nothing more', async () => {

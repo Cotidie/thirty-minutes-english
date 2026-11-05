@@ -4,7 +4,7 @@ import type { Account, CreditEntry } from '../types'
 import { CreditLine } from './CreditsPill'
 import './AccountsPanel.css'
 
-/** Who signed up, what each has to spend, and what each spent it on. A grant saves at once, apart from Save. */
+/** Who signed up, what each has to spend, and what each spent it on. A grant saves at once. */
 export function AccountsPanel() {
   const [accounts, setAccounts] = useState<Account[]>([])
   const [error, setError] = useState<string | null>(null)
@@ -113,7 +113,6 @@ function Charged({ account, credits, onSaved, onError }: ChargedProps) {
           onChange={(e) => setAmount(e.target.value)}
           onKeyDown={(e) => {
             if (e.key !== 'Enter') return
-            e.preventDefault() // the settings around this panel are a form of their own
             if (!saving) void add()
           }}
         />
