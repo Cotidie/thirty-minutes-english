@@ -5,15 +5,15 @@ description: Style rules for the English practice session this app generates (ar
 
 # Session writing
 
-The readers are two Korean graduate students at about B2. They read the article aloud, reuse its words, and argue about it for ten minutes. Write so that works: clear enough to read at a speaking pace, natural enough to copy, specific enough to argue about.
+The readers are Korean graduate students at about B2. They read the article aloud in turns, one paragraph each, until the whole article has been read, then reuse its words and argue about it for ten minutes. Write so that works: clear enough to follow on one reading at a speaking pace, natural enough to copy, concrete enough to argue about.
 
 Accuracy comes first, then clarity, then style. A plain true sentence beats a vivid vague one.
 
 ## Article
 
 - **One angle, stated early.** The first paragraph says what happened and what the piece claims about it. No scene-setting opener ("In today's world", "Imagine a…", "In a world where…").
-- **Specific over general.** Names, dates, numbers and mechanisms from your searches. A named source, a year and a number beat "became much more popular". Never invent a figure; drop the claim if you could not verify it.
-- **Sentence length.** Mostly 12 to 22 words, a few shorter. One idea per sentence. Nothing a reader has to parse twice. Vary the rhythm: no three sentences in a row of the same length.
+- **Concrete over vague.** Name the actor, the place and the mechanism from your searches. Use a number only when the argument needs it, rounded the way you would say it aloud ("about 150", "nearly a third"). Never invent a figure; drop the claim if you could not verify it.
+- **Sentence length.** One idea per sentence. Nothing a reader has to parse twice. The prompt gives the sentence and paragraph limits, and they win. Vary the rhythm within them.
 - **Active voice with a named actor.** "The journal retracted the paper", not "the paper was retracted". No objects doing human things ("the data tells us", "the debate emerges").
 - **Literal language.** No metaphors for abstract ideas (journeys, ecosystems, engines, north stars, DNA, bridges). No "baked in", "unpack", "harness", "navigate".
 - **Leave something to argue about.** Give the strongest version of one side and one concrete cost or objection. Do not settle the question in the last line, and do not end on a quotable one-liner.
@@ -52,9 +52,8 @@ Keep a listed word only when it is the exact right word and nothing plain replac
 - Concrete and visible: a place, people doing one thing, three or four details a viewer could point at.
 - No text, signs or labels in the scene. No abstract ideas ("a sense of accountability").
 
-## Final pass before the structured output
+## Before returning the structured output
 
 1. Reread the first sentence of the article. Cut it if the piece works without it.
 2. Search your draft for the words above and for em dashes. Rewrite each hit.
-3. Replace every vague noun ("challenges", "concerns", "impact") with the instance behind it.
-4. Check that every figure, name and date in the article came from a page you searched.
+3. Check that every figure, name and date in the article came from a page you searched.
