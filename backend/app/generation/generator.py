@@ -7,6 +7,7 @@ from pydantic import ValidationError
 
 from app.generation.exclusions import Exclusions
 from app.generation.levels import DEFAULT_LEVELS, describe_levels
+from app.generation.passes import VOCABULARY_COUNT
 from app.generation.progress import Progress, StreamTracker
 from app.llm import WEB_TOOLS, Claude, GenerationError, McpServer, firecrawl
 from app.models import Draft
@@ -22,8 +23,6 @@ class Generator(Protocol):
         exclude: Exclusions | None = None,
     ) -> Draft: ...
 
-
-VOCABULARY_COUNT = 8
 
 SESSION_SCHEMA: dict = {
     "type": "object",

@@ -43,6 +43,34 @@ def readable_body(word: str = "alpha", paragraphs: int = 4) -> str:
     return "\n\n".join(" ".join([sentence] * 5) for _ in range(paragraphs))
 
 
+def sample_first_draft(body: str | None = None) -> dict:
+    """What the drafting pass answers: a readable body, one source and one image candidate."""
+    return {
+        "title": "Twins at Work",
+        "body": readable_body("draft") if body is None else body,
+        "sources": [{"title": "A page", "url": "https://example.com"}],
+        "images": [
+            {
+                "image_url": "https://example.com/plant.jpg",
+                "page_url": "https://example.com",
+                "credit": "Example",
+                "shows": "A factory floor with a screen showing its twin.",
+            }
+        ],
+    }
+
+
+def sample_finish(figures: list[dict] | None = None) -> dict:
+    """What the finishing pass answers: everything of `sample_draft` but the article's text and sources."""
+    article = sample_draft().model_dump()["article"]
+    return {
+        "topic": sample_draft().topic,
+        **{key: article[key] for key in ("questions", "translation", "picture", "paragraph_picture")},
+        "figures": figures or [],
+        "vocabulary": sample_draft().model_dump()["vocabulary"],
+    }
+
+
 # Distinct words, since the corpus tells phrases apart by their letters only.
 # The curated topics every new file is seeded with, in seed order.
 CURATED_TOPICS = [Topic(text=text, category=category) for category, texts in CURATED.items() for text in texts]
