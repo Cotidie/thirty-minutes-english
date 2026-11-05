@@ -37,6 +37,12 @@ def sample_draft(topic: str = "Digital twins", title: str = "Twins at Work") -> 
     )
 
 
+def readable_body(word: str = "alpha", paragraphs: int = 4) -> str:
+    """A body inside every readability limit: paragraphs of five 11-word sentences (55 words each)."""
+    sentence = " ".join([word.capitalize()] + [word] * 10) + "."
+    return "\n\n".join(" ".join([sentence] * 5) for _ in range(paragraphs))
+
+
 # Distinct words, since the corpus tells phrases apart by their letters only.
 # The curated topics every new file is seeded with, in seed order.
 CURATED_TOPICS = [Topic(text=text, category=category) for category, texts in CURATED.items() for text in texts]
