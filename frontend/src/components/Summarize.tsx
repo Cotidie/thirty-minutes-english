@@ -104,11 +104,18 @@ export function useSummary({ paragraph: { id: paragraphId, text: paragraph }, on
   return { state, audioRef, level, said, writing, failure, start, close: round.close, dismiss }
 }
 
-/** Starts a round. It stays in its place under the paragraph; the round itself shows below. */
-export function SummarizeButton({ summary, kept, disabled }: { summary: SummaryRound; kept: boolean; disabled: boolean }) {
+/** Starts a round. It stays in its place under the paragraph; the round itself shows below. While someone else reads
+ * aloud, it is off and says who. */
+export function SummarizeButton({ summary, kept, disabled, reader }: { summary: SummaryRound; kept: boolean; disabled: boolean; reader: string | null }) {
   const { price, short } = usePrice('summary_voice', 'summary_feedback')
   return (
-    <button type="button" className="paragraph-action" onClick={summary.start} disabled={disabled || summary.state !== null || short !== null} title={short ?? undefined}>
+    <button
+      type="button"
+      className="paragraph-action"
+      onClick={summary.start}
+      disabled={disabled || reader !== null || summary.state !== null || short !== null}
+      title={(reader ? `${reader} is reading` : short) ?? undefined}
+    >
       {kept ? 'Summarize again' : 'Summarize'}
       <Price amount={price} />
     </button>

@@ -3,6 +3,8 @@
  * which arrives many times a second, renders nothing. None of it is saved anywhere.
  */
 
+import type { Shown } from '../assessor/judge'
+
 export type ViewValue = boolean | number | string | null
 
 export interface Person {
@@ -30,6 +32,20 @@ export interface TimerValue {
   at: number
 }
 
+/** A read-aloud round as the reader's screen has it: `reading` while they connect or read, `done` once the marks are final. */
+export interface SharedRound {
+  paragraph: number
+  phase: 'reading' | 'done'
+  /** All that was heard so far. */
+  heard: string
+  findings: Shown[]
+}
+
+/** Someone else's round, with the connection it came from. */
+export interface OthersRound extends SharedRound {
+  by: string
+}
+
 export type ServerMessage =
   | {
       type: 'welcome'
@@ -37,6 +53,7 @@ export type ServerMessage =
       people: readonly Person[]
       view: Readonly<Record<string, ViewValue>>
       timer: { running: boolean; elapsed: number } | null
+      rounds: Readonly<Record<string, SharedRound>>
     }
   | ({ type: 'joined' } & Person)
   | { type: 'left'; id: string }
@@ -44,6 +61,7 @@ export type ServerMessage =
   | ({ type: 'cursor'; id: string; tab: number } & (CursorPlace | { anchor: null }))
   | { type: 'view'; key: string; value: ViewValue; by: string; seq: number }
   | { type: 'timer'; running: boolean; elapsed: number; by: string; seq: number }
+  | { type: 'round'; id: string; round: SharedRound | null }
 
 const TIMER_KEY = ' timer' // a space, which no view key has
 const PERSON_COLORS = 6 // the --person-N tokens in base.css
@@ -65,6 +83,9 @@ export class PresenceStore {
   private tab: number | null = null
   private myCursor: CursorAt | null = null
   private timerValue: TimerValue | null = null
+  /** The others' rounds, by connection. */
+  private rounds = new Map<string, OthersRound>()
+  private myRound: SharedRound | null = null
   private lastSeq = 0
   /** The write of mine still on its way back, per key. */
   private readonly waiting = new Map<string, number>()
@@ -114,6 +135,20 @@ export class PresenceStore {
     return this.timerValue
   }
 
+  /** Someone else's round on this paragraph. */
+  roundOn(paragraph: number): OthersRound | undefined {
+    return [...this.rounds.values()].findLast((round) => round.paragraph === paragraph)
+  }
+
+  /** Someone else's round still being read, wherever it is. */
+  reading(): OthersRound | undefined {
+    return [...this.rounds.values()].find((round) => round.phase === 'reading')
+  }
+
+  person(id: string): Person | undefined {
+    return this.everyone.find((person) => person.id === id)
+  }
+
   setView(key: string, value: ViewValue) {
     this.view.set(key, value)
     this.send?.({ type: 'view', key, value, seq: this.nextSeq(key) })
@@ -132,6 +167,12 @@ export class PresenceStore {
     this.changed()
   }
 
+  /** My round goes to the others; none of mine is read back from here. */
+  setRound(round: SharedRound | null) {
+    this.myRound = round
+    this.send?.({ type: 'round', round })
+  }
+
   sendCursor(tab: number, place: CursorPlace | null) {
     this.myCursor = place && { tab, ...place }
     this.send?.({ type: 'cursor', tab, ...(place ?? { anchor: null }) })
@@ -148,6 +189,7 @@ export class PresenceStore {
         break
       case 'left':
         this.everyone = this.everyone.filter((person) => person.id !== message.id)
+        this.rounds.delete(message.id)
         this.placeCursor(message.id, null)
         this.changed()
         break
@@ -173,6 +215,11 @@ export class PresenceStore {
           this.changed()
         }
         break
+      case 'round':
+        if (message.round === null) this.rounds.delete(message.id)
+        else this.rounds.set(message.id, { ...message.round, by: message.id })
+        this.changed()
+        break
     }
   }
 
@@ -191,9 +238,11 @@ export class PresenceStore {
     this.waiting.clear()
     this.view = new Map(Object.entries(welcome.view))
     this.everyone = welcome.people
+    this.rounds = new Map(Object.entries(welcome.rounds).map(([id, round]) => [id, { ...round, by: id }]))
     this.cursorIds().forEach((id) => this.placeCursor(id, null))
     if (this.tab !== null) this.send?.({ type: 'tab', tab: this.tab })
     if (this.myCursor !== null) this.send?.({ type: 'cursor', ...this.myCursor })
+    if (this.myRound !== null) this.send?.({ type: 'round', round: this.myRound })
     if (welcome.timer !== null) {
       this.timerValue = { ...welcome.timer, at: Date.now() }
     } else if (this.timerValue !== null && timerElapsed(this.timerValue) > 0) {

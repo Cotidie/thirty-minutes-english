@@ -45,6 +45,7 @@ it('keeps the paragraph in view while it is summed up, then on Done judges the s
       summaries={[]}
       saved={[]}
       onSummary={onSummary}
+      onReading={vi.fn()}
       active={false}
       onStart={onStart}
       onEnd={onEnd}
@@ -91,6 +92,7 @@ it('gives the voice back when the judgment fails', async () => {
       summaries={[]}
       saved={[]}
       onSummary={vi.fn()}
+      onReading={vi.fn()}
       active={false}
       onStart={vi.fn()}
       onEnd={vi.fn()}
@@ -115,6 +117,7 @@ it('shows a kept summary in the card it was judged in, set apart from the articl
       summaries={[kept]}
       saved={[]}
       onSummary={vi.fn()}
+      onReading={vi.fn()}
       active={false}
       onStart={vi.fn()}
       onEnd={vi.fn()}

@@ -23,6 +23,7 @@ function renderMarked() {
       summaries={[]}
       saved={[FLAWED]}
       onSummary={vi.fn()}
+      onReading={vi.fn()}
       active={false}
       onStart={vi.fn()}
       onEnd={vi.fn()}

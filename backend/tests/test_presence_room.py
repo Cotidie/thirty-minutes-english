@@ -14,6 +14,17 @@ def view(key="chip:word:2", value=True, seq=1):
     return json.dumps({"type": "view", "key": key, "value": value, "seq": seq})
 
 
+def a_round(**over):
+    """A read-aloud round in progress on paragraph 1, with one word marked."""
+    sound = {"phoneme": "v", "score": 8, "weak": True, "heard": "b"}
+    finding = {"word": "verified", "heard": "b for v", "fix": "v", "at": 1, "score": 41, "repeated_ok": False, "sounds": [sound]}
+    return {"paragraph": 1, "phase": "reading", "heard": "Researchers berified", "findings": [finding]} | over
+
+
+def round_frame(r):
+    return json.dumps({"type": "round", "round": r})
+
+
 def rooms_with_a_second_between_writes():
     """The clock moves on each time it is read, so no limit on writes comes into a test about something else."""
     return Rooms(clock=itertools.count().__next__)
@@ -132,6 +143,17 @@ def test_someone_who_left_leaves_no_cursor_behind():
         json.dumps({"type": "timer", "running": True, "elapsed": -1, "seq": 1}),
         json.dumps({"type": "timer", "running": True, "elapsed": 86401, "seq": 1}),
         json.dumps({"type": "timer", "running": "yes", "elapsed": 1, "seq": 1}),
+        json.dumps({"type": "view", "key": "k", "value": True, "seq": 1, "pad": "x" * 1100}),
+        json.dumps({"type": "round"}),
+        round_frame(a_round(phase="listening")),
+        round_frame(a_round(paragraph="1")),
+        round_frame(a_round(paragraph=True)),
+        round_frame(a_round(paragraph=0)),
+        round_frame(a_round(heard="x" * 4001)),
+        round_frame(a_round(findings="none")),
+        round_frame(a_round(findings=[{k: v for k, v in a_round()["findings"][0].items() if k != "fix"}])),
+        round_frame(a_round()).replace('"score": 41', '"score": NaN'),
+        round_frame(a_round(findings=[a_round()["findings"][0] | {"sounds": [{"phoneme": "v" * 17, "score": 8, "weak": True}]}])),
     ],
 )
 def test_a_bad_frame_is_dropped_and_changes_nothing(raw):
@@ -178,6 +200,7 @@ WRITES = {
     "view": lambda i: view(key=f"k:{i}", seq=i),
     "tab": lambda i: json.dumps({"type": "tab", "tab": i % 10}),
     "timer": lambda i: json.dumps({"type": "timer", "running": True, "elapsed": i, "seq": i}),
+    "round": lambda i: round_frame(a_round(heard=str(i))),
 }
 
 
@@ -305,3 +328,66 @@ def test_a_taken_color_gives_way_and_a_second_connection_keeps_its_color():
     _, jo = rooms.join(1, 20, "jo", 0)
     _, mina_again = rooms.join(1, 10, "mina", 3)
     assert (mina.color, jo.color, mina_again.color) == (0, 1, 0)
+
+
+def test_a_round_goes_to_other_accounts_only():
+    rooms = Rooms()
+    room, mina = rooms.join(1, 10, "mina", 0)
+    _, my_other_tab = rooms.join(1, 10, "mina", 0)
+    _, jo = rooms.join(1, 20, "jo", 1)
+    for member in (mina, my_other_tab, jo):
+        member.outbox.take()
+    room.handle(mina, round_frame(a_round()))
+    assert jo.outbox.take() == [{"type": "round", "id": mina.id, "round": a_round()}]
+    assert mina.outbox.take() == [] and my_other_tab.outbox.take() == []
+
+
+def test_someone_coming_late_sees_the_round_in_progress_and_not_one_that_ended():
+    room, mina, jo = two_people()
+    room.handle(mina, round_frame(a_round()))
+    assert room.welcome(jo)["rounds"] == {mina.id: a_round()}
+    assert room.welcome(mina)["rounds"] == {}
+    jo.outbox.take()
+    room.handle(mina, round_frame(None))
+    assert jo.outbox.take() == [{"type": "round", "id": mina.id, "round": None}]
+    assert room.welcome(jo)["rounds"] == {}
+
+
+def test_a_round_ends_with_its_reader():
+    rooms = Rooms()
+    room, mina, jo = two_people(rooms)
+    room.handle(mina, round_frame(a_round()))
+    jo.outbox.take()
+    rooms.leave(1, mina)
+    assert jo.outbox.take() == [{"type": "left", "id": mina.id}]
+    _, newcomer = rooms.join(1, 30, "sol", 2)
+    assert room.welcome(newcomer)["rounds"] == {}
+
+
+def test_a_round_keeps_only_what_a_round_has():
+    room, mina, jo = two_people()
+    finding = a_round()["findings"][0]
+    padded = a_round(evil=1, findings=[finding | {"evil": 1, "sounds": [finding["sounds"][0] | {"evil": 1}]}])
+    room.handle(mina, round_frame(padded))
+    assert jo.outbox.take() == [{"type": "round", "id": mina.id, "round": a_round()}]
+
+
+def test_a_sound_without_a_heard_sound_stays_without_one():
+    room, mina, jo = two_people()
+    finding = a_round()["findings"][0] | {"sounds": [{"phoneme": "v", "score": 8, "weak": True}]}
+    room.handle(mina, round_frame(a_round(findings=[finding])))
+    assert jo.outbox.take()[0]["round"]["findings"][0]["sounds"] == [{"phoneme": "v", "score": 8, "weak": True}]
+
+
+def test_a_round_may_be_larger_than_other_frames():
+    room, mina, jo = two_people()
+    finding = a_round()["findings"][0]
+    big = a_round(heard="word " * 400, findings=[finding | {"at": i} for i in range(15)])
+    assert len(round_frame(big)) > 4000
+    room.handle(mina, round_frame(big))
+    assert jo.outbox.take() == [{"type": "round", "id": mina.id, "round": big}]
+    # Within every count and length, so only the size of the frame stops it.
+    too_big = a_round(findings=[finding | {"at": i, "sounds": finding["sounds"] * 10} for i in range(200)])
+    assert len(round_frame(too_big)) > 65536
+    room.handle(mina, round_frame(too_big))
+    assert jo.outbox.take() == []

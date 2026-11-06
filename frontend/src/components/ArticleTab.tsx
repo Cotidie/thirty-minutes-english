@@ -24,7 +24,7 @@ export function ArticleTab({
   const [reading, setReading] = useState<number | null>(null);
   const bodyRef = useRef<HTMLElement>(null);
   const { summaries, add: addSummary } = useSummaries(sessionId);
-  const marks = useReadingMarks(sessionId);
+  const { marks, add: addReading } = useReadingMarks(sessionId);
   const paragraphs = article.paragraphs;
   const cover = (article.figures ?? []).find((f) => f.paragraph_id === null);
   const sentences = pairSentences(
@@ -59,6 +59,7 @@ export function ArticleTab({
               summaries={summaries.filter((s) => s.paragraph_id === p.id)}
               saved={marks.get(p.id) ?? NO_MARKS}
               onSummary={addSummary}
+              onReading={addReading}
               active={reading !== null && reading !== i}
               onStart={() => setReading(i)}
               onEnd={() => setReading(null)}

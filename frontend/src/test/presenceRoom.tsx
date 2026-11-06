@@ -3,7 +3,7 @@ import type { ReactElement } from 'react'
 import { PresenceProvider } from '../lib/presence/PresenceProvider'
 import { FakeWebSocket } from './fakeWebSocket'
 
-export const WELCOME = { type: 'welcome', you: { id: 'me', color: 0 }, people: [], view: {}, timer: null }
+export const WELCOME = { type: 'welcome', you: { id: 'me', color: 0 }, people: [], view: {}, timer: null, rounds: {} }
 
 /** Renders inside a session whose socket is up, with nobody else in it yet. */
 export function renderInRoom(ui: ReactElement, welcome: object = WELCOME) {
@@ -23,4 +23,14 @@ export function someoneSets(socket: FakeWebSocket, key: string, value: unknown) 
 
 export function viewsSent(socket: FakeWebSocket) {
   return socket.sent.filter((message) => message.type === 'view').map(({ key, value }) => ({ key, value }))
+}
+
+/** Someone else in the session reads aloud: their round as it stands, or null once it ends. */
+export function someoneReads(socket: FakeWebSocket, round: object | null, id = 'jo1') {
+  act(() => socket.receive({ type: 'round', id, round }))
+}
+
+/** The rounds this screen has told the others about, in order. */
+export function roundsSent(socket: FakeWebSocket) {
+  return socket.sent.filter((message) => message.type === 'round').map((message) => message.round)
 }

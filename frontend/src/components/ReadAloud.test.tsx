@@ -1,5 +1,6 @@
 import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
+import { useState } from 'react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { LiveEvent } from '../lib/liveSession'
 import type { LiveConnection, LiveOptions } from '../lib/liveClient'
@@ -7,13 +8,15 @@ import type { AzureWord, Shown } from '../lib/assessor/judge'
 import type { AssessorOptions } from '../lib/assessor/azure'
 import { api } from '../api'
 import { pairSentences } from '../lib/sentences'
+import { renderInRoom, roundsSent } from '../test/presenceRoom'
 import { COACH_SILENCE_MS, COACH_TIMEOUT_MS } from './ReadAloud'
 import { Paragraph } from './Paragraph'
 
 const session = { token: 'eyJ.t', region: 'koreacentral', word_score: 60, hold: 31 }
 vi.mock('../api', () => ({
   api: {
-    addReading: vi.fn(async () => ({})),
+    // Filed as sent, the way the server answers.
+    addReading: vi.fn(async (reading: object) => ({ id: 1, created_at: '2026-11-06T00:00:00Z', ...reading })),
     assessorToken: vi.fn(async () => session),
     confirmHold: vi.fn(),
     giveBackHold: vi.fn(),
@@ -63,10 +66,8 @@ const verified: AzureWord = { Word: 'verified', PronunciationAssessment: { Accur
 const paragraph = 'Researchers verified it.'
 
 /** The paragraph on the page, idle: marks land on its words in place. */
-function renderIdle(active = false, saved: Shown[] = []) {
-  const onStart = vi.fn()
-  const onEnd = vi.fn()
-  render(
+function idleParagraph(active = false, saved: Shown[] = [], onStart = vi.fn(), onEnd = vi.fn()) {
+  return (
     <Paragraph
       paragraph={{ id: 7, text: paragraph }}
       pieces={pairSentences([paragraph], [{ en: paragraph, ko: '연구자들이 확인했다.' }])[0]}
@@ -74,12 +75,43 @@ function renderIdle(active = false, saved: Shown[] = []) {
       summaries={[]}
       saved={saved}
       onSummary={vi.fn()}
+      onReading={vi.fn()}
       active={active}
       onStart={onStart}
       onEnd={onEnd}
-    />,
+    />
   )
+}
+
+function renderIdle(active = false, saved: Shown[] = []) {
+  const onStart = vi.fn()
+  const onEnd = vi.fn()
+  render(idleParagraph(active, saved, onStart, onEnd))
   return { onStart, onEnd }
+}
+
+/** The paragraph as the article holds it: a round once filed comes back as the paragraph's saved marks. */
+function renderFiling() {
+  const onEnd = vi.fn()
+  function Filing() {
+    const [saved, setSaved] = useState<Shown[]>([])
+    return (
+      <Paragraph
+        paragraph={{ id: 7, text: paragraph }}
+        pieces={pairSentences([paragraph], [{ en: paragraph, ko: '연구자들이 확인했다.' }])[0]}
+        spans={[]}
+        summaries={[]}
+        saved={saved}
+        onSummary={vi.fn()}
+        onReading={(reading) => setSaved(reading.corrections ?? [])}
+        active={false}
+        onStart={vi.fn()}
+        onEnd={onEnd}
+      />
+    )
+  }
+  render(<Filing />)
+  return { onEnd }
 }
 
 /** Click Read aloud and wait until Azure is listening. */
@@ -129,6 +161,19 @@ describe('ReadAloud round', () => {
     )
   })
 
+  it('keeps the round done for the others when a last segment lands while Azure stops', async () => {
+    const { socket } = renderInRoom(idleParagraph())
+    await startRound()
+    // Azure hands over what it still held as it stops.
+    assessor.stop.mockImplementationOnce(async () => {
+      segment([berified], 'Researchers berified')
+      return undefined
+    })
+    await userEvent.click(screen.getByRole('button', { name: 'Done' }))
+    await waitFor(() => expect(vi.mocked(api.addReading)).toHaveBeenCalled())
+    expect(roundsSent(socket).at(-1)).toMatchObject({ paragraph: 7, phase: 'done', findings: [expect.objectContaining({ word: 'verified' })] })
+  })
+
   it('files a clean round too, so the old marks do not come back, and returns to idle on Close', async () => {
     const { onEnd } = renderIdle()
     await startRound()
@@ -144,7 +189,7 @@ describe('ReadAloud round', () => {
   })
 
   it('keeps the marks after Close, still clickable, with Read again on offer', async () => {
-    const { onEnd } = renderIdle()
+    const { onEnd } = renderFiling()
     await startRound()
     act(() => segment([berified], 'berified'))
     await userEvent.click(screen.getByRole('button', { name: 'Done' }))
@@ -382,6 +427,18 @@ describe('ReadAloud saved marks', () => {
     await userEvent.click(screen.getByRole('button', { name: 'verified: b for v' }))
     expect(screen.getByRole('note', { name: 'verified' })).toHaveTextContent("You said /b/. It's /v/.")
     expect(screen.getByRole('button', { name: 'Read again' })).toBeEnabled()
+  })
+
+  it('after Close the paragraph shows the marks it is given again, not its own round\'s', async () => {
+    renderIdle(false, [mark])
+    await userEvent.click(screen.getByRole('button', { name: 'Read again' }))
+    await waitFor(() => expect(screen.getByRole('status')).toHaveTextContent('Listening'))
+    act(() => segment([verified], 'Researchers verified it.'))
+    await userEvent.click(screen.getByRole('button', { name: 'Done' }))
+    await waitFor(() => expect(assessor.stop).toHaveBeenCalled())
+    expect(screen.queryByRole('button', { name: 'verified: b for v' })).not.toBeInTheDocument()
+    await userEvent.click(screen.getByRole('button', { name: 'Close' }))
+    expect(screen.getByRole('button', { name: 'verified: b for v' })).toBeInTheDocument()
   })
 
   it('clears them once a new round starts', async () => {

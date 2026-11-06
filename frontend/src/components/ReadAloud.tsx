@@ -1,10 +1,13 @@
-import { useEffect, useRef, useState, type RefObject } from 'react'
+import { useEffect, useRef, useState, type CSSProperties, type RefObject } from 'react'
 import { api } from '../api'
 import { startAzureAssessor, type Assessor } from '../lib/assessor/azure'
 import { Judge, type AzureWord, type Shown } from '../lib/assessor/judge'
 import { connectReadAloud, type LiveConnection } from '../lib/liveClient'
+import { personColor, type SharedRound } from '../lib/presence/store'
+import { useShareRound, type useOthersRound } from '../lib/presence/useSharedRound'
+import { useSharedView } from '../lib/presence/useSharedView'
 import { usePrice } from '../lib/usePrice'
-import type { Paragraph } from '../types'
+import type { Paragraph, Reading } from '../types'
 import { FindingCard } from './FindingCard'
 import { Price } from './Price'
 import './ReadAloud.css'
@@ -12,8 +15,10 @@ import './ReadAloud.css'
 interface Options {
   /** The paragraph read; a finished round is filed under its id. */
   paragraph: Paragraph
-  /** The marks the paragraph's last round left, shown until a new round starts. */
+  /** The marks shown while this page runs no round of its own: someone else's round on this paragraph, else the last one saved. */
   saved: Shown[]
+  /** The round this page read is filed. */
+  onFiled: (reading: Reading) => void
   onStart: () => void
   /** The microphone is free. */
   onEnd: () => void
@@ -59,6 +64,8 @@ interface Round {
   findings: Shown[]
   heard: string
   startedAt: number
+  /** Done was clicked: what Azure still hands over while it stops belongs to a finished round. */
+  over: boolean
 }
 
 /** One coach call for one clicked mark: opened, spoken, hung up. */
@@ -74,15 +81,19 @@ interface Call {
  * as the reader goes; a clicked mark opens the full account in text, and the
  * coach is dialled to say its two beats and hang up.
  */
-export function useReadAloud({ paragraph: { id: paragraphId, text: paragraph }, saved, onStart, onEnd }: Options): ReadAloudRound {
+export function useReadAloud({ paragraph: { id: paragraphId, text: paragraph }, saved, onFiled, onStart, onEnd }: Options): ReadAloudRound {
   const [phase, setPhase] = useState<Phase | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [heard, setHeard] = useState('')
   const [seconds, setSeconds] = useState(0)
-  /** The marks of a round started on this page; until then, the saved ones show. */
+  /** The marks of a round started on this page, until it is closed; otherwise the saved ones show. */
   const [fresh, setFresh] = useState<Shown[] | null>(null)
   const findings = fresh ?? saved
-  const [open, setOpen] = useState<number | null>(null)
+  /** Whichever mark anyone in the session opened last. */
+  const [open, setOpen] = useSharedView<number | null>(`mark:${paragraphId}`, null)
+  const share = useShareRound()
+  /** This paragraph's round is the one the others see. A connection shares one round, so no other paragraph may end it. */
+  const sharing = useRef(false)
   const audioRef = useRef<HTMLAudioElement>(null)
   const roundRef = useRef<Round | null>(null)
   const callRef = useRef<Call | null>(null)
@@ -100,12 +111,28 @@ export function useReadAloud({ paragraph: { id: paragraphId, text: paragraph }, 
     }
   }, [])
 
+  /** Tells the others how this paragraph's round stands, or that it is over. */
+  const shareRound = (round: Omit<SharedRound, 'paragraph'> | null) => {
+    if (round === null && !sharing.current) return
+    sharing.current = round !== null
+    share(round && { paragraph: paragraphId, ...round })
+  }
+
+  // Leaving the page ends the round for the others too.
+  useEffect(
+    () => () => {
+      if (sharing.current) share(null)
+    },
+    [share],
+  )
+
   const stopIfLeft = () => {
     if (!mounted.current) throw new Error('The page was left before the round started')
   }
 
   const start = async () => {
     onStart()
+    shareRound({ phase: 'reading', heard: '', findings: [] })
     setPhase('connecting')
     setError(null)
     setHeard('')
@@ -132,6 +159,7 @@ export function useReadAloud({ paragraph: { id: paragraphId, text: paragraph }, 
         findings: [],
         heard: '',
         startedAt: Date.now(),
+        over: false,
       }
       roundRef.current = round
       round.assessor = await startAzureAssessor({
@@ -151,6 +179,7 @@ export function useReadAloud({ paragraph: { id: paragraphId, text: paragraph }, 
       microphone?.getTracks().forEach((t) => t.stop())
       void endRound()
       giveBack()
+      shareRound(null)
       setError(e instanceof Error ? e.message : String(e))
       setPhase('failed')
     }
@@ -168,6 +197,7 @@ export function useReadAloud({ paragraph: { id: paragraphId, text: paragraph }, 
       round.heard = round.heard ? `${round.heard} ${text}` : text
       setHeard(round.heard)
     }
+    shareRound({ phase: round.over ? 'done' : 'reading', heard: round.heard, findings: round.findings })
   }
 
   /** Releases the microphone and Azure. Safe to call twice. */
@@ -257,10 +287,13 @@ export function useReadAloud({ paragraph: { id: paragraphId, text: paragraph }, 
     const elapsed = Math.round((Date.now() - round.startedAt) / 1000)
     setSeconds(elapsed)
     setPhase('done')
+    round.over = true
+    shareRound({ phase: 'done', heard: round.heard, findings: round.findings })
     await endRound()
     // Filed even when clean: the latest round is the one whose marks come back.
     await api
       .addReading({ paragraph_id: paragraphId, user_text: round.heard, seconds: elapsed, corrections: round.findings })
+      .then(onFiled)
       .catch(() => undefined)
   }
 
@@ -270,27 +303,37 @@ export function useReadAloud({ paragraph: { id: paragraphId, text: paragraph }, 
     void endRound()
     roundRef.current = null
     setPhase(null)
+    setFresh(null)
+    shareRound(null)
     onEnd()
   }
 
   return { phase, error, heard, seconds, findings, open, audioRef, start: () => void start(), done: () => void done(), reset, ask }
 }
 
-/** Starts a round. It stays in its place under the paragraph; the round itself shows below. */
-export function ReadAloudButton({ round, disabled }: { round: ReadAloudRound; disabled: boolean }) {
+/** Starts a round. It stays in its place under the paragraph; the round itself shows below. While someone else reads,
+ * it is off and says who. */
+export function ReadAloudButton({ round, disabled, reader }: { round: ReadAloudRound; disabled: boolean; reader: string | null }) {
   const { price, short } = usePrice('read_aloud_token')
   return (
-    <button type="button" className="paragraph-action" onClick={round.start} disabled={disabled || round.phase !== null || short !== null} title={short ?? undefined}>
+    <button
+      type="button"
+      className="paragraph-action"
+      onClick={round.start}
+      disabled={disabled || reader !== null || round.phase !== null || short !== null}
+      title={(reader ? `${reader} is reading` : short) ?? undefined}
+    >
       {round.phase !== null || round.findings.length > 0 ? 'Read again' : 'Read aloud'}
       <Price amount={price} />
     </button>
   )
 }
 
-/** The round as it runs: the open card, the status bar, and what was heard. */
-export function ReadAloudPanel({ round }: { round: ReadAloudRound }) {
+/** The round as it runs: the open card, the status bar, and what was heard. With no round of mine, someone else's. */
+export function ReadAloudPanel({ round, watched }: { round: ReadAloudRound; watched: ReturnType<typeof useOthersRound> }) {
   const { phase, error, heard, seconds, findings, open } = round
   const card = open === null ? null : findings[open]
+  if (phase === null && watched) return <WatchedRound watched={watched} card={card} audioRef={round.audioRef} />
   return (
     <div className={`read-aloud${phase === 'listening' ? ' is-live' : ''}`}>
       <audio ref={round.audioRef} autoPlay />
@@ -321,6 +364,29 @@ export function ReadAloudPanel({ round }: { round: ReadAloudRound }) {
             </dl>
           )}
         </>
+      )}
+    </div>
+  )
+}
+
+/** Someone else's round on this paragraph, as they read it: their name in their color, and what was heard. */
+function WatchedRound({ watched, card, audioRef }: { watched: NonNullable<ReturnType<typeof useOthersRound>>; card: Shown | null | undefined; audioRef: RefObject<HTMLAudioElement | null> }) {
+  const { name, color, round: theirs } = watched
+  return (
+    <div className="read-aloud is-watching" style={{ '--person': personColor(color) } as CSSProperties}>
+      {/* A mark of theirs that I click is spoken here, to me. */}
+      <audio ref={audioRef} autoPlay />
+      {card && <FindingCard finding={card} />}
+      <div className="read-aloud-bar">
+        <span className="read-aloud-status" role="status">
+          {theirs.phase === 'reading' ? `${name} is reading.` : `${name} finished. Click a mark to hear it.`}
+        </span>
+      </div>
+      {theirs.heard && (
+        <dl className="read-aloud-captions">
+          <dt>{name}</dt>
+          <dd>{theirs.heard}</dd>
+        </dl>
       )}
     </div>
   )

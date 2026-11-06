@@ -78,6 +78,7 @@ def test_welcome_gives_the_makers_color_and_tells_no_email_or_account_number(tmp
         with theirs.websocket_connect(url_of(session), headers=HOME) as them:
             welcome = them.receive_json()
     assert welcome["type"] == "welcome" and welcome["you"]["color"] == 1
+    assert welcome["rounds"] == {}
     assert welcome["people"][0]["name"] == "maker"
     for secret in ("maker@example.com", "friend@example.com", "user_id"):
         assert secret not in json.dumps(welcome)

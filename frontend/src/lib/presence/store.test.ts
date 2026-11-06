@@ -1,7 +1,7 @@
 import { expect, test, vi } from 'vitest'
-import { PresenceStore, type ServerMessage } from './store'
+import { PresenceStore, type ServerMessage, type SharedRound } from './store'
 
-const WELCOME = { type: 'welcome', you: { id: 'me', color: 0 }, people: [], view: {}, timer: null } as const
+const WELCOME = { type: 'welcome', you: { id: 'me', color: 0 }, people: [], view: {}, timer: null, rounds: {} } as const
 
 function joined(id: string) {
   const sent: Record<string, unknown>[] = []
@@ -182,4 +182,73 @@ test('a cursor is sent as a place, or as none', () => {
     { type: 'cursor', tab: 1, anchor: 'brief', x: 0.2, y: 0.3 },
     { type: 'cursor', tab: 1, anchor: null },
   ])
+})
+
+const ROUND: SharedRound = {
+  paragraph: 1,
+  phase: 'reading',
+  heard: 'Researchers berified',
+  findings: [{ word: 'verified', heard: 'b for v', fix: 'v', at: 1, score: 41, sounds: [], repeated_ok: false }],
+}
+
+test('a round someone is reading shows on its paragraph, by who reads it, until it ends', () => {
+  const { store } = joined('a')
+  const react = vi.fn()
+  store.subscribe(react)
+  store.receive({ type: 'round', id: 'b', round: ROUND })
+  expect(react).toHaveBeenCalled()
+  expect(store.roundOn(1)).toEqual({ ...ROUND, by: 'b' })
+  expect(store.roundOn(2)).toBeUndefined()
+  expect(store.reading()).toBe(store.roundOn(1))
+  store.receive({ type: 'round', id: 'b', round: null })
+  expect(store.roundOn(1)).toBeUndefined()
+  expect(store.reading()).toBeUndefined()
+})
+
+test('a round that is done is no one reading', () => {
+  const { store } = joined('a')
+  store.receive({ type: 'round', id: 'b', round: { ...ROUND, phase: 'done' } })
+  expect(store.roundOn(1)?.phase).toBe('done')
+  expect(store.reading()).toBeUndefined()
+})
+
+test('a round goes with the one who read it', () => {
+  const { store } = joined('a')
+  store.receive({ type: 'joined', id: 'b', name: 'jo', color: 1, tab: null })
+  store.receive({ type: 'round', id: 'b', round: ROUND })
+  expect(store.person('b')).toEqual({ id: 'b', name: 'jo', color: 1, tab: null })
+  store.receive({ type: 'left', id: 'b' })
+  expect(store.roundOn(1)).toBeUndefined()
+  expect(store.person('b')).toBeUndefined()
+})
+
+test('a welcome brings the rounds under way, and the next welcome replaces them', () => {
+  const store = new PresenceStore()
+  store.receive({ ...WELCOME, rounds: { b: ROUND } })
+  expect(store.roundOn(1)).toEqual({ ...ROUND, by: 'b' })
+  store.receive(WELCOME)
+  expect(store.roundOn(1)).toBeUndefined()
+})
+
+test('a round keeps its identity until it changes', () => {
+  const { store } = joined('a')
+  store.receive({ type: 'round', id: 'b', round: ROUND })
+  const before = store.roundOn(1)
+  store.receive({ type: 'view', key: 'chip', value: true, by: 'b', seq: 1 })
+  expect(store.roundOn(1)).toBe(before)
+})
+
+test('my round goes out, and again after a reconnect while it lasts', () => {
+  const { store, sent } = joined('a')
+  store.setRound(ROUND)
+  expect(sent.at(-1)).toEqual({ type: 'round', round: ROUND })
+  store.receive({ ...WELCOME, you: { id: 'a2', color: 0 } })
+  expect(sent.filter((m) => m.type === 'round')).toEqual([
+    { type: 'round', round: ROUND },
+    { type: 'round', round: ROUND },
+  ])
+  store.setRound(null)
+  store.receive({ ...WELCOME, you: { id: 'a3', color: 0 } })
+  expect(sent.filter((m) => m.type === 'round').at(-1)).toEqual({ type: 'round', round: null })
+  expect(sent.filter((m) => m.type === 'round')).toHaveLength(3)
 })

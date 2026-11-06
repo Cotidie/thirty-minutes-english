@@ -1,5 +1,6 @@
 """Who is in a session right now and what is on their screens: cursors, tabs, what they have turned over, the shared
-timer. None of it is saved, and losing it costs no more than a reload. Whatever must survive goes through REST.
+timer, and a read-aloud round in progress. None of it is saved, and losing it costs no more than a reload. Whatever must
+survive goes through REST.
 
 Messages tell people apart by a random id for the connection, and show them by a color and their username: never by
 account number or email. A username changed while someone is here shows from their next connection. Everything here runs on the
@@ -27,6 +28,14 @@ KEY = re.compile(r"[a-z]+(:[a-z0-9]+)*")
 MAX_KEY_CHARS = 80
 ANCHOR = re.compile(r"[a-z-]+(:[0-9]+)?")
 MAX_ANCHOR_CHARS = 40
+# A read-aloud round carries every mark so far and all that was heard, so its frame may be bigger than the others.
+MAX_ROUND_FRAME_BYTES = 65536
+MAX_HEARD_CHARS = 4000
+MAX_FINDINGS = 200
+MAX_SOUNDS = 32
+MAX_WORD_CHARS = 64
+MAX_PHONEME_CHARS = 16
+ROUND_PHASES = {"reading", "done"}  # reading: the reader is connecting or listening; done: the marks are final
 
 
 class Outbox:
@@ -95,6 +104,7 @@ class Member:
     color: int
     tab: int | None = None
     cursor: dict | None = None  # the last place they pointed at, for whoever comes in while the mouse stands still
+    round: dict | None = None  # the read-aloud round they are in, until they close it or leave
     outbox: Outbox = field(default_factory=Outbox)
     cursor_rate: _Rate = field(default_factory=_Rate)
 
@@ -144,6 +154,62 @@ def _is_elapsed(value: object) -> bool:
     return _is_number(value) and 0 <= value <= MAX_ELAPSED_SECONDS
 
 
+def _is_text(value: object, most: int) -> bool:
+    return type(value) is str and len(value) <= most
+
+
+def _is_score(value: object) -> bool:
+    return _is_number(value) and 0 <= value <= 100
+
+
+def _list_of(value: object, most: int, item: Callable[[object], dict | None]) -> list[dict] | None:
+    """Every item rebuilt by `item`, or None when the list or any item in it is not one."""
+    if type(value) is not list or len(value) > most:
+        return None
+    items = [item(entry) for entry in value]
+    return None if None in items else items
+
+
+def _sound_of(value: object) -> dict | None:
+    if not isinstance(value, dict):
+        return None
+    phoneme, score, weak = value.get("phoneme"), value.get("score"), value.get("weak")
+    if not (_is_text(phoneme, MAX_PHONEME_CHARS) and _is_score(score) and type(weak) is bool):
+        return None
+    sound = {"phoneme": phoneme, "score": score, "weak": weak}
+    if "heard" in value:
+        if not _is_text(value["heard"], MAX_PHONEME_CHARS):
+            return None
+        sound["heard"] = value["heard"]
+    return sound
+
+
+def _finding_of(value: object) -> dict | None:
+    if not isinstance(value, dict):
+        return None
+    word, heard, fix = value.get("word"), value.get("heard"), value.get("fix")
+    at, score, repeated_ok = value.get("at"), value.get("score"), value.get("repeated_ok")
+    sounds = _list_of(value.get("sounds"), MAX_SOUNDS, _sound_of)
+    if not (all(_is_text(text, MAX_WORD_CHARS) for text in (word, heard, fix)) and type(at) is int and at >= -1):
+        return None
+    if not (_is_score(score) and type(repeated_ok) is bool and sounds is not None):
+        return None
+    return {"word": word, "heard": heard, "fix": fix, "at": at, "score": score, "repeated_ok": repeated_ok, "sounds": sounds}
+
+
+def _round_of(value: object) -> dict | None:
+    """The round rebuilt from what a round has, or None when it is not one. A round of None is read before this."""
+    if not isinstance(value, dict):
+        return None
+    paragraph, phase, heard = value.get("paragraph"), value.get("phase"), value.get("heard")
+    findings = _list_of(value.get("findings"), MAX_FINDINGS, _finding_of)
+    if not (type(paragraph) is int and paragraph > 0 and phase in ROUND_PHASES and _is_text(heard, MAX_HEARD_CHARS)):
+        return None
+    if findings is None:
+        return None
+    return {"paragraph": paragraph, "phase": phase, "heard": heard, "findings": findings}
+
+
 class Room:
     """One session's people and what they share. What arrives malformed is dropped without a word, and so is a cursor
     that comes too fast. A write that comes too fast also closes the connection that sent it."""
@@ -160,6 +226,7 @@ class Room:
             "tab": self._read_tab,
             "view": self._read_view,
             "timer": self._read_timer,
+            "round": self._read_round,
         }
 
     def add(self, user_id: int, name: str, preferred_color: int) -> Member:
@@ -188,16 +255,20 @@ class Room:
             "people": [self._person(other) for other in self._other_accounts(member)],
             "view": dict(self._view),
             "timer": self._timer_now(),
+            "rounds": {other.id: other.round for other in self._other_accounts(member) if other.round is not None},
         }
 
     def handle(self, member: Member, raw: str) -> None:
-        message = self._parsed(raw)
-        reader = self._readers.get(message.get("type")) if message is not None else None
+        size = len(raw.encode())
+        message = self._parsed(raw, size)
+        if message is None or (message.get("type") != "round" and size > MAX_FRAME_BYTES):
+            return
+        reader = self._readers.get(message.get("type"))
         if reader is not None:
             reader(member, message)
 
-    def _parsed(self, raw: str) -> dict | None:
-        if len(raw.encode()) > MAX_FRAME_BYTES:
+    def _parsed(self, raw: str, size: int) -> dict | None:
+        if size > MAX_ROUND_FRAME_BYTES:
             return None
         try:
             message = json.loads(raw, parse_constant=_refuse_constant)
@@ -261,6 +332,19 @@ class Room:
             return
         self._timer = _Timer(running, elapsed, self._clock())
         self._send_to_everyone({"type": "timer", "running": running, "elapsed": elapsed, "by": member.id, "seq": seq})
+
+    def _read_round(self, member: Member, message: dict) -> None:
+        """Each reader writes only their own round, so it goes to the others without coming back. Not to the reader's other
+        connections either, as with cursors: those have no one by that id to name."""
+        if "round" not in message:
+            return
+        sent = message["round"]
+        read = None if sent is None else _round_of(sent)
+        if (sent is not None and read is None) or not self._within_write_rate(member):
+            return
+        member.round = read
+        for other in self._other_accounts(member):
+            other.outbox.put({"type": "round", "id": member.id, "round": read})
 
     def _send_to_everyone(self, message: dict) -> None:
         """Back to the sender too: everyone then applies the same writes in the same order and ends on the same value."""

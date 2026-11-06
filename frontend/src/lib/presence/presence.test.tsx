@@ -5,7 +5,7 @@ import { FakeWebSocket } from '../../test/fakeWebSocket'
 import { PresenceProvider } from './PresenceProvider'
 import { useSharedView } from './useSharedView'
 
-const WELCOME = { type: 'welcome', you: { id: 'me', color: 0 }, people: [], view: {}, timer: null }
+const WELCOME = { type: 'welcome', you: { id: 'me', color: 0 }, people: [], view: {}, timer: null, rounds: {} }
 
 function Chip() {
   const [on, setOn] = useSharedView<boolean>('chip:word:2', false)

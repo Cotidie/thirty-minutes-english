@@ -176,7 +176,7 @@ app/api/deps.py                  Me, 역할 검사, 세션 접근 검사
 | REST | 요청과 응답 | **모든 상태의 읽기와 쓰기** | 앱 전체 |
 | 세션 이벤트 스트림 `GET /api/sessions/{id}/events` | 서버에서 브라우저로 | 공유되는 세션 상태 중 무엇을 다시 읽어야 하는지 알림. 데이터는 없다 | 세션 화면 |
 | 계정 이벤트 스트림 `GET /api/me/events` | 서버에서 브라우저로 | 그 계정의 세션 목록을 다시 읽어야 한다는 알림. 데이터는 없다 | 홈 |
-| 현존감 WebSocket `/api/sessions/{id}/presence` | 양방향 | 누가 와 있는지, 커서, 탭, 뒤집어 본 화면 요소, 타이머. 저장하지 않는다. 자세한 것은 `2026-10-31-session-presence-design.md` | 세션 화면 |
+| 현존감 WebSocket `/api/sessions/{id}/presence` | 양방향 | 누가 와 있는지, 커서, 탭, 뒤집어 본 화면 요소, 타이머, 진행 중인 Read Aloud 회. 저장하지 않는다. 자세한 것은 `2026-10-31-session-presence-design.md` | 세션 화면 |
 | 폴링 `GET /api/jobs` | 브라우저에서 서버로 | 세션 생성 진행률. 시작한 사람만 보는 임시 상태다 | 홈, 세션 화면의 그림 진행 표시 |
 | WebSocket (브라우저와 Gemini, Azure 사이) | 양방향 | 말하기 연습의 음성. 우리 서버를 거치지 않는다 | 연습 화면 |
 

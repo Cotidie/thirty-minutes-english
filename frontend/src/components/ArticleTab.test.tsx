@@ -1,9 +1,10 @@
-import { fireEvent, render, screen, within } from '@testing-library/react'
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { api } from '../api'
 import { PresenceProvider } from '../lib/presence/PresenceProvider'
-import { renderInRoom, someoneSets, viewsSent, WELCOME } from '../test/presenceRoom'
+import { connectReadAloud } from '../lib/liveClient'
+import { renderInRoom, roundsSent, someoneReads, someoneSets, viewsSent, WELCOME } from '../test/presenceRoom'
 import { ArticleTab } from './ArticleTab'
 
 vi.mock('../api', () => ({
@@ -267,5 +268,61 @@ describe('ArticleTab with someone else in the session', () => {
     const { socket } = renderInRoom(<ArticleTab article={article} sessionId={3} />)
     someoneSets(socket, 'question', 99)
     expect(document.querySelector('mark')).toBeNull()
+  })})
+
+describe('ArticleTab while someone else reads aloud', () => {
+  const WITH_JO = { ...WELCOME, people: [{ id: 'jo1', name: 'jo', color: 1, tab: null }] }
+  const sheep = { word: 'cheap', heard: 'sh for tʃ', fix: 'tʃiːp', at: 2, score: 30, sounds: [], repeated_ok: false }
+  const JOS_ROUND = { paragraph: 1, phase: 'reading', heard: 'Ambition is sheep', findings: [sheep] }
+  const readButtons = () => screen.getAllByRole('button', { name: /^Read (aloud|again)/ })
+  const summarizeButtons = () => screen.getAllByRole('button', { name: /^Summarize/ })
+
+  it('shows their round on their paragraph as it comes in, and lets it go when it ends', () => {
+    const { socket } = renderInRoom(<ArticleTab article={article} sessionId={3} />, WITH_JO)
+    someoneReads(socket, JOS_ROUND)
+    expect(screen.getByRole('button', { name: 'cheap: sh for tʃ' })).toBeInTheDocument()
+    expect(screen.getByRole('status')).toHaveTextContent('jo is reading.')
+    expect(screen.getByText('Ambition is sheep')).toBeInTheDocument()
+    someoneReads(socket, null)
+    expect(screen.queryByRole('button', { name: 'cheap: sh for tʃ' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('status')).not.toBeInTheDocument()
+  })
+
+  it('turns Read aloud and Summarize off on every paragraph while they read, saying who', () => {
+    const { socket } = renderInRoom(<ArticleTab article={article} sessionId={3} />, WITH_JO)
+    someoneReads(socket, JOS_ROUND)
+    for (const button of [...readButtons(), ...summarizeButtons()]) {
+      expect(button).toBeDisabled()
+      expect(button).toHaveAttribute('title', 'jo is reading')
+    }
+    someoneReads(socket, { ...JOS_ROUND, phase: 'done' })
+    expect(screen.getByRole('status')).toHaveTextContent('jo finished. Click a mark to hear it.')
+    for (const button of [...readButtons(), ...summarizeButtons()]) expect(button).toBeEnabled()
+  })
+
+  it('shows a round already under way when I arrive', () => {
+    renderInRoom(<ArticleTab article={article} sessionId={3} />, { ...WITH_JO, rounds: { jo1: JOS_ROUND } })
+    expect(screen.getByRole('status')).toHaveTextContent('jo is reading.')
+    expect(screen.getByRole('button', { name: 'cheap: sh for tʃ' })).toBeInTheDocument()
+  })
+
+  it('tells them about my round, from the start until I close it', async () => {
+    const { socket } = renderInRoom(<ArticleTab article={article} sessionId={3} />)
+    await userEvent.click(screen.getAllByRole('button', { name: 'Read aloud' })[0])
+    await waitFor(() => expect(screen.getByRole('status')).toHaveTextContent('Listening'))
+    expect(roundsSent(socket)[0]).toEqual({ paragraph: 1, phase: 'reading', heard: '', findings: [] })
+    await userEvent.click(screen.getByRole('button', { name: 'Done' }))
+    await waitFor(() => expect(roundsSent(socket).at(-1)).toMatchObject({ paragraph: 1, phase: 'done' }))
+    await userEvent.click(screen.getByRole('button', { name: 'Close' }))
+    expect(roundsSent(socket).at(-1)).toBeNull()
+  })
+
+  it('opens the card of a mark they clicked, without dialling the coach', async () => {
+    vi.mocked(api.listReadings).mockResolvedValueOnce([{ id: 1, created_at: '', paragraph_id: 1, user_text: '', seconds: 9, corrections: [sheep] }])
+    const { socket } = renderInRoom(<ArticleTab article={article} sessionId={3} />, WITH_JO)
+    await screen.findByRole('button', { name: 'cheap: sh for tʃ' })
+    someoneSets(socket, 'mark:1', 0)
+    expect(screen.getByRole('note', { name: 'cheap' })).toBeInTheDocument()
+    expect(vi.mocked(connectReadAloud)).not.toHaveBeenCalled()
   })
 })
