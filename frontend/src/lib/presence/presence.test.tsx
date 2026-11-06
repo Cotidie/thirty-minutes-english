@@ -3,6 +3,7 @@ import userEvent from '@testing-library/user-event'
 import { beforeEach, expect, test } from 'vitest'
 import { FakeWebSocket } from '../../test/fakeWebSocket'
 import { PresenceProvider } from './PresenceProvider'
+import { useSomeoneReading } from './useSharedRound'
 import { useSharedView } from './useSharedView'
 
 const WELCOME = { type: 'welcome', you: { id: 'me', color: 0 }, people: [], view: {}, timer: null, rounds: {} }
@@ -84,4 +85,25 @@ test('a set while the socket is down stays on my screen and sends nothing', asyn
   await userEvent.click(screen.getByRole('button', { name: 'off' }))
   expect(screen.getByRole('button', { name: 'on' })).toBeInTheDocument()
   expect(socket.sent).toEqual([])
+})
+
+function Lock() {
+  return <p>{useSomeoneReading() ?? 'free'}</p>
+}
+
+test('a drop lets go of the rounds of the others, so nothing stays locked while I am cut off', () => {
+  render(
+    <PresenceProvider sessionId={7}>
+      <Lock />
+    </PresenceProvider>,
+  )
+  const socket = FakeWebSocket.only
+  const round = { paragraph: 1, phase: 'reading', heard: '', findings: [] }
+  act(() => {
+    socket.connect()
+    socket.receive({ ...WELCOME, people: [{ id: 'jo1', name: 'jo', color: 1, tab: null }], rounds: { jo1: round } })
+  })
+  expect(screen.getByText('jo')).toBeInTheDocument()
+  act(() => socket.drop(1006))
+  expect(screen.getByText('free')).toBeInTheDocument()
 })

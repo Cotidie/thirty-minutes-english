@@ -33,7 +33,7 @@ export interface ReadAloudRound {
   heard: string
   seconds: number
   findings: Shown[]
-  /** Index into `findings` of the one whose card is open. */
+  /** The place in the paragraph of the word whose card is open: the same in every list of marks, unlike an index. */
   open: number | null
   audioRef: RefObject<HTMLAudioElement | null>
   start: () => void
@@ -89,7 +89,7 @@ export function useReadAloud({ paragraph: { id: paragraphId, text: paragraph }, 
   /** The marks of a round started on this page, until it is closed; otherwise the saved ones show. */
   const [fresh, setFresh] = useState<Shown[] | null>(null)
   const findings = fresh ?? saved
-  /** Whichever mark anyone in the session opened last. */
+  /** Whichever mark anyone in the session opened last, by its word's place in the paragraph. */
   const [open, setOpen] = useSharedView<number | null>(`mark:${paragraphId}`, null)
   const share = useShareRound()
   /** This paragraph's round is the one the others see. A connection shares one round, so no other paragraph may end it. */
@@ -192,11 +192,11 @@ export function useReadAloud({ paragraph: { id: paragraphId, text: paragraph }, 
       ...round.findings.map((f) => (confirmed.some((c) => c.at === f.at) ? { ...f, repeated_ok: true } : f)),
       ...fresh.map((f) => ({ ...f, repeated_ok: false })),
     ]
+    if (text) round.heard = round.heard ? `${round.heard} ${text}` : text
+    // Azure hands over what it held as it stops. After Close, or once the page is left, that goes into the filing only.
+    if (!mounted.current || roundRef.current !== round) return
     setFresh(round.findings)
-    if (text) {
-      round.heard = round.heard ? `${round.heard} ${text}` : text
-      setHeard(round.heard)
-    }
+    setHeard(round.heard)
     shareRound({ phase: round.over ? 'done' : 'reading', heard: round.heard, findings: round.findings })
   }
 
@@ -212,7 +212,7 @@ export function useReadAloud({ paragraph: { id: paragraphId, text: paragraph }, 
 
   /** The reader clicked a mark: show its card and have the coach say it. */
   const ask = (index: number) => {
-    setOpen(index)
+    setOpen(findings[index].at)
     void speak(findings[index])
   }
 
@@ -332,12 +332,17 @@ export function ReadAloudButton({ round, disabled, reader }: { round: ReadAloudR
 /** The round as it runs: the open card, the status bar, and what was heard. With no round of mine, someone else's. */
 export function ReadAloudPanel({ round, watched }: { round: ReadAloudRound; watched: ReturnType<typeof useOthersRound> }) {
   const { phase, error, heard, seconds, findings, open } = round
-  const card = open === null ? null : findings[open]
-  if (phase === null && watched) return <WatchedRound watched={watched} card={card} audioRef={round.audioRef} />
+  const card = open === null ? null : findings.find((f) => f.at === open)
+  const theirs = phase === null ? watched : null
+  // One element whoever's round shows: a coach I hear keeps talking when their round comes or goes.
   return (
-    <div className={`read-aloud${phase === 'listening' ? ' is-live' : ''}`}>
+    <div
+      className={`read-aloud${phase === 'listening' ? ' is-live' : ''}${theirs ? ' is-watching' : ''}`}
+      style={theirs ? ({ '--person': personColor(theirs.color) } as CSSProperties) : undefined}
+    >
       <audio ref={round.audioRef} autoPlay />
       {card && <FindingCard finding={card} />}
+      {theirs && <WatchedRound watched={theirs} />}
       {phase !== null && (
         <>
           <div className="read-aloud-bar">
@@ -369,14 +374,11 @@ export function ReadAloudPanel({ round, watched }: { round: ReadAloudRound; watc
   )
 }
 
-/** Someone else's round on this paragraph, as they read it: their name in their color, and what was heard. */
-function WatchedRound({ watched, card, audioRef }: { watched: NonNullable<ReturnType<typeof useOthersRound>>; card: Shown | null | undefined; audioRef: RefObject<HTMLAudioElement | null> }) {
-  const { name, color, round: theirs } = watched
+/** Someone else's round on this paragraph, as they read it: who reads it, and what was heard. */
+function WatchedRound({ watched }: { watched: NonNullable<ReturnType<typeof useOthersRound>> }) {
+  const { name, round: theirs } = watched
   return (
-    <div className="read-aloud is-watching" style={{ '--person': personColor(color) } as CSSProperties}>
-      {/* A mark of theirs that I click is spoken here, to me. */}
-      <audio ref={audioRef} autoPlay />
-      {card && <FindingCard finding={card} />}
+    <>
       <div className="read-aloud-bar">
         <span className="read-aloud-status" role="status">
           {theirs.phase === 'reading' ? `${name} is reading.` : `${name} finished. Click a mark to hear it.`}
@@ -388,6 +390,6 @@ function WatchedRound({ watched, card, audioRef }: { watched: NonNullable<Return
           <dd>{theirs.heard}</dd>
         </dl>
       )}
-    </div>
+    </>
   )
 }

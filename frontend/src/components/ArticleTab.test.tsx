@@ -268,7 +268,8 @@ describe('ArticleTab with someone else in the session', () => {
     const { socket } = renderInRoom(<ArticleTab article={article} sessionId={3} />)
     someoneSets(socket, 'question', 99)
     expect(document.querySelector('mark')).toBeNull()
-  })})
+  })
+})
 
 describe('ArticleTab while someone else reads aloud', () => {
   const WITH_JO = { ...WELCOME, people: [{ id: 'jo1', name: 'jo', color: 1, tab: null }] }
@@ -321,7 +322,7 @@ describe('ArticleTab while someone else reads aloud', () => {
     vi.mocked(api.listReadings).mockResolvedValueOnce([{ id: 1, created_at: '', paragraph_id: 1, user_text: '', seconds: 9, corrections: [sheep] }])
     const { socket } = renderInRoom(<ArticleTab article={article} sessionId={3} />, WITH_JO)
     await screen.findByRole('button', { name: 'cheap: sh for tʃ' })
-    someoneSets(socket, 'mark:1', 0)
+    someoneSets(socket, 'mark:1', 2)
     expect(screen.getByRole('note', { name: 'cheap' })).toBeInTheDocument()
     expect(vi.mocked(connectReadAloud)).not.toHaveBeenCalled()
   })

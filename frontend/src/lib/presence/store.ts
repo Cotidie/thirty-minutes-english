@@ -173,6 +173,14 @@ export class PresenceStore {
     this.send?.({ type: 'round', round })
   }
 
+  /** The socket dropped. The others' rounds go, so a round nobody can end any more locks nothing; the welcome brings
+   * back whatever still stands. */
+  disconnected() {
+    if (this.rounds.size === 0) return
+    this.rounds = new Map()
+    this.changed()
+  }
+
   sendCursor(tab: number, place: CursorPlace | null) {
     this.myCursor = place && { tab, ...place }
     this.send?.({ type: 'cursor', tab, ...(place ?? { anchor: null }) })

@@ -87,7 +87,7 @@ function Word({ atom, spans, marks }: { atom: Atom; spans: Span[]; marks: Marks 
   return (
     <button
       type="button"
-      className={`reading-hit${finding.repeated_ok ? ' is-ok' : ''}${marks.open === index ? ' is-open' : ''}`}
+      className={`reading-hit${finding.repeated_ok ? ' is-ok' : ''}${marks.open === finding.at ? ' is-open' : ''}`}
       title={marks.locked ?? (marks.price ? `${title} · Hear the coach · ${marks.price}` : title)}
       aria-label={title}
       disabled={marks.locked !== null}

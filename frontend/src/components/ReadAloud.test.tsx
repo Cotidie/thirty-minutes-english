@@ -8,7 +8,8 @@ import type { AzureWord, Shown } from '../lib/assessor/judge'
 import type { AssessorOptions } from '../lib/assessor/azure'
 import { api } from '../api'
 import { pairSentences } from '../lib/sentences'
-import { renderInRoom, roundsSent } from '../test/presenceRoom'
+import { PresenceProvider } from '../lib/presence/PresenceProvider'
+import { renderInRoom, roundsSent, someoneReads, viewsSent } from '../test/presenceRoom'
 import { COACH_SILENCE_MS, COACH_TIMEOUT_MS } from './ReadAloud'
 import { Paragraph } from './Paragraph'
 
@@ -114,6 +115,21 @@ function renderFiling() {
   return { onEnd }
 }
 
+/** Azure stops a moment after it is asked, handing over what it still held as it goes. Returns how to let it finish. */
+function stopLate() {
+  let finish = () => undefined
+  assessor.stop.mockImplementationOnce(
+    () =>
+      new Promise<undefined>((resolve) => {
+        finish = () => {
+          segment([berified], 'Researchers berified')
+          resolve(undefined)
+        }
+      }),
+  )
+  return () => act(async () => finish())
+}
+
 /** Click Read aloud and wait until Azure is listening. */
 async function startRound() {
   await userEvent.click(screen.getByRole('button', { name: 'Read aloud' }))
@@ -172,6 +188,40 @@ describe('ReadAloud round', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Done' }))
     await waitFor(() => expect(vi.mocked(api.addReading)).toHaveBeenCalled())
     expect(roundsSent(socket).at(-1)).toMatchObject({ paragraph: 7, phase: 'done', findings: [expect.objectContaining({ word: 'verified' })] })
+  })
+
+  it('says the round is over when the page is left, even if Azure hands over more as it stops', async () => {
+    const { socket, rerender } = renderInRoom(idleParagraph())
+    await startRound()
+    const finish = stopLate()
+    rerender(
+      <PresenceProvider sessionId={3}>
+        <p />
+      </PresenceProvider>,
+    )
+    await finish()
+    expect(roundsSent(socket).at(-1)).toBeNull()
+  })
+
+  it('says the round is over on Close, even if Azure hands over more as it stops', async () => {
+    const { socket } = renderInRoom(idleParagraph())
+    await startRound()
+    const finish = stopLate()
+    await userEvent.click(screen.getByRole('button', { name: 'Done' }))
+    await userEvent.click(screen.getByRole('button', { name: 'Close' }))
+    await finish()
+    expect(roundsSent(socket).at(-1)).toBeNull()
+    expect(screen.queryByRole('button', { name: 'verified: b for v' })).not.toBeInTheDocument()
+  })
+
+  it('keeps one audio element while someone else\'s round comes and goes, so a coach I hear goes on', () => {
+    const { socket, container } = renderInRoom(idleParagraph())
+    const audio = container.querySelector('.read-aloud audio')
+    someoneReads(socket, { paragraph: 7, phase: 'done', heard: 'Researchers verified it.', findings: [] })
+    expect(screen.getByRole('status')).toHaveTextContent('Someone finished')
+    expect(container.querySelector('.read-aloud audio')).toBe(audio)
+    someoneReads(socket, null)
+    expect(container.querySelector('.read-aloud audio')).toBe(audio)
   })
 
   it('files a clean round too, so the old marks do not come back, and returns to idle on Close', async () => {
@@ -439,6 +489,12 @@ describe('ReadAloud saved marks', () => {
     expect(screen.queryByRole('button', { name: 'verified: b for v' })).not.toBeInTheDocument()
     await userEvent.click(screen.getByRole('button', { name: 'Close' }))
     expect(screen.getByRole('button', { name: 'verified: b for v' })).toBeInTheDocument()
+  })
+
+  it('tells the others which word\'s card is open by its place in the paragraph', async () => {
+    const { socket } = renderInRoom(idleParagraph(false, [mark]))
+    await userEvent.click(screen.getByRole('button', { name: 'verified: b for v' }))
+    expect(viewsSent(socket)).toEqual([{ key: 'mark:7', value: 1 }])
   })
 
   it('clears them once a new round starts', async () => {

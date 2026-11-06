@@ -3,7 +3,7 @@ import type { Shown } from './assessor/judge'
 /** What is drawn on a paragraph's words: the findings a reader can click. */
 export interface Marks {
   findings: Shown[]
-  /** Index into `findings` of the one whose card is open. */
+  /** The place in the paragraph of the word whose card is open. */
   open: number | null
   onOpen: (index: number) => void
   /** Why opening a finding cannot be paid for, when it cannot: it has the coach say the word. */

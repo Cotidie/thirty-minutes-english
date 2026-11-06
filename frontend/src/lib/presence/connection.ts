@@ -20,6 +20,7 @@ export function connectPresence(sessionId: number, store: PresenceStore): () => 
   })
   socket.addEventListener('message', (event) => store.receive(JSON.parse(event.data as string) as ServerMessage))
   socket.addEventListener('close', (event) => {
+    store.disconnected()
     if (REFUSED.has(event.code)) socket.close()
   })
   return () => {
