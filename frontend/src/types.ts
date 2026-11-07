@@ -178,10 +178,14 @@ export interface CreditsView {
   recent: CreditEntry[]
 }
 
-/** Someone a session is shared with. */
+/** Someone in a session: its owner, or someone it is shared with. */
 export interface ShareEntry {
   user_id: number
   username: string
+  /** Who made the session: nobody can stop sharing it with them. */
+  owner: boolean
+  /** The account looking. */
+  you: boolean
 }
 
 /** Someone a search for a name found: all one account may know of another. */
@@ -208,6 +212,9 @@ export interface Session {
   /** Whether this account made it; if not, `shared_by` is who did. */
   mine: boolean
   shared_by: string | null
+  /** Whether this account made it or had it shared, and so may share it and redraw its pictures. The admin opens every
+   * session but is in only those. */
+  member: boolean
 }
 
 /** A Gemini Live round: a one-use token in the socket URL and the setup message to send first. */

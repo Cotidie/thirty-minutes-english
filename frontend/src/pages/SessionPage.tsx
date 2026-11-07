@@ -119,7 +119,7 @@ function OpenSession({ id, onGone }: { id: number; onGone: () => void }) {
             <TabPeople tab={SUMMARY_TAB} />
           </button>
         </nav>
-        {session.mine && <SharePanel sessionId={session.id} />}
+        {session.member && <SharePanel sessionId={session.id} />}
       </aside>
       <NoteBox note={note} />
       <Cursors />
@@ -145,7 +145,7 @@ function OpenSession({ id, onGone }: { id: number; onGone: () => void }) {
             items={content.vocabulary}
             sessionId={session.id}
             arriving={arriving}
-            canRedraw={session.mine}
+            canRedraw={session.member}
             onPicture={(index, item) => setContent((c) => ({ vocabulary: c.vocabulary.map((v, i) => (i === index ? item : v)) }))}
             starred={stars.words}
             onToggleStar={(id) => toggle('words', id)}

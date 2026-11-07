@@ -17,6 +17,7 @@ const session = {
   title: 'T',
   mine: false,
   shared_by: 'mina',
+  member: true,
   content: {
     topic: 'X',
     expressions: [{ id: 1, phrase: 'a moving target', meaning: 'keeps changing', usage_note: 'n', examples: ['e1', 'e2'] }],
@@ -84,12 +85,22 @@ describe('SessionPage', () => {
     expect(redraw).toHaveAttribute('title', 'Not enough credits: this needs 10 and you have 3.')
   })
 
-  it('gives no redraw to whoever only had the session shared', async () => {
+  it('gives a redraw and the share panel to whoever had it shared', async () => {
     vi.mocked(useCredits).mockReturnValue(creditsOf(50, { redraw: 10 }))
-    vi.mocked(api.getSession).mockResolvedValueOnce({ ...mine, mine: false, shared_by: 'mina' })
+    vi.mocked(api.getSession).mockResolvedValueOnce({ ...mine, mine: false, member: true, shared_by: 'mina' })
+    vi.mocked(api.listShares).mockResolvedValueOnce([])
+    await load('/s/3#vocabulary')
+    expect(await screen.findByRole('button', { name: 'New picture for mitigate' })).toBeEnabled()
+    expect(screen.getByPlaceholderText('their username')).toBeInTheDocument()
+  })
+
+  it('gives neither to the admin opening a session they are not in', async () => {
+    vi.mocked(useCredits).mockReturnValue(creditsOf(50, { redraw: 10 }))
+    vi.mocked(api.getSession).mockResolvedValueOnce({ ...mine, mine: false, member: false, shared_by: 'mina' })
     await load('/s/3#vocabulary')
     await screen.findByText('mitigate')
     expect(screen.queryByRole('button', { name: 'New picture for mitigate' })).not.toBeInTheDocument()
+    expect(screen.queryByPlaceholderText('their username')).not.toBeInTheDocument()
   })
 
   it('lets the maker share whatever the balance is', async () => {

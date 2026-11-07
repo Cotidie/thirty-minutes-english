@@ -10,7 +10,8 @@ interface Props {
   sessionId: number
 }
 
-/** Whom the maker of a session has shared it with, and a search by username for whom to add. */
+/** Whom the session is shared with, as anyone in it sees it: its owner first, and a search by username for whom to add.
+ * Anyone in it adds or removes the others; nobody removes the owner, and I leave from Home. */
 export function SharePanel({ sessionId }: Props) {
   const [shares, setShares] = useState<ShareEntry[]>([])
   const [typed, setTyped] = useState('')
@@ -95,17 +96,23 @@ export function SharePanel({ sessionId }: Props) {
         <ul className="share-list">
           {shares.map((entry) => (
             <li key={entry.user_id} className="share-item">
-              <span className="share-name" title={entry.username}>
-                {entry.username}
+              <span className="share-who">
+                <span className="share-name" title={entry.username}>
+                  {entry.username}
+                </span>
+                {entry.owner && <span className="share-tag">owner</span>}
+                {entry.you && <span className="share-tag">you</span>}
               </span>
-              <button
-                type="button"
-                className="btn-link share-stop"
-                aria-label={`Stop sharing with ${entry.username}`}
-                onClick={() => void remove(entry)}
-              >
-                Stop
-              </button>
+              {!entry.owner && !entry.you && (
+                <button
+                  type="button"
+                  className="btn-link share-stop"
+                  aria-label={`Stop sharing with ${entry.username}`}
+                  onClick={() => void remove(entry)}
+                >
+                  Stop
+                </button>
+              )}
             </li>
           ))}
         </ul>

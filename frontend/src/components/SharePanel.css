@@ -81,6 +81,20 @@
   gap: 0.5rem;
 }
 
+/* The name and its tags, kept together on the left so Stop stays on the right. */
+.share-who {
+  display: flex;
+  align-items: baseline;
+  min-width: 0;
+}
+
+.share-tag {
+  flex: none;
+  margin-left: 0.35rem;
+  color: var(--muted);
+  font-size: 0.8rem;
+}
+
 .share-name {
   min-width: 0;
   overflow: hidden;

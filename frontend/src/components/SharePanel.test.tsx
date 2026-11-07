@@ -10,8 +10,10 @@ vi.mock('../api', async (original) => ({
   api: { listShares: vi.fn(), addShare: vi.fn(), removeShare: vi.fn(), findPeople: vi.fn() },
 }))
 
-const MINA = { user_id: 2, username: 'mina' }
-const JO = { user_id: 3, username: 'jo_kim' }
+const MINA = { user_id: 2, username: 'mina', owner: false, you: false }
+const JO = { user_id: 3, username: 'jo_kim', owner: false, you: false }
+const OWNER = { user_id: 1, username: 'ana', owner: true, you: false }
+const ME = { user_id: 5, username: 'sol', owner: false, you: true }
 
 beforeEach(() => {
   FakeEventSource.instances = []
@@ -61,6 +63,16 @@ test('a name nobody has says so', async () => {
   await userEvent.type(await screen.findByRole('combobox', { name: 'Share with' }), 'zzz')
   expect(await screen.findByText('No one goes by a name like that.')).toBeInTheDocument()
   expect(api.addShare).not.toHaveBeenCalled()
+})
+
+test('the owner is listed first with no Stop, and so am I', async () => {
+  vi.mocked(api.listShares).mockResolvedValue([OWNER, ME, MINA])
+  render(<SharePanel sessionId={7} />)
+  const rows = (await screen.findAllByRole('listitem')).map((row) => row.textContent)
+  expect(rows).toEqual(['anaowner', 'solyou', 'minaStop'])
+  expect(screen.getAllByRole('button', { name: /^Stop sharing with/ }).map((b) => b.getAttribute('aria-label'))).toEqual([
+    'Stop sharing with mina',
+  ])
 })
 
 test('a share can be ended', async () => {
