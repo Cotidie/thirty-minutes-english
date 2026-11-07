@@ -36,6 +36,7 @@
 - `is_admin`: 운영자. 한 명뿐이다. 세션 생성 권한을 포함한다.
 - `can_create`: 운영자가 켜 주는 세션 생성 권한.
 - 세션 접근권: 그 세션을 만든 사람, `session_shares`에 있는 사람, 또는 운영자.
+- 세션 멤버: 그 세션을 만든 사람(소유자)과 `session_shares`에 있는 사람. 운영자는 모든 세션을 열 수 있지만, 자기가 만들었거나 공유받은 세션에서만 멤버다. 멤버는 공유를 더하고 풀 수 있다. 소유자는 공유 목록에 없으므로 아무도 소유자를 뺄 수 없다.
 
 여기서 연습 권한(`can_practice`)을 계산한다. `is_admin` 또는 `can_create`이거나, 내가 만든 세션 또는 공유받은 세션이 하나 이상이면 참이다. 코치와 음성 API는 Gemini와 Azure 비용이 들고 요청에 세션 번호가 없다. 가입은 누구나 할 수 있으므로 로그인만 요구하면 비용 제한이 되지 않는다.
 
@@ -49,9 +50,9 @@
 | `GET /api/sessions/{id}`, 별표와 노트의 `GET`/`PUT`, 표현 교체와 추가, `examples`, `summaries`, `readings` | 세션 접근권 |
 | `GET /api/sessions/{id}/events` | 세션 접근권 |
 | `GET /api/me/events` | 로그인. 그 계정에 대한 알림만 |
-| `DELETE /api/sessions/{id}`, 다른 사람의 공유 해제 | 세션을 만든 사람만 |
+| `DELETE /api/sessions/{id}` | 소유자만. 모두에게서 사라진다 |
 | `DELETE /api/sessions/{id}/shares/me` | 공유받은 사람. 내 공유만 풀리고 세션은 남는다 |
-| 그림 다시 그리기, 공유 추가 | 세션을 만든 사람이면서 `can_create` 또는 `is_admin` |
+| 공유 목록, 공유 추가, 다른 사람의 공유 해제, 그림 다시 그리기 | 세션 멤버. 멤버가 아닌 운영자는 403 |
 | `GET /api/images/{name}` | 그 그림을 쓰는 세션에 접근권 |
 | `read-aloud`, `summary`, `example`, `assessor/token`, `speech` | `can_practice` |
 | `GET /api/topics`, `POST /api/topics/refresh` | `can_create` 또는 `is_admin` |
@@ -64,7 +65,7 @@
 - 없는 세션과 접근권 없는 세션은 똑같이 404다. 세션 번호로 존재 여부를 알아낼 수 없게 한다.
 - 운영자는 다른 사람의 세션에 공유받은 사람과 같은 권한을 가진다. 공유 관리는 할 수 없고, 그 세션은 운영자의 홈 목록에 나오지 않는다. 데이터베이스 페이지의 링크로 연다.
 
-운영자가 `can_create`를 끄면 비용이 새로 드는 생성, 그림 다시 그리기, 공유 추가만 막힌다. 이미 돌고 있는 job은 끝까지 간다. 그 계정이 만든 세션, 이미 지정한 공유, 연습 권한은 유지한다.
+운영자가 `can_create`를 끄면 비용이 새로 드는 생성과 그림 다시 그리기만 막힌다. 이미 돌고 있는 job은 끝까지 간다. 그 계정이 만든 세션, 이미 지정한 공유, 연습 권한은 유지한다.
 
 ## 운영자 계정
 
@@ -155,10 +156,10 @@ app/api/deps.py                  Me, 역할 검사, 세션 접근 검사
   - `JobRunner._run`은 job을 시작한 계정을 넘긴다. `swap_expression`과 `add_expression`은 요청한 계정을 넘긴다. 같은 세션 안의 중복을 막는 `_had`는 그대로다.
   - `SessionRepo.used_words`도 같은 세션들 중 최근 40개만 본다. 다른 사람이 쓴 단어는 다시 나올 수 있다.
   - 공유는 나중에 받아도 그 시점부터 계산에 들어간다. 이미 만든 세션은 바꾸지 않는다.
-- **공유:** `GET`, `POST /api/sessions/{id}/shares`, `DELETE /api/sessions/{id}/shares/{user_id}`. `POST`는 `{"user_id"}`를 받는다. 없는 계정이면 404 "That account is not here any more." 자기 자신과 중복 지정은 그대로 성공으로 처리한다. 대상은 `GET /api/users?q=`로 찾는다. username에 `q`가 들어간 계정을 최대 8개, `q`로 시작하는 이름부터 돌려준다. 검색한 사람은 빠지고, 응답에는 `id`와 `username`만 있다. 공유 목록 응답도 `user_id`와 `username`이다.
+- **공유:** `GET`, `POST /api/sessions/{id}/shares`, `DELETE /api/sessions/{id}/shares/{user_id}`. `POST`는 `{"user_id"}`를 받는다. 없는 계정이면 404 "That account is not here any more." 자기 자신, 소유자, 중복 지정은 아무것도 바꾸지 않고 성공으로 처리한다. 대상은 `GET /api/users?q=`로 찾는다. username에 `q`가 들어간 계정을 최대 8개, `q`로 시작하는 이름부터 돌려준다. 검색한 사람은 빠지고, 응답에는 `id`와 `username`만 있다. 공유 목록 응답은 소유자를 맨 앞에 두고 그다음 공유받은 사람을 username 순으로 둔다. 각 항목은 `user_id`, `username`, `owner`(소유자인가), `you`(묻는 계정인가)다. 화면은 소유자와 나에게 해제 버튼을 두지 않는다. 나는 홈에서 빠진다.
 - **별표:** 지금은 브라우저가 가진 전체 목록을 저장해서, 두 사람이 같은 세션을 열어 두면 한 사람의 별표가 다른 사람의 저장으로 지워진다. `PUT /api/sessions/{id}/stars`를 `PUT /api/sessions/{id}/stars/{kind}/{item}` (`{"starred": bool}`, `kind`는 `expressions` 또는 `words`)로 바꾸고, `useStars`는 누른 항목만 보낸 뒤 응답의 전체 목록으로 화면을 갱신한다.
-- **응답 추가:** `SessionSummary`와 `Session`에 `mine: bool`, `shared_by: str | None`(만든 사람의 username, 내 세션이면 없음)을 더한다.
-- **이름 변경 알림:** username을 바꾸면 그 계정이 들어 있는 세션들에 `shares`, 그 계정이 만든 세션을 공유받은 계정들에 `sessions`를 알린다.
+- **응답 추가:** `SessionSummary`와 `Session`에 `mine: bool`, `shared_by: str | None`(만든 사람의 username, 내 세션이면 없음)을 더한다. `Session`에는 `member: bool`도 더한다. 화면은 이 값으로 공유 패널과 그림 다시 그리기 버튼을 보인다.
+- **이름 변경 알림:** username을 바꾸면 그 계정이 공유받은 세션과 만든 세션에 `shares`, 그 계정이 만든 세션을 공유받은 계정들에 `sessions`를 알린다.
 
 ## 실시간 반영
 
@@ -199,7 +200,7 @@ app/api/deps.py                  Me, 역할 검사, 세션 접근 검사
 | `stars` | `GET /api/sessions/{id}/stars` | `set_star`, `swap_expression`(빠진 표현의 별표도 사라진다) |
 | `note` | `GET /api/sessions/{id}/note` | `set_note` |
 | `records` | `examples`, `summaries`, `readings`의 GET | `add_example`, `add_summary`, `add_reading` |
-| `shares` | `GET /api/sessions/{id}/shares`. 만든 사람의 공유 목록만 듣는다 | `ShareRepo.share`, `ShareRepo.unshare` |
+| `shares` | `GET /api/sessions/{id}/shares`. 세션 멤버가 듣는다 | `ShareRepo.share`, `ShareRepo.unshare` |
 | `gone` | 없음. 화면을 "This session is no longer available."로 바꾼다 | 저장소가 아니라 스트림이 판단한다 (아래) |
 | `sessions` (계정 스트림) | `GET /api/sessions` | `SessionRepo.create`(만든 사람에게), `SessionRepo.delete`(만든 사람과 공유받은 사람 모두에게), `ShareRepo.share`, `ShareRepo.unshare`(그 사람에게) |
 
