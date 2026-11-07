@@ -119,7 +119,7 @@ def _shares_of(db: Database, session_id: int, me: User) -> list[ShareEntry]:
     """Everyone in the session as `me` sees them: its owner first, then whoever it is shared with."""
     owner_id = db.shares.created_by(session_id)
     owner = db.accounts.get(owner_id) if owner_id is not None else None
-    owners =[ShareEntry(user_id=owner.id, username=owner.username, owner=True, you=owner.id == me.id)] if owner else []
+    owners = [ShareEntry(user_id=owner.id, username=owner.username, owner=True, you=owner.id == me.id)] if owner else []
     return owners + [
         ShareEntry(user_id=user.id, username=user.username, you=user.id == me.id) for user in db.shares.shared_with(session_id)
     ]

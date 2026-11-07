@@ -107,7 +107,7 @@ CREATE INDEX credits_by_user ON credits (user_id, id);
 
 - 구석 알약 (`CornerTools`): 운영자가 아닌 계정에만. 노란 코인과 잔액 숫자. `useAccountResource('credits', ...)`로 구독해 새로고침 없이 바뀐다. 누르면 잔액, 최근 내역 10건, "Ask the admin for more." 한 줄이 든 작은 패널이 열린다. 내역 한 줄은 날짜, 종류, 보충 설명, 금액이다. 예: `Nov 1 · Session · Blame for the Java Sea ferry… · −200`.
 - 홈: `SessionCreator`를 모든 계정에 보인다. Generate 버튼에 `200`이 붙는다. 모자라면 버튼이 비활성이고 아래에 `120 credits left. A session costs 200. Ask the admin for more.`를 보인다. "Session creation isn't on for this account yet" 문구는 없어진다. 빈 목록 문구는 하나로 합친다.
-- 세션 페이지: Practice 버튼에 회당 합계 `20`, Summarize 버튼에 회당 합계 `10`, Read aloud 버튼에 `5`가 붙는다. Read aloud에서 틀린 단어의 표시는 누르면 코치가 말해 주므로 `title`에 `Hear the coach · 5`를 보이고, 잔액이 5보다 적으면 표시가 비활성이다. 그림 다시 그리기(↻)는 만든 사람에게만 보이고(`canRedraw={session.mine}`), 툴팁에 `New picture · 10`을 보인다. 문장 듣기 버튼에는 가격을 붙이지 않는다(캐시에 있으면 무료라 미리 알 수 없다). 모자라서 402가 오면 기존 오류 자리에 보인다. `SharePanel`은 만든 사람에게 항상 추가 칸을 보인다.
+- 세션 페이지: Practice 버튼에 회당 합계 `20`, Summarize 버튼에 회당 합계 `10`, Read aloud 버튼에 `5`가 붙는다. Read aloud에서 틀린 단어의 표시는 누르면 코치가 말해 주므로 `title`에 `Hear the coach · 5`를 보이고, 잔액이 5보다 적으면 표시가 비활성이다. 그림 다시 그리기(↻)는 세션 멤버에게 보이고(`canRedraw={session.member}`), 툴팁에 `New picture · 10`을 보인다. 문장 듣기 버튼에는 가격을 붙이지 않는다(캐시에 있으면 무료라 미리 알 수 없다). 모자라서 402가 오면 기존 오류 자리에 보인다. `SharePanel`은 멤버에게 잔액과 상관없이 항상 추가 칸을 보인다.
 - 데이터베이스 화면의 Accounts 탭 (운영자, `/database/accounts`): 계정마다 이메일과 가입일, 잔액, 숫자 칸(기본 200)과 `Add` 버튼, 그 아래 최근 내역. 음수를 넣으면 회수. 운영자 자신의 행은 `∞ not charged`이고 칸이 없다. 저장은 지금 토글처럼 즉시다.
 
 ## 테스트
