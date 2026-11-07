@@ -129,7 +129,7 @@ def test_a_new_name_tells_the_shares_it_is_on_and_whoever_lists_a_session_it_mad
     db.changes.published.clear()
     db.account_changes.published.clear()
     db.accounts.set_username(maker.id, "new_name")
-    assert db.changes.published == [(theirs.id, SessionChange.SHARES)]
+    assert sorted(db.changes.published) == sorted([(made.id, SessionChange.SHARES), (theirs.id, SessionChange.SHARES)])
     assert db.account_changes.published == [(friend.id, AccountChange.SESSIONS), (maker.id, AccountChange.ME)]
 
 

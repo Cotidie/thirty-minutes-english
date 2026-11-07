@@ -60,9 +60,15 @@ def _free_name(conn: sqlite3.Connection) -> str:
 
 
 def _showing_the_name(conn: sqlite3.Connection, user_id: int) -> tuple[list[int], list[int]]:
-    """Where the account's name is on show to someone else: the sessions whose shares list it, and the accounts whose
-    list of sessions says it made one."""
-    shares = [row[0] for row in conn.execute("SELECT session_id FROM session_shares WHERE user_id = ?", (user_id,))]
+    """Where the account's name is on show to someone else: the sessions whose share panel lists it (those it is in and
+    those it made), and the accounts whose list of sessions says it made one."""
+    shares = [
+        row[0]
+        for row in conn.execute(
+            "SELECT session_id FROM session_shares WHERE user_id = ? UNION SELECT id FROM sessions WHERE created_by = ?",
+            (user_id, user_id),
+        )
+    ]
     lists = [
         row[0]
         for row in conn.execute(

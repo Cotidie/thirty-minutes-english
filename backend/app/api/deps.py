@@ -93,6 +93,13 @@ def require_creator(db: Database, me: User, session_id: int) -> None:
         raise HTTPException(status_code=403, detail="Only who made this session can do this.")
 
 
+def require_member(db: Database, me: User, session_id: int) -> None:
+    """404 as `require_access`; 403 for the admin on a session they neither made nor had shared with them."""
+    require_access(db, me, session_id)
+    if not db.shares.is_member(me.id, session_id):
+        raise HTTPException(status_code=403, detail="Only the people this session is shared with can do this.")
+
+
 def require_paragraph(db: Database, me: User, paragraph_id: int) -> None:
     """404 unless `paragraph_id` names a paragraph of a session `me` may open."""
     session_id = db.sessions.session_of_paragraph(paragraph_id)

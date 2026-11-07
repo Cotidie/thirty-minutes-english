@@ -1,4 +1,5 @@
-"""Who may open a session: its creator, whoever it is shared with, and the admin. Every check of that is here."""
+"""Who may open a session (its creator, whoever it is shared with, and the admin) and who may share it (its creator and
+whoever it is shared with). Every check of that is here."""
 
 from datetime import UTC, datetime
 from typing import TYPE_CHECKING
@@ -70,6 +71,20 @@ class ShareRepo:
                 return True
             return (
                 conn.execute("SELECT 1 FROM session_shares WHERE session_id = ? AND user_id = ?", (session_id, user.id)).fetchone()
+                is not None
+            )
+
+    def is_member(self, user_id: int, session_id: int) -> bool:
+        """Whether the account made the session or had it shared: the people who share it further. The admin opens every
+        session but is a member only of those."""
+        with self._db.connect() as conn:
+            row = conn.execute("SELECT created_by FROM sessions WHERE id = ?", (session_id,)).fetchone()
+            if row is None:
+                return False
+            if row[0] == user_id:
+                return True
+            return (
+                conn.execute("SELECT 1 FROM session_shares WHERE session_id = ? AND user_id = ?", (session_id, user_id)).fetchone()
                 is not None
             )
 

@@ -2,7 +2,7 @@ from dataclasses import asdict
 
 from fastapi import APIRouter, HTTPException, Response
 
-from app.api.deps import Db, Files, Jobs, Me, Svc, failed, held_or_402, off, paid, require_access, require_creator
+from app.api.deps import Db, Files, Jobs, Me, Svc, failed, held_or_402, off, paid, require_access, require_creator, require_member
 from app.api.schemas import CreateSessionRequest, JobStatus, RedrawRequest, ShareEntry, ShareRequest, StarRequest
 from app.db import Database
 from app.db.sessions import StarKind
@@ -97,7 +97,7 @@ def get_session(session_id: int, db: Db, me: Me) -> Session:
     if session is None:
         raise HTTPException(status_code=404, detail="session not found")
     mine, shared_by = db.sessions.viewpoint(session_id, me.id)
-    return session.model_copy(update={"mine": mine, "shared_by": shared_by})
+    return session.model_copy(update={"mine": mine, "shared_by": shared_by, "member": db.shares.is_member(me.id, session_id)})
 
 
 @router.delete("/sessions/{session_id}", status_code=204)
@@ -115,26 +115,33 @@ def delete_session(session_id: int, db: Db, files: Files, jobs: Jobs, me: Me) ->
     return Response(status_code=204)
 
 
-def _shares_of(db: Database, session_id: int) -> list[ShareEntry]:
-    return [ShareEntry(user_id=user.id, username=user.username) for user in db.shares.shared_with(session_id)]
+def _shares_of(db: Database, session_id: int, me: User) -> list[ShareEntry]:
+    """Everyone in the session as `me` sees them: its owner first, then whoever it is shared with."""
+    owner_id = db.shares.created_by(session_id)
+    owner = db.accounts.get(owner_id) if owner_id is not None else None
+    owners =[ShareEntry(user_id=owner.id, username=owner.username, owner=True, you=owner.id == me.id)] if owner else []
+    return owners + [
+        ShareEntry(user_id=user.id, username=user.username, you=user.id == me.id) for user in db.shares.shared_with(session_id)
+    ]
 
 
 @router.get("/sessions/{session_id}/shares", response_model=list[ShareEntry])
 def list_shares(session_id: int, db: Db, me: Me) -> list[ShareEntry]:
-    require_creator(db, me, session_id)
-    return _shares_of(db, session_id)
+    require_member(db, me, session_id)
+    return _shares_of(db, session_id, me)
 
 
 @router.post("/sessions/{session_id}/shares", response_model=list[ShareEntry], status_code=201)
 def add_share(session_id: int, body: ShareRequest, db: Db, me: Me) -> list[ShareEntry]:
-    """Only an account that exists; sharing with oneself or sharing again changes nothing."""
-    require_creator(db, me, session_id)
+    """Anyone in the session shares it further, with an account that exists; sharing with oneself, with the owner, or
+    sharing again changes nothing."""
+    require_member(db, me, session_id)
     user = db.accounts.get(body.user_id)
     if user is None:
         raise HTTPException(status_code=404, detail="That account is not here any more.")
-    if user.id != me.id:
+    if user.id not in (me.id, db.shares.created_by(session_id)):
         db.shares.share(session_id, user.id)
-    return _shares_of(db, session_id)
+    return _shares_of(db, session_id, me)
 
 
 @router.delete("/sessions/{session_id}/shares/me", status_code=204)
@@ -147,7 +154,8 @@ def leave_session(session_id: int, db: Db, me: Me) -> Response:
 
 @router.delete("/sessions/{session_id}/shares/{user_id}", status_code=204)
 def remove_share(session_id: int, user_id: int, db: Db, me: Me) -> Response:
-    require_creator(db, me, session_id)
+    """Anyone in the session stops sharing it with anyone else in it. The owner has no share to end, so nobody removes them."""
+    require_member(db, me, session_id)
     if not db.shares.unshare(session_id, user_id):
         raise HTTPException(status_code=404, detail="not shared with that account")
     return Response(status_code=204)
@@ -176,8 +184,8 @@ def add_expression(session_id: int, db: Db, me: Me) -> Expression:
 @router.post("/sessions/{session_id}/pictures/{index}", response_model=VocabularyItem)
 def redraw_picture(session_id: int, index: int, body: RedrawRequest, db: Db, services: Svc, files: Files, me: Me) -> VocabularyItem:
     """One of a word's pictures drawn again and shown in place of the old one, whose file goes:
-    the example sentence as it is, or a fresh scene for Practice."""
-    require_creator(db, me, session_id)
+    the example sentence as it is, or a fresh scene for Practice. Anyone in the session may, at their own price."""
+    require_member(db, me, session_id)
     session = db.sessions.get(session_id)
     if session is None or not 0 <= index < len(session.content.vocabulary):
         raise HTTPException(status_code=404, detail="no such word")

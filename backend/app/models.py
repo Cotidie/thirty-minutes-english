@@ -252,6 +252,8 @@ class Session(BaseModel):
     content: SessionContent
     mine: bool = True
     shared_by: str | None = None
+    member: bool = True
+    """Whether this account made the session or had it shared; the admin opens every session but is a member only of those."""
 
 
 class Stars(BaseModel):

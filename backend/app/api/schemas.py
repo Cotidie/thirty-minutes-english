@@ -74,6 +74,10 @@ class ShareRequest(BaseModel):
 class ShareEntry(BaseModel):
     user_id: int
     username: str
+    owner: bool = False
+    """Who made the session: nobody can stop sharing it with them."""
+    you: bool = False
+    """The account asking."""
 
 
 class CreateSessionRequest(BaseModel):

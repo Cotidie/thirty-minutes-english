@@ -48,6 +48,7 @@ def spend_everything(world, name: str) -> None:
         ("GET", "/api/summaries?session_id={sid}", 401, 404, 200, 200, 200),
         ("GET", "/api/readings?session_id={sid}", 401, 404, 200, 200, 200),
         ("POST", "/api/sessions/{sid}/expressions", 401, 404, 200, 200, 200),
+        ("GET", "/api/sessions/{sid}/shares", 401, 404, 200, 200, 403),
         ("DELETE", "/api/sessions/{sid}", 401, 404, 403, 204, 403),
         ("GET", "/api/settings", 401, 403, 403, 403, 200),
         ("GET", "/api/expressions", 401, 403, 403, 403, 200),
@@ -86,6 +87,12 @@ def test_a_session_says_whose_it_is(world):
     assert world.admin.get(f"/api/sessions/{world.sid}").json()["mine"] is False
 
 
+def test_a_session_says_whether_i_am_in_it_and_the_admin_is_not_by_opening_it(world):
+    assert world.creator.get(f"/api/sessions/{world.sid}").json()["member"] is True
+    assert world.sharee.get(f"/api/sessions/{world.sid}").json()["member"] is True
+    assert world.admin.get(f"/api/sessions/{world.sid}").json()["member"] is False
+
+
 def test_starting_a_session_takes_credits_except_from_the_admin(world):
     assert world.newcomer.post("/api/sessions", json={"topic": "X"}).status_code == 402
     assert world.sharee.post("/api/sessions", json={"topic": "X"}).status_code == 402
@@ -93,12 +100,15 @@ def test_starting_a_session_takes_credits_except_from_the_admin(world):
     assert world.admin.post("/api/sessions", json={"topic": "X"}).status_code == 202
 
 
-def test_sharee_may_change_expressions_and_keep_notes_but_not_draw_or_delete(world):
+def test_sharee_may_change_expressions_keep_notes_and_draw_but_not_delete(world):
     assert world.sharee.put(f"/api/sessions/{world.sid}/note", json={"text": "hi"}).status_code == 200
     assert world.creator.get(f"/api/sessions/{world.sid}/note").json()["text"] == "hi"
     expression = world.sharee.get(f"/api/sessions/{world.sid}").json()["content"]["expressions"][0]["id"]
     assert world.sharee.post(f"/api/sessions/{world.sid}/expressions/{expression}/swap").status_code == 200
-    assert world.sharee.post(f"/api/sessions/{world.sid}/pictures/0", json={}).status_code == 403
+    pictures_off = world.creator.post(f"/api/sessions/{world.sid}/pictures/0", json={}).status_code
+    assert pictures_off == 503  # this world has no illustrator: past every access check, the feature itself is off
+    assert world.sharee.post(f"/api/sessions/{world.sid}/pictures/0", json={}).status_code == pictures_off
+    assert world.sharee.delete(f"/api/sessions/{world.sid}").status_code == 403
 
 
 def test_an_empty_balance_stops_new_spending_but_keeps_my_sessions(world):
@@ -175,8 +185,9 @@ def test_the_creator_shares_with_an_account_the_list_names_by_username_and_the_f
     res = share_with(world, "newcomer")
     assert res.status_code == 201
     assert res.json() == [
-        {"user_id": world.accounts["newcomer"].id, "username": "newcomer"},
-        {"user_id": world.accounts["sharee"].id, "username": "sharee"},
+        {"user_id": world.accounts["creator"].id, "username": "creator", "owner": True, "you": True},
+        {"user_id": world.accounts["newcomer"].id, "username": "newcomer", "owner": False, "you": False},
+        {"user_id": world.accounts["sharee"].id, "username": "sharee", "owner": False, "you": False},
     ]
     assert world.newcomer.get(f"/api/sessions/{world.sid}").status_code == 200
     assert world.creator.get(f"/api/sessions/{world.sid}/shares").json() == res.json()
@@ -193,13 +204,40 @@ def test_sharing_twice_or_with_myself_changes_nothing(world):
     assert share_with(world, "creator").json() == before
 
 
-def test_only_the_creator_manages_shares(world):
-    sharee_id = world.accounts["sharee"].id
-    for who in (world.sharee, world.admin):
-        assert who.get(f"/api/sessions/{world.sid}/shares").status_code == 403
-        assert who.post(f"/api/sessions/{world.sid}/shares", json={"user_id": world.accounts["stranger"].id}).status_code == 403
-        assert who.delete(f"/api/sessions/{world.sid}/shares/{sharee_id}").status_code == 403
+def test_whoever_has_it_shared_manages_shares_too_but_not_the_admin_or_a_stranger(world):
+    stranger_id, newcomer_id = world.accounts["stranger"].id, world.accounts["newcomer"].id
+    assert world.sharee.get(f"/api/sessions/{world.sid}/shares").status_code == 200
+    assert world.sharee.post(f"/api/sessions/{world.sid}/shares", json={"user_id": stranger_id}).status_code == 201
+    assert world.stranger.get(f"/api/sessions/{world.sid}").status_code == 200
+    assert world.sharee.delete(f"/api/sessions/{world.sid}/shares/{stranger_id}").status_code == 204
+    assert world.stranger.get(f"/api/sessions/{world.sid}").status_code == 404
+    share_with(world, "newcomer")
+    assert world.sharee.delete(f"/api/sessions/{world.sid}/shares/{newcomer_id}").status_code == 204
+    assert world.admin.get(f"/api/sessions/{world.sid}/shares").status_code == 403
+    assert world.admin.post(f"/api/sessions/{world.sid}/shares", json={"user_id": stranger_id}).status_code == 403
+    assert world.admin.delete(f"/api/sessions/{world.sid}/shares/{world.accounts['sharee'].id}").status_code == 403
     assert world.stranger.get(f"/api/sessions/{world.sid}/shares").status_code == 404
+
+
+def test_nobody_removes_the_owner_but_the_owner_removes_anyone(world):
+    assert world.sharee.delete(f"/api/sessions/{world.sid}/shares/{world.accounts['creator'].id}").status_code == 404
+    assert world.creator.get(f"/api/sessions/{world.sid}").status_code == 200
+    assert world.creator.delete(f"/api/sessions/{world.sid}/shares/{world.accounts['sharee'].id}").status_code == 204
+
+
+def test_sharing_with_the_owner_changes_nothing(world):
+    before = world.sharee.get(f"/api/sessions/{world.sid}/shares").json()
+    res = world.sharee.post(f"/api/sessions/{world.sid}/shares", json={"user_id": world.accounts["creator"].id})
+    assert res.json() == before
+    assert [entry["username"] for entry in before].count("creator") == 1
+    assert [user.username for user in world.db.shares.shared_with(world.sid)] == ["sharee"]
+
+
+def test_a_sharee_sees_the_owner_first_and_themselves_marked(world):
+    assert world.sharee.get(f"/api/sessions/{world.sid}/shares").json() == [
+        {"user_id": world.accounts["creator"].id, "username": "creator", "owner": True, "you": False},
+        {"user_id": world.accounts["sharee"].id, "username": "sharee", "owner": False, "you": True},
+    ]
 
 
 def test_sharing_costs_nothing_even_on_an_empty_balance(world):
