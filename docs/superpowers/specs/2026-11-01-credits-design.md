@@ -35,7 +35,7 @@
 | Practice 음성 세션 시작 | `POST /api/example/sessions` | 10 |
 | Practice 글 피드백 | `POST /api/example/feedback` | 10 |
 | Summarize 녹취 세션 시작 | `POST /api/summary/sessions` | 5 |
-| Summarize 피드백 | `POST /api/summary/feedback` | 5 |
+| Summarize 피드백 (저장하며 뒤에서 판정, 실패한 것을 다시 판정) | `POST /api/summaries`, `POST /api/summaries/{id}/judge` | 5 |
 | Read aloud 발음 평가 토큰 (한 회에 한 번) | `GET /api/assessor/token` | 5 |
 | Read aloud 코치가 표시된 단어를 말해 주기 (표시를 누를 때마다) | `POST /api/read-aloud/sessions` | 5 |
 | 문장 듣기, 캐시에 없는 문장만 | `POST /api/speech` | 1 |

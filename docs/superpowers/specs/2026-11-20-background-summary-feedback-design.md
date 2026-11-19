@@ -1,6 +1,6 @@
 # Summarize 피드백을 서버 뒤에서 판정하기
 
-- 상태: 설계 (2026-11-20).
+- 상태: 구현됨 (2026-11-20). 구현 계획: `docs/superpowers/plans/2026-11-20-background-summary-feedback.md`.
 - 범위: Summarize의 판정과 저장을 서버가 뒤에서 한다. 브라우저는 Done 직후 문단을 풀고 다음 일로 넘어간다. 저장된 요약에 말한 사람을 기록한다. DB 스키마가 v18로 바뀐다.
 
 ## 목적
