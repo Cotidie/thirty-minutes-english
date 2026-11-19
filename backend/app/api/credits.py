@@ -3,7 +3,7 @@ credits it hands to someone else."""
 
 from fastapi import APIRouter, HTTPException, Response
 
-from app.api.deps import Db, Me, short_of_credits
+from app.api.deps import Db, Me, Zone, short_of_credits
 from app.api.schemas import CreditsView, GiftRequest
 from app.credits import PRICES, REPORT_WINDOW
 from app.db import Database
@@ -14,10 +14,11 @@ router = APIRouter(prefix="/api/me")
 
 
 @router.get("/credits", response_model=CreditsView)
-def my_credits(db: Db, me: Me) -> CreditsView:
+def my_credits(db: Db, me: Me, zone: Zone) -> CreditsView:
+    """The history counts days in the browser's time zone, sent as `tz`."""
     if me.is_admin:
         return CreditsView(balance=None, prices=PRICES, recent=[])
-    return CreditsView(balance=db.credits.balance(me.id), prices=PRICES, recent=db.credits.recent(me.id))
+    return CreditsView(balance=db.credits.balance(me.id), prices=PRICES, recent=db.credits.history(me.id, zone))
 
 
 @router.post("/credits/holds/{hold}/confirm", status_code=204)

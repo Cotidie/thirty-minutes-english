@@ -122,6 +122,14 @@ def test_the_admin_lists_balances_and_tops_an_account_up(accounts):
     assert [(e["amount"], e["kind"]) for e in history] == [(-100, "grant"), (500, "grant")]
 
 
+def test_the_admin_reads_an_account_s_history_grouped_in_their_time_zone(accounts):
+    admin, _, user = accounts
+    admin.post(f"/api/accounts/{user.id}/credits", json={"amount": 500})
+    admin.post(f"/api/accounts/{user.id}/credits", json={"amount": 500})
+    history = admin.get(f"/api/accounts/{user.id}/credits", params={"tz": "Asia/Seoul"}).json()
+    assert [(e["amount"], e["kind"], e["count"]) for e in history] == [(1000, "grant", 2)]
+
+
 def test_a_grant_of_nothing_to_nobody_or_to_the_admin_is_refused(accounts):
     admin, _, user = accounts
     boss = admin.get("/api/accounts").json()[0]

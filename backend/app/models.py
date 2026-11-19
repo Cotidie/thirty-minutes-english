@@ -243,6 +243,8 @@ class CreditEntry(BaseModel):
     amount: int
     kind: str
     detail: str | None
+    """How many rows of one day, kind, detail and sign this line sums; `at` is the newest."""
+    count: int = 1
 
 
 class SessionSummary(BaseModel):

@@ -1,8 +1,9 @@
 """What each account gained and spent. The balance is the sum of its rows that count; the admin spends without any."""
 
 import sqlite3
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, date, datetime, timedelta
 from typing import TYPE_CHECKING
+from zoneinfo import ZoneInfo
 
 from app.credits import PRICES
 from app.db.retry import when_free
@@ -39,6 +40,15 @@ class CreditRepo:
                 (user_id, _now(), limit),
             ).fetchall()
         return [CreditEntry(at=row["at"], amount=row["amount"], kind=row["kind"], detail=row["detail"]) for row in rows]
+
+    def history(self, user_id: int, zone: ZoneInfo, limit: int = 10) -> list[CreditEntry]:
+        """The newest `limit` lines, each summing the rows of one day in `zone`, one kind, one detail and one sign."""
+        with self._db.connect() as conn:
+            rows = conn.execute(
+                f"SELECT at, amount, kind, detail FROM credits WHERE user_id = ? AND {COUNTS} ORDER BY id DESC",
+                (user_id, _now()),
+            ).fetchall()
+        return _grouped(rows, zone)[:limit]
 
     def grant(self, user_id: int, amount: int, by: int) -> None:
         """Added by the admin, or taken back when `amount` is negative, which may leave the balance below zero."""
@@ -145,6 +155,24 @@ class CreditRepo:
     def _tell(self, user_id: int | None) -> None:
         if user_id is not None:
             self._db.account_changes.publish(user_id, AccountChange.CREDITS)
+
+
+def _grouped(rows: list[sqlite3.Row], zone: ZoneInfo) -> list[CreditEntry]:
+    """`rows` newest first, so the first row of a group is its newest and the groups keep that order."""
+    groups: dict[tuple[date, str, str | None, bool], CreditEntry] = {}
+    for row in rows:
+        key = (_day(row["at"], zone), row["kind"], row["detail"], row["amount"] > 0)
+        group = groups.get(key)
+        if group is None:
+            groups[key] = CreditEntry(at=row["at"], amount=row["amount"], kind=row["kind"], detail=row["detail"])
+        else:
+            group.amount += row["amount"]
+            group.count += 1
+    return list(groups.values())
+
+
+def _day(at: str, zone: ZoneInfo) -> date:
+    return datetime.fromisoformat(at).astimezone(zone).date()
 
 
 def _now() -> str:

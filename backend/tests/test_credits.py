@@ -1,6 +1,7 @@
 import sqlite3
 import threading
 from datetime import timedelta
+from zoneinfo import ZoneInfo
 
 import pytest
 
@@ -906,3 +907,85 @@ def test_a_gift_beyond_the_balance_says_what_it_needs(tmp_path):
     db, app, mina, jun = gift_world(tmp_path)
     answer = client_of(app, db, mina).post("/api/me/credits/gifts", json={"to": jun.id, "amount": 500})
     assert (answer.status_code, answer.json()["detail"]) == (402, "Not enough credits: this needs 500 and you have 300.")
+
+
+SEOUL, UTC_ZONE = ZoneInfo("Asia/Seoul"), ZoneInfo("UTC")
+
+
+def add_row(db, user, amount, kind, detail, at, state="settled"):
+    """A row written at `at`, as a charge or a grant from then would have left it."""
+    with db.connect() as conn:
+        conn.execute(
+            "INSERT INTO credits (user_id, at, amount, kind, detail, granted_by, state) VALUES (?, ?, ?, ?, ?, NULL, ?)",
+            (user.id, at, amount, kind, detail, state),
+        )
+
+
+def lines(entries):
+    return [(e.at.isoformat(), e.amount, e.kind, e.detail, e.count) for e in entries]
+
+
+def test_history_groups_a_day_s_rows_of_one_kind_and_detail(store):
+    mina = add_user(store, "mina@example.com")
+    for at in ("2026-11-17T01:00:00+00:00", "2026-11-17T02:00:00+00:00", "2026-11-17T03:00:00+00:00"):
+        add_row(store, mina, -5, "read_aloud_token", None, at)
+    assert lines(store.credits.history(mina.id, SEOUL)) == [("2026-11-17T03:00:00+00:00", -15, "read_aloud_token", None, 3)]
+
+
+def test_history_keeps_different_details_and_signs_apart(store):
+    mina = add_user(store, "mina@example.com")
+    add_row(store, mina, -200, "session", "Trams", "2026-11-17T01:00:00+00:00")
+    add_row(store, mina, -200, "session", "Ferries", "2026-11-17T02:00:00+00:00")
+    add_row(store, mina, 500, "grant", None, "2026-11-17T03:00:00+00:00")
+    add_row(store, mina, -100, "grant", None, "2026-11-17T04:00:00+00:00")
+    assert [(e.amount, e.kind, e.detail, e.count) for e in store.credits.history(mina.id, SEOUL)] == [
+        (-100, "grant", None, 1), (500, "grant", None, 1), (-200, "session", "Ferries", 1), (-200, "session", "Trams", 1),
+    ]
+
+
+def test_history_counts_days_in_the_given_zone(store):
+    mina = add_user(store, "mina@example.com")
+    add_row(store, mina, -5, "read_aloud_token", None, "2026-11-16T20:00:00+00:00")  # Nov 17, 05:00 in Seoul
+    add_row(store, mina, -5, "read_aloud_token", None, "2026-11-17T01:00:00+00:00")
+    assert [e.count for e in store.credits.history(mina.id, SEOUL)] == [2]
+    assert [e.count for e in store.credits.history(mina.id, UTC_ZONE)] == [1, 1]
+
+
+def test_history_is_newest_group_first_and_stops_at_the_limit(store):
+    mina = add_user(store, "mina@example.com")
+    for day in range(1, 13):
+        add_row(store, mina, -5, "speech", None, f"2026-11-{day:02d}T03:00:00+00:00")
+        add_row(store, mina, -5, "speech", None, f"2026-11-{day:02d}T04:00:00+00:00")
+    groups = store.credits.history(mina.id, SEOUL)
+    assert [e.at.day for e in groups] == list(range(12, 2, -1)) and {e.count for e in groups} == {2}
+    assert len(store.credits.history(mina.id, SEOUL, limit=3)) == 3
+
+
+def test_history_leaves_out_rows_that_do_not_count(store):
+    mina = add_user(store, "mina@example.com")
+    add_row(store, mina, -5, "read_aloud_token", None, "2026-11-17T01:00:00+00:00")
+    add_row(store, mina, -5, "read_aloud_token", None, "2026-11-17T02:00:00+00:00", state="released")
+    assert [e.count for e in store.credits.history(mina.id, SEOUL)] == [1]
+
+
+def test_my_credits_group_the_history_in_my_time_zone(tmp_path):
+    db = Database(tmp_path / "s.db")
+    app = create_app(db, Services(FakeGenerator()), InlineExecutor())
+    mina = add_user(db, "mina@example.com")
+    add_row(db, mina, -5, "read_aloud_token", None, "2026-11-16T20:00:00+00:00")
+    add_row(db, mina, -5, "read_aloud_token", None, "2026-11-17T01:00:00+00:00")
+    client = client_of(app, db, mina)
+    assert [(e["amount"], e["count"]) for e in client.get("/api/me/credits?tz=Asia/Seoul").json()["recent"]] == [(-10, 2)]
+    assert [e["count"] for e in client.get("/api/me/credits").json()["recent"]] == [1, 1]
+
+
+def test_an_unknown_time_zone_falls_back_to_utc(tmp_path):
+    db = Database(tmp_path / "s.db")
+    app = create_app(db, Services(FakeGenerator()), InlineExecutor())
+    mina = add_user(db, "mina@example.com")
+    add_row(db, mina, -5, "read_aloud_token", None, "2026-11-16T20:00:00+00:00")
+    add_row(db, mina, -5, "read_aloud_token", None, "2026-11-17T01:00:00+00:00")
+    client = client_of(app, db, mina)
+    for tz in ("Not/AZone", "../etc/passwd", ""):
+        res = client.get("/api/me/credits", params={"tz": tz})
+        assert res.status_code == 200 and [e["count"] for e in res.json()["recent"]] == [1, 1]

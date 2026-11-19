@@ -5,6 +5,7 @@ import sqlite3
 from collections.abc import Callable, Iterator
 from contextlib import contextmanager
 from typing import Annotated
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from fastapi import Depends, HTTPException, Request
 
@@ -61,6 +62,17 @@ Topics = Annotated[DailyTopics, Depends(_topics)]
 CurrentSettings = Annotated[Settings, Depends(_settings)]
 Models = Annotated[Catalog, Depends(_catalog)]
 Files = Annotated[PictureFiles, Depends(_files)]
+
+
+def zone_of(tz: str | None = None) -> ZoneInfo:
+    """The reader's time zone from the `tz` query (an IANA name such as Asia/Seoul); UTC when it is missing or unknown."""
+    try:
+        return ZoneInfo(tz) if tz else ZoneInfo("UTC")
+    except (ZoneInfoNotFoundError, ValueError):
+        return ZoneInfo("UTC")
+
+
+Zone = Annotated[ZoneInfo, Depends(zone_of)]
 
 
 def signed_in(request: Request) -> User:

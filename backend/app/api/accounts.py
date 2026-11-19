@@ -2,7 +2,7 @@
 
 from fastapi import APIRouter, Depends, HTTPException
 
-from app.api.deps import Db, Me, admin_only
+from app.api.deps import Db, Me, Zone, admin_only
 from app.api.schemas import AccountView, GrantRequest
 from app.db import Database
 from app.models import CreditEntry, User
@@ -16,8 +16,9 @@ def list_accounts(db: Db) -> list[AccountView]:
 
 
 @router.get("/{user_id}/credits", response_model=list[CreditEntry])
-def account_credits(user_id: int, db: Db) -> list[CreditEntry]:
-    return db.credits.recent(_account(db, user_id).id)
+def account_credits(user_id: int, db: Db, zone: Zone) -> list[CreditEntry]:
+    """Days are counted in the admin's browser time zone, sent as `tz`."""
+    return db.credits.history(_account(db, user_id).id, zone)
 
 
 @router.post("/{user_id}/credits", response_model=AccountView, status_code=201)
