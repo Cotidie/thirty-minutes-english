@@ -1,6 +1,6 @@
 # Read aloud: Done 한 번으로 끝내기
 
-- 상태: 설계 (2026-11-20).
+- 상태: 구현됨 (2026-11-20). 구현 계획: `docs/superpowers/plans/2026-11-20-read-aloud-one-step-done.md`.
 - 범위: 문단의 Read aloud 라운드를 Done 한 번으로 끝낸다. 서버와 DB는 바뀌지 않는다.
 
 ## 목적
