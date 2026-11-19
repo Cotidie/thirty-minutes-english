@@ -24,7 +24,8 @@ interface Options {
   onEnd: () => void
 }
 
-type Phase = 'connecting' | 'listening' | 'done' | 'failed'
+/** `done` holds while the round is filed; `unsaved` when it could not be. */
+type Phase = 'connecting' | 'listening' | 'done' | 'unsaved' | 'failed'
 
 /** A paragraph's read-aloud round as the page sees it. */
 export interface ReadAloudRound {
@@ -38,7 +39,7 @@ export interface ReadAloudRound {
   audioRef: RefObject<HTMLAudioElement | null>
   start: () => void
   done: () => void
-  /** Close: the marks stay for clicking. */
+  /** Close, after a failed start or filing: the paragraph goes back to the marks it is given. */
   reset: () => void
   /** The reader clicked a mark: show its card and have the coach say it. */
   ask: (index: number) => void
@@ -48,6 +49,7 @@ const STATUS_LABEL: Record<Phase, string> = {
   connecting: 'Connecting…',
   listening: 'Listening. Read the paragraph aloud; click a mark to hear it.',
   done: 'Round over. The marks stay: click one to hear it.',
+  unsaved: 'Could not save this round.',
   failed: 'Could not start.',
 }
 
@@ -193,7 +195,7 @@ export function useReadAloud({ paragraph: { id: paragraphId, text: paragraph }, 
       ...fresh.map((f) => ({ ...f, repeated_ok: false })),
     ]
     if (text) round.heard = round.heard ? `${round.heard} ${text}` : text
-    // Azure hands over what it held as it stops. After Close, or once the page is left, that goes into the filing only.
+    // Azure hands over what it held as it stops. Once the round is over, or the page is left, that goes into the filing only.
     if (!mounted.current || roundRef.current !== round) return
     setFresh(round.findings)
     setHeard(round.heard)
@@ -313,10 +315,10 @@ export function useReadAloud({ paragraph: { id: paragraphId, text: paragraph }, 
     const filed = await file(round, elapsed)
     if (!mounted.current || roundRef.current !== round) return
     if (filed) finish()
-    else setError('Could not save this round.')
+    else setPhase('unsaved')
   }
 
-  /** Close: the marks stay for clicking. */
+  /** Close, after a failed start or filing: the paragraph goes back to the marks it is given. */
   const reset = () => {
     hangUp()
     void endRound()
@@ -370,7 +372,7 @@ export function ReadAloudPanel({ round, watched }: { round: ReadAloudRound; watc
                 Done
               </button>
             )}
-            {(phase === 'done' || phase === 'failed') && (
+            {(phase === 'unsaved' || phase === 'failed') && (
               <button type="button" onClick={round.reset}>
                 Close
               </button>

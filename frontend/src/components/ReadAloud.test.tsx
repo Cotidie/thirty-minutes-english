@@ -6,6 +6,7 @@ import type { LiveEvent } from '../lib/liveSession'
 import type { LiveConnection, LiveOptions } from '../lib/liveClient'
 import type { AzureWord, Shown } from '../lib/assessor/judge'
 import type { AssessorOptions } from '../lib/assessor/azure'
+import type { Reading } from '../types'
 import { api } from '../api'
 import { pairSentences } from '../lib/sentences'
 import { PresenceProvider } from '../lib/presence/PresenceProvider'
@@ -473,6 +474,19 @@ describe('ReadAloud saved marks', () => {
     repeated_ok: false,
   }
 
+  const old: Shown = { ...mark, word: 'Researchers', heard: 'l for r', fix: 'r', at: 0, sounds: [{ phoneme: 'r', score: 8, weak: true, heard: 'l' }] }
+
+  it("keeps someone's finished round on the paragraph until its filing comes back as the saved marks", () => {
+    const { socket, rerender } = renderInRoom(idleParagraph(false, [old]))
+    expect(screen.getByRole('button', { name: 'Researchers: l for r' })).toBeInTheDocument()
+    someoneReads(socket, { paragraph: 7, phase: 'done', heard: 'Researchers berified it.', findings: [mark] })
+    someoneReads(socket, null)
+    expect(screen.getByRole('button', { name: 'verified: b for v' })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Researchers: l for r' })).not.toBeInTheDocument()
+    rerender(<PresenceProvider sessionId={3}>{idleParagraph(false, [])}</PresenceProvider>)
+    expect(screen.queryByRole('button', { name: 'verified: b for v' })).not.toBeInTheDocument()
+  })
+
   it('shows the last round\'s marks on arrival, and opens a card from one without a round', async () => {
     renderIdle(false, [mark])
     await userEvent.click(screen.getByRole('button', { name: 'verified: b for v' }))
@@ -573,13 +587,46 @@ describe('ReadAloud marks', () => {
     expect(connection.dispose).not.toHaveBeenCalled()
   })
 
+  it('shows no Close while Done is filing the round', async () => {
+    let file: (reading: Reading) => void = () => undefined
+    vi.mocked(api.addReading).mockImplementationOnce(() => new Promise<Reading>((resolve) => (file = resolve)))
+    const { onEnd } = renderIdle()
+    await startRound()
+    await userEvent.click(screen.getByRole('button', { name: 'Done' }))
+    await waitFor(() => expect(vi.mocked(api.addReading)).toHaveBeenCalled())
+    expect(screen.getByRole('status')).toHaveTextContent('Round over')
+    expect(screen.queryByRole('button', { name: 'Close' })).not.toBeInTheDocument()
+    await act(async () => file({ id: 1, created_at: '', paragraph_id: 7, user_text: '', seconds: 1, corrections: [] }))
+    expect(onEnd).toHaveBeenCalled()
+  })
+
+  it('does nothing more once the page is left while Done is filing the round', async () => {
+    let file: (reading: Reading) => void = () => undefined
+    vi.mocked(api.addReading).mockImplementationOnce(() => new Promise<Reading>((resolve) => (file = resolve)))
+    const onEnd = vi.fn()
+    const { socket, rerender } = renderInRoom(idleParagraph(false, [], vi.fn(), onEnd))
+    await startRound()
+    await userEvent.click(screen.getByRole('button', { name: 'Done' }))
+    await waitFor(() => expect(vi.mocked(api.addReading)).toHaveBeenCalled())
+    rerender(
+      <PresenceProvider sessionId={3}>
+        <p />
+      </PresenceProvider>,
+    )
+    const ends = onEnd.mock.calls.length
+    const sent = roundsSent(socket).length
+    await act(async () => file({ id: 1, created_at: '', paragraph_id: 7, user_text: '', seconds: 1, corrections: [] }))
+    expect(onEnd.mock.calls.length).toBe(ends)
+    expect(roundsSent(socket)).toHaveLength(sent)
+  })
+
   it('keeps the round open with Close when it could not be saved', async () => {
     const { onEnd } = renderIdle()
     vi.mocked(api.addReading).mockRejectedValueOnce(new Error('offline'))
     await startRound()
     act(() => segment([berified], 'berified'))
     await userEvent.click(screen.getByRole('button', { name: 'Done' }))
-    expect(await screen.findByText('Could not save this round.')).toBeInTheDocument()
+    await waitFor(() => expect(screen.getByRole('status')).toHaveTextContent('Could not save this round.'))
     expect(screen.getByRole('button', { name: 'verified: b for v' })).toBeInTheDocument()
     expect(onEnd).not.toHaveBeenCalled()
     await userEvent.click(screen.getByRole('button', { name: 'Close' }))

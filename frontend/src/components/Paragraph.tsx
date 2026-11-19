@@ -1,4 +1,4 @@
-import { useMemo } from 'react'
+import { useMemo, useState } from 'react'
 import type { Shown } from '../lib/assessor/judge'
 import type { Span } from '../lib/highlight'
 import type { Piece } from '../lib/sentences'
@@ -41,7 +41,8 @@ export function Paragraph({ paragraph, pieces, spans, summaries, saved, onSummar
   const starts = useMemo(() => wordStarts(paragraph.text), [paragraph.text])
   const watched = useOthersRound(paragraph.id)
   const reader = useSomeoneReading()
-  const round = useReadAloud({ paragraph, saved: watched?.round.findings ?? saved, onFiled: onReading, onStart, onEnd })
+  const shown = useMarksWhileIdle(watched, saved)
+  const round = useReadAloud({ paragraph, saved: shown, onFiled: onReading, onStart, onEnd })
   const summary = useSummary({ paragraph, onKept: onSummary, onStart, onEnd })
   const coach = usePrice('read_aloud_voice')
   const marks: Marks = { findings: round.findings, open: round.open, onOpen: round.ask, locked: coach.short, price: coach.price }
@@ -62,4 +63,21 @@ export function Paragraph({ paragraph, pieces, spans, summaries, saved, onSummar
       <SummaryPanel summary={summary} kept={summaries} />
     </div>
   )
+}
+
+/** What a finished round of someone else's leaves on screen, and the saved marks it ended on. */
+interface Held {
+  findings: Shown[]
+  saved: Shown[]
+}
+
+/** The marks this paragraph shows while this page reads nothing of its own: someone else's round as it goes, and once it
+ * is over its marks until its filing comes back as `saved`. The round ends as soon as it is filed, before this page has
+ * read the records again, so without the hold the paragraph would flash its old marks in between. */
+function useMarksWhileIdle(watched: ReturnType<typeof useOthersRound>, saved: Shown[]): Shown[] {
+  const [held, setHeld] = useState<Held | null>(null)
+  const finished = watched?.round.phase === 'done' ? watched.round.findings : null
+  if (finished && (held?.findings !== finished || held.saved !== saved)) setHeld({ findings: finished, saved })
+  if (watched) return watched.round.findings
+  return held && held.saved === saved ? held.findings : saved
 }
