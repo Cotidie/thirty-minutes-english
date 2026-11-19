@@ -6,7 +6,7 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from app.generation.jobs import Status
 from app.generation.progress import Stage
-from app.models import Correction, CreditEntry, SummaryFeedback, User
+from app.models import Correction, CreditEntry, User
 
 
 class Credentials(BaseModel):
@@ -157,21 +157,11 @@ class ExampleRequest(BaseModel):
     _check = field_validator("user_text", "coach_text")(_not_blank)
 
 
-class SummaryFeedbackRequest(BaseModel):
-    """What a reader said a paragraph was about, for the coach to judge against it."""
-
-    paragraph: str
-    user_text: str
-
-    _check = field_validator("paragraph", "user_text")(_not_blank)
-
-
 class SummaryRequest(BaseModel):
-    """A judged summary of one paragraph, kept with it."""
+    """What a reader said one paragraph was about, kept with it and judged against it."""
 
     paragraph_id: int
     user_text: str
-    feedback: SummaryFeedback
     seconds: float = 0
 
     _check = field_validator("user_text")(_not_blank)

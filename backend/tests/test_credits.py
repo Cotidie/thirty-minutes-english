@@ -15,8 +15,8 @@ from app.main import create_app
 from app.models import ExampleFeedback, SummaryFeedback
 from app.net import HttpError
 from app.wiring import Services
-from tests.conftest import add_user, admin_client, client_of, seed_expressions
-from tests.test_api import DeferredExecutor, FailingGenerator, FakeGenerator, InlineExecutor
+from tests.conftest import add_user, admin_client, client_of, sample_draft, seed_expressions
+from tests.test_api import DeferredExecutor, FailingGenerator, FakeGenerator, HeldExecutor, InlineExecutor
 
 
 def test_a_new_account_has_nothing_and_a_grant_shows_up_first(store):
@@ -61,14 +61,23 @@ def test_topics_are_free_to_any_login(tmp_path):
     assert client_of(app, db, add_user(db, "mina@example.com")).get("/api/topics").status_code == 200
 
 
-def paid_world(tmp_path, balance: int, **services):
+def paid_world(tmp_path, balance: int, judges=None, **services):
     db = Database(tmp_path / "s.db")
     seed_expressions(db, EXPRESSION_COUNT)
-    app = create_app(db, Services(FakeGenerator(), **services), InlineExecutor())
+    app = create_app(db, Services(FakeGenerator(), **services), InlineExecutor(), judges=judges or InlineExecutor())
     mina = add_user(db, "mina@example.com")
     if balance:
         db.credits.grant(mina.id, balance, by=mina.id)
     return db, mina, client_of(app, db, mina)
+
+
+def a_paragraph_of(db: Database, user) -> int:
+    """The first paragraph of a session `user` made."""
+    return db.sessions.create(sample_draft(), [], created_by=user.id).content.article.paragraphs[0].id
+
+
+def summary_of(paragraph_id: int) -> dict:
+    return {"paragraph_id": paragraph_id, "user_text": "It is words."}
 
 
 def test_making_a_session_costs_200_and_names_the_topic(tmp_path):
@@ -129,8 +138,8 @@ def test_an_error_no_route_expects_takes_nothing_either(tmp_path):
     db, mina, me = paid_world(tmp_path, 25, example_coach=CrashingCoach(), summary_coach=CrashingCoach())
     with pytest.raises(KeyError):
         me.post("/api/example/feedback", json=FEEDBACK_BODY)
-    with pytest.raises(KeyError):
-        me.post("/api/summary/feedback", json=PARAGRAPH | {"user_text": "It is words."})
+    summary = me.post("/api/summaries", json=summary_of(a_paragraph_of(db, mina))).json()
+    assert (summary["status"], summary["error"]) == ("failed", "feedback failed: 'candidates'")
     assert db.credits.balance(mina.id) == 25
 
 
@@ -140,8 +149,57 @@ def test_a_summary_coach_that_fails_takes_nothing(tmp_path):
             raise GenerationError("down")
 
     db, mina, me = paid_world(tmp_path, 25, summary_coach=Down())
-    assert me.post("/api/summary/feedback", json=PARAGRAPH | {"user_text": "It is words."}).status_code == 502
+    summary = me.post("/api/summaries", json=summary_of(a_paragraph_of(db, mina)))
+    assert (summary.status_code, summary.json()["status"]) == (201, "failed")
     assert db.credits.balance(mina.id) == 25
+
+
+def test_a_summary_judgment_costs_5_and_then_refuses(tmp_path):
+    db, mina, me = paid_world(tmp_path, PRICES["summary_feedback"] + 1, summary_coach=SummaryCoach())
+    paragraph = a_paragraph_of(db, mina)
+    assert me.post("/api/summaries", json=summary_of(paragraph)).status_code == 201
+    entry = db.credits.recent(mina.id)[0]
+    assert (entry.amount, entry.kind, entry.detail) == (-5, "summary_feedback", None)
+    assert me.post("/api/summaries", json=summary_of(paragraph)).status_code == 402
+    assert len(db.records.list_summaries(db.sessions.session_of_paragraph(paragraph), mina.id)) == 1
+
+
+def test_judging_again_twice_at_once_runs_it_once_and_gives_the_second_price_back(tmp_path):
+    held = HeldExecutor()
+    db, mina, me = paid_world(tmp_path, 20, judges=held, summary_coach=SummaryCoach())
+    summary_id = db.records.start_summary(a_paragraph_of(db, mina), mina.id, "It is words.", 1)
+    db.records.fail_summary(summary_id, "feedback failed: down")
+    assert me.post(f"/api/summaries/{summary_id}/judge").status_code == 200
+    assert me.post(f"/api/summaries/{summary_id}/judge").status_code == 409
+    held.release()
+    assert db.credits.balance(mina.id) == 15
+    assert db.records.get_summary(summary_id, mina.id).status == "done"
+
+
+def test_a_summary_whose_session_went_while_it_was_judged_is_paid_for_and_dropped(tmp_path):
+    class Deleting:
+        """Judges while the session goes."""
+
+        def feedback(self, paragraph, user_text):
+            db.sessions.delete(session_id)
+            return SummaryFeedback(missed=[], fixes=[], summary="x")
+
+    db, mina, me = paid_world(tmp_path, 10, summary_coach=Deleting())
+    paragraph = a_paragraph_of(db, mina)
+    session_id = db.sessions.session_of_paragraph(paragraph)
+    assert me.post("/api/summaries", json=summary_of(paragraph)).status_code == 404  # judged inline, gone by the answer
+    assert db.credits.balance(mina.id) == 5
+    assert db.credits.recent(mina.id)[0].kind == "summary_feedback"
+
+
+def test_a_summary_whose_session_went_before_it_was_judged_costs_nothing(tmp_path):
+    held = HeldExecutor()
+    db, mina, me = paid_world(tmp_path, 10, judges=held, summary_coach=SummaryCoach())
+    paragraph = a_paragraph_of(db, mina)
+    me.post("/api/summaries", json=summary_of(paragraph))
+    db.sessions.delete(db.sessions.session_of_paragraph(paragraph))
+    held.release()
+    assert db.credits.balance(mina.id) == 10
 
 
 class Assessor:
@@ -177,7 +235,6 @@ WORD = {"word": "mitigate", "meaning": "to lessen", "pos": "verb"}
     [
         ("/api/example/sessions", WORD, "practice_voice", "mitigate"),
         ("/api/summary/sessions", PARAGRAPH, "summary_voice", None),
-        ("/api/summary/feedback", PARAGRAPH | {"user_text": "It is words."}, "summary_feedback", None),
         ("/api/read-aloud/sessions", PARAGRAPH, "read_aloud_voice", None),
     ],
 )
@@ -194,7 +251,7 @@ def test_each_coach_takes_its_own_price_and_then_refuses(tmp_path, path, body, k
 def test_a_whole_summarize_round_costs_10(tmp_path):
     db, mina, me = paid_world(tmp_path, 10, transcriber=LiveRound(), summary_coach=SummaryCoach())
     assert me.post("/api/summary/sessions", json=PARAGRAPH).status_code < 300
-    assert me.post("/api/summary/feedback", json=PARAGRAPH | {"user_text": "It is words."}).status_code < 300
+    assert me.post("/api/summaries", json=summary_of(a_paragraph_of(db, mina))).status_code < 300
     assert db.credits.balance(mina.id) == 0
 
 

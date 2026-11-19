@@ -1,5 +1,6 @@
 import logging
 import os
+from concurrent.futures import ThreadPoolExecutor
 from collections.abc import Mapping
 from pathlib import Path
 
@@ -11,6 +12,7 @@ from app.api import ROUTERS
 from app.api.auth import public_router
 from app.api.presence import router as presence_router
 from app.api.deps import Rebuild, signed_in
+from app.coaching.summary_judging import JUDGES, RESTARTED, SummaryJudges
 from app.config.catalog import Catalog
 from app.config.settings import Settings
 from app.db import Database
@@ -33,13 +35,16 @@ def create_app(
     env: Mapping[str, str] | None = None,
     image_dir: Path | None = None,
     catalog: Catalog | None = None,
+    judges: Executor | None = None,
 ) -> FastAPI:
     """`rebuild` turns saved settings into fresh services; without it a settings
     change is stored but the running services stay as they are (tests). Without a
-    `catalog` the model lists are whatever the database holds, never fetched."""
+    `catalog` the model lists are whatever the database holds, never fetched. `judges` runs the summary judgments; tests
+    pass one that runs them on the spot or when told."""
     app = FastAPI(title="english-speaking-claude")
     app.state.db = db
     db.credits.release_abandoned()  # nothing can still be working on a hold when the app starts; these were left by the process before
+    db.records.fail_unfinished_summaries(RESTARTED)  # nor judging a summary
     app.state.files = PictureFiles(image_dir or db.images_dir)
     app.state.services = services
     app.state.env = os.environ if env is None else env
@@ -47,6 +52,7 @@ def create_app(
     app.state.catalog = catalog or Catalog(db.caches, fetchers={})
     app.state.jobs = JobRunner(db.sessions, db.expressions, db.stages, executor, SourceImages(db.pictures, app.state.files))
     app.state.topics = DailyTopics(db.topics, app.state.jobs.executor)
+    app.state.judges = SummaryJudges(db.records, db.credits, judges or ThreadPoolExecutor(max_workers=JUDGES, thread_name_prefix="summary-judge"))
     app.state.failed_logins = FailedLogins()
     app.state.signups = SignupLimit()
     app.state.presence = Rooms()

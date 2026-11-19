@@ -14,6 +14,7 @@ from app.config.settings import Settings
 from app.credits import CONFIRM_WINDOW
 from app.db import Database
 from app.db.credits import NotEnoughCredits
+from app.coaching.summary_judging import SummaryJudges
 from app.generation.jobs import JobRunner
 from app.models import User
 from app.pictures.files import PictureFiles
@@ -39,6 +40,10 @@ def _jobs(request: Request) -> JobRunner:
     return request.app.state.jobs
 
 
+def _judges(request: Request) -> SummaryJudges:
+    return request.app.state.judges
+
+
 def _topics(request: Request) -> DailyTopics:
     return request.app.state.topics
 
@@ -58,6 +63,7 @@ def _settings(request: Request) -> Settings:
 Db = Annotated[Database, Depends(_db)]
 Svc = Annotated[Services, Depends(_services)]
 Jobs = Annotated[JobRunner, Depends(_jobs)]
+Judges = Annotated[SummaryJudges, Depends(_judges)]
 Topics = Annotated[DailyTopics, Depends(_topics)]
 CurrentSettings = Annotated[Settings, Depends(_settings)]
 Models = Annotated[Catalog, Depends(_catalog)]

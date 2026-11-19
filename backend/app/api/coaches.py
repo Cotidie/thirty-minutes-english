@@ -1,4 +1,5 @@
-"""The voice coaches, the pronunciation assessor, reading aloud, and the text runs behind Practice and Summarize."""
+"""The voice coaches, the pronunciation assessor, reading aloud, and the text run behind Practice. Summarize is judged
+where its summaries are kept (records.py)."""
 
 from fastapi import APIRouter, Response
 
@@ -10,10 +11,9 @@ from app.api.schemas import (
     LiveSession,
     ParagraphRequest,
     SpeechRequest,
-    SummaryFeedbackRequest,
 )
 from app.llm import GenerationError
-from app.models import ExampleFeedback, SummaryFeedback
+from app.models import ExampleFeedback
 from app.net import HttpError
 from app.voice.assessor import AzureAssessor
 from app.voice.live import GeminiTranscriber, LiveAgent
@@ -64,18 +64,6 @@ def start_summary(body: ParagraphRequest, db: Db, me: Me, services: Svc) -> dict
     if transcriber is None:
         raise off("Summarize is off: set GEMINI_API_KEY in Settings")
     return browser_round(db, me, "summary_voice", None, lambda: _start_transcriber(transcriber, body.paragraph))
-
-
-@router.post("/summary/feedback", response_model=SummaryFeedback)
-def summary_feedback(body: SummaryFeedbackRequest, db: Db, me: Me, services: Svc) -> SummaryFeedback:
-    coach = services.summary_coach
-    if coach is None:
-        raise off("summary coach is off: the summary-coach folder is missing")
-    with paid(db, me, "summary_feedback"):
-        try:
-            return coach.feedback(body.paragraph, body.user_text)
-        except GenerationError as e:
-            raise failed("feedback", e) from e
 
 
 @router.post("/example/sessions", response_model=LiveSession, status_code=201)

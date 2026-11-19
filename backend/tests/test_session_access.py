@@ -263,3 +263,12 @@ def test_shares_me_is_a_404_for_whoever_has_no_share(world):
     assert world.creator.delete(f"/api/sessions/{world.sid}/shares/me").status_code == 404
     assert world.stranger.delete(f"/api/sessions/{world.sid}/shares/me").status_code == 404
     assert world.admin.delete(f"/api/sessions/{world.sid}/shares/me").status_code == 404
+
+
+def test_only_people_in_the_session_can_judge_again_or_remove_a_failed_summary(world):
+    paragraph = world.db.sessions.get(world.sid).content.article.paragraphs[0].id
+    summary = world.db.records.start_summary(paragraph, world.accounts["creator"].id, "said", 1)
+    world.db.records.fail_summary(summary, "feedback failed: down")
+    assert world.newcomer.post(f"/api/summaries/{summary}/judge").status_code == 404
+    assert world.newcomer.delete(f"/api/summaries/{summary}").status_code == 404
+    assert world.sharee.delete(f"/api/summaries/{summary}").status_code == 204
