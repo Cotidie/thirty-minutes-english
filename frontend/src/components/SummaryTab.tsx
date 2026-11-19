@@ -1,6 +1,7 @@
 import { type ReactNode, useState } from 'react'
 import { api } from '../api'
 import { useSessionResource } from '../lib/sessionChanges'
+import { speakerOf } from '../lib/speaker'
 import type { Example, SessionContent, Stars, Summary } from '../types'
 import { SummaryCard } from './SummaryCard'
 import './SummaryTab.css'
@@ -77,11 +78,11 @@ export function SummaryTab({ sessionId, content, stars }: Props) {
         </ol>
       </Section>
 
-      <Section title="Paragraphs you summed up" count={summaries?.length}>
+      <Section title="Paragraphs summed up" count={summaries?.length}>
         {summaries?.length === 0 && <p className="empty">No summaries yet. Each paragraph in the Article tab has a Summarize button.</p>}
         <ol className="summary-cards">
           {summaries?.map((s) => (
-            <SummaryCard key={s.id} label={`${(paragraphText.get(s.paragraph_id) ?? '').split(/\s+/).slice(0, 4).join(' ')}…`} line={s.user_text} note={s.feedback.summary} />
+            <SummaryCard key={s.id} label={`${speakerOf(s)} · ${opening(paragraphText.get(s.paragraph_id) ?? '')}`} line={s.user_text} note={feedbackNote(s)} />
           ))}
         </ol>
       </Section>
@@ -99,4 +100,16 @@ function Section({ title, count, children }: { title: string; count?: number; ch
       {children}
     </section>
   )
+}
+
+/** The first four words of a paragraph, to tell which one a summary is of. */
+function opening(text: string): string {
+  return `${text.split(/\s+/).slice(0, 4).join(' ')}…`
+}
+
+/** The model answer once the feedback is in; otherwise where it is. */
+function feedbackNote(summary: Summary): string {
+  if (summary.status === 'judging') return 'Waiting for feedback…'
+  if (summary.status === 'failed' || !summary.feedback) return 'No feedback: judge it again in the Article tab.'
+  return summary.feedback.summary
 }

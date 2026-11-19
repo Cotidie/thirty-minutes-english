@@ -1,7 +1,7 @@
 import { render, screen } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { api } from '../api'
-import type { Example, SessionContent, Stars } from '../types'
+import type { Example, SessionContent, Stars, Summary } from '../types'
 import { SummaryTab } from './SummaryTab'
 
 vi.mock('../api', () => ({ api: { listExamples: vi.fn(), listReadings: vi.fn(), listSummaries: vi.fn() } }))
@@ -37,6 +37,20 @@ const example: Example = {
   seconds: 11,
 }
 
+const summary = (over: Partial<Summary>): Summary => ({
+  id: 4,
+  created_at: '',
+  paragraph_id: 2,
+  user_text: 'small ones win',
+  seconds: 8,
+  status: 'done',
+  feedback: { missed: [], fixes: [], summary: 'Small twins pay off.' },
+  error: null,
+  speaker: 'jo',
+  mine: true,
+  ...over,
+})
+
 beforeEach(() => {
   vi.mocked(api.listExamples).mockResolvedValue([example])
   vi.mocked(api.listSummaries).mockResolvedValue([])
@@ -63,7 +77,7 @@ describe('SummaryTab', () => {
     render(<SummaryTab sessionId={3} content={content} stars={none} />)
     await screen.findByText("We mitigated the delay.")
     const titles = [...document.querySelectorAll('.summary-title')].map((t) => t.firstChild?.textContent)
-    expect(titles).toEqual(['Starred', 'Sentences you made', 'Paragraphs you summed up'])
+    expect(titles).toEqual(['Starred', 'Sentences you made', 'Paragraphs summed up'])
     expect(vi.mocked(api.listReadings)).not.toHaveBeenCalled()
   })
 
@@ -74,12 +88,28 @@ describe('SummaryTab', () => {
     expect([...counts].map((c) => c.textContent)).toEqual(['0', '1', '0'])
   })
 
-  it('names each summary by the opening words of the paragraph it sums up', async () => {
-    const feedback = { missed: [], fixes: [], summary: 'Small twins pay off.' }
-    vi.mocked(api.listSummaries).mockResolvedValueOnce([{ id: 4, created_at: '', paragraph_id: 2, user_text: 'small ones win', feedback, seconds: 8 }])
+  it('names each summary by who said it and the opening words of its paragraph', async () => {
+    vi.mocked(api.listSummaries).mockResolvedValueOnce([
+      summary({ id: 4, paragraph_id: 2, user_text: 'small ones win' }),
+      summary({ id: 5, paragraph_id: 1, user_text: 'upkeep pays', mine: false, speaker: 'mina' }),
+    ])
     render(<SummaryTab sessionId={3} content={content} stars={none} />)
     expect(await screen.findByText('small ones win')).toBeInTheDocument()
-    expect(screen.getByText('A modest twin delivers…')).toBeInTheDocument()
+    expect(screen.getByText('You · A modest twin delivers…')).toBeInTheDocument()
+    expect(screen.getByText('mina · Upkeep is what actually…')).toBeInTheDocument()
+  })
+
+  it('says where the feedback of each summary is', async () => {
+    vi.mocked(api.listSummaries).mockResolvedValueOnce([
+      summary({ id: 4, user_text: 'done one' }),
+      summary({ id: 5, user_text: 'judging one', status: 'judging', feedback: null }),
+      summary({ id: 6, user_text: 'failed one', status: 'failed', feedback: null, error: 'feedback failed: down' }),
+    ])
+    render(<SummaryTab sessionId={3} content={content} stars={none} />)
+    await screen.findByText('done one')
+    expect(screen.getByText('Small twins pay off.')).toBeInTheDocument()
+    expect(screen.getByText('Waiting for feedback…')).toBeInTheDocument()
+    expect(screen.getByText('No feedback: judge it again in the Article tab.')).toBeInTheDocument()
   })
 
   it('reports a failure instead of an empty summary', async () => {
