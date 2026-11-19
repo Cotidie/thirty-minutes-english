@@ -307,15 +307,14 @@ describe('ArticleTab while someone else reads aloud', () => {
     expect(screen.getByRole('button', { name: 'cheap: sh for tʃ' })).toBeInTheDocument()
   })
 
-  it('tells them about my round, from the start until I close it', async () => {
+  it('tells them about my round, from the start until I finish it', async () => {
     const { socket } = renderInRoom(<ArticleTab article={article} sessionId={3} />)
     await userEvent.click(screen.getAllByRole('button', { name: 'Read aloud' })[0])
     await waitFor(() => expect(screen.getByRole('status')).toHaveTextContent('Listening'))
     expect(roundsSent(socket)[0]).toEqual({ paragraph: 1, phase: 'reading', heard: '', findings: [] })
     await userEvent.click(screen.getByRole('button', { name: 'Done' }))
-    await waitFor(() => expect(roundsSent(socket).at(-1)).toMatchObject({ paragraph: 1, phase: 'done' }))
-    await userEvent.click(screen.getByRole('button', { name: 'Close' }))
-    expect(roundsSent(socket).at(-1)).toBeNull()
+    await waitFor(() => expect(roundsSent(socket).at(-1)).toBeNull())
+    expect(roundsSent(socket).at(-2)).toMatchObject({ paragraph: 1, phase: 'done' })
   })
 
   it('opens the card of a mark they clicked, without dialling the coach', async () => {

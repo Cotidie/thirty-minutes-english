@@ -280,7 +280,27 @@ export function useReadAloud({ paragraph: { id: paragraphId, text: paragraph }, 
     call.coach.dispose()
   }
 
-  /** The reader is done: the round is filed; the marks stay clickable. */
+  /** Filed even when clean: the latest round is the one whose marks come back. Whether it was. */
+  const file = (round: Round, seconds: number) =>
+    api
+      .addReading({ paragraph_id: paragraphId, user_text: round.heard, seconds, corrections: round.findings })
+      .then((reading) => {
+        onFiled(reading)
+        return true
+      })
+      .catch(() => false)
+
+  /** The round is over: the paragraph shows the marks it is given, and a coach still talking goes on. */
+  const finish = () => {
+    roundRef.current = null
+    setPhase(null)
+    setFresh(null)
+    shareRound(null)
+    onEnd()
+  }
+
+  /** The reader is done: the round is filed and over, its marks back from the filing and still clickable. When it cannot
+   * be filed, it stays open with its marks and Close. */
   const done = async () => {
     const round = roundRef.current
     if (!round) return
@@ -290,22 +310,17 @@ export function useReadAloud({ paragraph: { id: paragraphId, text: paragraph }, 
     round.over = true
     shareRound({ phase: 'done', heard: round.heard, findings: round.findings })
     await endRound()
-    // Filed even when clean: the latest round is the one whose marks come back.
-    await api
-      .addReading({ paragraph_id: paragraphId, user_text: round.heard, seconds: elapsed, corrections: round.findings })
-      .then(onFiled)
-      .catch(() => undefined)
+    const filed = await file(round, elapsed)
+    if (!mounted.current || roundRef.current !== round) return
+    if (filed) finish()
+    else setError('Could not save this round.')
   }
 
   /** Close: the marks stay for clicking. */
   const reset = () => {
     hangUp()
     void endRound()
-    roundRef.current = null
-    setPhase(null)
-    setFresh(null)
-    shareRound(null)
-    onEnd()
+    finish()
   }
 
   return { phase, error, heard, seconds, findings, open, audioRef, start: () => void start(), done: () => void done(), reset, ask }

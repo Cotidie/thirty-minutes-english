@@ -165,7 +165,6 @@ describe('ReadAloud round', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Done' }))
     await waitFor(() => expect(assessor.stop).toHaveBeenCalled())
     expect(track.stop).toHaveBeenCalled()
-    expect(screen.getByRole('status')).toHaveTextContent('Round over')
     await waitFor(() =>
       expect(vi.mocked(api.addReading)).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -175,6 +174,7 @@ describe('ReadAloud round', () => {
         }),
       ),
     )
+    await waitFor(() => expect(screen.queryByRole('status')).not.toBeInTheDocument())
   })
 
   it('keeps the round done for the others when a last segment lands while Azure stops', async () => {
@@ -186,8 +186,8 @@ describe('ReadAloud round', () => {
       return undefined
     })
     await userEvent.click(screen.getByRole('button', { name: 'Done' }))
-    await waitFor(() => expect(vi.mocked(api.addReading)).toHaveBeenCalled())
-    expect(roundsSent(socket).at(-1)).toMatchObject({ paragraph: 7, phase: 'done', findings: [expect.objectContaining({ word: 'verified' })] })
+    await waitFor(() => expect(roundsSent(socket).at(-1)).toBeNull())
+    expect(roundsSent(socket).at(-2)).toMatchObject({ paragraph: 7, phase: 'done', findings: [expect.objectContaining({ word: 'verified' })] })
   })
 
   it('says the round is over when the page is left, even if Azure hands over more as it stops', async () => {
@@ -203,15 +203,18 @@ describe('ReadAloud round', () => {
     expect(roundsSent(socket).at(-1)).toBeNull()
   })
 
-  it('says the round is over on Close, even if Azure hands over more as it stops', async () => {
+  it('says the round is over once Done has filed it, the last segment Azure hands over included', async () => {
     const { socket } = renderInRoom(idleParagraph())
     await startRound()
     const finish = stopLate()
     await userEvent.click(screen.getByRole('button', { name: 'Done' }))
-    await userEvent.click(screen.getByRole('button', { name: 'Close' }))
     await finish()
-    expect(roundsSent(socket).at(-1)).toBeNull()
-    expect(screen.queryByRole('button', { name: 'verified: b for v' })).not.toBeInTheDocument()
+    await waitFor(() =>
+      expect(vi.mocked(api.addReading)).toHaveBeenCalledWith(
+        expect.objectContaining({ corrections: [expect.objectContaining({ word: 'verified' })] }),
+      ),
+    )
+    await waitFor(() => expect(roundsSent(socket).at(-1)).toBeNull())
   })
 
   it('keeps one audio element while someone else\'s round comes and goes, so a coach I hear goes on', () => {
@@ -224,7 +227,7 @@ describe('ReadAloud round', () => {
     expect(container.querySelector('.read-aloud audio')).toBe(audio)
   })
 
-  it('files a clean round too, so the old marks do not come back, and returns to idle on Close', async () => {
+  it('files a clean round too, so the old marks do not come back, and returns to idle on Done', async () => {
     const { onEnd } = renderIdle()
     await startRound()
     act(() => segment([verified], 'Researchers verified it.'))
@@ -232,20 +235,18 @@ describe('ReadAloud round', () => {
     await waitFor(() => expect(assessor.stop).toHaveBeenCalled())
     await waitFor(() => expect(vi.mocked(api.addReading)).toHaveBeenCalledWith(expect.objectContaining({ corrections: [] })))
 
-    await userEvent.click(screen.getByRole('button', { name: 'Close' }))
-    expect(onEnd).toHaveBeenCalled()
+    await waitFor(() => expect(onEnd).toHaveBeenCalled())
     expect(screen.getByRole('button', { name: 'Read aloud' })).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: /b for v/ })).not.toBeInTheDocument()
   })
 
-  it('keeps the marks after Close, still clickable, with Read again on offer', async () => {
+  it('finishes on Done with the marks still clickable and Read again on offer', async () => {
     const { onEnd } = renderFiling()
     await startRound()
     act(() => segment([berified], 'berified'))
     await userEvent.click(screen.getByRole('button', { name: 'Done' }))
-    await waitFor(() => expect(assessor.stop).toHaveBeenCalled())
-    await userEvent.click(screen.getByRole('button', { name: 'Close' }))
-    expect(onEnd).toHaveBeenCalled()
+    await waitFor(() => expect(onEnd).toHaveBeenCalled())
+    expect(screen.queryByRole('button', { name: 'Close' })).not.toBeInTheDocument()
 
     expect(screen.getByRole('button', { name: 'Read again' })).toBeInTheDocument()
     await userEvent.click(screen.getByRole('button', { name: 'verified: b for v' }))
@@ -479,16 +480,15 @@ describe('ReadAloud saved marks', () => {
     expect(screen.getByRole('button', { name: 'Read again' })).toBeEnabled()
   })
 
-  it('after Close the paragraph shows the marks it is given again, not its own round\'s', async () => {
+  it('after Done the paragraph shows the marks it is given again, not its own round\'s', async () => {
     renderIdle(false, [mark])
     await userEvent.click(screen.getByRole('button', { name: 'Read again' }))
     await waitFor(() => expect(screen.getByRole('status')).toHaveTextContent('Listening'))
     act(() => segment([verified], 'Researchers verified it.'))
-    await userEvent.click(screen.getByRole('button', { name: 'Done' }))
-    await waitFor(() => expect(assessor.stop).toHaveBeenCalled())
     expect(screen.queryByRole('button', { name: 'verified: b for v' })).not.toBeInTheDocument()
-    await userEvent.click(screen.getByRole('button', { name: 'Close' }))
-    expect(screen.getByRole('button', { name: 'verified: b for v' })).toBeInTheDocument()
+    await userEvent.click(screen.getByRole('button', { name: 'Done' }))
+    await waitFor(() => expect(screen.getByRole('button', { name: 'verified: b for v' })).toBeInTheDocument())
+    expect(screen.queryByRole('status')).not.toBeInTheDocument()
   })
 
   it('tells the others which word\'s card is open by its place in the paragraph', async () => {
@@ -562,16 +562,27 @@ describe('ReadAloud marks', () => {
     await waitFor(() => expect(connection.correct).toHaveBeenCalledTimes(1))
   })
 
-  it('still dials the coach after Done, and drops the call on Close', async () => {
-    renderIdle()
+  it('lets a coach that is speaking finish when Done closes the round', async () => {
+    const { onEnd } = renderFiling()
+    await startRound()
+    act(() => segment([berified], 'berified'))
+    await userEvent.click(screen.getByRole('button', { name: 'verified: b for v' }))
+    await waitFor(() => expect(connect).toHaveBeenCalled())
+    await userEvent.click(screen.getByRole('button', { name: 'Done' }))
+    await waitFor(() => expect(onEnd).toHaveBeenCalled())
+    expect(connection.dispose).not.toHaveBeenCalled()
+  })
+
+  it('keeps the round open with Close when it could not be saved', async () => {
+    const { onEnd } = renderIdle()
+    vi.mocked(api.addReading).mockRejectedValueOnce(new Error('offline'))
     await startRound()
     act(() => segment([berified], 'berified'))
     await userEvent.click(screen.getByRole('button', { name: 'Done' }))
-    await waitFor(() => expect(assessor.stop).toHaveBeenCalled())
-
-    await userEvent.click(screen.getByRole('button', { name: 'verified: b for v' }))
-    await waitFor(() => expect(connect).toHaveBeenCalled())
+    expect(await screen.findByText('Could not save this round.')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'verified: b for v' })).toBeInTheDocument()
+    expect(onEnd).not.toHaveBeenCalled()
     await userEvent.click(screen.getByRole('button', { name: 'Close' }))
-    expect(connection.dispose).toHaveBeenCalled()
+    expect(onEnd).toHaveBeenCalled()
   })
 })
