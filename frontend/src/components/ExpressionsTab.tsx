@@ -5,6 +5,7 @@ import { StarButton } from './StarButton'
 import { KoreanChip } from './KoreanChip'
 import { Synonyms } from './Synonyms'
 import { Marked } from './Marked'
+import { strongestMatches } from '../lib/phraseMatch'
 import './ExpressionsTab.css'
 
 interface Props {
@@ -178,18 +179,18 @@ function KoreanSentence({ expressionId, example, phrase }: { expressionId: numbe
   )
 }
 
-/** A's and B's lines in Korean until tapped, then both English model answers, the expression marked where it is used. */
+/** A's and B's lines in Korean until tapped, then both English model answers, the expression marked where it is used.
+ * Only the line that holds the most of the expression is marked: the other may share a word or two without using it. */
 function KoreanDialogue({ expressionId, lines, phrase }: { expressionId: number; lines: KoreanLine[]; phrase: string }) {
   const [english, setEnglish] = useSharedView<boolean>(`dialogue:${expressionId}`, false)
+  const uses = strongestMatches(phrase, lines.map((line) => line.english))
   return (
     <button type="button" className="korean-example-card korean-dialogue-card" aria-pressed={english} onClick={() => setEnglish(!english)}>
       {lines.map((line, i) => (
         <span key={i} className="korean-dialogue-line">
           <span className="korean-dialogue-speaker">{i === 0 ? 'A' : 'B'}</span>
           {english ? (
-            <span className="korean-example-english">
-              <Marked text={line.english} word={phrase} />
-            </span>
+            <span className="korean-example-english">{uses[i] ? <Marked text={line.english} word={phrase} /> : line.english}</span>
           ) : (
             <span className="korean-example-korean" lang="ko">
               {line.korean}

@@ -68,23 +68,37 @@ function search(pattern: string, text: string): RegExp | null {
 
 /** The pattern that finds `phrase` in `text`, or null when no part of it is there. */
 export function phrasePattern(phrase: string, text: string): RegExp | null {
+  return bestMatch(phrase, text)?.pattern ?? null
+}
+
+/** Which of `texts` hold the most of `phrase`: the whole of it, or else its longest part that any of them holds. A text
+ * that holds only a shorter part shares words with the phrase without using it. None when no part is in any. */
+export function strongestMatches(phrase: string, texts: string[]): boolean[] {
+  const words = texts.map((text) => bestMatch(phrase, text)?.words ?? 0)
+  const most = Math.max(0, ...words)
+  return words.map((n) => most > 0 && n === most)
+}
+
+/** Where `phrase` is in `text` and how many of its words that match holds, or null when no part of it is there. */
+function bestMatch(phrase: string, text: string): { pattern: RegExp; words: number } | null {
   const tokens = phrase
     .replace(/\([^)]*\)/g, ' ')
     .split(/\s+/)
     .filter(Boolean)
     .map(tokenPattern)
-  const words = tokens.filter((t) => t !== GAP).length
+  const realWords = (run: Token[]) => run.filter((t) => t !== GAP).length
+  const words = realWords(tokens)
   const least = Math.min(2, words)
   // The whole phrase, then with a few extra words inside it, then its longest run that is there;
   // a run must hold at least two real words (one for a single word).
   const whole = search(join(tokens), text) ?? (words > 1 ? search(join(tokens, true), text) : null)
-  if (whole) return whole
+  if (whole) return { pattern: whole, words }
   for (let size = tokens.length - 1; size > 0; size--) {
     for (let start = 0; start + size <= tokens.length; start++) {
       const run = tokens.slice(start, start + size)
-      if (run[0] === GAP || run[run.length - 1] === GAP || run.filter((t) => t !== GAP).length < least) continue
+      if (run[0] === GAP || run[run.length - 1] === GAP || realWords(run) < least) continue
       const found = search(join(run), text)
-      if (found) return found
+      if (found) return { pattern: found, words: realWords(run) }
     }
   }
   return null

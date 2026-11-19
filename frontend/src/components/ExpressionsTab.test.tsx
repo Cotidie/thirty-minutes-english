@@ -174,6 +174,24 @@ describe('ExpressionsTab', () => {
     expect(within(card).getByText('요즘 일정 어때?')).toBeInTheDocument()
   })
 
+  it('marks only the line that uses the expression, not one that shares two of its words', async () => {
+    const tellMe = [
+      {
+        ...items[0],
+        phrase: 'Tell me about it',
+        korean_dialogue: [
+          { korean: '오늘 밤에 생각해 볼게.', english: "I'll think about it tonight." },
+          { korean: '내 말이, 우리 상사도 그래.', english: 'Tell me about it, my boss does the same.' },
+        ],
+      },
+    ]
+    render(<ExpressionsTab items={tellMe} starred={[]} onToggleStar={vi.fn()} onSwap={vi.fn()} onAdd={vi.fn()} />)
+    const card = screen.getByRole('button', { name: /오늘 밤에 생각해 볼게\./ })
+    await userEvent.click(card)
+    expect(within(card).getAllByText(/about it/, { selector: 'mark' }).map((mark) => mark.textContent)).toEqual(['Tell me about it'])
+    expect(within(card).getByText("I'll think about it tonight.")).toBeInTheDocument()
+  })
+
   it('switches to the one sentence and back with the toggle', async () => {
     render(<ExpressionsTab items={both} starred={[]} onToggleStar={vi.fn()} onSwap={vi.fn()} onAdd={vi.fn()} />)
     await userEvent.click(within(practice()).getByRole('button', { name: '한 문장' }))
