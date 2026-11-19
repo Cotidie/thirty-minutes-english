@@ -27,13 +27,15 @@ def list_examples(session_id: int, db: Db, me: Me) -> list[Example]:
 @router.post("/summaries", response_model=Summary, status_code=201)
 def add_summary(body: SummaryRequest, db: Db, me: Me) -> Summary:
     require_paragraph(db, me, body.paragraph_id)
-    return db.records.add_summary(body.paragraph_id, body.user_text, body.feedback, body.seconds)
+    summary_id = db.records.start_summary(body.paragraph_id, me.id, body.user_text, body.seconds)
+    db.records.finish_summary(summary_id, body.feedback)
+    return db.records.get_summary(summary_id, me.id)
 
 
 @router.get("/summaries", response_model=list[Summary])
 def list_summaries(session_id: int, db: Db, me: Me) -> list[Summary]:
     require_access(db, me, session_id)
-    return db.records.list_summaries(session_id)
+    return db.records.list_summaries(session_id, me.id)
 
 
 @router.post("/readings", response_model=Reading, status_code=201)

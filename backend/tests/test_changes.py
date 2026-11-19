@@ -36,7 +36,7 @@ def world(store):
         (lambda db, s: db.sessions.add_figure(s.id, None, db.pictures.add(None, None, None), "c", None, None), {"session"}),
         (lambda db, s: db.sessions.replace_picture(s.content.vocabulary[0].id, "image", db.pictures.add(None, None, None)), {"session"}),
         (lambda db, s: db.records.add_example(s.id, s.content.vocabulary[0].id, "u", "c", 1.0), {"records"}),
-        (lambda db, s: db.records.add_summary(s.content.article.paragraphs[0].id, "u", FEEDBACK, 1.0), {"records"}),
+        (lambda db, s: db.records.start_summary(s.content.article.paragraphs[0].id, None, "u", 1.0), {"records"}),
         (lambda db, s: db.records.add_reading(s.content.article.paragraphs[0].id, "u", 1.0, []), {"records"}),
         (lambda db, s: db.expressions.delete(s.content.expressions[0].id), {"session"}),
         (lambda db, s: db.sessions.delete(s.id), {"access"}),
@@ -46,6 +46,30 @@ def test_every_write_says_what_changed(world, write, expected):
     db, session = world
     write(db, session)
     assert set(db.changes.published) == {(session.id, SessionChange(name)) for name in expected}
+
+
+def test_each_step_of_a_summary_says_the_records_changed_and_a_step_that_changes_nothing_says_nothing(world):
+    db, session = world
+    paragraph = session.content.article.paragraphs[0].id
+    records = db.records
+    summary = records.start_summary(paragraph, None, "u", 1.0)
+    for step in (
+        lambda: records.fail_summary(summary, "feedback failed: down"),
+        lambda: records.rejudge_summary(summary),
+        lambda: records.finish_summary(summary, FEEDBACK),
+    ):
+        db.changes.published.clear()
+        assert step() is True
+        assert db.changes.published == [(session.id, SessionChange.RECORDS)]
+    db.changes.published.clear()
+    assert records.fail_summary(summary, "feedback failed: down") is False  # done already
+    assert db.changes.published == []
+
+    gone = records.start_summary(paragraph, None, "u", 1.0)
+    records.fail_summary(gone, "feedback failed: down")
+    db.changes.published.clear()
+    assert records.remove_failed_summary(gone) is True
+    assert db.changes.published == [(session.id, SessionChange.RECORDS)]
 
 
 def test_a_read_says_nothing(world):

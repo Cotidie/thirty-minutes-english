@@ -179,15 +179,67 @@ def test_readings_and_summaries_hang_off_a_paragraph_and_go_with_the_session(sto
     assert readings[0].corrections[0].at == 1 and readings[1].corrections == []
 
     feedback = SummaryFeedback(missed=[], fixes=[SummaryFix(said="a", better="b")], summary="s")
-    s1 = store.records.add_summary(second, "said", feedback, 5)
-    s2 = store.records.add_summary(first, "said again", feedback, 6)
-    summaries = store.records.list_summaries(session.id)
-    assert [(s.id, s.paragraph_id) for s in summaries] == [(s1.id, second), (s2.id, first)]  # in the order made
+    s1 = store.records.start_summary(second, None, "said", 5)
+    s2 = store.records.start_summary(first, None, "said again", 6)
+    store.records.finish_summary(s1, feedback)
+    summaries = store.records.list_summaries(session.id, viewer_id=0)
+    assert [(s.id, s.paragraph_id) for s in summaries] == [(s1, second), (s2, first)]  # in the order made
     assert summaries[0].feedback == feedback
 
-    assert store.records.list_readings(other.id) == [] and store.records.list_summaries(other.id) == []
+    assert store.records.list_readings(other.id) == [] and store.records.list_summaries(other.id, viewer_id=0) == []
     store.sessions.delete(session.id)
-    assert store.records.list_readings(session.id) == [] and store.records.list_summaries(session.id) == []
+    assert store.records.list_readings(session.id) == [] and store.records.list_summaries(session.id, viewer_id=0) == []
+
+
+RESTARTED = "The server restarted before the feedback came back."
+
+
+def test_a_summary_goes_from_judging_to_done_or_failed_and_only_a_failed_one_comes_back_or_goes(store):
+    mina, jo = add_user(store, "mina@example.com"), add_user(store, "jo@example.com")
+    session = store.sessions.create(sample_draft(), [], created_by=mina.id)
+    paragraph = session.content.article.paragraphs[0]
+    records = store.records
+    feedback = SummaryFeedback(missed=[], fixes=[], summary="s")
+
+    first = records.start_summary(paragraph.id, mina.id, "said", 5)
+    judging = records.get_summary(first, mina.id)
+    assert (judging.status, judging.feedback, judging.error, judging.speaker, judging.mine) == ("judging", None, None, "mina", True)
+    assert records.get_summary(first, jo.id).mine is False
+    assert records.summary_to_judge(first) == (paragraph.text, "said")
+    assert records.rejudge_summary(first) is False and records.remove_failed_summary(first) is False
+
+    assert records.fail_summary(first, "feedback failed: down") is True
+    failed = records.get_summary(first, mina.id)
+    assert (failed.status, failed.error, failed.feedback) == ("failed", "feedback failed: down", None)
+    assert records.summary_to_judge(first) is None
+    assert records.finish_summary(first, feedback) is False
+
+    assert records.rejudge_summary(first) is True
+    again = records.get_summary(first, mina.id)
+    assert (again.status, again.error) == ("judging", None)
+    assert records.rejudge_summary(first) is False
+    assert records.finish_summary(first, feedback) is True
+    done = records.get_summary(first, mina.id)
+    assert (done.status, done.feedback) == ("done", feedback)
+
+    second = records.start_summary(paragraph.id, jo.id, "gone", 2)
+    records.fail_summary(second, "feedback failed: down")
+    assert records.remove_failed_summary(second) is True
+    assert [s.id for s in records.list_summaries(session.id, mina.id)] == [first]
+    assert records.get_summary(second, mina.id) is None
+
+    nobody = records.start_summary(paragraph.id, None, "who", 1)
+    assert records.get_summary(nobody, mina.id).speaker is None
+
+
+def test_summaries_left_judging_fail_when_the_app_starts_again(store):
+    paragraph = store.sessions.create(sample_draft(), []).content.article.paragraphs[0].id
+    left = store.records.start_summary(paragraph, None, "left", 1)
+    done = store.records.start_summary(paragraph, None, "done", 1)
+    store.records.finish_summary(done, SummaryFeedback(missed=[], fixes=[], summary="s"))
+    store.records.fail_unfinished_summaries(RESTARTED)
+    assert (store.records.get_summary(left, 0).status, store.records.get_summary(left, 0).error) == ("failed", RESTARTED)
+    assert store.records.get_summary(done, 0).status == "done"
 
 
 def test_a_reading_kept_before_corrections_were_saved_has_none(store):

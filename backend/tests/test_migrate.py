@@ -213,7 +213,7 @@ def test_an_unmatched_reading_is_dropped_with_a_warning(tmp_path, caplog):
     assert [c.word for c in readings[1].corrections] == ["one"]  # the pause findings v1 read past are gone
     assert readings[0].corrections is None
     assert "readings_dropped=1" in caplog.text and "A paragraph that was never there." in caplog.text
-    [summary] = db.records.list_summaries(11)
+    [summary] = db.records.list_summaries(11, viewer_id=0)
     assert (summary.paragraph_id, summary.feedback.fixes[0].better) == (paragraphs[2].id, "b")
 
 

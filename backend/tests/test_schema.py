@@ -12,8 +12,38 @@ from app.topics.curated import CURATED
 from tests.conftest import CURATED_TOPICS, add_user, sample_draft, seed_expressions
 
 
+V17_SUMMARIES = """
+CREATE TABLE summaries (
+    id           INTEGER PRIMARY KEY AUTOINCREMENT,
+    created_at   TEXT    NOT NULL,
+    paragraph_id INTEGER NOT NULL REFERENCES paragraphs(id) ON DELETE CASCADE,
+    user_text    TEXT    NOT NULL,
+    feedback     TEXT    NOT NULL,
+    seconds      REAL    NOT NULL DEFAULT 0
+) STRICT
+"""
+
+
+def as_v17(path) -> None:
+    """Rewrites a current file the way v17 kept it: summaries always judged, with no one who said them."""
+    conn = sqlite3.connect(path)
+    with conn:
+        conn.execute("ALTER TABLE summaries RENAME TO summaries_v18")
+        conn.execute("DROP INDEX IF EXISTS summaries_paragraph")
+        conn.execute(V17_SUMMARIES)
+        conn.execute(
+            "INSERT INTO summaries (id, created_at, paragraph_id, user_text, feedback, seconds)"
+            " SELECT id, created_at, paragraph_id, user_text, feedback, seconds FROM summaries_v18"
+        )
+        conn.execute("DROP TABLE summaries_v18")
+        conn.execute("CREATE INDEX summaries_paragraph ON summaries (paragraph_id)")
+        conn.execute("PRAGMA user_version = 17")
+    conn.close()
+
+
 def as_v16(path) -> None:
     """Rewrites a current file the way v16 kept it: expressions with no dialogue column."""
+    as_v17(path)
     conn = sqlite3.connect(path)
     with conn:
         conn.execute("ALTER TABLE expressions DROP COLUMN korean_dialogue")
@@ -230,7 +260,7 @@ def test_a_v16_file_gains_an_empty_korean_dialogue_on_each_expression(tmp_path):
     as_v16(path)
     db = Database(path)
     with db.connect() as conn:
-        assert conn.execute("PRAGMA user_version").fetchone()[0] == schema.VERSION == 17
+        assert conn.execute("PRAGMA user_version").fetchone()[0] == schema.VERSION
     assert list(tmp_path.glob("s.db.bak-v16-????-??-??"))
     assert db.expressions.get(expression).korean_dialogue is None
 
@@ -545,3 +575,38 @@ def test_an_upgrade_to_v16_that_fails_leaves_the_v15_file_as_it_was(tmp_path):
     assert conn.execute("PRAGMA user_version").fetchone()[0] == 15
     assert "username" not in [c[1] for c in conn.execute("PRAGMA table_info(users)")]
     conn.close()
+
+
+FEEDBACK_JSON = '{"missed": [], "fixes": [], "summary": "s"}'
+
+
+def test_v18_keeps_every_summary_as_judged_with_no_speaker_and_carries_the_id_counter_on(tmp_path):
+    path = tmp_path / "s.db"
+    db = Database(path)
+    session = db.sessions.create(sample_draft(), [])
+    paragraph = session.content.article.paragraphs[0].id
+    as_v17(path)
+    with sqlite3.connect(path) as conn:
+        for said in ("kept", "deleted"):
+            conn.execute(
+                "INSERT INTO summaries (created_at, paragraph_id, user_text, feedback, seconds) VALUES ('2026-11-01T00:00:00+00:00', ?, ?, ?, 5)",
+                (paragraph, said, FEEDBACK_JSON),
+            )
+        conn.execute("DELETE FROM summaries WHERE user_text = 'deleted'")
+    db = Database(path)
+    with db.connect() as conn:
+        assert conn.execute("PRAGMA user_version").fetchone()[0] == schema.VERSION == 18
+    [kept] = db.records.list_summaries(session.id, viewer_id=0)
+    assert (kept.id, kept.status, kept.feedback.summary, kept.speaker, kept.mine) == (1, "done", "s", None, False)
+    assert db.records.start_summary(paragraph, None, "again", 3) == 3
+
+
+def test_a_summary_is_done_exactly_when_it_has_feedback(tmp_path):
+    db = Database(tmp_path / "s.db")
+    paragraph = db.sessions.create(sample_draft(), []).content.article.paragraphs[0].id
+    insert = "INSERT INTO summaries (created_at, paragraph_id, user_text, status, feedback) VALUES ('t', ?, 'said', ?, ?)"
+    with db.connect() as conn:
+        with pytest.raises(sqlite3.IntegrityError):
+            conn.execute(insert, (paragraph, "done", None))
+        with pytest.raises(sqlite3.IntegrityError):
+            conn.execute(insert, (paragraph, "judging", FEEDBACK_JSON))

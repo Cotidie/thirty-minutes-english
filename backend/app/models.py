@@ -1,5 +1,6 @@
 from datetime import datetime
 from enum import StrEnum
+from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
@@ -366,15 +367,23 @@ class Reading(BaseModel):
     corrections: list[Correction] | None = None
 
 
+SummaryStatus = Literal["judging", "done", "failed"]
+
+
 class Summary(BaseModel):
-    """One paragraph the reader summed up out loud, and what the coach made of it."""
+    """One paragraph someone summed up out loud, and what the coach made of it: the feedback once it is in, or why it
+    could not be had. `speaker` is who said it, None when no one is known; `mine` says whether that is who asked."""
 
     id: int
     created_at: datetime
     paragraph_id: int
     user_text: str
-    feedback: SummaryFeedback
     seconds: float
+    status: SummaryStatus = "done"
+    feedback: SummaryFeedback | None = None
+    error: str | None = None
+    speaker: str | None = None
+    mine: bool = False
 
 
 class Example(BaseModel):
