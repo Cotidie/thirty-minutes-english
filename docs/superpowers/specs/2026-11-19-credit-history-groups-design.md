@@ -1,6 +1,6 @@
 # 크레딧 기록 묶기
 
-- 상태: 설계 (2026-11-19).
+- 상태: 구현됨 (2026-11-20). 구현 계획: `docs/superpowers/plans/2026-11-19-credit-history-groups.md`.
 - 범위: 크레딧 기록(Database > Accounts의 History, 크레딧 버튼 패널)에서 같은 날, 같은 항목의 줄을 한 줄로 묶는다. DB 스키마는 바뀌지 않는다.
 
 ## 목적
