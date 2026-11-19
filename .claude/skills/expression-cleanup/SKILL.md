@@ -64,6 +64,15 @@ When you cannot tell 4 from 5, list the expression as borderline instead of prop
    Every id should answer 204.
 5. Update `decisions.md`: add what was deleted, add what was kept on purpose, and replace the pending list. Commit it.
 
+## After an import
+
+New expressions have no Korean dialogue. Preview a few, then fill the rest:
+
+    docker compose exec backend uv run --no-dev python -m app.generation.korean_dialogues --limit 10
+    docker compose exec backend uv run --no-dev python -m app.generation.korean_dialogues --apply
+
+It only asks for expressions that have none, so running it again is safe.
+
 ## Common mistakes
 
 - Keeping a fixed narrow sentence because it is "practical" or "everyday".
