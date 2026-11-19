@@ -69,3 +69,16 @@
     grid-template-columns: minmax(0, 1fr);
   }
 }
+
+/* A kept summary whose feedback is still coming. */
+.summary-judging {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+
+.summary-failed-actions {
+  display: flex;
+  gap: 0.5rem;
+  margin-top: 0.5rem;
+}

@@ -358,14 +358,25 @@ export interface SummaryFeedback {
   summary: string
 }
 
-/** One paragraph summed up out loud, and what the coach made of it. */
+/** Where a summary's feedback is: still coming, in, or not to be had. */
+export type SummaryStatus = 'judging' | 'done' | 'failed'
+
+/** One paragraph someone summed up out loud, and what the coach made of it once the server has judged it. */
 export interface Summary {
   id: number
   created_at: string
   paragraph_id: number
   user_text: string
-  feedback: SummaryFeedback
   seconds: number
+  status: SummaryStatus
+  /** Only once the status is done. */
+  feedback: SummaryFeedback | null
+  /** Why the feedback failed, only then. */
+  error: string | null
+  /** Who said it, when known. */
+  speaker: string | null
+  /** Whether that is the one reading it. */
+  mine: boolean
 }
 
 /** One sentence made with one of the session's words, and the coach's echo of it. */

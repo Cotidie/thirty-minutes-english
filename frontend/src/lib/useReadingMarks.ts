@@ -12,7 +12,10 @@ import { useSessionResource } from './sessionChanges'
 export function useReadingMarks(sessionId: number): { marks: Map<number, Shown[]>; add: (reading: Reading) => void } {
   const [readings, setReadings] = useState<Reading[]>([])
 
-  useSessionResource(sessionId, 'records', () => api.listReadings(sessionId), setReadings)
+  // Summaries share the `records` event, so the readings often come back unchanged; keeping the list then keeps every
+  // paragraph's marks the same, which is what a paragraph holding a finished round's marks waits on.
+  const show = useCallback((next: Reading[]) => setReadings((now) => (sameReadings(now, next) ? now : next)), [])
+  useSessionResource(sessionId, 'records', () => api.listReadings(sessionId), show)
 
   const add = useCallback((reading: Reading) => setReadings((all) => [reading, ...all]), [])
   const marks = useMemo(() => {
@@ -24,4 +27,9 @@ export function useReadingMarks(sessionId: number): { marks: Map<number, Shown[]
     return marks
   }, [readings])
   return { marks, add }
+}
+
+/** Readings are never changed once filed, so the same ids in the same order with the same marks are the same list. */
+function sameReadings(a: Reading[], b: Reading[]): boolean {
+  return a.length === b.length && a.every((r, i) => r.id === b[i].id && JSON.stringify(r.corrections) === JSON.stringify(b[i].corrections))
 }

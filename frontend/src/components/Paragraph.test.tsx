@@ -74,3 +74,25 @@ test('the admin, who is charged nothing, sees no price', () => {
   expect(screen.getByRole('button', { name: 'Read again' })).toHaveTextContent(/^Read again$/)
   expect(screen.getByRole('button', { name: 'Summarize' })).toHaveTextContent(/^Summarize$/)
 })
+
+test('short of credits, Judge again on a failed summary is off and says why', () => {
+  vi.mocked(useCredits).mockReturnValue(creditsOf(2, PRICES))
+  const failed = { id: 7, created_at: '', paragraph_id: 1, user_text: 'said', seconds: 3, status: 'failed' as const, feedback: null, error: 'feedback failed: down', speaker: null, mine: true }
+  render(
+    <Paragraph
+      paragraph={{ id: 1, text: TEXT }}
+      pieces={pairSentences([TEXT], [{ en: TEXT, ko: '전혀 결함이 없었다.' }])[0]}
+      spans={[]}
+      summaries={[failed]}
+      saved={[]}
+      onSummary={vi.fn()}
+      onReading={vi.fn()}
+      active={false}
+      onStart={vi.fn()}
+      onEnd={vi.fn()}
+    />,
+  )
+  const again = screen.getByRole('button', { name: /^Judge again/ })
+  expect(again).toBeDisabled()
+  expect(again).toHaveAttribute('title', 'Not enough credits: this needs 5 and you have 2.')
+})

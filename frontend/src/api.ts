@@ -17,7 +17,6 @@ import type {
   PersonMatch,
   PictureFace,
   Summary,
-  SummaryFeedback,
   PracticeTarget,
   Reading,
   Session,
@@ -184,11 +183,13 @@ export const api = {
   /** Gemini's transcription model, primed with the paragraph's words. */
   startSummary: (paragraph: string) =>
     request<LiveSession>('/api/summary/sessions', { method: 'POST', body: JSON.stringify({ paragraph }) }),
-  /** A spoken summary judged against its paragraph: what was missed, the wording fixed, and the summary with the fixes in. */
-  summaryFeedback: (paragraph: string, userText: string) =>
-    request<SummaryFeedback>('/api/summary/feedback', { method: 'POST', body: JSON.stringify({ paragraph, user_text: userText }) }),
-  addSummary: (summary: { paragraph_id: number; user_text: string; feedback: SummaryFeedback; seconds: number }) =>
+  /** Keeps a spoken summary and has the server judge it against its paragraph; it answers before the feedback is in. */
+  addSummary: (summary: { paragraph_id: number; user_text: string; seconds: number }) =>
     request<Summary>('/api/summaries', { method: 'POST', body: JSON.stringify(summary) }),
+  /** A summary whose feedback failed, judged again with what was said. */
+  judgeSummaryAgain: (id: number) => request<Summary>(`/api/summaries/${id}/judge`, { method: 'POST' }),
+  /** Only a summary whose feedback failed can go. */
+  removeSummary: (id: number) => request<void>(`/api/summaries/${id}`, { method: 'DELETE' }),
   listSummaries: (sessionId: number) => request<Summary[]>(`/api/summaries?session_id=${sessionId}`),
   addReading: (reading: {
     paragraph_id: number
