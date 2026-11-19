@@ -12,8 +12,18 @@ from app.topics.curated import CURATED
 from tests.conftest import CURATED_TOPICS, add_user, sample_draft, seed_expressions
 
 
+def as_v16(path) -> None:
+    """Rewrites a current file the way v16 kept it: expressions with no dialogue column."""
+    conn = sqlite3.connect(path)
+    with conn:
+        conn.execute("ALTER TABLE expressions DROP COLUMN korean_dialogue")
+        conn.execute("PRAGMA user_version = 16")
+    conn.close()
+
+
 def as_v15(path) -> None:
     """Rewrites a current file the way v15 kept it: accounts with no username."""
+    as_v16(path)
     conn = sqlite3.connect(path)
     with conn:
         conn.execute("DROP INDEX users_username")
@@ -79,6 +89,7 @@ def as_v10(path) -> None:
 
 def as_v9(path) -> None:
     """Rewrites a current file the way v9 kept it: no accounts, and no creator on a session."""
+    as_v16(path)
     conn = sqlite3.connect(path)
     conn.execute("PRAGMA foreign_keys = OFF")
     with conn:
@@ -211,6 +222,17 @@ def test_a_v4_file_keeps_its_sessions_through_every_step(tmp_path):
         assert conn.execute("SELECT 1 FROM sqlite_master WHERE name = 'swapped_expressions'").fetchone() is None  # made at v5, gone at v15
     assert list(tmp_path.glob("s.db.bak-v4-????-??-??"))
     assert db.sessions.get(session.id).content.article.title == session.content.article.title
+
+
+def test_a_v16_file_gains_an_empty_korean_dialogue_on_each_expression(tmp_path):
+    path = tmp_path / "s.db"
+    [expression] = seed_expressions(Database(path), 1)
+    as_v16(path)
+    db = Database(path)
+    with db.connect() as conn:
+        assert conn.execute("PRAGMA user_version").fetchone()[0] == schema.VERSION == 17
+    assert list(tmp_path.glob("s.db.bak-v16-????-??-??"))
+    assert db.expressions.get(expression).korean_dialogue is None
 
 
 def test_a_v5_file_gains_an_empty_korean_example_on_each_expression(tmp_path):

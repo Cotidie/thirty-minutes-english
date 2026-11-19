@@ -11,12 +11,12 @@ from typing import TYPE_CHECKING
 from app.db.shares import VISIBLE_SESSIONS
 from app.generation.exclusions import key
 from app.live.changes import SessionChange
-from app.models import CorpusEntry, Expression
+from app.models import CorpusEntry, Expression, KoreanLine
 
 if TYPE_CHECKING:
     from app.db import Database
 
-COLUMNS = "e.id, e.phrase, e.meaning, e.synonyms, e.examples, e.usage_note, e.korean, e.korean_example"
+COLUMNS = "e.id, e.phrase, e.meaning, e.synonyms, e.examples, e.usage_note, e.korean, e.korean_example, e.korean_dialogue"
 # Every session that uses an expression now.
 USES = "SELECT session_id, expression_id FROM session_expressions"
 
@@ -31,6 +31,7 @@ def expression_from(row: sqlite3.Row) -> Expression:
         examples=json.loads(row["examples"]),
         korean=row["korean"],
         korean_example=row["korean_example"] and json.loads(row["korean_example"]),
+        korean_dialogue=row["korean_dialogue"] and json.loads(row["korean_dialogue"]),
     )
 
 
@@ -89,6 +90,24 @@ class ExpressionRepo:
                         sessions=json.loads(row["sessions"]))
             for row in rows
         ]
+
+    def without_dialogue(self, limit: int | None = None) -> list[Expression]:
+        """The expressions with no Korean dialogue yet, oldest id first; all of them when `limit` is None."""
+        with self._db.connect() as conn:
+            rows = conn.execute(
+                f"SELECT {COLUMNS} FROM expressions e WHERE e.korean_dialogue IS NULL ORDER BY e.id LIMIT ?",
+                (-1 if limit is None else limit,),
+            ).fetchall()
+        return [expression_from(row) for row in rows]
+
+    def set_dialogue(self, expression_id: int, lines: list[KoreanLine]) -> None:
+        """Keeps `lines` (A, then B) as the expression's dialogue. Nothing is published: the corpus tool that writes
+        these runs in its own process, and open sessions read the dialogue when they next load."""
+        with self._db.connect() as conn:
+            conn.execute(
+                "UPDATE expressions SET korean_dialogue = ? WHERE id = ?",
+                (json.dumps([line.model_dump() for line in lines], ensure_ascii=False), expression_id),
+            )
 
     def delete(self, expression_id: int) -> bool:
         """Takes the expression out of the corpus and out of every session that taught it, with its stars

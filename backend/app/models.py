@@ -57,6 +57,13 @@ class KoreanExample(BaseModel):
     english: str
 
 
+class KoreanLine(BaseModel):
+    """One speaker's line: Korean to say in English, then `english` as the model answer."""
+
+    korean: str
+    english: str
+
+
 class Expression(BaseModel):
     """One expression of the corpus; a session teaches a few of them."""
 
@@ -71,6 +78,8 @@ class Expression(BaseModel):
     korean: str | None = None
     """None until the corpus has one."""
     korean_example: KoreanExample | None = None
+    """None until the corpus has one. A's line, then B's; at least one says the expression."""
+    korean_dialogue: list[KoreanLine] | None = None
 
 
 class CorpusEntry(Expression):

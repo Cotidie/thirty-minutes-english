@@ -1,8 +1,9 @@
+import json
 import random
 
 from app.db import Database
 from app.main import create_app
-from app.models import KoreanExample
+from app.models import KoreanExample, KoreanLine
 from app.wiring import Services
 from tests.conftest import NAMES, add_user, admin_client, sample_draft, seed_expressions
 from tests.test_api import FakeGenerator, InlineExecutor
@@ -150,3 +151,41 @@ def test_the_words_to_avoid_come_from_my_sessions_and_those_shared_with_me(store
     words = store.sessions.used_words(seen_by=me.id)
     assert "mine" in words and "shared" in words and "theirs" not in words
     assert "theirs" in store.sessions.used_words()
+
+
+DIALOGUE = [
+    KoreanLine(korean="아까 그분 이름이 뭐였더라?", english="What was his name again?"),
+    KoreanLine(korean="미안, 나도 이름을 못 들었어.", english="Sorry, I didn't catch his name either."),
+]
+
+
+def test_a_korean_dialogue_comes_with_its_expression_wherever_it_is_read(store):
+    a, b = seed_expressions(store, 2)
+    store.expressions.set_dialogue(a, DIALOGUE)
+    session = store.sessions.create(sample_draft(), [a, b]).id
+    assert [e.korean_dialogue for e in store.sessions.get(session).content.expressions] == [DIALOGUE, None]
+    assert store.expressions.get(a).korean_dialogue == DIALOGUE
+    assert [e.korean_dialogue for e in store.expressions.list_all()] == [DIALOGUE, None]
+
+
+def test_a_dialogue_is_kept_as_readable_korean_in_order(store):
+    [a] = seed_expressions(store, 1)
+    store.expressions.set_dialogue(a, DIALOGUE)
+    with store.connect() as conn:
+        raw = conn.execute("SELECT korean_dialogue FROM expressions WHERE id = ?", (a,)).fetchone()[0]
+    assert json.loads(raw) == [line.model_dump() for line in DIALOGUE]
+    assert "이름" in raw
+
+
+def test_without_dialogue_lists_the_empty_ones_by_id_up_to_the_limit(store):
+    a, b, c = seed_expressions(store, 3)
+    store.expressions.set_dialogue(b, DIALOGUE)
+    assert [e.id for e in store.expressions.without_dialogue()] == [a, c]
+    assert [e.id for e in store.expressions.without_dialogue(1)] == [a]
+
+
+def test_importing_an_expression_again_keeps_its_dialogue(store):
+    [a] = seed_expressions(store, 1)
+    store.expressions.set_dialogue(a, DIALOGUE)
+    assert store.expressions.add("alpha phrase", "new meaning", [], ["e"], "n", None, "s") == a
+    assert store.expressions.get(a).korean_dialogue == DIALOGUE

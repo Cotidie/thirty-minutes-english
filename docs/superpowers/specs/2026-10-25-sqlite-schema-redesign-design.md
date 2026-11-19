@@ -78,7 +78,8 @@ CREATE TABLE expressions (
     korean     TEXT,
     source     TEXT    NOT NULL,                 -- 출처 이름. 세션에서 옮긴 것은 'session'
     added_at   TEXT    NOT NULL,
-    korean_example TEXT                          -- JSON {korean, english}: 한국어 예문과 영어 모범 답안. NULL이면 아직 없음 (v6)
+    korean_example TEXT,                         -- JSON {korean, english}: 한국어 예문과 영어 모범 답안. NULL이면 아직 없음 (v6)
+    korean_dialogue TEXT                         -- JSON [{korean, english}, {korean, english}]: A, B 두 줄 대화문. 적어도 한 줄에 표현. NULL이면 아직 없음 (v17)
 ) STRICT;
 
 CREATE TABLE session_expressions (               -- 지금 가르치는 것. 행이 있으면 쓴 표현
@@ -141,7 +142,7 @@ CREATE TABLE stage_times (id INTEGER PRIMARY KEY AUTOINCREMENT, stage TEXT NOT N
 
 인덱스: `paragraphs(session_id)`, `vocabulary(session_id)`, `session_expressions(session_id)`, `session_expressions(expression_id)`, `examples(session_expression_id)`, `examples(vocabulary_id)`, `readings(paragraph_id)`, `summaries(paragraph_id)`, `stage_times(stage, id)`, `sessions(topic_id)`, `topic_days(topic_id)`.
 
-버전: v3에 `figures`, v4(2026-10-26)에 `topics`와 참조형 `topic_days`·`sessions.topic_id`. v3→v4 업그레이드는 날짜 붙은 백업(`.bak-v3-…`)을 남기고, 큐레이션 주제를 넣고(이후엔 코드가 아니라 DB가 원본, `app/topics/curated.py`는 시드), 뉴스 JSON과 세션 주제 텍스트를 참조로 바꾸고, foreign key를 끈 채 `sessions`를 다시 만든 뒤 키를 검사한다. v5(2026-10-27)에 `swapped_expressions`(v15에서 없어짐). v6(2026-10-27)에 `expressions.korean_example`. 열 하나 추가라 백업(`.bak-v5-…`) 뒤 `ALTER TABLE`만 한다. v7(2026-10-27)에 표현의 Your turn이 빠져 `examples`를 단어 전용으로 다시 만든다: 백업(`.bak-v6-…`) 뒤 `session_expression_id`와 CHECK를 없애고, 표현으로 만든 문장은 버리며, id 카운터는 이어 간다. v15(2026-11-04)에 `swapped_expressions`와 `expressions.setting`을 지우고, 사용 메모 앞의 setting 이름("Casual. ")을 걷어낸다. 한 트랜잭션이고 백업(`.bak-v14-…`)을 남긴다.
+버전: v3에 `figures`, v4(2026-10-26)에 `topics`와 참조형 `topic_days`·`sessions.topic_id`. v3→v4 업그레이드는 날짜 붙은 백업(`.bak-v3-…`)을 남기고, 큐레이션 주제를 넣고(이후엔 코드가 아니라 DB가 원본, `app/topics/curated.py`는 시드), 뉴스 JSON과 세션 주제 텍스트를 참조로 바꾸고, foreign key를 끈 채 `sessions`를 다시 만든 뒤 키를 검사한다. v5(2026-10-27)에 `swapped_expressions`(v15에서 없어짐). v6(2026-10-27)에 `expressions.korean_example`. 열 하나 추가라 백업(`.bak-v5-…`) 뒤 `ALTER TABLE`만 한다. v7(2026-10-27)에 표현의 Your turn이 빠져 `examples`를 단어 전용으로 다시 만든다: 백업(`.bak-v6-…`) 뒤 `session_expression_id`와 CHECK를 없애고, 표현으로 만든 문장은 버리며, id 카운터는 이어 간다. v15(2026-11-04)에 `swapped_expressions`와 `expressions.setting`을 지우고, 사용 메모 앞의 setting 이름("Casual. ")을 걷어낸다. 한 트랜잭션이고 백업(`.bak-v14-…`)을 남긴다. v17(2026-11-19)에 `expressions.korean_dialogue`. 열 하나 추가라 백업(`.bak-v16-…`) 뒤 `ALTER TABLE`만 한다.
 
 ## 표현 선택 규칙
 

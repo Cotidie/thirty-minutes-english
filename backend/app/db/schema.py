@@ -9,7 +9,7 @@ from app.accounts.usernames import random_username
 from app.db import topics
 from app.models import Category
 
-VERSION = 16
+VERSION = 17
 
 # Added in v3, by session since v9: images under the article's paragraphs, and its cover (no paragraph) under the title.
 FIGURES = """
@@ -62,6 +62,12 @@ CREATE INDEX swapped_expressions_expression ON swapped_expressions (expression_i
 # answer, as one JSON object {"korean", "english"}; NULL until the corpus has one.
 KOREAN_EXAMPLES = """
 ALTER TABLE expressions ADD COLUMN korean_example TEXT;
+"""
+
+# Added in v17: a two-line dialogue the pair say in English, A then B, as a JSON array
+# [{"korean", "english"}, {"korean", "english"}]; NULL until the corpus has one.
+KOREAN_DIALOGUES = """
+ALTER TABLE expressions ADD COLUMN korean_dialogue TEXT;
 """
 
 # Rebuilt in v7: sentences are made with words only, since expressions lost their Your turn.
@@ -262,7 +268,7 @@ CREATE INDEX session_expressions_expression ON session_expressions (expression_i
 CREATE INDEX readings_paragraph ON readings (paragraph_id);
 CREATE INDEX summaries_paragraph ON summaries (paragraph_id);
 CREATE INDEX stage_times_stage ON stage_times (stage, id);
-""" + FIGURES + KOREAN_EXAMPLES + EXAMPLES + ACCOUNTS + CREDITS + CREDIT_HOLDS + f"{USERNAME_COLUMN};\n{USERNAME_INDEX};\n"
+""" + FIGURES + KOREAN_EXAMPLES + EXAMPLES + ACCOUNTS + CREDITS + CREDIT_HOLDS + f"{USERNAME_COLUMN};\n{USERNAME_INDEX};\n" + KOREAN_DIALOGUES
 
 
 def _run(conn: sqlite3.Connection, script: str) -> None:
@@ -314,6 +320,9 @@ def upgrade(conn: sqlite3.Connection, version: int) -> None:
         _plain_expressions(conn)
     if version < 16:
         _usernames(conn)
+    if version < 17:
+        _run(conn, KOREAN_DIALOGUES)
+        conn.execute("PRAGMA user_version = 17")
 
 
 def _add_pool(conn: sqlite3.Connection, category: Category, version: int) -> None:
