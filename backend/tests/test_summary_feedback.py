@@ -1,13 +1,14 @@
+import sqlite3
 from pathlib import Path
 
 from app.coaching.summary_feedback import SummaryCoach
-from app.coaching.summary_judging import RESTARTED
+from app.coaching.summary_judging import NOT_SAVED, RESTARTED, SummaryJudges
 from app.db import Database
 from app.live.changes import SessionChange
 from app.llm import GenerationError
 from app.main import create_app
 from app.wiring import Services
-from tests.conftest import Recorder, admin_client
+from tests.conftest import Recorder, add_user, admin_client, sample_draft
 from tests.test_api import FakeGenerator, HeldExecutor, InlineExecutor
 
 AGENT_DIR = Path(__file__).parents[2] / "agents" / "summary-coach"
@@ -124,3 +125,27 @@ def test_the_summary_round_is_503_without_a_voice_key(tmp_path):
         off = c.post("/api/summaries", json={"paragraph_id": paragraph["id"], "user_text": "x"})
         assert (off.status_code, off.json()["detail"]) == (503, "summary coach is off: the summary-coach folder is missing")
         assert c.post("/api/summary/feedback", json={"paragraph": PARAGRAPH, "user_text": "x"}).status_code in (404, 405)
+
+
+def test_a_judgment_whose_feedback_cannot_be_saved_fails_the_summary_and_gives_the_price_back(tmp_path, caplog):
+    db = Database(tmp_path / "s.db")
+    mina = add_user(db, "mina@example.com")
+    db.credits.grant(mina.id, 10, by=mina.id)
+    paragraph = db.sessions.create(sample_draft(), [], created_by=mina.id).content.article.paragraphs[0].id
+    summary_id = db.records.start_summary(paragraph, mina.id, SAID, 1)
+    hold = db.credits.hold(mina, "summary_feedback")
+
+    class Locked:
+        """The records, except that keeping the feedback finds the database locked every time."""
+
+        def __getattr__(self, name):
+            return getattr(db.records, name)
+
+        def finish_summary(self, *args):
+            raise sqlite3.OperationalError("database is locked")
+
+    SummaryJudges(Locked(), db.credits, InlineExecutor()).judge(summary_id, SummaryCoach(FakeCli(), AGENT_DIR), hold)
+    summary = db.records.get_summary(summary_id, mina.id)
+    assert (summary.status, summary.error) == ("failed", NOT_SAVED)
+    assert db.credits.balance(mina.id) == 10
+    assert "could not be judged or saved" in caplog.text

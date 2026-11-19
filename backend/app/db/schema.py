@@ -404,7 +404,10 @@ def _figures_by_session(conn: sqlite3.Connection) -> None:
 
 def _summaries_with_status(conn: sqlite3.Connection) -> None:
     """v17 to v18: every summary kept so far was judged, and no one is known to have said it; the id counter carries
-    on so a new summary never takes a gone one's id."""
+    on so a new summary never takes a gone one's id. All of it or none: otherwise the renamed table outlives a failed
+    copy and the next start cannot rename again."""
+    conn.commit()
+    conn.execute("BEGIN")
     (counter,) = conn.execute("SELECT COALESCE(MAX(seq), 0) FROM sqlite_sequence WHERE name = 'summaries'").fetchone()
     conn.execute("ALTER TABLE summaries RENAME TO summaries_v17")
     conn.execute("DROP INDEX IF EXISTS summaries_paragraph")

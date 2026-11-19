@@ -5,6 +5,7 @@ import json
 from datetime import UTC, datetime
 from typing import TYPE_CHECKING
 
+from app.db.retry import when_free
 from app.live.changes import SessionChange
 from app.models import Correction, Example, Reading, Summary, SummaryFeedback
 
@@ -119,9 +120,14 @@ class RecordRepo:
         return [_summary(row) for row in rows]
 
     def _move(self, statement: str, *params: object) -> bool:
-        """Runs one UPDATE or DELETE ... RETURNING paragraph_id on a summary and announces it if a row moved."""
-        with self._db.connect() as conn:
-            rows = conn.execute(statement, params).fetchall()  # all of them, so the statement is done before the commit
+        """Runs one UPDATE or DELETE ... RETURNING paragraph_id on a summary and announces it if a row moved. A busy
+        database is tried again: the judges write from their own threads, and a lost write would strand a summary."""
+
+        def write() -> list:
+            with self._db.connect() as conn:
+                return conn.execute(statement, params).fetchall()  # all of them, so the statement is done before the commit
+
+        rows = when_free(write)
         if not rows:
             return False
         self._announce(rows[0]["paragraph_id"])

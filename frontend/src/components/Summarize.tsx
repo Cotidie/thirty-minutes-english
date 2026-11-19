@@ -36,7 +36,7 @@ export interface SummaryRound {
   level: number
   /** What was said, final once the round is closed. */
   said: string
-  /** Being judged and kept. */
+  /** Being sent to the server, which judges it afterwards. */
   writing: boolean
   failure: string | null
   start: () => void
@@ -202,13 +202,20 @@ function Judgment({ summary }: { summary: Summary }) {
   return <Feedback answer={summary.feedback} />
 }
 
-/** Why the feedback failed, and a way to judge the same words again or drop them. Whoever judges again pays. */
+/** Why the feedback failed, and a way to judge the same words again or drop them. Whoever judges again pays. Once
+ * either is asked for, both stay off: the card changes when the list is read again, and a second press would only
+ * be refused. */
 function FailedJudgment({ summary }: { summary: Summary }) {
   const { price, short } = usePrice('summary_feedback')
   const [error, setError] = useState<string | null>(null)
+  const [asked, setAsked] = useState(false)
   const act = (call: () => Promise<unknown>) => {
     setError(null)
-    call().catch((e: Error) => setError(e.message))
+    setAsked(true)
+    call().catch((e: Error) => {
+      setError(e.message)
+      setAsked(false)
+    })
   }
   return (
     <div className="summary-failed">
@@ -219,13 +226,13 @@ function FailedJudgment({ summary }: { summary: Summary }) {
           type="button"
           className="paragraph-action"
           onClick={() => act(() => api.judgeSummaryAgain(summary.id))}
-          disabled={short !== null}
+          disabled={asked || short !== null}
           title={short ?? undefined}
         >
           Judge again
           <Price amount={price} />
         </button>
-        <button type="button" className="paragraph-action" onClick={() => act(() => api.removeSummary(summary.id))}>
+        <button type="button" className="paragraph-action" onClick={() => act(() => api.removeSummary(summary.id))} disabled={asked}>
           Remove
         </button>
       </div>

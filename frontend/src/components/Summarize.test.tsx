@@ -179,6 +179,17 @@ it('shows a failed judgment with Judge again and Remove', async () => {
   expect(api.removeSummary).toHaveBeenCalledExactlyOnceWith(7)
 })
 
+it('turns Judge again and Remove off while one of them is under way', async () => {
+  vi.mocked(api.judgeSummaryAgain).mockReturnValue(new Promise(() => undefined))
+  renderParagraph({ summaries: [summary({ status: 'failed', feedback: null, error: 'feedback failed: down' })] })
+  const again = screen.getByRole('button', { name: /^Judge again/ })
+  await userEvent.click(again)
+  expect(again).toBeDisabled()
+  expect(screen.getByRole('button', { name: 'Remove' })).toBeDisabled()
+  await userEvent.click(again)
+  expect(api.judgeSummaryAgain).toHaveBeenCalledOnce()
+})
+
 it('names who said each summary', () => {
   renderParagraph({ summaries: [summary({ id: 1, mine: false, speaker: 'mina' }), summary({ id: 2, mine: false, speaker: null })] })
   const list = screen.getByRole('list', { name: 'Summaries of this paragraph' })

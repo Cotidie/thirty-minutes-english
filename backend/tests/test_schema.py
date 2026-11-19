@@ -610,3 +610,20 @@ def test_a_summary_is_done_exactly_when_it_has_feedback(tmp_path):
             conn.execute(insert, (paragraph, "done", None))
         with pytest.raises(sqlite3.IntegrityError):
             conn.execute(insert, (paragraph, "judging", FEEDBACK_JSON))
+
+
+def test_an_upgrade_to_v18_that_fails_leaves_the_v17_file_as_it_was(tmp_path):
+    path = tmp_path / "s.db"
+    Database(path)
+    as_v17(path)
+    conn = sqlite3.connect(path)  # foreign keys off: a summary of a paragraph that is not there
+    with conn:
+        conn.execute("INSERT INTO summaries (created_at, paragraph_id, user_text, feedback) VALUES ('t', 999, 'orphan', ?)", (FEEDBACK_JSON,))
+    conn.close()
+    with pytest.raises(sqlite3.IntegrityError):
+        Database(path)
+    conn = sqlite3.connect(path)
+    assert conn.execute("PRAGMA user_version").fetchone()[0] == 17
+    assert "status" not in [c[1] for c in conn.execute("PRAGMA table_info(summaries)")]
+    assert conn.execute("SELECT count(*) FROM sqlite_master WHERE name = 'summaries_v17'").fetchone()[0] == 0
+    conn.close()

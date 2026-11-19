@@ -1,3 +1,5 @@
+import sqlite3
+
 import pytest
 
 from app.generation.generator import VOCABULARY_COUNT
@@ -293,3 +295,19 @@ def test_a_star_on_an_item_of_another_session_is_ignored(store):
     assert store.sessions.set_star(mine.id, "words", word, True).words == []
     assert store.sessions.set_star(mine.id, "expressions", ids[0], True).expressions == []
     assert store.sessions.get_stars(other.id).words == []
+
+
+def test_a_summary_step_is_tried_again_while_the_database_is_busy(store, monkeypatch):
+    paragraph = store.sessions.create(sample_draft(), []).content.article.paragraphs[0].id
+    summary = store.records.start_summary(paragraph, None, "said", 1)
+    real, tries = store.connect, []
+
+    def busy_once():
+        tries.append(1)
+        if len(tries) == 1:
+            raise sqlite3.OperationalError("database is locked")
+        return real()
+
+    monkeypatch.setattr(store, "connect", busy_once)
+    monkeypatch.setattr("app.db.retry.WAIT_SECONDS", 0)
+    assert store.records.fail_summary(summary, "feedback failed: down") is True

@@ -16,6 +16,7 @@ from app.generation.jobs import Executor
 log = logging.getLogger(__name__)
 
 RESTARTED = "The server restarted before the feedback came back."
+NOT_SAVED = "feedback failed: it came back but could not be saved"
 
 # How many judgments run at once; each is a claude CLI process. The rest wait their turn.
 JUDGES = 4
@@ -32,19 +33,33 @@ class SummaryJudges:
         self._executor.submit(self._judge, summary_id, coach, hold)
 
     def _judge(self, summary_id: int, coach: SummaryCoach, hold: int | None) -> None:
+        """Settles or gives back `hold` exactly once, whatever fails: nothing on this thread reaches anyone else, so a
+        summary must never be left waiting with its price held."""
+        try:
+            paid = self._fill_in(summary_id, coach)
+        except Exception:
+            log.exception("summary %s could not be judged or saved", summary_id)
+            paid = False
+            try:
+                self._records.fail_summary(summary_id, NOT_SAVED)
+            except sqlite3.Error:
+                log.exception("summary %s stays judging until the app starts again", summary_id)
+        _quietly(self._credits.settle if paid else self._credits.release, hold)
+
+    def _fill_in(self, summary_id: int, coach: SummaryCoach) -> bool:
+        """Judges the summary and keeps the feedback. True when the judgment ran and was kept, or its summary went with
+        the session meanwhile; False when there was nothing to pay for."""
         said = self._records.summary_to_judge(summary_id)
         if said is None:  # gone with its session before a judge got to it
-            _quietly(self._credits.release, hold)
-            return
+            return False
         try:
             feedback = coach.feedback(*said)
         except Exception as e:
             log.exception("summary %s could not be judged", summary_id)
             self._records.fail_summary(summary_id, f"feedback failed: {getattr(e, 'message', e)}")
-            _quietly(self._credits.release, hold)
-            return
+            return False
         self._records.finish_summary(summary_id, feedback)
-        _quietly(self._credits.settle, hold)  # the judgment ran, even when its summary went with the session meanwhile
+        return True
 
 
 def _quietly(step: Callable[[int | None], None], hold: int | None) -> None:
