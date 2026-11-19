@@ -13,11 +13,20 @@ export interface Expression {
   korean?: string | null
   /** Said in English by each of the pair, then tapped for the model answer; null until the corpus has one. */
   korean_example?: KoreanExample | null
+  /** A's line, then B's, each said in English by one of the pair; at least one uses the expression. Null until the
+   * corpus has one. */
+  korean_dialogue?: KoreanLine[] | null
 }
 
 export interface KoreanExample {
   korean: string
   /** The model answer: one way to say `korean` with the expression. */
+  english: string
+}
+
+/** One speaker's line of a Korean dialogue, with its English model answer. */
+export interface KoreanLine {
+  korean: string
   english: string
 }
 

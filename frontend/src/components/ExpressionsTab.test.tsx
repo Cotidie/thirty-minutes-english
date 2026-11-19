@@ -140,6 +140,62 @@ describe('ExpressionsTab', () => {
     render(<ExpressionsTab items={items} starred={[]} onToggleStar={vi.fn()} onSwap={vi.fn()} onAdd={vi.fn()} />)
     expect(screen.queryByRole('button', { name: /Your turn/ })).toBeNull()
   })
+
+  const sentence = { korean: '마감이 계속 바뀌어.', english: 'The deadline is a moving target.' }
+  const dialogue = [
+    { korean: '요즘 일정 어때?', english: 'How is the schedule these days?' },
+    { korean: '마감이 자꾸 바뀌어서 정신없어.', english: "The deadline is a moving target, so it's chaos." },
+  ]
+  const both = [{ ...items[0], korean_example: sentence, korean_dialogue: dialogue }]
+  const practice = () => screen.getByRole('group', { name: '연습 방식' })
+
+  it('shows the dialogue first, with a toggle to the one sentence, when the expression has both', () => {
+    render(<ExpressionsTab items={both} starred={[]} onToggleStar={vi.fn()} onSwap={vi.fn()} onAdd={vi.fn()} />)
+    expect(within(practice()).getByRole('button', { name: '대화' })).toHaveAttribute('aria-pressed', 'true')
+    expect(within(practice()).getByRole('button', { name: '한 문장' })).toHaveAttribute('aria-pressed', 'false')
+    const card = screen.getByRole('button', { name: /요즘 일정 어때\?/ })
+    expect(card).toHaveAttribute('aria-pressed', 'false')
+    for (const text of ['A', 'B', '요즘 일정 어때?', '마감이 자꾸 바뀌어서 정신없어.', '영어로 어떻게 말할까요?']) {
+      expect(within(card).getByText(text)).toBeInTheDocument()
+    }
+    expect(screen.queryByText('마감이 계속 바뀌어.')).toBeNull()
+  })
+
+  it('flips both lines of the dialogue to English at once and back', async () => {
+    render(<ExpressionsTab items={both} starred={[]} onToggleStar={vi.fn()} onSwap={vi.fn()} onAdd={vi.fn()} />)
+    const card = screen.getByRole('button', { name: /요즘 일정 어때\?/ })
+    await userEvent.click(card)
+    expect(card).toHaveAttribute('aria-pressed', 'true')
+    expect(within(card).getByText('How is the schedule these days?')).toBeInTheDocument()
+    expect(within(card).getAllByText('a moving target', { selector: 'mark' })).toHaveLength(1)
+    expect(within(card).queryByText('요즘 일정 어때?')).toBeNull()
+    expect(within(card).getByText('모범 답안 · 다르게 말해도 표현을 넣었으면 충분해요')).toBeInTheDocument()
+    await userEvent.click(card)
+    expect(within(card).getByText('요즘 일정 어때?')).toBeInTheDocument()
+  })
+
+  it('switches to the one sentence and back with the toggle', async () => {
+    render(<ExpressionsTab items={both} starred={[]} onToggleStar={vi.fn()} onSwap={vi.fn()} onAdd={vi.fn()} />)
+    await userEvent.click(within(practice()).getByRole('button', { name: '한 문장' }))
+    expect(within(practice()).getByRole('button', { name: '한 문장' })).toHaveAttribute('aria-pressed', 'true')
+    expect(screen.getByRole('button', { name: /마감이 계속 바뀌어\./ })).toBeInTheDocument()
+    expect(screen.queryByText('요즘 일정 어때?')).toBeNull()
+    await userEvent.click(within(practice()).getByRole('button', { name: '대화' }))
+    expect(screen.getByText('요즘 일정 어때?')).toBeInTheDocument()
+  })
+
+  it('shows only the dialogue, with no toggle, when the expression has no one sentence', () => {
+    render(<ExpressionsTab items={[{ ...items[0], korean_dialogue: dialogue }]} starred={[]} onToggleStar={vi.fn()} onSwap={vi.fn()} onAdd={vi.fn()} />)
+    expect(screen.queryByRole('group', { name: '연습 방식' })).toBeNull()
+    expect(screen.getByText('한국어로 해 보기')).toBeInTheDocument()
+    expect(screen.getByText('요즘 일정 어때?')).toBeInTheDocument()
+  })
+
+  it('shows only the one sentence, with no toggle, when the expression has no dialogue', () => {
+    render(<ExpressionsTab items={[{ ...items[0], korean_example: sentence }]} starred={[]} onToggleStar={vi.fn()} onSwap={vi.fn()} onAdd={vi.fn()} />)
+    expect(screen.queryByRole('group', { name: '연습 방식' })).toBeNull()
+    expect(screen.getByText('마감이 계속 바뀌어.')).toBeInTheDocument()
+  })
 })
 
 describe('ExpressionsTab with someone else in the session', () => {
@@ -161,5 +217,26 @@ describe('ExpressionsTab with someone else in the session', () => {
     expect(screen.queryByText('목표가 자꾸 바뀌어.')).not.toBeInTheDocument()
     await userEvent.click(screen.getByRole('button', { pressed: true }))
     expect(viewsSent(socket)).toEqual([{ key: 'example:21', value: false }])
+  })
+
+  it('switches the mode and flips the dialogue with them', async () => {
+    const both = [
+      {
+        ...items[0],
+        korean_example: { korean: '목표가 자꾸 바뀌어.', english: 'It is a moving target.' },
+        korean_dialogue: [
+          { korean: '요즘 일정 어때?', english: 'How is the schedule?' },
+          { korean: '목표가 자꾸 바뀌어.', english: 'It is a moving target.' },
+        ],
+      },
+    ]
+    const { socket } = renderInRoom(tab(both))
+    someoneSets(socket, 'mode:21', 'solo')
+    expect(screen.queryByText('요즘 일정 어때?')).toBeNull()
+    someoneSets(socket, 'mode:21', 'dialogue')
+    someoneSets(socket, 'dialogue:21', true)
+    expect(screen.getByText('How is the schedule?')).toBeInTheDocument()
+    await userEvent.click(screen.getByRole('button', { name: '한 문장' }))
+    expect(viewsSent(socket)).toEqual([{ key: 'mode:21', value: 'solo' }])
   })
 })

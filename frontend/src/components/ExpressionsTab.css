@@ -132,11 +132,49 @@
   border-top: 1px dashed var(--line);
 }
 
+/* The label, and the one sentence or dialogue toggle when the expression has both. */
+.korean-example-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  margin-bottom: 0.5rem;
+}
+
 .korean-example-label {
-  margin: 0 0 0.5rem;
+  margin: 0;
   font-size: 0.8rem;
   font-weight: 600;
   color: var(--phrase);
+}
+
+.korean-practice-modes {
+  display: inline-flex;
+  flex: none;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  overflow: hidden;
+}
+
+.korean-practice-modes button {
+  padding: 0.2rem 0.75rem;
+  border: 0;
+  background: transparent;
+  font: inherit;
+  font-size: 0.78rem;
+  color: var(--muted);
+  cursor: pointer;
+}
+
+.korean-practice-modes button + button {
+  border-left: 1px solid var(--line);
+}
+
+.korean-practice-modes button[aria-pressed='true'] {
+  background: var(--phrase);
+  color: var(--paper);
+  font-weight: 600;
 }
 
 /* The Korean sentence until tapped, then the English model answer. */
@@ -172,4 +210,31 @@
 
 .korean-example-card[aria-pressed='true'] .korean-example-hint {
   color: var(--phrase);
+}
+
+/* A's line, then B's: the speaker in a narrow column beside each line. */
+.korean-dialogue-card {
+  gap: 0.45rem;
+}
+
+.korean-dialogue-line {
+  display: grid;
+  grid-template-columns: 1.25rem 1fr;
+  align-items: baseline;
+  gap: 0.4rem;
+}
+
+.korean-dialogue-speaker {
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--muted);
+}
+
+.korean-dialogue-card .korean-example-korean,
+.korean-dialogue-card .korean-example-english {
+  font-size: 1.15rem;
+}
+
+.korean-dialogue-card .korean-example-hint {
+  margin-top: 0.15rem;
 }

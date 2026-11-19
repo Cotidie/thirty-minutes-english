@@ -153,7 +153,7 @@ CREATE TABLE stage_times (id INTEGER PRIMARY KEY AUTOINCREMENT, stage TEXT NOT N
 - corpus가 비어 있으면 표현 0개인 세션. Expressions 탭은 "This session has no expressions."
 - 바꾸기(Expressions 탭의 ↻): 같은 규칙으로 하나를 뽑되 그 세션이 지금 가르치는 표현은 빼고, 같은 position에 넣는다. 그 자리의 별표는 지운다. 남은 후보가 없으면 404.
 - 더하기(Expressions 탭 맨 아래 가로로 긴 +): 바꾸기와 같은 규칙으로 하나를 뽑아 맨 뒤 position에 넣는다. 세션이 없거나 남은 후보가 없으면 404.
-- 한국어 예문: 표현마다 하나. 카드의 영어 예문 아래에 한국어로 보이고, 둘이 각자 영어로 말해 본 뒤 누르면 영어 모범 답안(표현에 형광펜)으로 바뀐다. 다시 누르면 한국어. 앱에는 쓰는 경로가 없고, `backend/data/corpus-temment-2026-10-26/scripts/write_korean_examples.py`가 Claude로 만들어 `--apply`로 채운다(영어 예문과 다른 상황, 모범 답안엔 표현이 꼭 들어감).
+- 한국어로 해 보기: 표현마다 한 문장 예문(`korean_example`)과 A, B 두 줄 대화문(`korean_dialogue`). 카드의 영어 예문 아래에 한국어로 보이고, 둘이 영어로 말해 본 뒤 누르면 영어 모범 답안(표현에 형광펜)으로 바뀐다. 대화는 두 줄이 한꺼번에 바뀌고, 표현은 적어도 한 줄에 든다. 둘 다 있으면 라벨 옆 토글(한 문장 | 대화, 기본 대화)로 고르고, 하나만 있으면 그것만 보인다. 모드(`mode:{id}`)와 뒤집기(`example:{id}`, `dialogue:{id}`)는 presence로 세션 모두가 같이 보고 저장하지 않는다. 앱에는 쓰는 경로가 없다. 대화문은 `python -m app.generation.korean_dialogues`가 Claude로 만들어 `--apply`로 빈 것만 채운다. 한 문장 예문을 만들던 로컬 스크립트는 남아 있지 않다.
 - 삭제(Database 페이지): 표현은 corpus와 그 표현을 가르친 모든 세션에서 지운다(별표 포함). 주제는 그 주제로 쓴 세션이 없을 때만 지운다(있으면 409). 그날 뉴스 목록에서도 빠진다.
 - 주제 매칭 없음. 현재 프롬프트도 표현은 주제와 무관. 필요해지면 `expression_tags(expression_id, tag)` 추가.
 

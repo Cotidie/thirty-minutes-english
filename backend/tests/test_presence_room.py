@@ -391,3 +391,10 @@ def test_a_round_may_be_larger_than_other_frames():
     assert len(round_frame(too_big)) > 65536
     room.handle(mina, round_frame(too_big))
     assert jo.outbox.take() == []
+
+
+def test_the_korean_practice_keys_reach_everyone():
+    room, mina, jo = two_people()
+    room.handle(mina, view(key="mode:21", value="solo", seq=1))
+    room.handle(mina, view(key="dialogue:21", value=True, seq=2))
+    assert [(m["key"], m["value"]) for m in jo.outbox.take() if m["type"] == "view"] == [("mode:21", "solo"), ("dialogue:21", True)]
