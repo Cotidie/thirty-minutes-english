@@ -1,6 +1,6 @@
 ---
 name: session-writing
-description: Style rules for the English practice session this app generates (article, vocabulary examples, discussion questions, picture scenes). Use before writing any part of a session. The prompt's content rules and output schema win where they are stricter.
+description: Style rules for the English practice session this app generates (article, vocabulary examples, discussion question, picture scenes). Use before writing any part of a session. The prompt's content rules and output schema win where they are stricter.
 ---
 
 # Session writing
@@ -42,10 +42,10 @@ Keep a listed word only when it is the exact right word and nothing plain replac
 - Each must fit the item's own example sentence in its place, in the same sense and register. Skip a near-miss rather than add a second one.
 - A word or short phrase, no explanation, no repeat of words from the definition.
 
-## Discussion questions
+## Discussion question
 
-- Ask the way a friend would across a table: short, plain, one question per sentence.
-- The open question names two positions a reasonable person could hold, drawn from the article's angle.
+- Ask the way a friend would across a table: short, plain, one question in one sentence.
+- Name two positions a reasonable person could hold, drawn from the article's angle.
 
 ## Picture scenes
 
@@ -55,4 +55,4 @@ Keep a listed word only when it is the exact right word and nothing plain replac
 ## Before returning the structured output
 
 1. When this call writes the article: reread its first sentence and cut it if the piece works without it, and check that every number, name and date in it came from a page you searched. When the prompt says the article is final, leave it as it is.
-2. Search what you wrote for the words above and for em dashes, and rewrite each hit. Text copied from a final article (evidence passages, the English side of a translation) stays exactly as copied.
+2. Search what you wrote for the words above and for em dashes, and rewrite each hit. Text copied from a final article (the English side of a translation) stays exactly as copied.

@@ -39,11 +39,6 @@ export interface CorpusEntry extends Expression {
   sessions: number[]
 }
 
-export interface Question {
-  text: string
-  evidence: string[]
-}
-
 interface Source {
   title: string
   url: string
@@ -78,7 +73,8 @@ export interface Article {
   paragraphs: Paragraph[]
   /** Absent on sessions made before figures were kept. */
   figures?: Figure[]
-  questions: Question[]
+  /** The open question the two talk over once they have summed the article up. */
+  question: string
   sources?: Source[]
   translation?: SentencePair[]
 }

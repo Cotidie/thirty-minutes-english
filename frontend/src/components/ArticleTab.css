@@ -16,40 +16,23 @@
   margin: 0 0 1.1em;
 }
 
-.questions {
+.discussion {
   margin-top: 2.5rem;
   border-top: 1px solid var(--line);
   padding-top: 1rem;
 }
 
-.questions h3 {
+.discussion h3 {
   margin: 0;
   font-size: 1rem;
   font-weight: 600;
   padding: 0.4rem 0;
 }
 
-.questions ol {
+.discussion p {
   font-family: var(--serif);
   font-size: 1.2rem;
-  padding-left: 1.4rem;
-  margin: 0.75rem 0 0;
-}
-
-.questions li {
-  margin-bottom: 0.75rem;
-}
-
-.question {
-  display: block;
-  width: 100%;
-  border: 0;
-  background: transparent;
-  padding: 0.15rem 0.35rem;
-  margin-left: -0.35rem;
-  text-align: left;
-  font: inherit;
-  line-height: inherit;
+  margin: 0.75rem 0;
 }
 
 .sources {
@@ -74,24 +57,6 @@
 .source-host {
   margin-left: 0.5rem;
   color: var(--muted);
-}
-
-.question.is-open {
-  display: inline-flex;
-  align-items: baseline;
-  flex-wrap: wrap;
-  gap: 0.5rem;
-}
-
-.question-tag {
-  font-family: var(--sans);
-  font-size: 0.7rem;
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
-  color: var(--muted);
-  border: 1px solid var(--line);
-  border-radius: 999px;
-  padding: 0 0.45rem;
 }
 
 .article-figure {

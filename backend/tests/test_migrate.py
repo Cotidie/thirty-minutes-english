@@ -84,7 +84,7 @@ CREATE TABLE IF NOT EXISTS settings (
 ARTICLE = {
     "title": "First",
     "body": "Para one.\n\nPara two here.\n\n  Para three.  ",
-    "questions": [{"text": "Why?", "evidence": ["Para one."]}],
+    "questions": [{"text": "Why?", "evidence": ["Para one."]}, {"text": "Would you?", "evidence": []}],
     "sources": [{"title": "A page", "url": "https://example.com"}],
     "translation": [{"en": "Para one.", "ko": "하나다."}, {"en": "Not in the body.", "ko": "없다."}],
 }
@@ -168,6 +168,7 @@ def test_a_v1_file_is_backed_up_and_comes_up_current_with_everything_in_rows(tmp
     # One corpus row per normalized phrase: the shared one reads as the later session worded it.
     assert [e.phrase for e in got.content.expressions] == [*FIRST_PHRASES[:2], "play devil's advocate", *FIRST_PHRASES[3:]]
     assert got.content.article.translation[0].en == "Para one." and len(got.content.article.translation) == 1
+    assert got.content.article.question == "Would you?"
     assert db.expressions.count() == 9  # ten taught, one phrase shared by the two sessions
     assert db.sessions.get_note(11).text == "my note"
     assert db.sessions.get_stars(11) == Stars(expressions=[got.content.expressions[1].id], words=[got.content.vocabulary[2].id])

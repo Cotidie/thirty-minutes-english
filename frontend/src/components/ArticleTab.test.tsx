@@ -1,6 +1,6 @@
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { api } from '../api'
 import { PresenceProvider } from '../lib/presence/PresenceProvider'
 import { connectReadAloud } from '../lib/liveClient'
@@ -31,27 +31,10 @@ const article = {
     { id: 1, text: 'Ambition is cheap. Upkeep is what actually pays.' },
     { id: 2, text: 'A modest twin delivers more value.' },
   ],
-  questions: [
-    { text: 'What pays?', evidence: ['Upkeep is what actually pays.'] },
-    { text: 'Legacy question', evidence: [] },
-  ],
+  question: 'Would you fund a twin you could not maintain?',
 }
 
-/** The evidence as marked on the page, word by word. */
-const markedText = () => [...document.querySelectorAll('mark')].map((m) => m.textContent).join('')
-
 describe('ArticleTab', () => {
-  it('marks the evidence in the body when a question is clicked, and clears it on a second click', async () => {
-    render(<ArticleTab article={article} sessionId={3} />)
-    expect(document.querySelector('mark')).toBeNull()
-
-    await userEvent.click(screen.getByRole('button', { name: 'What pays?' }))
-    expect(markedText()).toBe('Upkeep is what actually pays.')
-
-    await userEvent.click(screen.getByRole('button', { name: 'What pays?' }))
-    expect(document.querySelector('mark')).toBeNull()
-  })
-
   it('lists sources as links when present and hides the block when absent', () => {
     const { unmount } = render(
       <ArticleTab
@@ -68,10 +51,15 @@ describe('ArticleTab', () => {
     expect(screen.queryByText('Sources')).toBeNull()
   })
 
-  it('renders a question without evidence as plain text', () => {
-    render(<ArticleTab article={article} sessionId={3} />)
-    expect(screen.queryByRole('button', { name: 'Legacy question' })).toBeNull()
-    expect(screen.getByText('Legacy question')).toBeInTheDocument()
+  it('shows the discussion question as plain text, and no section when there is none', () => {
+    const { unmount } = render(<ArticleTab article={article} sessionId={3} />)
+    expect(screen.getByRole('heading', { name: 'Discussion question' })).toBeInTheDocument()
+    expect(screen.getByText('Would you fund a twin you could not maintain?')).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /Would you fund/ })).toBeNull()
+    unmount()
+
+    render(<ArticleTab article={{ ...article, question: '' }} sessionId={3} />)
+    expect(screen.queryByRole('heading', { name: 'Discussion question' })).toBeNull()
   })
 
   it('puts back the marks of each paragraph\'s latest reading, leaving out ones kept without a place', async () => {
@@ -126,25 +114,7 @@ describe('ArticleTab', () => {
   })
 })
 
-describe('ArticleTab open question', () => {
-  it('marks the question the article does not answer and leaves it unclickable', async () => {
-    render(
-      <ArticleTab
-        article={{
-          ...article,
-          questions: [
-            { text: 'What pays?', evidence: ['Upkeep is what actually pays.'] },
-            { text: 'Would you fund a twin you could not maintain?', evidence: [] },
-          ],
-        }}
-        sessionId={3}
-      />,
-    )
-    expect(screen.getByRole('button', { name: 'What pays?' })).toBeInTheDocument()
-    expect(screen.queryByRole('button', { name: /Would you fund/ })).not.toBeInTheDocument()
-    expect(screen.getByText('your take')).toBeInTheDocument()
-  })
-
+describe('ArticleTab translation', () => {
   it('flips a sentence to its Korean once the English has sunk, and back on the next click', async () => {
     const translated = {
       ...article,
@@ -173,20 +143,6 @@ describe('ArticleTab open question', () => {
     // The untranslated paragraph stays plain text, not a button.
     expect(screen.queryByRole('button', { name: 'A modest twin delivers more value.' })).not.toBeInTheDocument()
   })
-
-  it('still marks evidence inside a translated sentence, and across two of them', async () => {
-    const translated = {
-      ...article,
-      questions: [{ text: 'Both?', evidence: ['cheap. Upkeep is what'] }],
-      translation: [
-        { en: 'Ambition is cheap.', ko: '야심은 싸다.' },
-        { en: 'Upkeep is what actually pays.', ko: '유지가 진짜 돈이 든다.' },
-      ],
-    }
-    render(<ArticleTab article={translated} sessionId={3} />)
-    await userEvent.click(screen.getByRole('button', { name: 'Both?' }))
-    expect(markedText()).toBe('cheap. Upkeep is what')
-  })
 })
 
 describe('ArticleTab with someone else in the session', () => {
@@ -197,16 +153,6 @@ describe('ArticleTab with someone else in the session', () => {
       { en: 'Upkeep is what actually pays.', ko: '유지가 진짜 돈이 든다.' },
     ],
   }
-  const scrolled = vi.fn()
-
-  beforeEach(() => {
-    scrolled.mockClear()
-    Element.prototype.scrollIntoView = scrolled
-  })
-  afterEach(() => {
-    delete (Element.prototype as Partial<Element>).scrollIntoView
-  })
-
   it('flips a sentence the same way a click does', () => {
     const { socket } = renderInRoom(<ArticleTab article={translated} sessionId={3} />)
     const sentence = screen.getByRole('button', { name: 'Ambition is cheap.' })
@@ -248,26 +194,6 @@ describe('ArticleTab with someone else in the session', () => {
       </PresenceProvider>,
     )
     expect(screen.getByText('야심은 싸다.')).toHaveClass('is-ko', 'is-still')
-  })
-
-  it('marks the passage of the question they picked, without scrolling me', () => {
-    const { socket } = renderInRoom(<ArticleTab article={article} sessionId={3} />)
-    someoneSets(socket, 'question', 0)
-    expect(markedText()).toBe('Upkeep is what actually pays.')
-    expect(scrolled).not.toHaveBeenCalled()
-  })
-
-  it('scrolls only the person who clicked the question', async () => {
-    const { socket } = renderInRoom(<ArticleTab article={article} sessionId={3} />)
-    await userEvent.click(screen.getByRole('button', { name: 'What pays?' }))
-    expect(scrolled).toHaveBeenCalledOnce()
-    expect(viewsSent(socket)).toEqual([{ key: 'question', value: 0 }])
-  })
-
-  it('a question number that is not here marks nothing', () => {
-    const { socket } = renderInRoom(<ArticleTab article={article} sessionId={3} />)
-    someoneSets(socket, 'question', 99)
-    expect(document.querySelector('mark')).toBeNull()
   })
 })
 

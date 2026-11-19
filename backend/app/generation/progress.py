@@ -23,7 +23,7 @@ class Stage(StrEnum):
     SEARCHING = "searching"
     DRAFTING = "drafting"  # the first pass: research done, the draft written
     EDITING = "editing"  # edited for reading aloud and machine-sounding phrasing taken out, then lengths repaired
-    FINISHING = "finishing"  # questions, translation, figures and words for the final article
+    FINISHING = "finishing"  # the question, translation, figures and words for the final article
     FINALIZING = "finalizing"
     ILLUSTRATING = "illustrating"  # pictures for the words, after the text is done
 

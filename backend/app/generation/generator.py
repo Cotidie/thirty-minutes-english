@@ -1,6 +1,6 @@
 """A session's text, written by Claude in three passes: a researched draft, an edit for reading aloud that
-also takes out machine-sounding prose, then everything copied from the final article (questions, translation,
-figures, pictures to draw) and the words. One repair runs between the last two if a length limit still breaks."""
+also takes out machine-sounding prose, then everything taken from the final article (the discussion question,
+translation, figures, pictures to draw) and the words. One repair runs between the last two if a length limit still breaks."""
 
 import logging
 from collections.abc import Callable

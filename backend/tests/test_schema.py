@@ -1,3 +1,4 @@
+import json
 import re
 import sqlite3
 
@@ -24,8 +25,24 @@ CREATE TABLE summaries (
 """
 
 
+ANSWERED = [{"text": "What pays?", "evidence": ["One."]}, {"text": "Who pays?", "evidence": ["Two two."]}]
+
+
+def as_v18(path) -> None:
+    """Rewrites a current file the way v18 kept it: a JSON list of questions, the two the article answered and the open one last."""
+    conn = sqlite3.connect(path)
+    with conn:
+        conn.execute("ALTER TABLE sessions RENAME COLUMN question TO questions")
+        for session_id, question in conn.execute("SELECT id, questions FROM sessions").fetchall():
+            stored = json.dumps([*ANSWERED, {"text": question, "evidence": []}])
+            conn.execute("UPDATE sessions SET questions = ? WHERE id = ?", (stored, session_id))
+        conn.execute("PRAGMA user_version = 18")
+    conn.close()
+
+
 def as_v17(path) -> None:
     """Rewrites a current file the way v17 kept it: summaries always judged, with no one who said them."""
+    as_v18(path)
     conn = sqlite3.connect(path)
     with conn:
         conn.execute("ALTER TABLE summaries RENAME TO summaries_v18")
@@ -125,7 +142,7 @@ def as_v9(path) -> None:
     with conn:
         for table in ("credits", "session_shares", "logins", "users"):
             conn.execute(f"DROP TABLE {table}")
-        conn.execute(schema.SESSIONS.split(";")[0].replace("CREATE TABLE sessions", "CREATE TABLE sessions_v9"))
+        conn.execute(schema.SESSIONS.split(";")[0].replace("CREATE TABLE sessions", "CREATE TABLE sessions_v9").replace("question ", "questions "))
         conn.execute("INSERT INTO sessions_v9 SELECT id, created_at, topic_id, title, note, questions, sources, translation FROM sessions")
         counter = conn.execute("SELECT seq FROM sqlite_sequence WHERE name = 'sessions'").fetchone()
         conn.execute("DROP TABLE sessions")
@@ -176,7 +193,7 @@ def test_a_fresh_file_is_at_the_current_version_with_strict_tables_and_live_fore
         assert conn.execute("PRAGMA user_version").fetchone()[0] == schema.VERSION
         sqls = [r[0] for r in conn.execute("SELECT sql FROM sqlite_master WHERE type = 'table' AND name NOT LIKE 'sqlite_%'")]
         assert sqls and all(s.rstrip().endswith("STRICT") for s in sqls)
-        assert {r[1] for r in conn.execute("PRAGMA table_info(sessions)")} == {"id", "created_at", "created_by", "topic_id", "title", "note", "questions", "sources", "translation"}
+        assert {r[1] for r in conn.execute("PRAGMA table_info(sessions)")} == {"id", "created_at", "created_by", "topic_id", "title", "note", "question", "sources", "translation"}
         with pytest.raises(sqlite3.IntegrityError):
             conn.execute("INSERT INTO paragraphs (session_id, position, text) VALUES (999, 0, 'x')")
 
@@ -230,6 +247,7 @@ def test_a_v3_file_moves_its_topics_into_rows_and_keeps_everything_else(tmp_path
     assert db.topics.news("2026-10-25") == ["News A", "News B"]
     assert [(s.id, s.topic) for s in (db.sessions.get(curated.id), db.sessions.get(typed.id))] == [(curated.id, CURATED_TOPICS[0].text), (typed.id, "My own topic")]
     assert db.sessions.get(typed.id).content.article.paragraphs == typed.content.article.paragraphs
+    assert db.sessions.get(typed.id).content.article.question == typed.content.article.question  # renamed at v4, kept as text at v19
     entries = {t.text: t for t in db.topics.list_all()}
     assert (entries["My own topic"].category, entries["My own topic"].sessions) == (Category.TYPED, [typed.id])
     assert (entries[CURATED_TOPICS[0].text].category, entries[CURATED_TOPICS[0].text].sessions) == (CURATED_TOPICS[0].category, [curated.id])
@@ -595,7 +613,7 @@ def test_v18_keeps_every_summary_as_judged_with_no_speaker_and_carries_the_id_co
         conn.execute("DELETE FROM summaries WHERE user_text = 'deleted'")
     db = Database(path)
     with db.connect() as conn:
-        assert conn.execute("PRAGMA user_version").fetchone()[0] == schema.VERSION == 18
+        assert conn.execute("PRAGMA user_version").fetchone()[0] == schema.VERSION
     [kept] = db.records.list_summaries(session.id, viewer_id=0)
     assert (kept.id, kept.status, kept.feedback.summary, kept.speaker, kept.mine) == (1, "done", "s", None, False)
     assert db.records.start_summary(paragraph, None, "again", 3) == 3
@@ -626,4 +644,33 @@ def test_an_upgrade_to_v18_that_fails_leaves_the_v17_file_as_it_was(tmp_path):
     assert conn.execute("PRAGMA user_version").fetchone()[0] == 17
     assert "status" not in [c[1] for c in conn.execute("PRAGMA table_info(summaries)")]
     assert conn.execute("SELECT count(*) FROM sqlite_master WHERE name = 'summaries_v17'").fetchone()[0] == 0
+    conn.close()
+
+
+def test_v19_keeps_only_the_open_question_of_each_session_as_text(tmp_path):
+    path = tmp_path / "s.db"
+    session = Database(path).sessions.create(sample_draft(), [])
+    as_v18(path)
+    db = Database(path)
+    with db.connect() as conn:
+        assert conn.execute("PRAGMA user_version").fetchone()[0] == schema.VERSION == 19
+        assert "questions" not in [c[1] for c in conn.execute("PRAGMA table_info(sessions)")]
+    assert db.sessions.get(session.id).content.article.question == "Would you fund a twin you could not maintain?"
+    assert list(tmp_path.glob("s.db.bak-v18-????-??-??"))
+
+
+def test_an_upgrade_to_v19_that_fails_leaves_the_v18_file_as_it_was(tmp_path):
+    path = tmp_path / "s.db"
+    db = Database(path)
+    db.sessions.create(sample_draft(), [])
+    broken = db.sessions.create(sample_draft(), [])
+    as_v18(path)
+    with sqlite3.connect(path) as conn:
+        conn.execute("UPDATE sessions SET questions = 'not json' WHERE id = ?", (broken.id,))
+    with pytest.raises(json.JSONDecodeError):
+        Database(path)
+    conn = sqlite3.connect(path)
+    assert conn.execute("PRAGMA user_version").fetchone()[0] == 18
+    assert "questions" in [c[1] for c in conn.execute("PRAGMA table_info(sessions)")]
+    assert json.loads(conn.execute("SELECT questions FROM sessions ORDER BY id").fetchone()[0])[0] == ANSWERED[0]
     conn.close()

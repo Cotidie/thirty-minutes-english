@@ -51,11 +51,6 @@
   }
 }
 
-.article mark {
-  background: linear-gradient(transparent 6%, var(--marker) 6%, var(--marker) 94%, transparent 94%);
-  color: inherit;
-}
-
 /* A finding, drawn on its word. */
 .reading-hit {
   all: unset;

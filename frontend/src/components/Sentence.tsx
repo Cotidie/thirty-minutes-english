@@ -1,5 +1,4 @@
-import { Fragment, useState, type KeyboardEvent } from 'react'
-import { segmentsIn, type Span } from '../lib/highlight'
+import { useState, type KeyboardEvent } from 'react'
 import { useSharedView } from '../lib/presence/useSharedView'
 import { atoms, type Atom, type Marks } from '../lib/words'
 import './Sentence.css'
@@ -10,8 +9,6 @@ export interface RunProps {
   text: string
   /** Where `text` starts in its paragraph. */
   start: number
-  /** Evidence passages, in paragraph coordinates. */
-  spans: Span[]
   /** Word index by paragraph offset, from `wordStarts`. */
   starts: Map<number, number>
   marks: Marks
@@ -63,12 +60,12 @@ export function Sentence({ ko, viewKey, ...run }: RunProps & { ko: string; viewK
   )
 }
 
-/** Article text word by word: evidence marked, findings on their words. */
-export function Run({ text, start, spans, starts, marks }: RunProps) {
+/** Article text word by word, findings on their words. */
+export function Run({ text, start, starts, marks }: RunProps) {
   return (
     <>
       {atoms(text, start, starts).map((atom, j) => (
-        <Word key={j} atom={atom} spans={spans} marks={marks} />
+        <Word key={j} atom={atom} marks={marks} />
       ))}
     </>
   )
@@ -76,12 +73,9 @@ export function Run({ text, start, spans, starts, marks }: RunProps) {
 
 /** A mispronounced word is a button that opens its finding. Green once read right.
  * Its click and keys stop here, so the sentence around it does not flip to the Korean. */
-function Word({ atom, spans, marks }: { atom: Atom; spans: Span[]; marks: Marks }) {
-  const inner = segmentsIn(atom.text, spans, atom.offset).map((seg, j) =>
-    seg.marked ? <mark key={j}>{seg.text}</mark> : <Fragment key={j}>{seg.text}</Fragment>,
-  )
+function Word({ atom, marks }: { atom: Atom; marks: Marks }) {
   const index = atom.word === null ? -1 : marks.findings.findIndex((f) => f.at === atom.word)
-  if (index < 0) return <>{inner}</>
+  if (index < 0) return <>{atom.text}</>
   const finding = marks.findings[index]
   const title = `${finding.word}: ${finding.heard}`
   return (
@@ -97,7 +91,7 @@ function Word({ atom, spans, marks }: { atom: Atom; spans: Span[]; marks: Marks 
       }}
       onKeyDown={(e) => e.stopPropagation()}
     >
-      {inner}
+      {atom.text}
     </button>
   )
 }

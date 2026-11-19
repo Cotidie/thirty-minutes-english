@@ -19,7 +19,6 @@ function renderMarked() {
     <Paragraph
       paragraph={{ id: 1, text: TEXT }}
       pieces={pairSentences([TEXT], [{ en: TEXT, ko: '전혀 결함이 없었다.' }])[0]}
-      spans={[]}
       summaries={[]}
       saved={[FLAWED]}
       onSummary={vi.fn()}
@@ -82,7 +81,6 @@ test('short of credits, Judge again on a failed summary is off and says why', ()
     <Paragraph
       paragraph={{ id: 1, text: TEXT }}
       pieces={pairSentences([TEXT], [{ en: TEXT, ko: '전혀 결함이 없었다.' }])[0]}
-      spans={[]}
       summaries={[failed]}
       saved={[]}
       onSummary={vi.fn()}

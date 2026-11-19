@@ -132,15 +132,12 @@ The article below is final. Do not change it. Where a part asks you to copy from
 
 Produce two parts.
 
-1. article parts: Write 3 discussion questions. Each is one short sentence of at most 14 words, in plain \
-conversational wording a friend would ask across a table. No compound questions, no "explain the writer's \
-reasoning", no quoting. Questions invite explanation, not yes/no. Example of the right length: "Why does the \
-writer call the space race a bad label?" The first two are answered by the article: one on the main claim, one on \
-a supporting detail. For each of those two give evidence: 1 or 2 passages copied word for word from the article \
-body (exact substrings, 5 to 30 words each, same capitalization and punctuation) that the answer rests on. The \
-third is an open question the article does not settle. It asks the two speakers what they think, about something \
-two reasonable people would disagree on, and it grows out of the article's angle rather than asking about life in \
-general. Its evidence is an empty list. Then give translation: every sentence of the article body, in reading \
+1. article parts: Write 1 discussion question, an open one the article does not settle. It asks the two \
+speakers what they think, about something two reasonable people would disagree on, and it grows out of the \
+article's angle rather than asking about life in general. It is one short sentence of at most 14 words, in plain \
+conversational wording a friend would ask across a table. No compound question, no quoting. Example of the right \
+length: "Should a city keep its old stadium or tear it down for housing?" \
+Then give translation: every sentence of the article body, in reading \
 order, as pairs. en is the sentence copied character for character from the body, final punctuation included, one \
 sentence per pair; never merge or split sentences. ko is that sentence in natural written Korean (해라체, "~다"로 \
 끝맺기), translated with its neighbors in mind so the Korean reads well in sequence; keep names, figures, and dates \

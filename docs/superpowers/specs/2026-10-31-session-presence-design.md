@@ -32,7 +32,6 @@
 | 그림 뒤집기 (Example, Practice) | `VocabCell.flipped` |
 | 장면 설명 | `SceneCaption.shown` |
 | 기사 문장의 한국어 전환 | `Sentence.lang` |
-| 토론 질문 선택 (근거 문장 표시) | `ArticleTab.active` |
 | 타이머 시작, 일시정지, 재개, 초기화 | `SessionTimer.running`, `elapsed` |
 | 진행 중인 Read Aloud 회: 누가 읽는지, 찍히는 마크, 들은 문장 | `useReadAloud`의 회 (아래 "진행 중인 Read Aloud 회") |
 | Read Aloud 마크 카드 열기 | `useReadAloud.open` |
@@ -168,7 +167,6 @@ JSON 텍스트 프레임이다. 필드 이름은 구현자 재량이고 담기�
 | 그림 면 | `face:{단어 id}` |
 | 장면 설명 | `caption:{단어 id}` |
 | 기사 문장 | `sentence:{문단 id}:{문단 안 시작 위치}` |
-| 토론 질문 | `question` (선택된 번호 또는 null) |
 | 열린 Read Aloud 마크 카드 | `mark:{문단 id}` (카드가 열린 단어의 문단 안 위치 또는 null) |
 
 `KoreanChip`은 지금 `korean`과 `of`만 받으므로 키를 넘겨받도록 바꾼다.

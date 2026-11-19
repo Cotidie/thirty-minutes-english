@@ -14,8 +14,8 @@ def test_create_then_get_roundtrip(store, draft):
     assert fetched == created
     assert fetched.topic == "Digital twins"
     article = fetched.content.article
-    assert (article.title, article.questions, article.sources, article.translation) == (
-        draft.article.title, draft.article.questions, draft.article.sources, draft.article.translation
+    assert (article.title, article.question, article.sources, article.translation) == (
+        draft.article.title, draft.article.question, draft.article.sources, draft.article.translation
     )
     assert [v.model_dump(exclude={"id", "image", "example_image"}) for v in fetched.content.vocabulary] == [
         v.model_dump() for v in draft.vocabulary

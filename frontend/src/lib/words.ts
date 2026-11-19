@@ -23,8 +23,6 @@ export function wordStarts(paragraph: string): Map<number, number> {
 /** One word of a paragraph, or the whitespace between two. */
 export interface Atom {
   text: string
-  /** Where it starts in the paragraph. */
-  offset: number
   /** The word's index in the paragraph; null for whitespace or a word cut by a sentence boundary. */
   word: number | null
 }
@@ -34,10 +32,10 @@ export function atoms(text: string, start: number, starts: Map<number, number>):
   const out: Atom[] = []
   let cursor = 0
   for (const m of text.matchAll(/\S+/g)) {
-    if (m.index > cursor) out.push({ text: text.slice(cursor, m.index), offset: start + cursor, word: null })
-    out.push({ text: m[0], offset: start + m.index, word: starts.get(start + m.index) ?? null })
+    if (m.index > cursor) out.push({ text: text.slice(cursor, m.index), word: null })
+    out.push({ text: m[0], word: starts.get(start + m.index) ?? null })
     cursor = m.index + m[0].length
   }
-  if (cursor < text.length) out.push({ text: text.slice(cursor), offset: start + cursor, word: null })
+  if (cursor < text.length) out.push({ text: text.slice(cursor), word: null })
   return out
 }

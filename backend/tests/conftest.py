@@ -9,7 +9,7 @@ from app.api.deps import LOGIN_COOKIE
 from app.db import Database
 from app.generation.generator import VOCABULARY_COUNT
 from app.live.changes import Change
-from app.models import ArticleDraft, Draft, ParagraphPictureDraft, PictureDraft, Question, SentencePair, Source, Topic, User, VocabularyDraft
+from app.models import ArticleDraft, Draft, ParagraphPictureDraft, PictureDraft, SentencePair, Source, Topic, User, VocabularyDraft
 from app.topics.curated import CURATED
 
 
@@ -20,11 +20,7 @@ def sample_draft(topic: str = "Digital twins", title: str = "Twins at Work") -> 
         article=ArticleDraft(
             title=title,
             body="One.\n\nTwo two.\n\nThree.",
-            questions=[
-                Question(text="q1", evidence=["One."]),
-                Question(text="q2", evidence=["Two two."]),
-                Question(text="q3"),
-            ],
+            question="Would you fund a twin you could not maintain?",
             sources=[Source(title="A page", url="https://example.com")],
             translation=[SentencePair(en="One.", ko="하나다.")],
             picture=PictureDraft(scene="A tram stop in the rain at dusk, two students under one umbrella.", caption="Waiting for the tram."),
@@ -65,7 +61,7 @@ def sample_finish(figures: list[dict] | None = None) -> dict:
     article = sample_draft().model_dump()["article"]
     return {
         "topic": sample_draft().topic,
-        **{key: article[key] for key in ("questions", "translation", "picture", "paragraph_picture")},
+        **{key: article[key] for key in ("question", "translation", "picture", "paragraph_picture")},
         "figures": figures or [],
         "vocabulary": sample_draft().model_dump()["vocabulary"],
     }

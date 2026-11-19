@@ -17,7 +17,7 @@
 ## 원칙
 
 1. **참조 우선.** 다른 곳에서 가리키거나 개별 갱신·조회하는 값은 행 + FK. 같은 값을 두 번 저장하지 않는다.
-2. **JSON 컬럼은 통째 값만.** 부모 행과 항상 함께 읽고 쓰며 아무도 가리키지 않는 값(동의어 목록, 질문, 출처, 번역 쌍, 교정 결과, 피드백). 타입은 `TEXT`(SQLite에 JSON형 없음. `JSON`으로 선언하면 NUMERIC 친화성이라 `'3'`이 정수가 됨). 이름은 내용으로, `_json` 접미사 없음.
+2. **JSON 컬럼은 통째 값만.** 부모 행과 항상 함께 읽고 쓰며 아무도 가리키지 않는 값(동의어 목록, 출처, 번역 쌍, 교정 결과, 피드백). 타입은 `TEXT`(SQLite에 JSON형 없음. `JSON`으로 선언하면 NUMERIC 친화성이라 `'3'`이 정수가 됨). 이름은 내용으로, `_json` 접미사 없음.
 3. **corpus는 독립.** `expressions`는 표현 자체와 출처만. 배운 기록·별·태그는 다른 테이블.
 4. **STRICT 테이블.** 타입 실수를 DB가 잡는다. boolean은 `INTEGER` 0/1.
 5. 파생값은 저장하지 않는다. body = 단락 join, 그림 파일명 = `{pictures.id}.png`. 예외: `expressions.key`(정규화 phrase, UNIQUE용 정체성), `translation`의 `en`(한국어를 찾는 열쇠), `corrections` 안의 `word`(평가 결과 문서의 일부).
@@ -35,7 +35,7 @@ CREATE TABLE sessions (
     topic_id    INTEGER NOT NULL REFERENCES topics(id),  -- v4. 직접 입력한 주제도 topics 행(category 'typed')
     title       TEXT    NOT NULL,
     note        TEXT    NOT NULL DEFAULT '',     -- 자유 메모 (v1 notes)
-    questions   TEXT    NOT NULL,                -- JSON [{text, evidence: [..]}]
+    question    TEXT    NOT NULL,                -- v19. 기사가 답하지 않는 토론 질문 하나
     sources     TEXT    NOT NULL,                -- JSON [{title, url}]
     translation TEXT    NOT NULL                 -- JSON [{en, ko}]
 ) STRICT;
@@ -170,10 +170,10 @@ CREATE TABLE stage_times (id INTEGER PRIMARY KEY AUTOINCREMENT, stage TEXT NOT N
 
 | 모델 | 역할 |
 |---|---|
-| `Draft` (topic, article: `ArticleDraft`(title, body, questions, sources, translation), vocabulary: `VocabularyDraft[]`) | 생성기 출력. id·그림·표현 없음 |
+| `Draft` (topic, article: `ArticleDraft`(title, body, question, sources, translation), vocabulary: `VocabularyDraft[]`) | 생성기 출력. id·그림·표현 없음 |
 | `Session` (id, created_at, topic, content: `SessionContent`) | 저장·제공. `content` 중첩은 프론트 호환용으로 유지 |
 | `SessionContent` (topic, expressions: `Expression[]`, article: `Article`, vocabulary: `VocabularyItem[]`) | |
-| `Article` (title, paragraphs: `Paragraph(id, text)[]`, questions, sources, translation) | `body` 없음 |
+| `Article` (title, paragraphs: `Paragraph(id, text)[]`, question, sources, translation) | `body` 없음 |
 | `Expression` (+ `id` = corpus id) | |
 | `VocabularyItem` (+ `id`; `image`, `example_image`는 `"{picture_id}.png"` 파생) | |
 | `Stars` (expressions: `int[]` corpus id, words: `int[]` vocabulary id) | |

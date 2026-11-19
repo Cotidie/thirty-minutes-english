@@ -93,11 +93,6 @@ class CorpusEntry(Expression):
     sessions: list[int] = []
 
 
-class Question(BaseModel):
-    text: str
-    evidence: list[str] = []
-
-
 class Source(BaseModel):
     title: str
     url: str
@@ -139,7 +134,8 @@ class ArticleDraft(BaseModel):
 
     title: str
     body: str
-    questions: list[Question]
+    """The open discussion question: something two reasonable people would answer differently."""
+    question: str
     sources: list[Source] = []
     translation: list[SentencePair] = []
     figures: list[FigureDraft] = []
@@ -178,7 +174,7 @@ class Article(BaseModel):
 
     title: str
     paragraphs: list[Paragraph]
-    questions: list[Question]
+    question: str
     sources: list[Source] = []
     translation: list[SentencePair] = []
     figures: list[Figure] = []

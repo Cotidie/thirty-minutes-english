@@ -9,7 +9,7 @@ Thirty minutes of English speaking practice for two people, a new session every 
 | Part | Time | What you do |
 |---|---|---|
 | Expressions | 10 min | Read 5 expressions aloud, then make one sentence each |
-| Article | 10 min | Read a short article, summarize it, discuss 3 questions |
+| Article | 10 min | Read a short article, summarize it, discuss one open question |
 | Vocabulary | 10 min | Explain 8 words in English, then check the meaning |
 | Summary | after | Review your notes, starred items, your sentences, and corrections |
 

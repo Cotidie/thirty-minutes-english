@@ -73,7 +73,6 @@ function idleParagraph(active = false, saved: Shown[] = [], onStart = vi.fn(), o
     <Paragraph
       paragraph={{ id: 7, text: paragraph }}
       pieces={pairSentences([paragraph], [{ en: paragraph, ko: '연구자들이 확인했다.' }])[0]}
-      spans={[]}
       summaries={[]}
       saved={saved}
       onSummary={vi.fn()}
@@ -101,7 +100,6 @@ function renderFiling() {
       <Paragraph
         paragraph={{ id: 7, text: paragraph }}
         pieces={pairSentences([paragraph], [{ en: paragraph, ko: '연구자들이 확인했다.' }])[0]}
-        spans={[]}
         summaries={[]}
         saved={saved}
         onSummary={vi.fn()}

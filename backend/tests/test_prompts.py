@@ -69,7 +69,7 @@ def test_the_draft_researches_and_collects_images_but_places_nothing():
     prompt = draft_prompt("Digital twins")
     assert f"invoke the {APP_SKILL} skill" in prompt and "Today's article topic: Digital twins" in prompt
     assert "firecrawl_search first" in prompt and "firecrawl_scrape" in prompt and "Never a logo" in prompt
-    assert "after 0" not in prompt and "discussion questions" not in prompt and "vocabulary" not in prompt
+    assert "after 0" not in prompt and "discussion question" not in prompt and "vocabulary" not in prompt
     assert "Names, dates, numbers" not in prompt and "(dates, names, figures)" not in prompt
 
 
@@ -78,7 +78,7 @@ def test_the_finish_keeps_the_article_and_picks_figures_from_the_candidates():
     assert "The article below is final. Do not change it." in prompt
     assert "- image_url: https://example.com/plant.jpg; page_url: https://example.com; credit: Example; shows: A factory floor." in prompt
     assert (
-        prompt.index("Write 3 discussion questions")
+        prompt.index("Write 1 discussion question, an open one")
         < prompt.index("Then give translation")
         < prompt.index("Then give figures")
         < prompt.index("Always give picture")

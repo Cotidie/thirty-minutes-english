@@ -18,7 +18,7 @@ const content: SessionContent = {
       { id: 1, text: 'Upkeep is what actually pays for a twin.' },
       { id: 2, text: 'A modest twin delivers more value than a grand one.' },
     ],
-    questions: [],
+    question: '',
   },
   vocabulary: [
     { id: 41, word: 'mitigate', pos: 'verb', definition: 'make less severe', example: 'We mitigated it.' },

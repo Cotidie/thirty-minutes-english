@@ -16,18 +16,18 @@ describe('atoms', () => {
 
   it('cuts a sentence into words and gaps, each word carrying its paragraph index', () => {
     expect(atoms('Upkeep pays.', 19, starts)).toEqual([
-      { text: 'Upkeep', offset: 19, word: 3 },
-      { text: ' ', offset: 25, word: null },
-      { text: 'pays.', offset: 26, word: 4 },
+      { text: 'Upkeep', word: 3 },
+      { text: ' ', word: null },
+      { text: 'pays.', word: 4 },
     ])
   })
 
   it('keeps the gap between sentences, and leaves a cut word unnumbered', () => {
-    expect(atoms(' ', 18, starts)).toEqual([{ text: ' ', offset: 18, word: null }])
+    expect(atoms(' ', 18, starts)).toEqual([{ text: ' ', word: null }])
     expect(atoms('keep pays.', 21, starts)).toEqual([
-      { text: 'keep', offset: 21, word: null },
-      { text: ' ', offset: 25, word: null },
-      { text: 'pays.', offset: 26, word: 4 },
+      { text: 'keep', word: null },
+      { text: ' ', word: null },
+      { text: 'pays.', word: 4 },
     ])
   })
 })

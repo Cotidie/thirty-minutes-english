@@ -14,7 +14,7 @@ from app.db import topics
 from app.db.expressions import expression_from
 from app.db.shares import ACCOUNTS_LISTING, VISIBLE_SESSIONS
 from app.live.changes import AccountChange, SessionChange
-from app.models import Article, Category, Draft, Expression, Figure, Note, Paragraph, Question, SentencePair, Session, SessionContent, SessionSummary, Source, Stars, VocabularyItem
+from app.models import Article, Category, Draft, Expression, Figure, Note, Paragraph, SentencePair, Session, SessionContent, SessionSummary, Source, Stars, VocabularyItem
 
 if TYPE_CHECKING:
     from app.db import Database
@@ -61,8 +61,8 @@ class SessionRepo:
         with self._db.connect() as conn:
             now = datetime.now(UTC).isoformat()
             cur = conn.execute(
-                "INSERT INTO sessions (created_at, topic_id, title, questions, sources, translation, created_by) VALUES (?, ?, ?, ?, ?, ?, ?)",
-                (now, topics.ensure(conn, draft.topic, Category.TYPED, now), article.title, _json(article.questions), _json(article.sources),
+                "INSERT INTO sessions (created_at, topic_id, title, question, sources, translation, created_by) VALUES (?, ?, ?, ?, ?, ?, ?)",
+                (now, topics.ensure(conn, draft.topic, Category.TYPED, now), article.title, article.question, _json(article.sources),
                  _json(article.translation), created_by),
             )
             session_id = cur.lastrowid
@@ -106,7 +106,7 @@ class SessionRepo:
         article = Article(
             title=row["title"],
             paragraphs=[Paragraph(id=p["id"], text=p["text"]) for p in paragraphs],
-            questions=[Question(**q) for q in json.loads(row["questions"])],
+            question=row["question"],
             sources=[Source(**s) for s in json.loads(row["sources"])],
             translation=[SentencePair(**t) for t in json.loads(row["translation"])],
             figures=[

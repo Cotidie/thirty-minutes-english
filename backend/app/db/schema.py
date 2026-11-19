@@ -9,7 +9,7 @@ from app.accounts.usernames import random_username
 from app.db import topics
 from app.models import Category
 
-VERSION = 18
+VERSION = 19
 
 # Added in v3, by session since v9: images under the article's paragraphs, and its cover (no paragraph) under the title.
 FIGURES = """
@@ -136,7 +136,7 @@ CREATE TABLE sessions (
     topic_id    INTEGER NOT NULL REFERENCES topics(id),
     title       TEXT    NOT NULL,
     note        TEXT    NOT NULL DEFAULT '',
-    questions   TEXT    NOT NULL,
+    question    TEXT    NOT NULL,
     sources     TEXT    NOT NULL,
     translation TEXT    NOT NULL
 ) STRICT;
@@ -334,6 +334,8 @@ def upgrade(conn: sqlite3.Connection, version: int) -> None:
         conn.execute("PRAGMA user_version = 17")
     if version < 18:
         _summaries_with_status(conn)
+    if version < 19:
+        _open_question_only(conn)
 
 
 def _add_pool(conn: sqlite3.Connection, category: Category, version: int) -> None:
@@ -420,6 +422,23 @@ def _summaries_with_status(conn: sqlite3.Connection) -> None:
     conn.execute("DELETE FROM sqlite_sequence WHERE name IN ('summaries', 'summaries_v17')")
     conn.execute("INSERT INTO sqlite_sequence (name, seq) VALUES ('summaries', ?)", (counter,))
     conn.execute("PRAGMA user_version = 18")
+
+
+def _open_question_only(conn: sqlite3.Connection) -> None:
+    """v18 to v19: a session keeps only its open question, as plain text; the questions the article answered go.
+    A file that came through v4 has the new column name already, still holding the JSON list. All of it or none."""
+    conn.commit()
+    conn.execute("BEGIN")
+    if any(column[1] == "questions" for column in conn.execute("PRAGMA table_info(sessions)")):
+        conn.execute("ALTER TABLE sessions RENAME COLUMN questions TO question")
+    for session_id, stored in conn.execute("SELECT id, question FROM sessions").fetchall():
+        conn.execute("UPDATE sessions SET question = ? WHERE id = ?", (open_question(json.loads(stored)), session_id))
+    conn.execute("PRAGMA user_version = 19")
+
+
+def open_question(questions: list[dict]) -> str:
+    """The open question of a list kept before v19: always the last, after the ones the article answered."""
+    return questions[-1]["text"] if questions else ""
 
 
 def _examples_of_words(conn: sqlite3.Connection) -> None:

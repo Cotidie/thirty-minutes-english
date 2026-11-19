@@ -105,13 +105,13 @@ class Migration:
     def _session(self, row: sqlite3.Row) -> None:
         conn, session_id, created_at = self.conn, row["id"], row["created_at"]
         content = json.loads(row["content_json"])
-        article = ArticleDraft.model_validate(content["article"])
+        stored = content["article"]
+        article = ArticleDraft.model_validate({**stored, "question": schema.open_question(stored.get("questions", []))})
         note = conn.execute("SELECT text FROM notes_v1 WHERE session_id = ?", (session_id,)).fetchone()
         conn.execute(
-            "INSERT INTO sessions (id, created_at, topic_id, title, note, questions, sources, translation) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
-            (session_id, created_at, topics.ensure(conn, row["topic"], Category.TYPED, created_at), row["title"], note[0] if note else "", *(
-                json.dumps([m.model_dump() for m in models], ensure_ascii=False) for models in (article.questions, article.sources, article.translation)
-            )),
+            "INSERT INTO sessions (id, created_at, topic_id, title, note, question, sources, translation) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+            (session_id, created_at, topics.ensure(conn, row["topic"], Category.TYPED, created_at), row["title"], note[0] if note else "",
+             article.question, *(json.dumps([m.model_dump() for m in models], ensure_ascii=False) for models in (article.sources, article.translation))),
         )
         conn.executemany(
             "INSERT INTO paragraphs (session_id, position, text) VALUES (?, ?, ?)",

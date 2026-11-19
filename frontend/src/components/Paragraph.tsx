@@ -1,6 +1,5 @@
 import { useMemo, useState } from 'react'
 import type { Shown } from '../lib/assessor/judge'
-import type { Span } from '../lib/highlight'
 import type { Piece } from '../lib/sentences'
 import type { Paragraph as ArticleParagraph, Reading, Summary } from '../types'
 import { useOthersRound, useSomeoneReading } from '../lib/presence/useSharedRound'
@@ -15,8 +14,6 @@ interface Props {
   paragraph: ArticleParagraph
   /** The paragraph cut into its translated sentences. */
   pieces: Piece[]
-  /** Evidence passages to mark, in paragraph coordinates. */
-  spans: Span[]
   /** Summaries of this paragraph already kept. */
   summaries: Summary[]
   /** The marks this paragraph's last read-aloud round left. */
@@ -37,7 +34,7 @@ interface Props {
  * their rounds show goes below the row. The text stays in view while it is summed up. Someone else's round on it shows
  * here as they read, and while anyone reads, no one else starts a round.
  */
-export function Paragraph({ paragraph, pieces, spans, summaries, saved, onSummary, onReading, active, onStart, onEnd }: Props) {
+export function Paragraph({ paragraph, pieces, summaries, saved, onSummary, onReading, active, onStart, onEnd }: Props) {
   const starts = useMemo(() => wordStarts(paragraph.text), [paragraph.text])
   const watched = useOthersRound(paragraph.id)
   const reader = useSomeoneReading()
@@ -51,7 +48,7 @@ export function Paragraph({ paragraph, pieces, spans, summaries, saved, onSummar
     <div className="paragraph" data-presence-anchor={`paragraph:${paragraph.id}`}>
       <p>
         {pieces.map((piece, j) => {
-          const run = { text: piece.text, start: piece.start, spans, starts, marks }
+          const run = { text: piece.text, start: piece.start, starts, marks }
           return piece.ko === null ? <Run key={j} {...run} /> : <Sentence key={j} {...run} ko={piece.ko} viewKey={`sentence:${paragraph.id}:${piece.start}`} />
         })}
       </p>

@@ -49,7 +49,6 @@ function renderParagraph(props: { summaries?: Summary[]; onSummary?: () => void;
     <Paragraph
       paragraph={{ id: 4, text: paragraph }}
       pieces={[{ text: paragraph, start: 0, ko: null }]}
-      spans={[]}
       summaries={props.summaries ?? []}
       saved={[]}
       onSummary={props.onSummary ?? vi.fn()}
@@ -204,7 +203,6 @@ it('shows a kept summary in the card it was judged in, set apart from the articl
     <Paragraph
       paragraph={{ id: 4, text: paragraph }}
       pieces={[{ text: paragraph, start: 0, ko: null }]}
-      spans={[]}
       summaries={[kept]}
       saved={[]}
       onSummary={vi.fn()}

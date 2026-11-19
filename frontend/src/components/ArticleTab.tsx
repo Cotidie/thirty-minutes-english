@@ -1,10 +1,8 @@
-import { Fragment, useEffect, useRef, useState } from "react";
-import { markedSpans } from "../lib/highlight";
-import { useSharedView } from "../lib/presence/useSharedView";
+import { Fragment, useState } from "react";
 import { pairSentences } from "../lib/sentences";
 import { useReadingMarks } from "../lib/useReadingMarks";
 import { useSummaries } from "../lib/useSummaries";
-import type { Article, Figure, Question } from "../types";
+import type { Article, Figure } from "../types";
 import { Paragraph } from "./Paragraph";
 import "./ArticleTab.css";
 
@@ -17,12 +15,8 @@ export function ArticleTab({
   article: Article;
   sessionId: number;
 }) {
-  const [active, setActive] = useSharedView<number | null>("question", null);
-  /** Scrolling is each person's own: only a click of mine takes me to the passage. */
-  const scrollToPassage = useRef(false);
   /** The paragraph holding the microphone. */
   const [reading, setReading] = useState<number | null>(null);
-  const bodyRef = useRef<HTMLElement>(null);
   const { summaries, add: addSummary } = useSummaries(sessionId);
   const { marks, add: addReading } = useReadingMarks(sessionId);
   const paragraphs = article.paragraphs;
@@ -31,23 +25,14 @@ export function ArticleTab({
     paragraphs.map((p) => p.text),
     article.translation ?? [],
   );
-  const evidence = active === null ? [] : (article.questions[active]?.evidence ?? []);
-
-  useEffect(() => {
-    if (!scrollToPassage.current) return;
-    scrollToPassage.current = false;
-    bodyRef.current
-      ?.querySelector("mark")
-      ?.scrollIntoView?.({ behavior: "smooth", block: "center" });
-  }, [active]);
 
   return (
     <section className="tab-panel">
       <p className="tab-brief" data-presence-anchor="brief">
         Read it, then each of you sums it up in your own words before the
-        questions. Click a sentence for the Korean, a question for its passage.
+        question. Click a sentence for the Korean.
       </p>
-      <article className="article" ref={bodyRef}>
+      <article className="article">
         <h2 className="article-title" data-presence-anchor="title">{article.title}</h2>
         {cover && <ArticleFigure figure={cover} />}
         {paragraphs.map((p, i) => (
@@ -55,7 +40,6 @@ export function ArticleTab({
             <Paragraph
               paragraph={p}
               pieces={sentences[i]}
-              spans={markedSpans(p.text, evidence)}
               summaries={summaries.filter((s) => s.paragraph_id === p.id)}
               saved={marks.get(p.id) ?? NO_MARKS}
               onSummary={addSummary}
@@ -72,23 +56,12 @@ export function ArticleTab({
           </Fragment>
         ))}
       </article>
-      <section className="questions">
-        <h3>Discussion questions</h3>
-        <ol>
-          {article.questions.map((q, i) => (
-            <li key={q.text} data-presence-anchor={`question:${i}`}>
-              <QuestionItem
-                question={q}
-                active={active === i}
-                onToggle={() => {
-                  scrollToPassage.current = true;
-                  setActive(active === i ? null : i);
-                }}
-              />
-            </li>
-          ))}
-        </ol>
-      </section>
+      {article.question && (
+        <section className="discussion">
+          <h3>Discussion question</h3>
+          <p data-presence-anchor="question">{article.question}</p>
+        </section>
+      )}
       {article.sources && article.sources.length > 0 && (
         <details className="sources">
           <summary>Sources</summary>
@@ -105,36 +78,6 @@ export function ArticleTab({
         </details>
       )}
     </section>
-  );
-}
-
-function QuestionItem({
-  question,
-  active,
-  onToggle,
-}: {
-  question: Question;
-  active: boolean;
-  onToggle: () => void;
-}) {
-  // Nothing in the article answers it, so there is no passage to point at.
-  if (question.evidence.length === 0) {
-    return (
-      <span className="question is-open">
-        {question.text}
-        <span className="question-tag">your take</span>
-      </span>
-    );
-  }
-  return (
-    <button
-      type="button"
-      className={`question${active ? " is-active" : ""}`}
-      aria-pressed={active}
-      onClick={onToggle}
-    >
-      {question.text}
-    </button>
   );
 }
 

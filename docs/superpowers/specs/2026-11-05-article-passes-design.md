@@ -41,7 +41,7 @@
 - 새 세션의 기사에서 모든 문장이 20단어 이하이고, 문단이 4~5개이며, 각 문단이 50~65단어다. 이 기준은 코드로 검사되고, 어긋나면 한 번 고쳐진다.
 - 수치는 주장에 필요한 것만 남고, 소리 내어 말하듯 반올림된다.
 - 기사는 예전처럼 관점이 분명하고, 한쪽의 가장 강한 근거와 구체적인 반론 하나를 담는다.
-- 질문의 evidence와 번역은 최종 본문에서 그대로 복사된다. 마무리 단계는 본문을 바꿀 수 없다.
+- 번역은 최종 본문에서 그대로 복사된다. 마무리 단계는 본문을 바꿀 수 없다.
 
 ## 하지 않는 것
 
@@ -74,7 +74,7 @@ topic
   │
   ├─ 길이 검사 (코드) ── 어긋남 있음 ──► 고치기 (Repair) 한 번 ──► title, body
   ▼
-3. 마무리 (Finish) ── session-writing, check_items ──► questions, translation, figures,
+3. 마무리 (Finish) ── session-writing, check_items ──► question, translation, figures,
   │                                                    picture, paragraph_picture, vocabulary
   ▼
 코드가 Draft를 조립: 2단계(또는 고치기)의 title과 body + 1단계의 sources + 3단계의 나머지
@@ -89,7 +89,7 @@ topic
 | 1. 초안 | `Read`, `WEB_TOOLS`, firecrawl MCP | `english-session:session-writing` | topic | title, body, sources (0~5), images (0~4) |
 | 2. 편집 | `Read` (스킬의 references 파일을 읽는 데 필요) | `english-session:humanizer`, `english-session:stop-slop` | title, body | title, body |
 | 고치기 | 없음 | 없음 | title, body, 어긋난 항목 목록 | title, body |
-| 3. 마무리 | `Read` | `english-session:session-writing` | topic, title, body, 이미지 후보 | topic, questions, translation, figures, picture, paragraph_picture, vocabulary |
+| 3. 마무리 | `Read` | `english-session:session-writing` | topic, title, body, 이미지 후보 | topic, question, translation, figures, picture, paragraph_picture, vocabulary |
 
 `check_items` MCP 서버(이미 가르친 단어 확인)는 예전처럼 제외 단어가 있을 때만 붙고, 3단계에만 붙는다. 1단계 이미지 후보의 항목은 `image_url`, `page_url`, `credit`, `shows`(그 이미지가 무엇을 보여주는지 한 문장)다. 문단 위치(`after`)는 없다.
 
@@ -156,16 +156,15 @@ topic
 
 ### 3단계: 마무리
 
-입력은 topic, 최종 title과 body, 1단계의 이미지 후보다. 예전 `PROMPT_TEMPLATE`에서 다음 부분을 옮긴다: 질문 3개와 evidence, 번역, figures, picture, paragraph_picture, "2. vocabulary" 전체, 그리고 `CHECK_ITEMS_RULE`. 바뀌는 점은 다음과 같다.
+입력은 topic, 최종 title과 body, 1단계의 이미지 후보다. 예전 `PROMPT_TEMPLATE`에서 다음 부분을 옮긴다: 토론 질문, 번역, figures, picture, paragraph_picture, "2. vocabulary" 전체, 그리고 `CHECK_ITEMS_RULE`. 바뀌는 점은 다음과 같다.
 
 - 프롬프트가 "기사는 확정되었으니 고치지 말라"고 한다. 출력 schema에 title과 body가 없으므로 본문은 구조적으로 바뀌지 않는다.
 - figures는 이미지 후보에서 고른다. cover는 `after` 0, 두 번째는 해당 문단 번호(1부터)이고, caption은 그 이미지와 기사(또는 문단)의 관계를 한 문장으로 쓴다. 후보에 없는 `image_url`은 코드가 버린다.
-- 질문의 evidence는 기사 화면이 표시할 수 있는 것만 남긴다. 화면(`frontend/src/lib/highlight.ts`의 `markedSpans`)처럼 앞뒤 공백을 떼고 대소문자를 가리지 않고, 한 문단 안에서 찾는다. 찾지 못한 구절은 코드가 버리고 경고로 남긴다.
-- 문단 번호는 body의 빈 줄로 나눈 순서로 센다. 프롬프트에 body를 번호 없이 그대로 넣어 evidence와 번역에 번호가 섞이지 않게 한다.
+- 문단 번호는 body의 빈 줄로 나눈 순서로 센다. 프롬프트에 body를 번호 없이 그대로 넣어 번역에 번호가 섞이지 않게 한다.
 
 ### Draft 조립
 
-코드가 `Draft`를 만든다 (`passes.assemble`). `topic`과 `vocabulary`는 3단계에서, `article.title`과 `article.body`는 2단계(또는 고치기)에서, `article.sources`는 1단계에서, `article.questions`, `translation`, `figures`, `picture`, `paragraph_picture`는 3단계에서 가져온다. 검증 실패는 `GenerationError`가 된다. `Draft`, `ArticleDraft`와 그 뒤의 저장, 이미지 내려받기, 그림 그리기(`backend/app/generation/jobs.py`)는 바뀌지 않는다.
+코드가 `Draft`를 만든다 (`passes.assemble`). `topic`과 `vocabulary`는 3단계에서, `article.title`과 `article.body`는 2단계(또는 고치기)에서, `article.sources`는 1단계에서, `article.question`, `translation`, `figures`, `picture`, `paragraph_picture`는 3단계에서 가져온다. 검증 실패는 `GenerationError`가 된다. `Draft`, `ArticleDraft`와 그 뒤의 저장, 이미지 내려받기, 그림 그리기(`backend/app/generation/jobs.py`)는 바뀌지 않는다.
 
 ### 진행 표시
 
@@ -178,7 +177,7 @@ topic
 | `searching` | Searching the web | 1단계 검색 |
 | `drafting` (예전의 `writing`을 대신함) | Writing a draft | 1단계의 생각과 글쓰기 |
 | `editing` | Editing for reading aloud | 2단계와 고치기 |
-| `finishing` | Writing questions, translation, and words | 3단계 |
+| `finishing` | Writing the question, translation, and words | 3단계 |
 | `finalizing` | Checking the structure | 3단계의 StructuredOutput |
 | `illustrating` | Drawing a picture for each word | 예전과 같음 |
 
@@ -201,7 +200,7 @@ topic
 - 첫 문단의 독자 설명에 "문단 하나씩 돌아가며 끝까지 소리 내어 읽는다"를 더한다.
 - "Specific over general" 항목을 "Concrete over vague"로 바꾼다. 행위자, 장소, 작동 방식을 밝히고, 수치는 주장에 필요할 때만 소리 내어 말하듯 반올림해서 쓴다. 확인하지 않은 수치를 지어내지 않는다는 규칙은 남긴다.
 - "Sentence length" 항목은 프롬프트의 읽기 기준이 이긴다고 적고, 22단어 같은 별도 숫자를 두지 않는다.
-- 마지막 점검 목록("Before returning the structured output")은 두 항목이다. 첫 문장 자르기와 수치·이름·날짜의 출처 확인은 그 호출이 기사를 쓸 때만 한다. 프롬프트가 기사를 확정했다고 하면 기사는 그대로 둔다. 금지 낱말과 em dash 고치기는 그 호출이 쓴 글에만 하고, 확정된 기사에서 복사한 글(evidence, 번역의 영어 쪽)은 복사한 그대로 둔다.
+- 마지막 점검 목록("Before returning the structured output")은 두 항목이다. 첫 문장 자르기와 수치·이름·날짜의 출처 확인은 그 호출이 기사를 쓸 때만 한다. 프롬프트가 기사를 확정했다고 하면 기사는 그대로 둔다. 금지 낱말과 em dash 고치기는 그 호출이 쓴 글에만 하고, 확정된 기사에서 복사한 글(번역의 영어 쪽)은 복사한 그대로 둔다.
 
 ### stop-slop 가져오기
 

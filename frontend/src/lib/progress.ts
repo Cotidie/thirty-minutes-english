@@ -102,7 +102,7 @@ function stageLabel(stage: Stage): string {
     case 'editing':
       return 'Editing for reading aloud'
     case 'finishing':
-      return 'Writing questions, translation, and words'
+      return 'Writing the question, translation, and words'
     case 'finalizing':
       return 'Checking the structure'
     case 'illustrating':
