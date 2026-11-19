@@ -112,6 +112,7 @@ export function CreditLine({ entry, grantedBy = 'the admin' }: { entry: CreditEn
       <time dateTime={entry.at}>{new Date(entry.at).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}</time>
       <span className="credit-what">
         {lineLabel(entry, grantedBy)}
+        {(entry.count ?? 1) > 1 && <span className="credit-count"> ×{entry.count}</span>}
         {showDetail && <span className="credit-detail"> · {entry.detail}</span>}
       </span>
       <span className="credit-amount">{entry.amount > 0 ? `+${entry.amount}` : `−${-entry.amount}`}</span>

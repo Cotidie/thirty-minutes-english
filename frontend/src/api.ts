@@ -62,6 +62,11 @@ function credentials(email: string, password: string): RequestInit {
   return { method: 'POST', body: JSON.stringify({ email, password }) }
 }
 
+/** `tz=` and this browser's IANA time zone, so the server counts days as the reader sees them. */
+function timeZoneQuery(): string {
+  return `tz=${encodeURIComponent(Intl.DateTimeFormat().resolvedOptions().timeZone)}`
+}
+
 export const api = {
   me: () => request<Me>('/api/auth/me'),
   login: (email: string, password: string) => request<Me>('/api/auth/login', credentials(email, password)),
@@ -100,11 +105,13 @@ export const api = {
   /** A session shared with me, off my list; it stays for everyone else. */
   leaveSession: (sessionId: number) => request<void>(`/api/sessions/${sessionId}/shares/me`, { method: 'DELETE' }),
   listAccounts: () => request<Account[]>('/api/accounts'),
-  accountCredits: (id: number) => request<CreditEntry[]>(`/api/accounts/${id}/credits`),
+  /** The account's history, its days counted in this browser's time zone. */
+  accountCredits: (id: number) => request<CreditEntry[]>(`/api/accounts/${id}/credits?${timeZoneQuery()}`),
   /** Adds to an account's balance, or takes back when negative. */
   grantCredits: (id: number, amount: number) =>
     request<Account>(`/api/accounts/${id}/credits`, { method: 'POST', body: JSON.stringify({ amount }) }),
-  myCredits: () => request<CreditsView>('/api/me/credits'),
+  /** My balance, the prices, and my history, its days counted in this browser's time zone. */
+  myCredits: () => request<CreditsView>(`/api/me/credits?${timeZoneQuery()}`),
   /** Hands `amount` of my credits to the account `to`; both balances are read again on the credits event. */
   giftCredits: (to: number, amount: number) =>
     request<void>('/api/me/credits/gifts', { method: 'POST', body: JSON.stringify({ to, amount }) }),

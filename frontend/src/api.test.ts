@@ -32,3 +32,13 @@ test('a 401 from the auth routes is left to the page', async () => {
   await expect(api.me()).rejects.toMatchObject({ status: 401 })
   expect(goToLogin).not.toHaveBeenCalled()
 })
+
+test('the credit history asks for days in the browser time zone', async () => {
+  answer(200, { balance: 0, prices: {}, recent: [] })
+  await api.myCredits()
+  const zone = encodeURIComponent(Intl.DateTimeFormat().resolvedOptions().timeZone)
+  expect(vi.mocked(fetch).mock.calls[0][0]).toBe(`/api/me/credits?tz=${zone}`)
+  answer(200, [])
+  await api.accountCredits(2)
+  expect(vi.mocked(fetch).mock.calls[0][0]).toBe(`/api/accounts/2/credits?tz=${zone}`)
+})

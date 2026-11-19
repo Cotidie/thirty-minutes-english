@@ -149,3 +149,18 @@ test('the panel stays open while a gift is on its way', async () => {
   land()
   await waitFor(() => expect(screen.getByRole('dialog', { name: 'Credits' })).toHaveTextContent('Ask the admin for more.'))
 })
+
+test("shows a group's count only when there is more than one", async () => {
+  has(340, [
+    { at: '2026-11-17T03:00:00Z', amount: -15, kind: 'read_aloud_token', detail: null, count: 3 },
+    { at: '2026-11-17T02:00:00Z', amount: -10, kind: 'practice_feedback', detail: 'mitigate', count: 2 },
+    { at: '2026-11-17T01:00:00Z', amount: -200, kind: 'session', detail: 'Trams', count: 1 },
+  ])
+  render(<CreditsPill />)
+  await userEvent.click(screen.getByRole('button', { name: 'Credits' }))
+  const rows = within(screen.getByRole('dialog', { name: 'Credits' })).getAllByRole('listitem')
+  expect(rows[0]).toHaveTextContent('Read aloud ×3')
+  expect(rows[0]).toHaveTextContent('−15')
+  expect(rows[1]).toHaveTextContent('Practice feedback ×2 · mitigate')
+  expect(rows[2]).not.toHaveTextContent('×')
+})

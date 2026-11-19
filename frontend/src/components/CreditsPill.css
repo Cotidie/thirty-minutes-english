@@ -192,3 +192,8 @@
     width: calc(100vw - 2rem);
   }
 }
+
+/* How many rows a line sums, when more than one. */
+.credit-count {
+  color: var(--muted);
+}

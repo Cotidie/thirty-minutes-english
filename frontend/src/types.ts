@@ -174,10 +174,13 @@ export interface Account extends Me {
 
 /** One line of an account's history: credits gained when `amount` is positive, spent when negative. */
 export interface CreditEntry {
+  /** The newest of the rows this line sums. */
   at: string
   amount: number
   kind: string
   detail: string | null
+  /** How many rows of one day, kind, detail and sign this line sums; 1 when absent. */
+  count?: number
 }
 
 /** What the account has to spend, what each kind of charge costs, and its last charges. */
